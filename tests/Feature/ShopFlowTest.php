@@ -7,6 +7,7 @@ use App\Models\Coupon;
 use App\Models\Product;
 use App\Models\ShippingMethod;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -206,5 +207,73 @@ class ShopFlowTest extends TestCase
             ->assertSee('application/ld+json', false)
             ->assertSee('"@type":"Product"', false)
             ->assertSee('rel="canonical"', false);
+    }
+
+    public function test_admin_can_create_update_and_delete_user(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/users', [
+            'name' => 'Khách Mới',
+            'email' => 'khachmoi@trillfa.com',
+            'phone' => '0900111222',
+            'role' => 'customer',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $user = User::where('email', 'khachmoi@trillfa.com')->first();
+        $this->assertNotNull($user);
+        $this->assertTrue(Hash::check('password123', $user->password));
+
+        $this->put('/admin/users/'.$user->id, [
+            'name' => 'Khách Đã Sửa',
+            'email' => 'khachmoi@trillfa.com',
+            'role' => 'admin',
+            'password' => '',
+            'password_confirmation' => '',
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('Khách Đã Sửa', $user->fresh()->name);
+        $this->assertSame('admin', $user->fresh()->role);
+
+        $this->delete('/admin/users/'.$admin->id)->assertSessionHas('error');
+
+        $other = User::where('email', 'khach1@trillfa.com')->first();
+        $this->delete('/admin/users/'.$other->id)->assertSessionHas('success');
+        $this->assertNull(User::find($other->id));
+    }
+
+    public function test_admin_can_reset_user_password(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/users/'.$customer->id.'/password', [
+            'password' => 'newpassword123',
+            'password_confirmation' => 'newpassword123',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue(Hash::check('newpassword123', $customer->fresh()->password));
+    }
+
+    public function test_admin_can_update_banner(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+        $banner = \App\Models\Banner::first();
+
+        $this->put('/admin/banners/'.$banner->id, [
+            'title' => 'Banner Đã Sửa',
+            'position' => 'hero',
+            'sort_order' => 5,
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Banner Đã Sửa', $banner->fresh()->title);
+        $this->assertSame(5, (int) $banner->fresh()->sort_order);
     }
 }
