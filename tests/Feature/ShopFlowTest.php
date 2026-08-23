@@ -395,4 +395,18 @@ class ShopFlowTest extends TestCase
         $this->assertIsArray($post->tags);
         $this->assertEquals(['alpha', 'beta', 'gamma'], $post->tags);
     }
+
+
+    public function test_category_custom_icon_image_renders(): void
+    {
+        $cat = \App\Models\Category::create([
+            'name' => 'Danh mục icon ảnh',
+            'slug' => 'danh-muc-icon-anh-'.uniqid(),
+            'is_active' => true,
+            'icon_image' => 'samples/2aOboQqOBTR5uosVCsNhbUXA5FrAsBRBPGV455LU.jpg',
+        ]);
+
+        $this->get('/shop')->assertOk()->assertSee('/samples/2aOboQqOBTR5uosVCsNhbUXA5FrAsBRBPGV455LU.jpg');
+        $this->get('/')->assertOk()->assertSee('/samples/2aOboQqOBTR5uosVCsNhbUXA5FrAsBRBPGV455LU.jpg');
+    }
 }

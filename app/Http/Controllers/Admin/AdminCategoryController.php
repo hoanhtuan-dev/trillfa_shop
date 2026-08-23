@@ -24,6 +24,7 @@ class AdminCategoryController extends Controller
             'description' => ['nullable', 'string'],
             'image' => ['nullable', 'image', 'max:4096'],
             'icon' => ['nullable', 'string', 'max:50'],
+            'icon_image' => ['nullable', 'image', 'max:2048'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -33,6 +34,9 @@ class AdminCategoryController extends Controller
 
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('categories', 'public');
+        }
+        if ($request->hasFile('icon_image')) {
+            $data['icon_image'] = $request->file('icon_image')->store('categories', 'public');
         }
 
         Category::create($data);
@@ -48,6 +52,7 @@ class AdminCategoryController extends Controller
             'description' => ['nullable', 'string'],
             'image' => ['nullable', 'image', 'max:4096'],
             'icon' => ['nullable', 'string', 'max:50'],
+            'icon_image' => ['nullable', 'image', 'max:2048'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -57,6 +62,11 @@ class AdminCategoryController extends Controller
 
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('categories', 'public');
+        }
+        if ($request->hasFile('icon_image')) {
+            $data['icon_image'] = $request->file('icon_image')->store('categories', 'public');
+        } elseif ($request->boolean('icon_image_remove')) {
+            $data['icon_image'] = null;
         }
 
         $category->update($data);

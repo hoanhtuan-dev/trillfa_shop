@@ -82,7 +82,7 @@
             @foreach($categories as $cat)
                 <a href="{{ route('shop.category', $cat->slug) }}" class="group card card-hover flex flex-col items-center gap-3 p-5 text-center">
                     <span class="grid h-16 w-16 place-items-center rounded-2xl bg-cream-100 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
-                        <x-category-icon :name="$cat->icon" />
+                        <x-category-icon :name="$cat->icon" :image="$cat->icon_image_url" />
                     </span>
                     <span class="text-sm font-medium text-ink-900">{{ $cat->name }}</span>
                 </a>

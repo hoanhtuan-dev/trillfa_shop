@@ -53,7 +53,10 @@
                         @foreach($categories as $cat)
                             <li>
                                 <a href="{{ route('shop.category', $cat->slug) }}" class="flex items-center justify-between text-ink-700 hover:text-brand-700 {{ $category && $category->id === $cat->id ? 'font-semibold text-brand-700' : '' }}">
-                                    <span>{{ $cat->name }}</span>
+                                    <span class="flex items-center gap-2">
+                                        <span class="grid h-6 w-6 place-items-center text-brand-600"><x-category-icon :name="$cat->icon" :image="$cat->icon_image_url" size="h-5 w-5" /></span>
+                                        {{ $cat->name }}
+                                    </span>
                                     <span class="text-xs text-ink-500">{{ $cat->products_count ?? '' }}</span>
                                 </a>
                                 @if($cat->children->isNotEmpty())

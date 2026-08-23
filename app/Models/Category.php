@@ -12,7 +12,7 @@ class Category extends Model
     use HasFactory;
 
     protected $fillable = [
-        'parent_id', 'name', 'slug', 'description', 'image', 'icon',
+        'parent_id', 'name', 'slug', 'description', 'image', 'icon', 'icon_image',
         'is_active', 'sort_order', 'meta_title', 'meta_description',
     ];
 
@@ -42,6 +42,11 @@ class Category extends Model
     public function getImageUrlAttribute(): ?string
     {
         return $this->image ? (str_starts_with($this->image, 'http') ? $this->image : asset('storage/'.$this->image)) : null;
+    }
+
+    public function getIconImageUrlAttribute(): ?string
+    {
+        return asset_image($this->icon_image);
     }
 
     public function scopeActive($query)

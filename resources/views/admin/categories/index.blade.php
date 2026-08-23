@@ -96,6 +96,20 @@
                     @endforeach
                 </div>
                 <input type="hidden" name="icon" :value="form.icon">
+                <div class="mt-3">
+                    <p class="label">Hoặc dùng icon tùy chỉnh (tải ảnh lên)</p>
+                    <input type="hidden" name="icon_image_remove" :value="iconRemove ? '1' : '0'">
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="$refs.iconImg.click()" class="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-cream-300 px-3 py-2 text-sm text-ink-500 transition hover:border-brand-500">Chọn ảnh icon</button>
+                        <input x-ref="iconImg" type="file" name="icon_image" @change="onIconImg" class="hidden" accept="image/*">
+                        <button type="button" @click="removeIconImg" class="btn-ghost btn-sm !text-red-500" x-show="iconPreview">Xóa</button>
+                    </div>
+                    <template x-if="iconPreview">
+                        <div class="relative mt-2 inline-block">
+                            <img :src="iconPreview" class="h-16 w-16 rounded-xl bg-cream-100 object-cover" alt="">
+                        </div>
+                    </template>
+                </div>
             </div>
 
             <div class="flex items-center gap-2 pt-2">
@@ -115,6 +129,8 @@ document.addEventListener('alpine:init', () => {
         editing: null,
         form: { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true, icon: 'tag' },
         imagePreview: null,
+        iconPreview: null,
+        iconRemove: false,
         fileName: '',
         get formAction() { return this.editing ? '/admin/categories/' + this.editing : this.createUrl; },
         get formMethod() { return this.editing ? 'PUT' : 'POST'; },
@@ -124,11 +140,13 @@ document.addEventListener('alpine:init', () => {
             this.editing = c.id;
             this.form = { id: c.id, name: c.name, parent_id: c.parent_id || '', description: c.description || '', sort_order: c.sort_order || 0, is_active: !!c.is_active, icon: c.icon || 'tag' };
             this.setImage(c.image || null);
+            this.setIconPreview(c.icon_image || null);
         },
         reset() {
             this.editing = null;
             this.form = { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true, icon: 'tag' };
             this.setImage(null);
+            this.setIconPreview(null);
         },
         setImage(url) {
             if (this.imagePreview) URL.revokeObjectURL(this.imagePreview);
@@ -147,6 +165,24 @@ document.addEventListener('alpine:init', () => {
             this.imagePreview = null;
             this.fileName = '';
             if (this.$refs.image) this.$refs.image.value = '';
+        },
+        setIconPreview(url, remove = false) {
+            if (this.iconPreview) URL.revokeObjectURL(this.iconPreview);
+            this.iconPreview = url;
+            this.iconRemove = remove;
+        },
+        onIconImg(e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            if (this.iconPreview) URL.revokeObjectURL(this.iconPreview);
+            this.iconPreview = URL.createObjectURL(f);
+            this.iconRemove = false;
+        },
+        removeIconImg() {
+            if (this.iconPreview) URL.revokeObjectURL(this.iconPreview);
+            this.iconPreview = null;
+            this.iconRemove = true;
+            if (this.$refs.iconImg) this.$refs.iconImg.value = '';
         },
     }));
 });
