@@ -17,7 +17,11 @@
     <x-seo />
     @stack('meta')
     <link rel="preconnect" href="https://fonts.bunny.net">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @if(file_exists(public_path('build/manifest.json')))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @else
+        <style>body{font-family:system-ui,sans-serif;background:#f4f2ec;color:#1b1a17;margin:0;padding:48px;text-align:center}h1{color:#33674d}p{color:#3a382f}a{color:#33674d}</style>
+    @endif
     @stack('head')
 </head>
 <body class="flex min-h-screen flex-col">
