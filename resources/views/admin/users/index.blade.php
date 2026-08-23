@@ -75,7 +75,7 @@
     <!-- Form create/edit -->
     <div class="card h-fit p-6">
         <h2 class="mb-4 font-display text-lg font-semibold text-ink-900" x-text="editing ? 'Sửa người dùng' : 'Thêm người dùng'"></h2>
-        <form :action="formAction" class="space-y-4">
+        <form :action="formAction" method="POST" class="space-y-4">
             @csrf
             <input type="hidden" name="_method" :value="formMethod">
             <input type="hidden" name="is_active" :value="form.is_active ? '1' : '0'">

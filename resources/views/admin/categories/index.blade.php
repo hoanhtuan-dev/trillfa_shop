@@ -50,7 +50,7 @@
 
     <div class="card p-6 h-fit">
         <h2 class="mb-4 font-display text-lg font-semibold text-ink-900" x-text="editing ? 'Sửa danh mục' : 'Thêm danh mục'"></h2>
-        <form :action="formAction" enctype="multipart/form-data" class="space-y-4">
+        <form :action="formAction" method="POST" enctype="multipart/form-data" class="space-y-4">
             @csrf
             <input type="hidden" name="_method" :value="formMethod">
             <input type="hidden" name="is_active" value="0">
