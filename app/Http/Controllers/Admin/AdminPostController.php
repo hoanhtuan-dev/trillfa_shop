@@ -37,6 +37,7 @@ class AdminPostController extends Controller
         $data['slug'] = Str::slug($data['title']).'-'.substr(uniqid(), -4);
         $data['author_id'] = auth()->id();
         $data['published_at'] = $data['published_at'] ?? now();
+        $data['tags'] = $this->parseTags($data['tags'] ?? null);
 
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('posts', 'public');
@@ -69,6 +70,8 @@ class AdminPostController extends Controller
     {
         $data = $this->validated($request);
 
+        $data['tags'] = $this->parseTags($data['tags'] ?? null);
+
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('posts', 'public');
         }
@@ -83,6 +86,19 @@ class AdminPostController extends Controller
         $post->delete();
 
         return back()->with('success', 'Đã xóa bài viết.');
+    }
+
+    protected function parseTags($value): array
+    {
+        if (is_array($value)) {
+            return array_values(array_filter(array_map('trim', $value)));
+        }
+
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', (string) $value))));
     }
 
     protected function validated(Request $request): array

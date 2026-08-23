@@ -128,7 +128,7 @@
             <div class="mt-6 divide-y divide-cream-200 text-sm">
                 <div class="flex py-2.5"><span class="w-28 shrink-0 text-ink-500">Danh mục</span><a href="{{ $product->category ? route('shop.category', $product->category->slug) : route('shop.index') }}" class="text-ink-900 hover:text-brand-700">{{ $product->category?->name ?? 'Chung' }}</a></div>
                 @if($product->sku)<div class="flex py-2.5"><span class="w-28 shrink-0 text-ink-500">Mã SKU</span><span class="text-ink-900">{{ $product->sku }}</span></div>@endif
-                @if($product->tags)<div class="flex py-2.5"><span class="w-28 shrink-0 text-ink-500">Thẻ</span><div class="flex flex-wrap gap-2">@foreach($product->tags as $tag)<a href="{{ route('shop.index', ['q' => $tag]) }}" class="chip !py-1 text-xs">{{ $tag }}</a>@endforeach</div></div>@endif
+                @if(is_array($product->tags) && count($product->tags))<div class="flex py-2.5"><span class="w-28 shrink-0 text-ink-500">Thẻ</span><div class="flex flex-wrap gap-2">@foreach($product->tags as $tag)<a href="{{ route('shop.index', ['q' => $tag]) }}" class="chip !py-1 text-xs">{{ $tag }}</a>@endforeach</div></div>@endif
             </div>
         </div>
     </div>

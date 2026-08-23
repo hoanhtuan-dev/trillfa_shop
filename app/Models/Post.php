@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -51,6 +52,34 @@ class Post extends Model
                 strip_tags((string) $post->body),
             ]));
         });
+    }
+
+    /**
+     * Ensure tags is always an array (handles legacy comma-separated strings).
+     */
+    protected function tags(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $this->normalizeTags($value),
+        );
+    }
+
+    protected function normalizeTags($value): array
+    {
+        if (is_array($value)) {
+            return array_values(array_filter(array_map('trim', $value), fn ($v) => $v !== ''));
+        }
+
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $decoded = json_decode((string) $value, true);
+        if (is_array($decoded)) {
+            return array_values(array_filter(array_map('trim', $decoded), fn ($v) => $v !== ''));
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', trim((string) $value, '" []'))), fn ($v) => $v !== ''));
     }
 
     public function getReadingTimeAttribute(): int

@@ -33,7 +33,7 @@
             {!! $post->body !!}
         </div>
 
-        @if($post->tags)
+        @if(is_array($post->tags) && count($post->tags))
             <div class="mt-10 flex flex-wrap gap-2">
                 @foreach($post->tags as $tag)
                     <a href="{{ route('blog.index', ['q' => $tag]) }}" class="chip !py-1.5 text-xs">#{{ $tag }}</a>

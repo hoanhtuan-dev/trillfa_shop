@@ -358,4 +358,41 @@ class ShopFlowTest extends TestCase
             ->assertSee('Doanh thu')
             ->assertSee('Sản phẩm bán chạy');
     }
+
+
+    public function test_post_with_string_tags_still_renders(): void
+    {
+        // Legacy: tags stored as a comma string (JSON string literal) must not crash the view.
+        $post = \App\Models\Post::create([
+            'title' => 'Bài viết tag chuỗi',
+            'slug' => 'bai-tag-chuoi-'.uniqid(),
+            'status' => 'published',
+            'excerpt' => 'Tóm tắt bài viết.',
+            'body' => '<p>Nội dung bài viết.</p>',
+            'tags' => 'thoi-trang, meo-hay',
+            'author_id' => 1,
+        ]);
+
+        $this->get('/blog/'.$post->slug)
+            ->assertOk()
+            ->assertSee('thoi-trang');
+    }
+
+    public function test_admin_saving_tags_stored_as_array(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/posts', [
+            'title' => 'Bài post tag test',
+            'status' => 'published',
+            'body' => '<p>Nội dung test.</p>',
+            'tags' => 'alpha, beta, gamma',
+        ])->assertSessionHasNoErrors();
+
+        $post = \App\Models\Post::where('title', 'Bài post tag test')->first();
+        $this->assertNotNull($post);
+        $this->assertIsArray($post->tags);
+        $this->assertEquals(['alpha', 'beta', 'gamma'], $post->tags);
+    }
 }
