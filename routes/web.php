@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdminCategoryController;
 use App\Http\Controllers\Admin\AdminCouponController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminPageContentController;
 use App\Http\Controllers\Admin\AdminPaymentController;
 use App\Http\Controllers\Admin\AdminPostController;
 use App\Http\Controllers\Admin\AdminProductController;
@@ -177,6 +178,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/banners/{banner}', [AdminBannerController::class, 'destroy'])->name('banners.destroy');
 
     Route::get('/settings', [AdminSettingController::class, 'index'])->name('settings.index');
+    Route::get('/pages/about', [AdminPageContentController::class, 'about'])->name('pages.about');
+    Route::post('/pages/about', [AdminPageContentController::class, 'updateAbout'])->name('pages.about.update');
     Route::post('/settings', [AdminSettingController::class, 'update'])->name('settings.update');
 
     Route::get('/shipping', [AdminShippingController::class, 'index'])->name('shipping.index');
@@ -186,6 +189,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/shipping/{method}', [AdminShippingController::class, 'destroy'])->name('shipping.destroy');
 
     Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');
+    Route::post('/payments', [AdminPaymentController::class, 'store'])->name('payments.store');
     Route::put('/payments/{method}', [AdminPaymentController::class, 'update'])->name('payments.update');
     Route::post('/payments/{method}/toggle', [AdminPaymentController::class, 'toggleActive'])->name('payments.toggle');
+    Route::delete('/payments/{method}', [AdminPaymentController::class, 'destroy'])->name('payments.destroy');
 });

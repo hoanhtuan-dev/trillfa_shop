@@ -409,4 +409,42 @@ class ShopFlowTest extends TestCase
         $this->get('/shop')->assertOk()->assertSee('/samples/2aOboQqOBTR5uosVCsNhbUXA5FrAsBRBPGV455LU.jpg');
         $this->get('/')->assertOk()->assertSee('/samples/2aOboQqOBTR5uosVCsNhbUXA5FrAsBRBPGV455LU.jpg');
     }
+
+
+    public function test_admin_can_update_about_page(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/pages/about', [
+            'about_heading' => 'Giới thiệu Trillfa Fa mới',
+            'about_intro' => 'Nội dung mở đầu mới.',
+            'about_v1_title' => 'Sáng tạo',
+            'about_v1_text' => 'Luôn sáng tạo.',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Giới thiệu Trillfa Fa mới', setting('about_heading'));
+
+        $this->get('/gioi-thieu')->assertOk()->assertSee('Giới thiệu Trillfa Fa mới');
+    }
+
+    public function test_admin_can_manage_payment_method(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/payments', [
+            'name' => 'Ví ZaloPay',
+            'code' => 'zalopay',
+            'description' => 'Thanh toán qua ví ZaloPay.',
+            'fee' => 0,
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $method = \App\Models\PaymentMethod::where('code', 'zalopay')->first();
+        $this->assertNotNull($method);
+
+        $this->delete('/admin/payments/'.$method->id)->assertSessionHas('success');
+        $this->assertNull(\App\Models\PaymentMethod::find($method->id));
+    }
 }

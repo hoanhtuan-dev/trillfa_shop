@@ -1,21 +1,24 @@
 @extends('layouts.app')
 
-@section('title', 'Về chúng tôi')
+@section('title', setting('about_heading', 'Về chúng tôi'))
 
 @section('content')
 <div class="container-x py-12">
     <div class="mx-auto max-w-3xl text-center">
         <p class="kicker mb-3">Về Trillfa Fa</p>
-        <h1 class="font-display text-4xl font-semibold text-ink-900 sm:text-5xl">Thời trang cho người Việt hiện đại</h1>
-        <p class="mt-5 text-lg leading-relaxed text-ink-500">Trillfa Fa ra đời với khát vọng mang đến trải nghiệm mua sắm trực tuyến tối giản, tinh tế nhưng đầy cảm hứng — nơi mỗi sản phẩm đều là một lựa chọn phong cách cho cuộc sống của bạn.</p>
+        <h1 class="font-display text-4xl font-semibold text-ink-900 sm:text-5xl">{{ setting('about_heading', 'Thời trang cho người Việt hiện đại') }}</h1>
+        <p class="mt-5 text-lg leading-relaxed text-ink-500">{{ setting('about_intro', 'Trillfa Fa ra đời với khát vọng mang đến trải nghiệm mua sắm trực tuyến tối giản, tinh tế nhưng đầy cảm hứng — nơi mỗi sản phẩm đều là một lựa chọn phong cách cho cuộc sống của bạn.') }}</p>
+        @if(setting('about_image'))
+            <img src="{{ asset_image(setting('about_image')) }}" alt="" class="mx-auto mt-8 w-full max-w-2xl rounded-3xl object-cover">
+        @endif
     </div>
 
     <div class="mt-14 grid gap-6 sm:grid-cols-3">
         @php
             $vals = [
-                ['Tinh gọn & Tối giản', 'Chúng tôi tin vào sự tối giản. Mỗi sản phẩm đều được tuyển chọn kỹ lưỡng, chỉ giữ lại những gì thực sự cần thiết và đẹp nhất.'],
-                ['Chất lượng bền vững', 'Chúng tôi ưu tiên chất liệu bền vững và quy trình sản xuất có trách nhiệm với môi trường.'],
-                ['Phục vụ tận tâm', 'Hành trình mua sắm của bạn được đồng hành bởi đội ngũ hỗ trợ 24/7, đổi trả dễ dàng.'],
+                [setting('about_v1_title', 'Tinh gọn & Tối giản'), setting('about_v1_text', 'Chúng tôi tin vào sự tối giản. Mỗi sản phẩm đều được tuyển chọn kỹ lưỡng, chỉ giữ lại những gì thực sự cần thiết và đẹp nhất.')],
+                [setting('about_v2_title', 'Chất lượng bền vững'), setting('about_v2_text', 'Chúng tôi ưu tiên chất liệu bền vững và quy trình sản xuất có trách nhiệm với môi trường.')],
+                [setting('about_v3_title', 'Phục vụ tận tâm'), setting('about_v3_text', 'Hành trình mua sắm của bạn được đồng hành bởi đội ngũ hỗ trợ 24/7, đổi trả dễ dàng.')],
             ];
         @endphp
         @foreach($vals as $v)
@@ -28,6 +31,12 @@
             </div>
         @endforeach
     </div>
+
+    @if(setting('about_body'))
+        <div class="prose-content mx-auto mt-14 max-w-3xl">
+            {!! setting('about_body') !!}
+        </div>
+    @endif
 
     <div class="card mt-14 flex flex-col items-center gap-4 bg-brand-50 !border-brand-100 p-10 text-center">
         <h2 class="font-display text-2xl font-semibold text-ink-900 sm:text-3xl">Hãy cùng nhau tạo nên phong cách</h2>
