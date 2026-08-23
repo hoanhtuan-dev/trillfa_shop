@@ -47,6 +47,17 @@ class AdminPostController extends Controller
         return redirect()->route('admin.posts.index')->with('success', 'Đã tạo bài viết.');
     }
 
+    public function preview(Post $post)
+    {
+        $post->load('author', 'category');
+
+        $related = Post::published()->where('id', '!=', $post->id)
+            ->when($post->blog_category_id, fn ($q) => $q->where('blog_category_id', $post->blog_category_id))
+            ->latest()->limit(3)->get();
+
+        return view('blog.show', compact('post', 'related'));
+    }
+
     public function edit(Post $post)
     {
         $categories = BlogCategory::active()->orderBy('sort_order')->get();

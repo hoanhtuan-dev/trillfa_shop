@@ -75,6 +75,14 @@ class AdminOrderController extends Controller
         }, 200, $headers);
     }
 
+    public function destroy(Order $order)
+    {
+        $order->items()->delete();
+        $order->delete();
+
+        return back()->with('success', 'Đã xóa đơn hàng '.$order->order_number.'.');
+    }
+
     public function show(Order $order)
     {
         $order->load('items.product', 'user', 'coupon');

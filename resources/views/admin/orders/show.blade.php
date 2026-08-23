@@ -7,6 +7,9 @@
     <div class="mb-5 flex items-center justify-between">
         <a href="{{ route('admin.orders.index') }}" class="btn-outline btn-sm">← Quay lại</a>
         <div class="flex items-center gap-2">
+            <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Xóa đơn hàng này?')">@csrf @method('DELETE')
+                <button type="submit" class="btn-outline !border-red-300 !text-red-600 hover:!bg-red-600 hover:!text-white btn-sm">Xóa</button>
+            </form>
             <span class="badge {{ $order->payment_status === 'paid' ? 'bg-brand-600 text-white' : 'bg-amber-500 text-white' }}">{{ $order->payment_status_label }}</span>
             <span class="badge {{ $order->status === 'completed' ? 'bg-brand-600 text-white' : ($order->status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700') }}">{{ $order->status_label }}</span>
         </div>

@@ -42,7 +42,14 @@
                             <td class="px-5 py-3"><span class="badge {{ $order->payment_status === 'paid' ? 'bg-brand-100 text-brand-700' : 'bg-amber-100 text-amber-700' }}">{{ $order->payment_status_label }}</span></td>
                             <td class="px-5 py-3"><span class="badge {{ $order->status === 'completed' ? 'bg-brand-600 text-white' : ($order->status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700') }}">{{ $order->status_label }}</span></td>
                             <td class="px-5 py-3 text-xs text-ink-500">{{ $order->created_at?->format('d/m/Y') }}</td>
-                            <td class="px-5 py-3 text-right"><a href="{{ route('admin.orders.show', $order) }}" class="btn-outline btn-sm">Chi tiết</a></td>
+                            <td class="px-5 py-3 text-right">
+    <div class="flex justify-end gap-1">
+        <a href="{{ route('admin.orders.show', $order) }}" class="btn-outline btn-sm">Chi tiết</a>
+        <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Xóa đơn hàng {{ $order->order_number }}?')">@csrf @method('DELETE')
+            <button type="submit" class="btn-ghost !p-2 text-red-500" title="Xóa"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166"/></svg></button>
+        </form>
+    </div>
+</td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="px-5 py-10 text-center text-ink-500">Không có đơn hàng nào.</td></tr>

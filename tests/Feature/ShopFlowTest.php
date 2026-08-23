@@ -276,4 +276,44 @@ class ShopFlowTest extends TestCase
         $this->assertSame('Banner Đã Sửa', $banner->fresh()->title);
         $this->assertSame(5, (int) $banner->fresh()->sort_order);
     }
+
+
+    public function test_admin_can_preview_draft_post(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $post = \App\Models\Post::create([
+            'title' => 'Bài viết nháp',
+            'slug' => 'bai-viet-nhap-'.uniqid(),
+            'excerpt' => 'Nội dung nháp',
+            'body' => '<p>Đây là bài viết nháp.</p>',
+            'tags' => ['nha'],
+            'status' => 'draft',
+            'author_id' => $admin->id,
+        ]);
+
+        $this->get('/admin/posts/'.$post->id.'/preview')
+            ->assertOk()
+            ->assertSee('Bài viết nháp');
+    }
+
+    public function test_admin_logout(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/dang-xuat')->assertRedirect(route('home'));
+        $this->assertGuest();
+    }
+
+    public function test_admin_can_delete_order(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+        $order = \App\Models\Order::first();
+
+        $this->delete('/admin/orders/'.$order->id)->assertSessionHas('success');
+        $this->assertNull(\App\Models\Order::find($order->id));
+    }
 }
