@@ -1,0 +1,25 @@
+{
+  "name": "Trillfa Fa",
+  "short_name": "Trillfa Fa",
+  "description": "Thời trang & Phong cách sống — Mua sắm trực tuyến tối giản, tinh tế.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#faf9f6",
+  "theme_color": "#1f372b",
+  "lang": "vi",
+  "categories": ["shopping", "fashion", "lifestyle"],
+  "icons": [
+    { "src": "/icons/favicon-32x32.png", "sizes": "32x32", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Cửa hàng", "url": "/shop", "description": "Khám phá sản phẩm" },
+    { "name": "Giỏ hàng", "url": "/gio-hang", "description": "Giỏ hàng của bạn" },
+    { "name": "Blog", "url": "/blog", "description": "Câu chuyện & phong cách" }
+  ]
+}

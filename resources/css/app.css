@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views';
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+    --font-display: 'Fraunces', ui-serif, Georgia, serif;
+
+    --color-brand-50: #f1f7f3;
+    --color-brand-100: #ddebe2;
+    --color-brand-200: #bed8c9;
+    --color-brand-300: #93bda6;
+    --color-brand-400: #659c80;
+    --color-brand-500: #458062;
+    --color-brand-600: #33674d;
+    --color-brand-700: #2a533f;
+    --color-brand-800: #244334;
+    --color-brand-900: #1f372b;
+    --color-brand-950: #0f1f18;
+
+    --color-cream-50: #faf9f6;
+    --color-cream-100: #f4f2ec;
+    --color-cream-200: #e9e5db;
+    --color-cream-300: #d8d2c4;
+
+    --color-ink-900: #1b1a17;
+    --color-ink-700: #3a382f;
+    --color-ink-500: #6e6a5d;
+
+    --color-clay-500: #b06a3b;
+    --color-clay-600: #96522a;
+
+    --radius-4xl: 2rem;
+}
+
+@layer base {
+    * {
+        @apply border-cream-200;
+    }
+
+    html {
+        @apply scroll-smooth;
+    }
+
+    body {
+        @apply bg-cream-50 font-sans text-ink-900 antialiased;
+        font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    }
+
+    ::selection {
+        @apply bg-brand-600 text-cream-50;
+    }
+
+    h1, h2, h3, h4, .font-display {
+        @apply font-display tracking-tight;
+    }
+}
+
+@layer components {
+    .container-x {
+        @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+    }
+
+    .btn-primary {
+        @apply btn bg-ink-900 px-6 py-3 text-cream-50 hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
+    }
+
+    .btn-brand {
+        @apply btn bg-brand-600 px-6 py-3 text-white hover:bg-brand-700 hover:shadow-lg hover:shadow-brand-900/20 active:scale-[.98];
+    }
+
+    .btn-outline {
+        @apply btn border border-cream-300 bg-transparent px-6 py-3 text-ink-900 hover:border-ink-900 hover:bg-ink-900 hover:text-cream-50 active:scale-[.98];
+    }
+
+    .btn-ghost {
+        @apply btn px-4 py-2 text-ink-700 hover:bg-cream-200/70 active:scale-[.98];
+    }
+
+    .btn-sm {
+        @apply px-4 py-2 text-xs;
+    }
+
+    .input {
+        @apply w-full rounded-xl border border-cream-300 bg-white px-4 py-3 text-sm text-ink-900 placeholder:text-ink-500/70 transition-all focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10;
+    }
+
+    .label {
+        @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-700;
+    }
+
+    .card {
+        @apply rounded-3xl border border-cream-200 bg-white;
+    }
+
+    .card-hover {
+        @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-ink-900/10;
+    }
+
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
+    }
+
+    .chip {
+        @apply inline-flex items-center gap-2 rounded-full border border-cream-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-brand-500 hover:text-brand-700;
+    }
+
+    .section-title {
+        @apply font-display text-2xl font-semibold text-ink-900 sm:text-3xl;
+    }
+
+    .kicker {
+        @apply text-xs font-semibold uppercase tracking-[0.2em] text-brand-600;
+    }
+
+    .link {
+        @apply text-brand-700 underline-offset-4 hover:underline;
+    }
+
+    .prose-content h2 { @apply mt-8 mb-3 font-display text-2xl font-semibold text-ink-900; }
+    .prose-content h3 { @apply mt-6 mb-2 font-display text-xl font-semibold text-ink-900; }
+    .prose-content p { @apply mb-4 leading-relaxed text-ink-700; }
+    .prose-content ul { @apply mb-4 list-disc space-y-1 pl-5 text-ink-700; }
+    .prose-content ol { @apply mb-4 list-decimal space-y-1 pl-5 text-ink-700; }
+    .prose-content blockquote { @apply my-5 border-l-4 border-brand-500 bg-cream-100 py-3 pl-5 italic text-ink-700; }
+    .prose-content a { @apply text-brand-700 underline underline-offset-2; }
+    .prose-content img { @apply my-6 w-full rounded-2xl; }
+}
+
+@utility btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+@layer utilities {
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .text-balance { text-wrap: balance; }
+}
