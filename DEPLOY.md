@@ -180,3 +180,53 @@ chmod -R 775 storage bootstrap/cache
   public_html/                (web root — chính là thư mục public của app)
     index.php  .htaccess  build/  images/  icons/  samples/  manifest.webmanifest  sw.js
 ```
+
+---
+
+## ⚠️ Shared Hosting (Hostinger): `proc_open` / `exec` / `symlink` bị tắt
+
+Hostinger (và nhiều shared hosting) disable `proc_open`, `exec`, `shell_exec`, `symlink` trong `disable_functions`. Điều này gây 3 lỗi phổ biến khi deploy:
+
+### 1. `composer install` lỗi: "Process class relies on proc_open …"
+- Composer chạy script **post-autoload-dump** (`@php artisan package:discover`) bằng Symfony Process (cần `proc_open`).
+- **Cách 1 (khuyến nghị):** tránh chạy Composer trên server — build sẵn `vendor/` ở local rồi upload:
+  ```bash
+  # Ở máy local (đúng PHP 8.3):
+  composer install --no-dev --optimize-autoloader
+  ```
+  rồi upload toàn bộ project (bao gồm `vendor/`) lên host.
+- **Cách 2:** chạy trên server nhưng **bỏ script**:
+  ```bash
+  composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts
+  ```
+  (`--no-scripts` bỏ qua `package:discover`. Nếu cần, chạy thủ công `php artisan package:discover`; nếu lỗi thì bỏ qua — Laravel vẫn tự discover ở request đầu.)
+
+### 2. `php artisan storage:link` lỗi: "Call to undefined function Illuminate\Filesystem\exec()"
+- Tạo symlink bằng PHP cần `symlink()` hoặc `exec('ln -s')` — đều bị tắt.
+- **Cách xử lý:** tạo symlink bằng **SSH shell** (không qua PHP):
+  ```bash
+  cd /home/uXXXX/domains/your-domain
+  ln -s ../storage/app/public public_html/storage
+  ```
+  Kiểm tra: `readlink public_html/storage` → `../storage/app/public`.
+
+### 3. "No arguments expected for config:cache, got route:cache"
+- Artisan **không** nhận nhiều lệnh trong một dòng. Chạy riêng từng lệnh (nối bằng `&&`):
+  ```bash
+  php artisan config:cache && php artisan route:cache && php artisan view:cache
+  ```
+
+### Chuỗi deploy khuyến nghị trên Hostinger
+```bash
+cd /home/uXXXX/domains/your-domain
+composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts   # hoặc upload vendor sẵn
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed --force          # (tuỳ chọn) dữ liệu mẫu
+ln -s ../storage/app/public public_html/storage   # thay cho artisan storage:link
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+> **Lưu ý:** không dùng `php artisan serve` trên shared hosting (cần `proc_open`). Host dùng Apache/nginx, truy cập qua `https://domain` là đủ.
