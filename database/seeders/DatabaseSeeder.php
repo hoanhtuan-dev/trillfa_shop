@@ -174,6 +174,19 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
         }
+
+        $iconMap = [
+            'thoi-trang-nu' => 'heart', 'ao-nu' => 'shirt', 'dam-vay' => 'star', 'quan-nu' => 'shirt',
+            'thoi-trang-nam' => 'star', 'ao-nam' => 'shirt', 'quan-nam' => 'shirt',
+            'giay-dep' => 'bag',
+            'phu-kien' => 'bag', 'tui-xach' => 'bag', 'kinh-mat' => 'eye', 'dong-ho' => 'clock',
+            'nha-cua-doi-song' => 'home', 'trang-tri' => 'gift', 'gia-dung' => 'home',
+            'suc-khoe-lam-dep' => 'sparkles',
+        ];
+
+        foreach ($iconMap as $slug => $icon) {
+            Category::where('slug', $slug)->update(['icon' => $icon]);
+        }
     }
 
     protected function products(): void

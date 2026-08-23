@@ -8,7 +8,7 @@
     $catItems = $categories->map(fn($c) => [
         'id' => $c->id, 'name' => $c->name, 'parent_id' => $c->parent_id,
         'description' => $c->description, 'sort_order' => $c->sort_order,
-        'is_active' => $c->is_active, 'image' => $c->image_url,
+        'is_active' => $c->is_active, 'image' => $c->image_url, 'icon' => $c->icon,
     ])->values();
     $parents = $categories->whereNull('parent_id');
 @endphp
@@ -85,6 +85,19 @@
                     </div>
                 </template>
             </div>
+            <div>
+                <label class="label">Icon hiển thị</label>
+                <div class="grid grid-cols-5 gap-2">
+                    @foreach(category_icons() as $key => $icon)
+                        <button type="button" :class="form.icon === '{{ $key }}' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-cream-200 text-ink-700 hover:border-brand-400'" @click="form.icon = '{{ $key }}'" class="flex flex-col items-center gap-1 rounded-xl border p-2">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">{!! $icon['svg'] !!}</svg>
+                            <span class="text-[10px]">{{ $icon['label'] }}</span>
+                        </button>
+                    @endforeach
+                </div>
+                <input type="hidden" name="icon" :value="form.icon">
+            </div>
+
             <div class="flex items-center gap-2 pt-2">
                 <button type="submit" class="btn-brand">Lưu</button>
                 <button type="button" @click="reset()" class="btn-ghost" x-show="editing">Hủy sửa</button>
@@ -100,7 +113,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('categoryForm', (items, createUrl) => ({
         items, createUrl,
         editing: null,
-        form: { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true },
+        form: { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true, icon: 'tag' },
         imagePreview: null,
         fileName: '',
         get formAction() { return this.editing ? '/admin/categories/' + this.editing : this.createUrl; },
@@ -109,12 +122,12 @@ document.addEventListener('alpine:init', () => {
             const c = this.items.find(x => x.id === id);
             if (!c) return;
             this.editing = c.id;
-            this.form = { id: c.id, name: c.name, parent_id: c.parent_id || '', description: c.description || '', sort_order: c.sort_order || 0, is_active: !!c.is_active };
+            this.form = { id: c.id, name: c.name, parent_id: c.parent_id || '', description: c.description || '', sort_order: c.sort_order || 0, is_active: !!c.is_active, icon: c.icon || 'tag' };
             this.setImage(c.image || null);
         },
         reset() {
             this.editing = null;
-            this.form = { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true };
+            this.form = { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true, icon: 'tag' };
             this.setImage(null);
         },
         setImage(url) {

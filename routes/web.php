@@ -11,8 +11,10 @@ use App\Http\Controllers\Admin\AdminPostController;
 use App\Http\Controllers\Admin\AdminProductController;
 use App\Http\Controllers\Admin\AdminReviewController;
 use App\Http\Controllers\Admin\AdminSettingController;
+use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminShippingController;
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\AdminWidgetController;
 use App\Http\Controllers\Api\CartApiController;
 use App\Http\Controllers\Api\CouponApiController;
 use App\Http\Controllers\Api\SearchApiController;
@@ -119,6 +121,10 @@ Route::prefix('api')->name('api.')->group(function () {
 // Admin
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/reports', [AdminReportController::class, 'index'])->name('reports.index');
+    Route::get('/widgets', [AdminWidgetController::class, 'index'])->name('widgets.index');
+    Route::post('/widgets', [AdminWidgetController::class, 'update'])->name('widgets.update');
 
     Route::get('/products', [AdminProductController::class, 'index'])->name('products.index');
     Route::get('/products/create', [AdminProductController::class, 'create'])->name('products.create');

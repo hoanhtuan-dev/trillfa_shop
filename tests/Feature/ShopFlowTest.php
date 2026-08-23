@@ -316,4 +316,46 @@ class ShopFlowTest extends TestCase
         $this->delete('/admin/orders/'.$order->id)->assertSessionHas('success');
         $this->assertNull(\App\Models\Order::find($order->id));
     }
+
+
+    public function test_admin_can_toggle_widgets(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/widgets', [
+            'enabled_featured' => '0',
+            'limit_featured' => 6,
+            'enabled_hero' => '1',
+        ])->assertSessionHas('success');
+
+        $this->assertSame('0', setting('widget_featured_enabled'));
+        $this->assertSame(6, (int) setting('widget_featured_limit'));
+        $this->assertSame('1', setting('widget_hero_enabled'));
+    }
+
+    public function test_admin_can_update_category_with_icon(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+        $cat = \App\Models\Category::first();
+
+        $this->put('/admin/categories/'.$cat->id, [
+            'name' => $cat->name,
+            'is_active' => '1',
+            'icon' => 'star',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('star', $cat->fresh()->icon);
+    }
+
+    public function test_admin_reports_page(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin)
+            ->get('/admin/reports')
+            ->assertOk()
+            ->assertSee('Doanh thu')
+            ->assertSee('Sản phẩm bán chạy');
+    }
 }
