@@ -13,13 +13,14 @@
 </div>
 
 <!-- Header -->
-<header x-data="navbar" class="sticky top-0 z-40 border-b border-cream-200 bg-cream-50/90 backdrop-blur-lg transition-shadow" :class="scrolled ? 'shadow-md shadow-ink-900/5' : ''">
+<header x-data="navbar" @keydown.escape="mobileOpen = false" class="sticky top-0 z-40 border-b border-cream-200 bg-cream-50/90 backdrop-blur-lg transition-shadow" :class="scrolled ? 'shadow-md shadow-ink-900/5' : ''">
     <div class="container-x">
         <div class="flex h-16 items-center justify-between gap-4 lg:h-20">
             <!-- Left: mobile menu + logo -->
             <div class="flex items-center gap-3">
-                <button @click="mobileOpen = !mobileOpen" class="btn-ghost !p-2 lg:hidden" aria-label="Menu">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+                <button @click="mobileOpen = !mobileOpen" class="btn-ghost !p-2 lg:hidden" aria-label="Menu" :aria-expanded="mobileOpen">
+                    <svg x-show="!mobileOpen" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+                    <svg x-show="mobileOpen" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
                 <a href="{{ route('home') }}" class="flex items-center gap-2">
                     <img src="{{ asset('images/logo.png') }}" alt="Trillfa Fa" class="h-10 w-10 rounded-full object-cover" loading="eager">
@@ -119,6 +120,12 @@
 
     <!-- Mobile menu -->
     <div x-show="mobileOpen" x-collapse class="border-t border-cream-200 lg:hidden">
+        <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3 lg:hidden">
+            <span class="font-display text-base font-semibold text-ink-900">Menu</span>
+            <button @click="mobileOpen = false" class="btn-ghost !p-2" aria-label="Đóng menu">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
         <div class="container-x space-y-1 py-4">
             <div x-data="searchBox" class="pb-3">
                 <div class="relative">

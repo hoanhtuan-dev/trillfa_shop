@@ -44,6 +44,7 @@ class QuickCheckoutController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255', 'min:2'],
             'phone' => ['required', 'string', 'max:30', 'regex:/^[0-9+\s.-]{8,20}$/'],
+            'address' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
             'terms' => ['accepted'],
         ]);
@@ -56,6 +57,7 @@ class QuickCheckoutController extends Controller
             'name' => $data['name'],
             'phone' => $data['phone'],
             'email' => null,
+            'address' => $data['address'] ?? null,
             'note' => $data['note'] ?? null,
         ], $user?->id, 'cod');
 

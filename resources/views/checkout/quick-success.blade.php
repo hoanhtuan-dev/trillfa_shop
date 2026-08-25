@@ -17,6 +17,7 @@
             <div class="mt-8 rounded-2xl bg-cream-100 p-6 text-sm">
                 <div class="flex justify-between"><span class="text-ink-500">Mã đơn hàng</span><span class="font-semibold text-ink-900">{{ $order->order_number }}</span></div>
                 <div class="mt-2 flex justify-between"><span class="text-ink-500">Thanh toán</span><span class="font-semibold text-ink-900">Khi nhận hàng (COD)</span></div>
+                @if($order->address)<div class="mt-2 flex justify-between"><span class="text-ink-500">Địa chỉ</span><span class="text-ink-900">{{ $order->address }}</span></div>@endif
                 <div class="mt-2 flex justify-between"><span class="text-ink-500">Tổng cộng</span><span class="font-semibold text-brand-700">{{ format_price($order->total) }}</span></div>
             </div>
 

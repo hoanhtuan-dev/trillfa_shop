@@ -7,6 +7,15 @@
     <x-breadcrumb :items="[['label' => 'Trang chủ', 'url' => route('home')], ['label' => 'Giỏ hàng', 'url' => route('cart.show')], ['label' => 'Thanh toán']]" />
     <h1 class="mt-6 font-display text-3xl font-semibold text-ink-900 sm:text-4xl">Thanh toán</h1>
 
+    @auth
+        @if(! ($address ?? null))
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+                <span class="flex items-center gap-2 font-medium text-amber-800"><svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Bạn chưa có địa chỉ giao hàng lưu sẵn.</span>
+                <a href="{{ route('account.addresses') }}" class="font-semibold text-brand-700 underline underline-offset-2">Tạo địa chỉ ngay →</a>
+            </div>
+        @endif
+    @endauth
+
     <form method="POST" action="{{ route('checkout.store') }}" class="mt-8 grid gap-8 lg:grid-cols-[1fr_420px]">
         @csrf
 

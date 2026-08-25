@@ -541,6 +541,7 @@ class ShopFlowTest extends TestCase
         $this->post('/thanh-toan-nhanh', [
             'name' => 'Khách Vãng Lai',
             'phone' => '0912345888',
+            'address' => '123 Nguyễn Huệ, Quận 1',
             'terms' => '1',
         ])->assertRedirect()->assertSessionHasNoErrors();
 
@@ -549,7 +550,7 @@ class ShopFlowTest extends TestCase
         $order = \App\Models\Order::latest('id')->first();
         $this->assertSame('0912345888', $order->phone);
         $this->assertNull($order->email);
-        $this->assertNull($order->address);
+        $this->assertSame('123 Nguyễn Huệ, Quận 1', $order->address);
 
         // Pending account silently persisted (inactive) and linked to the order
         $user = \App\Models\User::where('phone', '0912345888')->first();

@@ -31,6 +31,12 @@
                         <x-error name="phone" />
                     </div>
                     <div class="sm:col-span-2">
+                        <label class="label">Địa chỉ giao hàng <span class="font-normal text-ink-500">(tùy chọn)</span></label>
+                        <input type="text" name="address" value="{{ old('address') }}" class="input" placeholder="Số nhà, tên đường, phường/xã..." autocomplete="street-address">
+                        <x-error name="address" />
+                        <p class="mt-1 text-xs text-ink-500">Để trống nếu nhân viên sẽ gọi xác nhận địa chỉ.</p>
+                    </div>
+                    <div class="sm:col-span-2">
                         <label class="label">Ghi chú (tùy chọn)</label>
                         <textarea name="note" rows="2" class="input" placeholder="Ghi chú cho đơn hàng...">{{ old('note') }}</textarea>
                     </div>

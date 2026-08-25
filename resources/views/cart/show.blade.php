@@ -104,8 +104,22 @@
                     <div class="flex justify-between border-t border-cream-200 pt-3 text-base font-semibold text-ink-900"><span>Tổng cộng</span><span x-text="$money($store.cart.total)"></span></div>
                 </div>
 
-                <a href="{{ route('checkout.show') }}" class="btn-brand mt-5 w-full">Tiến hành thanh toán</a>
-                <a href="{{ route('checkout.quick') }}" class="btn-outline mt-2 w-full">Thanh toán nhanh <span class="font-normal opacity-80">(chỉ cần SĐT)</span></a>
+                @auth
+                    @if(! auth()->user()->addresses()->where('is_default', true)->exists())
+                        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            <p class="flex items-center gap-2 font-medium text-amber-800"><svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Bạn chưa có địa chỉ giao hàng.</p>
+                            <a href="{{ route('account.addresses') }}" class="mt-2 inline-flex items-center gap-1 font-semibold text-brand-700 underline underline-offset-2">Tạo địa chỉ giao hàng ngay →</a>
+                        </div>
+                    @endif
+                @endauth
+
+                @guest
+                    <a href="{{ route('checkout.quick') }}" class="btn-brand mt-5 w-full">Thanh toán nhanh <span class="font-normal opacity-80">(chỉ cần SĐT)</span></a>
+                    <a href="{{ route('checkout.show') }}" class="btn-outline mt-2 w-full">Thanh toán đầy đủ</a>
+                @else
+                    <a href="{{ route('checkout.show') }}" class="btn-brand mt-5 w-full">Tiến hành thanh toán</a>
+                    <a href="{{ route('checkout.quick') }}" class="btn-outline mt-2 w-full">Thanh toán nhanh <span class="font-normal opacity-80">(chỉ cần SĐT)</span></a>
+                @endguest
                 <a href="{{ route('shop.index') }}" class="btn-ghost mt-2 w-full text-ink-500">Tiếp tục mua sắm</a>
             </div>
         </div>

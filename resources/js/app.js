@@ -245,8 +245,16 @@ document.addEventListener('alpine:init', () => {
             this.onScroll = () => { this.scrolled = window.scrollY > 8; };
             window.addEventListener('scroll', this.onScroll, { passive: true });
             this.onScroll();
+
+            // Close the mobile menu when clicking outside the header.
+            this.onClick = (e) => {
+                if (this.mobileOpen && this.$el && !this.$el.contains(e.target)) {
+                    this.mobileOpen = false;
+                }
+            };
+            document.addEventListener('click', this.onClick);
         },
-        destroy() { window.removeEventListener('scroll', this.onScroll); },
+        destroy() { window.removeEventListener('scroll', this.onScroll); document.removeEventListener('click', this.onClick); },
     }));
 
     // Product card "quick add"

@@ -37,6 +37,6 @@ class OrderItem extends Model
 
     public function getImageUrlAttribute(): ?string
     {
-        return $this->image ? (str_starts_with($this->image, 'http') ? $this->image : asset('storage/'.$this->image)) : null;
+        return $this->image ? asset_image($this->image) : null;
     }
 }
