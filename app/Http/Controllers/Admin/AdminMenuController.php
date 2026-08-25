@@ -104,11 +104,15 @@ class AdminMenuController extends Controller
             'location' => ['required', 'in:header,footer'],
             'label' => ['required', 'string', 'max:255'],
             'url' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'in:custom,category,page'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'parent_id' => ['nullable', 'integer', 'exists:menu_items,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $data['parent_id'] = $data['parent_id'] ?? null;
+        $data['type'] = $data['type'] ?? 'custom';
+        $data['category_id'] = $data['category_id'] ?? null;
         $data['is_active'] = $request->boolean('is_active', true);
 
         return $data;

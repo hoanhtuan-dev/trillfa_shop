@@ -480,23 +480,20 @@ class DatabaseSeeder extends Seeder
         \App\Models\MenuItem::where('location', 'footer')->delete();
 
         $sort = 0;
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Trang chủ', 'url' => '/', 'sort_order' => $sort++]);
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Tất cả sản phẩm', 'url' => '/shop', 'sort_order' => $sort++]);
+        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Trang chủ', 'url' => '/', 'type' => 'page', 'sort_order' => $sort++]);
+        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Tất cả sản phẩm', 'url' => '/shop', 'type' => 'page', 'sort_order' => $sort++]);
 
+        // Category menu items: frontend auto-renders subcategories recursively.
         foreach (Category::active()->whereNull('parent_id')->orderBy('sort_order')->get() as $cat) {
-            $parent = \App\Models\MenuItem::create([
-                'location' => 'header', 'label' => $cat->name, 'url' => '/danh-muc/'.$cat->slug, 'sort_order' => $sort++,
+            \App\Models\MenuItem::create([
+                'location' => 'header', 'label' => $cat->name, 'url' => '/danh-muc/'.$cat->slug,
+                'type' => 'category', 'category_id' => $cat->id, 'sort_order' => $sort++,
             ]);
-            foreach ($cat->children()->get() as $child) {
-                $parent->children()->create([
-                    'location' => 'header', 'label' => $child->name, 'url' => '/danh-muc/'.$child->slug, 'sort_order' => $child->sort_order,
-                ]);
-            }
         }
 
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Blog', 'url' => '/blog', 'sort_order' => $sort++]);
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Về chúng tôi', 'url' => '/gioi-thieu', 'sort_order' => $sort++]);
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Liên hệ', 'url' => '/lien-he', 'sort_order' => $sort++]);
+        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Blog', 'url' => '/blog', 'type' => 'page', 'sort_order' => $sort++]);
+        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Về chúng tôi', 'url' => '/gioi-thieu', 'type' => 'page', 'sort_order' => $sort++]);
+        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Liên hệ', 'url' => '/lien-he', 'type' => 'page', 'sort_order' => $sort++]);
 
         $fsort = 0;
         foreach (['Tất cả sản phẩm' => '/shop', 'Blog' => '/blog', 'Về chúng tôi' => '/gioi-thieu', 'Liên hệ' => '/lien-he'] as $label => $url) {

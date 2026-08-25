@@ -504,4 +504,28 @@ class ShopFlowTest extends TestCase
             ->assertSee('Child')
             ->assertSee('Grandchild');
     }
+
+
+    public function test_menu_category_auto_renders_subcategories(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $cat = \App\Models\Category::create(['name' => 'Cat Auto', 'slug' => 'cat-auto-'.uniqid(), 'is_active' => true]);
+        \App\Models\Category::create(['name' => 'Sub Auto', 'slug' => 'sub-auto-'.uniqid(), 'is_active' => true, 'parent_id' => $cat->id]);
+
+        $this->post('/admin/menu', [
+            'location' => 'header',
+            'label' => 'Cat Auto Menu',
+            'url' => '/danh-muc/'.$cat->slug,
+            'type' => 'category',
+            'category_id' => $cat->id,
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Cat Auto Menu')
+            ->assertSee('Sub Auto');
+    }
 }

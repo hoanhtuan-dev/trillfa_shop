@@ -12,7 +12,7 @@
                 @include('partials.menu-mobile', ['items' => $item->children])
             </div>
         @else
-            <a href="{{ $item->getUrl() }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-900 hover:bg-cream-100">{{ $item->label }}</a>
+            <a href="{{ $item->url }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-900 hover:bg-cream-100">{{ $item->label }}</a>
         @endif
     </div>
 @endforeach

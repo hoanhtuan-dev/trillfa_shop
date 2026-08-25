@@ -12,9 +12,14 @@ class MenuItem extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['location', 'parent_id', 'label', 'url', 'sort_order', 'is_active'];
+    protected $fillable = ['location', 'parent_id', 'label', 'url', 'type', 'category_id', 'sort_order', 'is_active'];
 
     protected $casts = ['sort_order' => 'integer', 'is_active' => 'boolean'];
+
+    public function category(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
 
     public function parent(): BelongsTo
     {

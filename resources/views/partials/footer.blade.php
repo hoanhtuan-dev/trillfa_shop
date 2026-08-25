@@ -49,8 +49,8 @@
         <div>
             <h4 class="mb-4 text-sm font-semibold uppercase tracking-wide text-ink-900">Mua sắm</h4>
             <ul class="space-y-2.5 text-sm text-ink-500">
-                @forelse(menu_items('footer') as $fitem)
-                    <li><a href="{{ $fitem->getUrl() }}" class="transition hover:text-brand-700">{{ $fitem->label }}</a></li>
+                @forelse(menu_tree('footer') as $fitem)
+                    <li><a href="{{ $fitem->url }}" class="transition hover:text-brand-700">{{ $fitem->label }}</a></li>
                 @empty
                     @foreach ($navbarCategories->take(5) as $cat)
                         <li><a href="{{ route('shop.category', $cat->slug) }}" class="transition hover:text-brand-700">{{ $cat->name }}</a></li>

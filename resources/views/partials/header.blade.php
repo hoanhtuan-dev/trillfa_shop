@@ -109,7 +109,7 @@
 
         <!-- Nav (managed via Admin -> Menu; multi-level) -->
         <nav class="hidden h-12 items-center gap-1 lg:flex">
-            @include('partials.menu-flyout', ['items' => menu_items('header'), 'isRoot' => true, 'level' => 0])
+            @include('partials.menu-flyout', ['items' => menu_tree('header'), 'isRoot' => true, 'level' => 0])
         </nav>
     </div>
 
@@ -124,7 +124,7 @@
                     </button>
                 </div>
             </div>
-            @include('partials.menu-mobile', ['items' => menu_items('header')])
+            @include('partials.menu-mobile', ['items' => menu_tree('header')])
             <div class="pt-2">
                 @auth
                     <a href="{{ route('account.dashboard') }}" class="btn-brand w-full">Tài khoản của tôi</a>

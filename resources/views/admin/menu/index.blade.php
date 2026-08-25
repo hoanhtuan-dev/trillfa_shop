@@ -9,10 +9,14 @@
         'header' => ['label' => 'Menu Header (thanh điều hướng)', 'items' => $headerMenu],
         'footer' => ['label' => 'Menu Footer', 'items' => $footerMenu],
     ];
-    $categoriesJs = $categories->map(fn($c) => [
-        'name' => $c->name, 'slug' => $c->slug,
-        'children' => $c->children->map(fn($ch) => ['name'=>$ch->name,'slug'=>$ch->slug])->values(),
-    ])->values();
+    $categoriesJs = collect();
+    foreach ($categories as $c) {
+        $categoriesJs->push(['id' => $c->id, 'name' => $c->name, 'slug' => $c->slug, 'depth' => 0]);
+        foreach ($c->children as $ch) {
+            $categoriesJs->push(['id' => $ch->id, 'name' => $ch->name, 'slug' => $ch->slug, 'depth' => 1]);
+        }
+    }
+    $categoriesJs = $categoriesJs->values();
     $pagesJs = collect($pages)->map(fn($p) => ['label'=>$p['label'],'url'=>$p['url']])->values();
 
     $js = [];
@@ -77,10 +81,12 @@
                     <input type="hidden" name="_method" :value="formMethod">
                     <input type="hidden" name="location" :value="location">
                     <input type="hidden" name="is_active" :value="form.is_active ? '1' : '0'">
+                    <input type="hidden" name="type" :value="form.type">
+                    <input type="hidden" name="category_id" :value="form.category_id || ''">
                     <div><label class="label">Nhãn *</label><input type="text" name="label" x-model="form.label" class="input" required></div>
                     <div>
                         <label class="label">Loại liên kết</label>
-                        <select x-model="linkType" class="input">
+                        <select x-model="linkType" @change="linkType === 'custom' ? (form.type = 'custom', form.category_id = '') : (form.type = linkType)" class="input">
                             <option value="custom">Đường dẫn tùy chỉnh</option>
                             <option value="category">Danh mục sản phẩm</option>
                             <option value="page">Trang</option>
@@ -91,16 +97,11 @@
                         <input type="text" name="url" x-model="form.url" class="input">
                     </div>
                     <div x-show="linkType === 'category'">
-                        <label class="label">Chọn danh mục</label>
+                        <label class="label">Chọn danh mục (tự động render danh mục con đệ quy)</label>
                         <select @change="pickCategory($event.target.value)" class="input">
                             <option value="">— Chọn danh mục —</option>
-                            <template x-for="(c, i) in categories" :key="c.slug">
-                                <optgroup :label="c.name">
-                                    <option :value="c.slug" x-text="c.name"></option>
-                                    <template x-for="ch in c.children" :key="ch.slug">
-                                        <option :value="c.slug + '::' + ch.slug" x-text="'   ↳ ' + ch.name"></option>
-                                    </template>
-                                </optgroup>
+                            <template x-for="c in categories" :key="c.id">
+                                <option :value="c.id" x-text="(c.depth ? '   ↳ ' : '') + c.name"></option>
                             </template>
                         </select>
                     </div>
@@ -143,26 +144,32 @@ document.addEventListener('alpine:init', () => {
         categories, pages,
         editing: null,
         linkType: 'custom',
-        form: { id: null, label: '', url: '', parent_id: '', is_active: true },
+        get setType() { return this.linkType; },
+        form: { id: null, label: '', url: '', type: 'custom', category_id: '', parent_id: '', is_active: true },
         get formAction() { return this.editing ? '/admin/menu/' + this.editing : this.createUrl; },
         get formMethod() { return this.editing ? 'PUT' : 'POST'; },
         edit(id) {
             const m = this.items.find(x => x.id === id);
             if (!m) return;
             this.editing = m.id;
-            this.form = { id: m.id, label: m.label, url: m.url || '', parent_id: m.parent_id || '', is_active: !!m.is_active };
-            this.linkType = 'custom';
+            this.form = { id: m.id, label: m.label, url: m.url || '', type: m.type || 'custom', category_id: m.category_id || '', parent_id: m.parent_id || '', is_active: !!m.is_active };
+            this.linkType = m.type === 'category' ? 'category' : (m.type === 'page' ? 'page' : 'custom');
         },
-        resetForm() { this.editing = null; this.form = { id: null, label: '', url: '', parent_id: '', is_active: true }; this.linkType = 'custom'; },
+        resetForm() { this.editing = null; this.form = { id: null, label: '', url: '', type: 'custom', category_id: '', parent_id: '', is_active: true }; this.linkType = 'custom'; },
         pickCategory(val) {
             if (!val) return;
-            const [parent, child] = val.split('::');
-            this.form.url = '/danh-muc/' + (child || parent);
-            if (!this.form.label) { const c = this.categories.find(x => x.slug === parent); const cc = c && c.children.find(x => x.slug === child); this.form.label = cc ? cc.name : c.name; }
+            const c = this.categories.find(x => x.id === Number(val));
+            if (!c) return;
+            this.form.category_id = c.id;
+            this.form.type = 'category';
+            this.form.url = '/danh-muc/' + c.slug;
+            if (!this.form.label) this.form.label = c.name;
         },
         pickPage(val) {
             if (!val) return;
             this.form.url = val;
+            this.form.type = 'page';
+            this.form.category_id = '';
             if (!this.form.label) { const p = this.pages.find(x => x.url === val); if (p) this.form.label = p.label; }
         },
         up(id) { this.post('/admin/menu/' + id + '/up'); },

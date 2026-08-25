@@ -158,12 +158,48 @@ if (! function_exists('widget_limit')) {
         return max(1, (int) setting('widget_'.$key.'_limit', $default));
     }
 }
-if (! function_exists('menu_items')) {
-    function menu_items(string $location = 'header'): \Illuminate\Support\Collection
+if (! function_exists('category_children_nodes')) {
+    function category_children_nodes(\App\Models\Category $category): \Illuminate\Support\Collection
     {
-        return \App\Models\MenuItem::location($location)->active()
-            ->whereNull('parent_id')
-            ->with('children')
-            ->orderBy('sort_order')->orderBy('id')->get();
+        return $category->children()->orderBy('sort_order')->get()->map(function ($sub) {
+            return (object) [
+                'label' => $sub->name,
+                'url' => route('shop.category', $sub->slug),
+                'children' => category_children_nodes($sub),
+            ];
+        });
+    }
+}
+
+if (! function_exists('menu_tree')) {
+    function menu_tree(string $location = 'header'): \Illuminate\Support\Collection
+    {
+        $items = \App\Models\MenuItem::location($location)->active()
+            ->with('category')->orderBy('sort_order')->orderBy('id')->get();
+
+        $byParent = $items->groupBy('parent_id');
+
+        $builder = function ($parentId) use ($byParent, &$builder) {
+            $nodes = collect();
+
+            foreach ($byParent->get($parentId, collect()) as $item) {
+                // Category-type menu item: auto-render subcategories recursively.
+                if ($item->type === 'category' && $item->category) {
+                    $children = category_children_nodes($item->category);
+                } else {
+                    $children = $builder($item->id);
+                }
+
+                $nodes->push((object) [
+                    'label' => $item->label,
+                    'url' => $item->getUrl(),
+                    'children' => $children,
+                ]);
+            }
+
+            return $nodes;
+        };
+
+        return $builder(null);
     }
 }

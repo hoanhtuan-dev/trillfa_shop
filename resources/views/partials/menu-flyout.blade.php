@@ -11,7 +11,7 @@
                 </svg>
             </button>
         @else
-            <a href="{{ $item->getUrl() }}" class="{{ $level === 0 ? 'block rounded-full px-4 py-2 text-sm font-medium text-ink-700 hover:bg-cream-200/70 hover:text-ink-900' : 'block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-cream-100' }}">{{ $item->label }}</a>
+            <a href="{{ $item->url }}" class="{{ $level === 0 ? 'block rounded-full px-4 py-2 text-sm font-medium text-ink-700 hover:bg-cream-200/70 hover:text-ink-900' : 'block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-cream-100' }}">{{ $item->label }}</a>
         @endif
 
         @if($hasChildren)
