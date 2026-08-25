@@ -79,13 +79,13 @@
                 <h2 class="mb-4 font-display text-lg font-semibold text-ink-900">Khách hàng</h2>
                 <div class="space-y-1 text-sm">
                     <p class="font-medium text-ink-900">{{ $order->name }}</p>
-                    <p class="text-ink-500">{{ $order->email }}</p>
+                    <p class="text-ink-500">{{ $order->email ?: '—' }}</p>
                     <p class="text-ink-500">{{ $order->phone }}</p>
                 </div>
             </div>
             <div class="card p-6">
                 <h2 class="mb-4 font-display text-lg font-semibold text-ink-900">Giao hàng</h2>
-                <p class="text-sm leading-relaxed text-ink-500">{{ $order->address }}</p>
+                <p class="text-sm leading-relaxed text-ink-500">{{ $order->address ?: 'Chưa cung cấp (nhân viên sẽ gọi xác nhận)' }}</p>
                 <p class="mt-1 text-sm text-ink-500">{{ implode(', ', array_filter([$order->ward, $order->district, $order->province])) }}</p>
                 @if($order->note)<p class="mt-2 rounded-lg bg-cream-100 p-2 text-xs text-ink-500">Ghi chú: {{ $order->note }}</p>@endif
             </div>

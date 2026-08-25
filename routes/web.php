@@ -27,6 +27,7 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\QuickCheckoutController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\ShopController;
@@ -75,6 +76,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/thanh-toan/{order}/thanh-toan', [CheckoutController::class, 'confirmPay'])->name('checkout.confirm');
     Route::get('/thanh-toan/{order}/hoan-tat', [CheckoutController::class, 'success'])->name('checkout.success');
 });
+
+// Quick checkout — guests can order with just name + phone (COD)
+Route::get('/thanh-toan-nhanh', [QuickCheckoutController::class, 'form'])->name('checkout.quick');
+Route::post('/thanh-toan-nhanh', [QuickCheckoutController::class, 'store'])->name('checkout.quick.store');
+Route::get('/thanh-toan-nhanh/{order}/hoan-tat', [QuickCheckoutController::class, 'success'])->name('checkout.quick-success');
+Route::get('/hoan-thien-tai-khoan/{order}', [QuickCheckoutController::class, 'completeForm'])->name('account.complete');
+Route::post('/hoan-thien-tai-khoan/{order}', [QuickCheckoutController::class, 'completeStore'])->name('account.complete.store');
 
 // Account (auth)
 Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function () {

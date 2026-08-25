@@ -7,6 +7,7 @@ use App\Models\Coupon;
 use App\Models\Product;
 use App\Models\ShippingMethod;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CartService
 {
@@ -26,7 +27,7 @@ class CartService
             $this->mergeGuestCart($cart);
         } else {
             $cart = Cart::firstOrCreate([
-                'session_id' => session()->getId(),
+                'session_id' => $this->guestToken(),
                 'user_id' => null,
             ]);
         }
@@ -279,6 +280,24 @@ class CartService
         ];
     }
 
+    /**
+     * A stable guest-cart key kept in session data (survives session-id
+     * migration on login and per-request regeneration in tests).
+     */
+    protected function guestToken(): string
+    {
+        $token = session('guest_cart_token');
+
+        if ($token) {
+            return $token;
+        }
+
+        $token = Str::random(32);
+        session(['guest_cart_token' => $token]);
+
+        return $token;
+    }
+
     protected function refreshCart(): void
     {
         $this->cart = $this->cart(true);
@@ -288,7 +307,7 @@ class CartService
     {
         $guestCart = Cart::with('items')
             ->whereNull('user_id')
-            ->where('session_id', session()->getId())
+            ->where('session_id', $this->guestToken())
             ->first();
 
         if (! $guestCart || $guestCart->id === $userCart->id) {

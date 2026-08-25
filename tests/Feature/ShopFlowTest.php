@@ -528,4 +528,91 @@ class ShopFlowTest extends TestCase
             ->assertSee('Cat Auto Menu')
             ->assertSee('Sub Auto');
     }
+
+
+    public function test_quick_checkout_guest_creates_pending_account(): void
+    {
+        $this->withSession(['marker' => 'x']);
+        $product = Product::first();
+        $this->postJson('/api/cart/add', ['product_id' => $product->id, 'quantity' => 2])->assertOk();
+
+        $ordersBefore = \App\Models\Order::count();
+
+        $this->post('/thanh-toan-nhanh', [
+            'name' => 'Khách Vãng Lai',
+            'phone' => '0912345888',
+            'terms' => '1',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('orders', $ordersBefore + 1);
+
+        $order = \App\Models\Order::latest('id')->first();
+        $this->assertSame('0912345888', $order->phone);
+        $this->assertNull($order->email);
+        $this->assertNull($order->address);
+
+        // Pending account silently persisted (inactive) and linked to the order
+        $user = \App\Models\User::where('phone', '0912345888')->first();
+        $this->assertNotNull($user);
+        $this->assertFalse($user->is_active);
+        $this->assertSame($user->id, $order->user_id);
+
+        // Cart cleared and success page encourages completing registration
+        $this->getJson('/api/cart')->assertJsonPath('count', 0);
+        $this->get(route('checkout.quick-success', $order))
+            ->assertOk()
+            ->assertSee('Hoàn thiện tài khoản')
+            ->assertSee('0912345888');
+    }
+
+    public function test_guest_can_complete_pending_account(): void
+    {
+        $this->withSession(['marker' => 'x']);
+        $product = Product::first();
+        $this->postJson('/api/cart/add', ['product_id' => $product->id, 'quantity' => 1])->assertOk();
+
+        $this->post('/thanh-toan-nhanh', [
+            'name' => 'Khách Cần Hoàn Thiện',
+            'phone' => '0912345999',
+            'terms' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $order = \App\Models\Order::latest('id')->first();
+
+        $this->get(route('account.complete', $order))
+            ->assertOk()
+            ->assertSee('Hoàn thiện tài khoản');
+
+        $this->post(route('account.complete.store', $order), [
+            'email' => 'guest.completed@example.com',
+            'password' => 'secret12345',
+            'password_confirmation' => 'secret12345',
+        ])->assertRedirect(route('account.dashboard'));
+
+        $this->assertDatabaseHas('users', ['email' => 'guest.completed@example.com', 'is_active' => 1]);
+        $this->assertAuthenticated();
+        $this->assertSame('guest.completed@example.com', $order->fresh()->email);
+    }
+
+    public function test_quick_checkout_links_existing_customer(): void
+    {
+        $this->withSession(['marker' => 'x']);
+        $user = User::where('email', 'customer@trillfa.com')->first();
+        $product = Product::first();
+
+        $this->postJson('/api/cart/add', ['product_id' => $product->id, 'quantity' => 1])->assertOk();
+
+        $this->post('/thanh-toan-nhanh', [
+            'name' => $user->name,
+            'phone' => $user->phone,
+            'terms' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $order = \App\Models\Order::latest('id')->first();
+        $this->assertSame($user->id, $order->user_id);
+
+        $this->get(route('checkout.quick-success', $order))
+            ->assertOk()
+            ->assertSee('Đăng ký để quản lý đơn tốt hơn');
+    }
 }

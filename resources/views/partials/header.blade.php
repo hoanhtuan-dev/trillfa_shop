@@ -34,11 +34,15 @@
                         x-model="query"
                         @input="onInput"
                         @keydown.enter.prevent="go()"
+                        @keydown.escape="clear()"
                         @focus="open = true"
-                        type="search"
+                        type="text"
                         placeholder="Tìm kiếm sản phẩm..."
-                        class="input !rounded-full !py-2.5 pl-4 pr-4"
+                        class="input !rounded-full !py-2.5 pl-4 pr-16"
                     >
+                    <button @click="clear()" x-show="query.length > 0" x-transition.opacity.duration.150ms type="button" class="absolute right-11 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-ink-400 hover:text-ink-900" aria-label="Thoát tìm kiếm">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                     <button @click="go()" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-ink-900 p-2 text-cream-50 hover:bg-brand-700">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"/></svg>
                     </button>
@@ -118,7 +122,10 @@
         <div class="container-x space-y-1 py-4">
             <div x-data="searchBox" class="pb-3">
                 <div class="relative">
-                    <input x-model="query" @input="onInput" @keydown.enter.prevent="go()" type="search" placeholder="Tìm kiếm sản phẩm..." class="input !rounded-full !py-2.5 pl-4 pr-4">
+                    <input x-model="query" @input="onInput" @keydown.enter.prevent="go()" @keydown.escape="clear()" type="text" placeholder="Tìm kiếm sản phẩm..." class="input !rounded-full !py-2.5 pl-4 pr-16">
+                    <button @click="clear()" x-show="query.length > 0" x-transition.opacity.duration.150ms type="button" class="absolute right-11 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-ink-400 hover:text-ink-900" aria-label="Thoát tìm kiếm">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                     <button @click="go()" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-ink-900 p-2 text-cream-50">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"/></svg>
                     </button>

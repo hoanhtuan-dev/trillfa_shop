@@ -82,6 +82,7 @@
                 <div class="flex justify-between pt-2 text-base font-semibold text-ink-900"><span>Tổng cộng</span><span x-text="$money($store.cart.total)"></span></div>
             </div>
             <a href="{{ route('checkout.show') }}" class="btn-brand mt-4 w-full">Thanh toán</a>
+            <a href="{{ route('checkout.quick') }}" class="btn-outline mt-2 w-full">Thanh toán nhanh</a>
             <button @click="$store.cart.closeDrawer()" class="btn-ghost mt-2 w-full text-ink-500">Tiếp tục mua sắm</button>
         </div>
     </div>

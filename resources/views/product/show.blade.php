@@ -34,6 +34,7 @@
                 <p class="text-sm font-semibold text-brand-700" x-text="$money(selectedPrice)"></p>
             </div>
             <button @click="addToCart()" :disabled="outOfStock" class="btn-brand btn-sm shrink-0" x-text="outOfStock ? 'Hết hàng' : 'Thêm giỏ'"></button>
+            <button @click="buyNow()" :disabled="outOfStock" class="btn-outline btn-sm shrink-0">Mua ngay</button>
         </div>
     </div>
         <!-- Gallery -->
@@ -117,6 +118,10 @@
                     </button>
                 </div>
                 <p class="mt-3 text-sm" :class="outOfStock ? 'text-red-600' : 'text-ink-500'" x-text="stockText"></p>
+                <button type="button" @click="buyNow()" :disabled="adding || outOfStock" class="btn-outline mt-3 flex w-full items-center justify-center gap-2">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                    <span>Mua ngay — Thanh toán nhanh</span>
+                </button>
             </form>
 
             <!-- Delivery/shipping info -->
@@ -311,6 +316,13 @@
                 this.adding = true;
                 await Alpine.store('cart').add(this.productId, this.hasVariants ? this.selectedVariantId : null, this.quantity);
                 this.adding = false;
+            },
+            async buyNow() {
+                if (this.outOfStock) return;
+                this.adding = true;
+                await Alpine.store('cart').add(this.productId, this.hasVariants ? this.selectedVariantId : null, this.quantity);
+                this.adding = false;
+                window.location.href = '/thanh-toan-nhanh';
             }
         }));
     });

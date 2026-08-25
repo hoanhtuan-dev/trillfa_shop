@@ -4,16 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Mail\OrderConfirmation;
 use App\Models\Order;
-use App\Models\Product;
-use App\Models\ProductVariant;
 use App\Services\CartService;
+use App\Services\CheckoutService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
-    public function __construct(protected CartService $cart)
+    public function __construct(protected CartService $cart, protected CheckoutService $checkout)
     {
     }
 
@@ -51,67 +49,14 @@ class CheckoutController extends Controller
             'terms' => ['accepted'],
         ]);
 
-        if ($data['shipping_method'] ?? null) {
-            $this->cart->setShippingMethod($data['shipping_method']);
-        }
-
-        $payload = $this->cart->payload();
-
-        $order = DB::transaction(function () use ($request, $data, $payload) {
-            $order = Order::create([
-                'order_number' => Order::generateNumber(),
-                'user_id' => auth()->id(),
-                'email' => $data['email'],
-                'name' => $data['name'],
-                'phone' => $data['phone'],
-                'address' => $data['address'],
-                'ward' => $data['ward'] ?? null,
-                'district' => $data['district'] ?? null,
-                'province' => $data['province'] ?? null,
-                'note' => $data['note'] ?? null,
-                'subtotal' => $payload['subtotal'],
-                'discount' => $payload['discount'],
-                'shipping_fee' => $payload['shipping_fee'],
-                'tax' => 0,
-                'total' => $payload['total'],
-                'shipping_method' => $payload['shipping_method']['name'] ?? null,
-                'payment_method' => $data['payment_method'],
-                'payment_status' => 'unpaid',
-                'coupon_id' => $this->cart->cart()->coupon_id,
-                'status' => Order::STATUS_PENDING,
-                'placed_at' => now(),
-            ]);
-
-            foreach ($this->cart->cart()->items as $item) {
-                $order->items()->create([
-                    'product_id' => $item->product_id,
-                    'variant_id' => $item->variant_id,
-                    'product_name' => $item->product?->name ?? 'Sản phẩm',
-                    'sku' => $item->product?->sku,
-                    'options' => $item->options,
-                    'price' => $item->price,
-                    'quantity' => $item->quantity,
-                    'subtotal' => round($item->price * $item->quantity, 2),
-                    'image' => $item->product?->image,
-                ]);
-
-                $this->stockOut($item->product_id, $item->variant_id, $item->quantity);
-            }
-
-            if ($this->cart->cart()->coupon) {
-                $coupon = $this->cart->cart()->coupon;
-                $coupon->increment('used_count');
-            }
-
-            return $order;
-        });
+        $order = $this->checkout->place($this->cart, $data, auth()->id(), $data['payment_method']);
 
         $isOnline = in_array($data['payment_method'], ['vnpay', 'momo']);
         $this->cart->clear();
         session()->forget('shipping_method');
 
         try {
-            Mail::to($data['email'])->send(new OrderConfirmation($order));
+            Mail::to($order->email)->send(new OrderConfirmation($order));
         } catch (\Throwable $e) {
             logger()->error('Send order confirmation email failed: '.$e->getMessage());
         }
@@ -146,21 +91,5 @@ class CheckoutController extends Controller
     public function success(Order $order)
     {
         return view('checkout.success', compact('order'));
-    }
-
-    protected function stockOut(int $productId, ?int $variantId, int $quantity): void
-    {
-        if ($variantId) {
-            ProductVariant::where('id', $variantId)->decrement('stock', $quantity);
-            $product = Product::find($productId);
-            if ($product) {
-                $product->increment('sales_count', $quantity);
-                $product->stock = $product->variants()->sum('stock');
-                $product->save();
-            }
-        } else {
-            Product::where('id', $productId)->decrement('stock', $quantity);
-            Product::where('id', $productId)->increment('sales_count', $quantity);
-        }
     }
 }

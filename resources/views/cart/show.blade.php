@@ -105,6 +105,7 @@
                 </div>
 
                 <a href="{{ route('checkout.show') }}" class="btn-brand mt-5 w-full">Tiến hành thanh toán</a>
+                <a href="{{ route('checkout.quick') }}" class="btn-outline mt-2 w-full">Thanh toán nhanh <span class="font-normal opacity-80">(chỉ cần SĐT)</span></a>
                 <a href="{{ route('shop.index') }}" class="btn-ghost mt-2 w-full text-ink-500">Tiếp tục mua sắm</a>
             </div>
         </div>
