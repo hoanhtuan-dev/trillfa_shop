@@ -9,6 +9,38 @@
 
     <form method="POST" action="{{ route('checkout.store') }}" class="mt-8 grid gap-8 lg:grid-cols-[1fr_420px]">
         @csrf
+
+        <!-- Mobile order-summary accordion -->
+        <div class="card lg:hidden" x-data="{ open: false }">
+            <button type="button" @click="open = !open" class="flex w-full items-center justify-between p-4">
+                <div class="text-left">
+                    <p class="text-xs text-ink-500">Tổng cộng</p>
+                    <p class="text-lg font-semibold text-brand-700" x-text="$money($store.cart.total)"></p>
+                </div>
+                <span class="text-sm text-ink-500" x-text="open ? 'Ẩn chi tiết' : 'Xem chi tiết'"></span>
+            </button>
+            <div x-show="open" x-collapse class="border-t border-cream-200 p-4">
+                <div class="max-h-60 space-y-3 overflow-y-auto">
+                    <template x-for="item in $store.cart.items" :key="item.id">
+                        <div class="flex items-center gap-3">
+                            <img :src="item.image" class="h-12 w-12 rounded-lg bg-cream-100 object-cover" alt="">
+                            <div class="flex-1 min-w-0">
+                                <p class="truncate text-sm font-medium text-ink-900" x-text="item.name"></p>
+                                <p class="text-xs text-ink-500" x-text="item.variant_name || ''"></p>
+                            </div>
+                            <span class="text-sm text-ink-700" x-text="'x' + item.quantity + ' · ' + $money(item.line_total)"></span>
+                        </div>
+                    </template>
+                </div>
+                <div class="mt-3 space-y-1.5 border-t border-cream-200 pt-3 text-sm">
+                    <div class="flex justify-between text-ink-500"><span>Tạm tính</span><span x-text="$money($store.cart.subtotal)"></span></div>
+                    <div class="flex justify-between text-brand-600" x-show="$store.cart.discount > 0"><span>Giảm giá</span><span x-text="'-' + $money($store.cart.discount)"></span></div>
+                    <div class="flex justify-between text-ink-500"><span>Phí vận chuyển</span><span x-text="$store.cart.shippingFee > 0 ? $money($store.cart.shippingFee) : 'Miễn phí'"></span></div>
+                    <div class="flex justify-between border-t border-cream-200 pt-2 text-base font-semibold text-ink-900"><span>Tổng</span><span x-text="$money($store.cart.total)"></span></div>
+                </div>
+            </div>
+        </div>
+
         <div class="space-y-6">
             <!-- Contact -->
             <div class="card p-6">

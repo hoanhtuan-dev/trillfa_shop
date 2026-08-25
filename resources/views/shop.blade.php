@@ -29,74 +29,34 @@
         </form>
     </div>
 
-    <div class="grid gap-8 lg:grid-cols-[260px_1fr]">
-        <!-- Filters -->
-        <aside class="lg:sticky lg:top-24 lg:self-start" x-data="{ open: false }">
-            <button @click="open = !open" class="btn-outline w-full lg:hidden">Bộ lọc</button>
-            <div class="mt-4 space-y-6 lg:mt-0" :class="open ? 'block' : 'hidden lg:block'">
-                <!-- Search -->
-                <form method="GET" class="card p-5">
-                    @if($category)<input type="hidden" name="category_id" value="{{ $category->id }}">@endif
-                    @if(request()->has('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}">@endif
-                    <label class="label">Tìm kiếm</label>
-                    <input type="text" name="q" value="{{ request('q') }}" placeholder="Tên sản phẩm..." class="input">
-                    <button type="submit" class="btn-brand btn-sm mt-3 w-full">Lọc</button>
-                </form>
-
-                <!-- Categories -->
-                <div class="card p-5">
-                    <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-900">Danh mục</h3>
-                    <ul class="space-y-2 text-sm">
-                        <li>
-                            <a href="{{ route('shop.index') }}" class="flex items-center justify-between text-ink-700 hover:text-brand-700 {{ !$category ? 'font-semibold text-brand-700' : '' }}">Tất cả</a>
-                        </li>
-                        @foreach($categories as $cat)
-                            <li>
-                                <a href="{{ route('shop.category', $cat->slug) }}" class="flex items-center justify-between text-ink-700 hover:text-brand-700 {{ $category && $category->id === $cat->id ? 'font-semibold text-brand-700' : '' }}">
-                                    <span class="flex items-center gap-2">
-                                        <span class="grid h-6 w-6 place-items-center text-brand-600"><x-category-icon :name="$cat->icon" :image="$cat->icon_image_url" size="h-5 w-5" /></span>
-                                        {{ $cat->name }}
-                                    </span>
-                                    <span class="text-xs text-ink-500">{{ $cat->products_count ?? '' }}</span>
-                                </a>
-                                @if($cat->children->isNotEmpty())
-                                    <ul class="mt-1.5 space-y-1.5 pl-4">
-                                        @foreach($cat->children as $child)
-                                            <li><a href="{{ route('shop.category', $child->slug) }}" class="flex items-center justify-between text-xs text-ink-500 hover:text-brand-700">{{ $child->name }}</a></li>
-                                        @endforeach
-                                    </ul>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-
-                <!-- Price -->
-                <form method="GET" class="card p-5">
-                    @if($category)<input type="hidden" name="category_id" value="{{ $category->id }}">@endif
-                    @if(request()->has('q'))<input type="hidden" name="q" value="{{ request('q') }}">@endif
-                    <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-900">Khoảng giá</h3>
-                    <div class="flex items-center gap-2">
-                        <input type="number" name="min_price" value="{{ request('min_price') }}" placeholder="Từ" class="input !py-2" min="0">
-                        <span class="text-ink-500">–</span>
-                        <input type="number" name="max_price" value="{{ request('max_price') }}" placeholder="Đến" class="input !py-2" min="0">
-                    </div>
-                    <button type="submit" class="btn-outline btn-sm mt-3 w-full">Áp dụng</button>
-                </form>
-
-                <!-- Brand -->
-                @if($brands->isNotEmpty())
-                <div class="card p-5">
-                    <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-900">Thương hiệu</h3>
-                    <div class="flex flex-wrap gap-2">
-                        @foreach($brands as $brand)
-                            <a href="{{ route('shop.index', ['brand' => $brand] + request()->except(['page','brand'])) }}" class="chip {{ request('brand') === $brand ? '!border-brand-600 !text-brand-700' : '' }}">{{ $brand }}</a>
-                        @endforeach
-                    </div>
-                </div>
-                @endif
-            </div>
+    <div class="grid gap-8 lg:grid-cols-[260px_1fr]" x-data="{ filtersOpen: false }">
+        <!-- Filters (desktop) -->
+        <aside class="hidden lg:block lg:sticky lg:top-24 lg:self-start">
+            @include('partials.shop-filters')
         </aside>
+
+        <!-- Mobile: open bottom-sheet -->
+        <button @click="filtersOpen = true" class="btn-outline lg:hidden">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h12M6 12h12M6 18h6"/></svg>
+            Bộ lọc
+        </button>
+
+        <!-- Mobile: bottom-sheet -->
+        <div x-show="filtersOpen" x-cloak class="fixed inset-0 z-[75] lg:hidden">
+            <div @click="filtersOpen = false" class="absolute inset-0 bg-ink-900/40 backdrop-blur-sm"></div>
+            <div x-show="filtersOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full" class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white p-5 pb-24">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="font-display text-lg font-semibold text-ink-900">Bộ lọc</h2>
+                    <button @click="filtersOpen = false" class="btn-ghost !p-2" aria-label="Đóng">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="space-y-6">
+                    @include('partials.shop-filters')
+                </div>
+                <button @click="filtersOpen = false" class="btn-brand mt-4 w-full">Áp dụng</button>
+            </div>
+        </div>
 
         <!-- Products -->
         <div>

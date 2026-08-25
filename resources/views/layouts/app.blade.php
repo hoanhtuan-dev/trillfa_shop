@@ -34,6 +34,7 @@
     @include('partials.footer')
     <div class="h-16 md:hidden"></div>
     @include('partials.mobile-nav')
+    @include('partials.floating-contact')
     @include('partials.cart-drawer')
     @include('partials.toasts')
     @include('partials.flash')
