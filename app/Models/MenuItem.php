@@ -1,0 +1,43 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class MenuItem extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['location', 'parent_id', 'label', 'url', 'sort_order', 'is_active'];
+
+    protected $casts = ['sort_order' => 'integer', 'is_active' => 'boolean'];
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(MenuItem::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(MenuItem::class, 'parent_id')->where('is_active', true)->orderBy('sort_order');
+    }
+
+    public function scopeLocation(Builder $q, string $location): Builder
+    {
+        return $q->where('location', $location);
+    }
+
+    public function scopeActive(Builder $q): Builder
+    {
+        return $q->where('is_active', true);
+    }
+
+    public function getUrl(): ?string
+    {
+        return $this->url ? (str_starts_with($this->url, 'http') || str_starts_with($this->url, '/') ? $this->url : url($this->url)) : '#';
+    }
+}

@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AdminBannerController;
 use App\Http\Controllers\Admin\AdminCategoryController;
 use App\Http\Controllers\Admin\AdminCouponController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminMenuController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminPageContentController;
 use App\Http\Controllers\Admin\AdminPaymentController;
@@ -171,6 +172,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/posts/{post}', [AdminPostController::class, 'update'])->name('posts.update');
     Route::delete('/posts/{post}', [AdminPostController::class, 'destroy'])->name('posts.destroy');
 
+    Route::get('/menu', [AdminMenuController::class, 'index'])->name('menu.index');
+    Route::post('/menu', [AdminMenuController::class, 'store'])->name('menu.store');
+    Route::put('/menu/{menuItem}', [AdminMenuController::class, 'update'])->name('menu.update');
+    Route::delete('/menu/{menuItem}', [AdminMenuController::class, 'destroy'])->name('menu.destroy');
+    Route::post('/menu/{menuItem}/toggle', [AdminMenuController::class, 'toggleActive'])->name('menu.toggle');
+    Route::post('/menu/{menuItem}/up', [AdminMenuController::class, 'moveUp'])->name('menu.up');
+    Route::post('/menu/{menuItem}/down', [AdminMenuController::class, 'moveDown'])->name('menu.down');
+
     Route::get('/banners', [AdminBannerController::class, 'index'])->name('banners.index');
     Route::post('/banners', [AdminBannerController::class, 'store'])->name('banners.store');
     Route::put('/banners/{banner}', [AdminBannerController::class, 'update'])->name('banners.update');
@@ -180,6 +189,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/settings', [AdminSettingController::class, 'index'])->name('settings.index');
     Route::get('/pages/about', [AdminPageContentController::class, 'about'])->name('pages.about');
     Route::post('/pages/about', [AdminPageContentController::class, 'updateAbout'])->name('pages.about.update');
+    Route::get('/pages/contact', [AdminPageContentController::class, 'contact'])->name('pages.contact');
+    Route::post('/pages/contact', [AdminPageContentController::class, 'updateContact'])->name('pages.contact.update');
     Route::post('/settings', [AdminSettingController::class, 'update'])->name('settings.update');
 
     Route::get('/shipping', [AdminShippingController::class, 'index'])->name('shipping.index');

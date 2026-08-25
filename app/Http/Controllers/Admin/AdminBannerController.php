@@ -63,6 +63,7 @@ class AdminBannerController extends Controller
             'image' => ['nullable', 'image', 'max:4096'],
             'button_text' => ['nullable', 'string', 'max:120'],
             'button_link' => ['nullable', 'string', 'max:255'],
+            'link' => ['nullable', 'string', 'max:255'],
             'position' => ['nullable', 'string', 'max:50'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],

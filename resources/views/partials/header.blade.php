@@ -107,28 +107,25 @@
             </div>
         </div>
 
-        <!-- Nav -->
+        <!-- Nav (managed via Admin -> Menu) -->
         <nav class="hidden h-12 items-center gap-1 lg:flex">
-            <a href="{{ route('shop.index') }}" class="rounded-full px-3 text-sm font-medium text-ink-700 hover:bg-cream-200/70 hover:text-ink-900">Tất cả sản phẩm</a>
-            @foreach ($navbarCategories as $cat)
+            @foreach(menu_items('header') as $item)
                 <div class="relative" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false">
-                    <a href="{{ route('shop.category', $cat->slug) }}" class="flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium text-ink-700 hover:bg-cream-200/70 hover:text-ink-900">
-                        {{ $cat->name }}
-                        @if($cat->children->isNotEmpty())
+                    <a href="{{ $item->getUrl() }}" class="flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium text-ink-700 hover:bg-cream-200/70 hover:text-ink-900">
+                        {{ $item->label }}
+                        @if($item->children->isNotEmpty())
                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
                         @endif
                     </a>
-                    @if($cat->children->isNotEmpty())
+                    @if($item->children->isNotEmpty())
                         <div x-show="open" x-transition.opacity.duration.150ms class="absolute left-0 z-50 mt-0 min-w-[220px] rounded-2xl border border-cream-200 bg-white p-2 shadow-xl">
-                            @foreach ($cat->children as $child)
-                                <a href="{{ route('shop.category', $child->slug) }}" class="block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-cream-100">{{ $child->name }}</a>
+                            @foreach ($item->children as $child)
+                                <a href="{{ $child->getUrl() }}" class="block rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-cream-100">{{ $child->label }}</a>
                             @endforeach
                         </div>
                     @endif
                 </div>
             @endforeach
-            <a href="{{ route('blog.index') }}" class="rounded-full px-3 text-sm font-medium text-ink-700 hover:bg-cream-200/70 hover:text-ink-900">Blog</a>
-            <a href="{{ route('page.about') }}" class="rounded-full px-3 text-sm font-medium text-ink-700 hover:bg-cream-200/70 hover:text-ink-900">Về chúng tôi</a>
         </nav>
     </div>
 
@@ -143,12 +140,12 @@
                     </button>
                 </div>
             </div>
-            <a href="{{ route('shop.index') }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-900 hover:bg-cream-100">Tất cả sản phẩm</a>
-            @foreach ($navbarCategories as $cat)
-                <a href="{{ route('shop.category', $cat->slug) }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-700 hover:bg-cream-100">{{ $cat->name }}</a>
+            @foreach(menu_items('header') as $item)
+                <a href="{{ $item->getUrl() }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-900 hover:bg-cream-100">{{ $item->label }}</a>
+                @foreach($item->children as $child)
+                    <a href="{{ $child->getUrl() }}" class="block rounded-lg py-2.5 pl-8 pr-3 text-sm font-medium text-ink-500 hover:bg-cream-100">{{ $child->label }}</a>
+                @endforeach
             @endforeach
-            <a href="{{ route('blog.index') }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-700 hover:bg-cream-100">Blog</a>
-            <a href="{{ route('page.about') }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-700 hover:bg-cream-100">Về chúng tôi</a>
             <div class="pt-2">
                 @auth
                     <a href="{{ route('account.dashboard') }}" class="btn-brand w-full">Tài khoản của tôi</a>

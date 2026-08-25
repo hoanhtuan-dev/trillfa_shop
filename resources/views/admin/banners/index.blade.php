@@ -45,8 +45,9 @@
             <div><label class="label">Phụ đề</label><input type="text" name="subtitle" x-model="form.subtitle" class="input"></div>
             <div class="grid grid-cols-2 gap-3">
                 <div><label class="label">Nút bấm</label><input type="text" name="button_text" x-model="form.button_text" class="input"></div>
-                <div><label class="label">Liên kết</label><input type="text" name="button_link" x-model="form.button_link" class="input"></div>
+                <div><label class="label">Liên kết nút</label><input type="text" name="button_link" x-model="form.button_link" class="input" placeholder="/san-pham"></div>
             </div>
+            <div><label class="label">Link toàn banner (bấm vào ảnh banner)</label><input type="text" name="link" x-model="form.link" class="input" placeholder="https://... hoặc /danh-muc/..."></div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="label">Vị trí</label>
@@ -84,7 +85,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('bannerForm', (items, createUrl) => ({
         items, createUrl,
         editing: null,
-        form: { id: null, title: '', subtitle: '', button_text: '', button_link: '', position: 'hero', sort_order: 0, is_active: true },
+        form: { id: null, title: '', subtitle: '', button_text: '', button_link: '', link: '', position: 'hero', sort_order: 0, is_active: true },
         imagePreview: null,
         fileName: '',
         get formAction() { return this.editing ? '/admin/banners/' + this.editing : this.createUrl; },
@@ -93,7 +94,7 @@ document.addEventListener('alpine:init', () => {
             const b = this.items.find(x => x.id === id);
             if (!b) return;
             this.editing = b.id;
-            this.form = { id: b.id, title: b.title, subtitle: b.subtitle || '', button_text: b.button_text || '', button_link: b.button_link || '', position: b.position || 'hero', sort_order: b.sort_order || 0, is_active: !!b.is_active };
+            this.form = { id: b.id, title: b.title, subtitle: b.subtitle || '', button_text: b.button_text || '', button_link: b.button_link || '', link: b.link || '', position: b.position || 'hero', sort_order: b.sort_order || 0, is_active: !!b.is_active };
             this.setImage(b.image || null);
         },
         resetForm() {

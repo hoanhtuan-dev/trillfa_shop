@@ -158,3 +158,12 @@ if (! function_exists('widget_limit')) {
         return max(1, (int) setting('widget_'.$key.'_limit', $default));
     }
 }
+if (! function_exists('menu_items')) {
+    function menu_items(string $location = 'header'): \Illuminate\Support\Collection
+    {
+        return \App\Models\MenuItem::location($location)->active()
+            ->whereNull('parent_id')
+            ->with('children')
+            ->orderBy('sort_order')->orderBy('id')->get();
+    }
+}

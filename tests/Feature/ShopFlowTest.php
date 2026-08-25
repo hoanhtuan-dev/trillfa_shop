@@ -447,4 +447,40 @@ class ShopFlowTest extends TestCase
         $this->delete('/admin/payments/'.$method->id)->assertSessionHas('success');
         $this->assertNull(\App\Models\PaymentMethod::find($method->id));
     }
+
+
+    public function test_admin_can_manage_menu(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/menu', [
+            'location' => 'header',
+            'label' => 'Khuyến mãi',
+            'url' => '/shop?sort=price_desc',
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $item = \App\Models\MenuItem::where('label', 'Khuyến mãi')->first();
+        $this->assertNotNull($item);
+
+        $this->get('/')->assertOk()->assertSee('Khuyến mãi');
+
+        $this->delete('/admin/menu/'.$item->id)->assertSessionHas('success');
+        $this->assertNull(\App\Models\MenuItem::find($item->id));
+    }
+
+    public function test_admin_can_update_contact_page(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/pages/contact', [
+            'contact_heading' => 'Liên hệ Trillfa Fa',
+            'contact_intro' => 'Chúng tôi sẵn sàng hỗ trợ bạn.',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Liên hệ Trillfa Fa', setting('contact_heading'));
+        $this->get('/lien-he')->assertOk()->assertSee('Liên hệ Trillfa Fa');
+    }
 }

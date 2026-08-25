@@ -114,7 +114,7 @@
     <section class="container-x py-8">
         <div class="grid gap-4 sm:grid-cols-2">
             @foreach($secondaryBanners->take(2) as $banner)
-                <a href="{{ $banner->button_link ?: route('shop.index') }}" class="group relative overflow-hidden rounded-3xl">
+                <a href="{{ $banner->link ?: ($banner->button_link ?: route('shop.index')) }}" class="group relative overflow-hidden rounded-3xl">
                     <img src="{{ $banner->image_url ?: asset('images/placeholder.svg') }}" alt="{{ $banner->title }}" class="h-64 w-full object-cover transition-transform duration-500 group-hover:scale-105">
                     <div class="absolute inset-0 bg-gradient-to-t from-ink-900/70 to-transparent"></div>
                     <div class="absolute bottom-0 left-0 p-6 text-white">

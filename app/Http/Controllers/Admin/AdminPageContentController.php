@@ -39,4 +39,24 @@ class AdminPageContentController extends Controller
 
         return back()->with('success', 'Đã lưu nội dung trang Giới thiệu.');
     }
+
+    public function contact()
+    {
+        return view('admin.pages.contact');
+    }
+
+    public function updateContact(Request $request)
+    {
+        $data = $request->validate([
+            'contact_heading' => ['required', 'string', 'max:255'],
+            'contact_intro' => ['nullable', 'string', 'max:2000'],
+            'contact_hours' => ['nullable', 'string', '255'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            set_setting($key, $value);
+        }
+
+        return back()->with('success', 'Đã lưu nội dung trang Liên hệ.');
+    }
 }

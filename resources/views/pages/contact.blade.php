@@ -6,8 +6,8 @@
 <div class="container-x py-12">
     <div class="mx-auto max-w-3xl text-center">
         <p class="kicker mb-3">Liên hệ</p>
-        <h1 class="font-display text-4xl font-semibold text-ink-900 sm:text-5xl">Chúng tôi luôn lắng nghe</h1>
-        <p class="mt-4 text-ink-500">Mọi câu hỏi, góp ý hay hỗ trợ — hãy liên hệ với chúng tôi.</p>
+        <h1 class="font-display text-4xl font-semibold text-ink-900 sm:text-5xl">{{ setting('contact_heading', 'Chúng tôi luôn lắng nghe') }}</h1>
+        <p class="mt-4 text-ink-500">{{ setting('contact_intro', 'Mọi câu hỏi, góp ý hay hỗ trợ — hãy liên hệ với chúng tôi.') }}</p>
     </div>
 
     <div class="mt-12 grid gap-8 lg:grid-cols-2">
