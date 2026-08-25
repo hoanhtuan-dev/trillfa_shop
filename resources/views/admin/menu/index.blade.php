@@ -9,12 +9,25 @@
         'header' => ['label' => 'Menu Header (thanh điều hướng)', 'items' => $headerMenu],
         'footer' => ['label' => 'Menu Footer', 'items' => $footerMenu],
     ];
+    $categoriesJs = $categories->map(fn($c) => [
+        'name' => $c->name, 'slug' => $c->slug,
+        'children' => $c->children->map(fn($ch) => ['name'=>$ch->name,'slug'=>$ch->slug])->values(),
+    ])->values();
+    $pagesJs = collect($pages)->map(fn($p) => ['label'=>$p['label'],'url'=>$p['url']])->values();
+
     $js = [];
     foreach ($locations as $loc => $info) {
-        $top = $info['items']->whereNull('parent_id');
+        $byId = $info['items']->keyBy('id');
+        $depth = [];
+        foreach ($info['items'] as $it) {
+            $d = 0; $p = $it->parent_id;
+            while ($p && isset($byId[$p])) { $d++; $p = $byId[$p]->parent_id; }
+            $depth[$it->id] = $d;
+        }
         $js[$loc] = [
             'items' => $info['items']->map(fn($m) => ['id'=>$m->id,'label'=>$m->label,'url'=>$m->url,'parent_id'=>$m->parent_id,'sort_order'=>$m->sort_order,'is_active'=>$m->is_active])->values(),
-            'parents' => $top->map(fn($m) => ['id'=>$m->id,'label'=>$m->label])->values(),
+            'parents' => $info['items']->map(fn($m) => ['id'=>$m->id,'label'=>(str_repeat('— ', $depth[$m->id] ?? 0)).$m->label])->values(),
+            'depth' => $depth,
             'url' => route('admin.menu.store'),
         ];
     }
@@ -23,7 +36,7 @@
 <div class="space-y-8">
     @foreach($locations as $loc => $info)
         @php $cfg = $js[$loc]; @endphp
-        <div x-data="menuForm('{{ $loc }}', {{ Js::from($cfg) }})" class="grid gap-6 lg:grid-cols-[1fr_380px]">
+        <div x-data="menuForm('{{ $loc }}', {{ Js::from($cfg) }}, {{ Js::from($categoriesJs) }}, {{ Js::from($pagesJs) }})" class="grid gap-6 lg:grid-cols-[1fr_420px]">
             <!-- List -->
             <div class="card overflow-hidden">
                 <div class="border-b border-cream-200 p-5">
@@ -32,8 +45,9 @@
                 </div>
                 <div class="divide-y divide-cream-200">
                     @forelse($info['items'] as $item)
-                        <div class="flex items-center gap-3 p-4">
-                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-500 {{ $item->parent_id ? 'ml-6' : '' }}">
+                        @php $d = $cfg['depth'][$item->id] ?? 0; @endphp
+                        <div class="flex items-center gap-3 p-4" style="padding-left: {{ 16 + $d * 24 }}px">
+                            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-500">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.008v.008H3.75V6.75zm0 5.25h.008v.008H3.75V12zm0 5.25h.008v.008H3.75v-.008z"/></svg>
                             </span>
                             <div class="flex-1 min-w-0">
@@ -64,9 +78,43 @@
                     <input type="hidden" name="location" :value="location">
                     <input type="hidden" name="is_active" :value="form.is_active ? '1' : '0'">
                     <div><label class="label">Nhãn *</label><input type="text" name="label" x-model="form.label" class="input" required></div>
-                    <div><label class="label">URL (vd /san-pham, https://...)</label><input type="text" name="url" x-model="form.url" class="input"></div>
                     <div>
-                        <label class="label">Mục cha (với menu header)</label>
+                        <label class="label">Loại liên kết</label>
+                        <select x-model="linkType" class="input">
+                            <option value="custom">Đường dẫn tùy chỉnh</option>
+                            <option value="category">Danh mục sản phẩm</option>
+                            <option value="page">Trang</option>
+                        </select>
+                    </div>
+                    <div x-show="linkType === 'custom'">
+                        <label class="label">URL (vd /san-pham, https://...)</label>
+                        <input type="text" name="url" x-model="form.url" class="input">
+                    </div>
+                    <div x-show="linkType === 'category'">
+                        <label class="label">Chọn danh mục</label>
+                        <select @change="pickCategory($event.target.value)" class="input">
+                            <option value="">— Chọn danh mục —</option>
+                            <template x-for="(c, i) in categories" :key="c.slug">
+                                <optgroup :label="c.name">
+                                    <option :value="c.slug" x-text="c.name"></option>
+                                    <template x-for="ch in c.children" :key="ch.slug">
+                                        <option :value="c.slug + '::' + ch.slug" x-text="'   ↳ ' + ch.name"></option>
+                                    </template>
+                                </optgroup>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="linkType === 'page'">
+                        <label class="label">Chọn trang</label>
+                        <select @change="pickPage($event.target.value)" class="input">
+                            <option value="">— Chọn trang —</option>
+                            <template x-for="p in pages" :key="p.url">
+                                <option :value="p.url" x-text="p.label"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Mục cha (để tạo submenu)</label>
                         <select name="parent_id" x-model="form.parent_id" class="input">
                             <option value="">— Cấp cao nhất —</option>
                             <template x-for="p in parents" :key="p.id">
@@ -89,10 +137,12 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('menuForm', (location, cfg) => ({
+    Alpine.data('menuForm', (location, cfg, categories, pages) => ({
         location,
         items: cfg.items, parents: cfg.parents, createUrl: cfg.url,
+        categories, pages,
         editing: null,
+        linkType: 'custom',
         form: { id: null, label: '', url: '', parent_id: '', is_active: true },
         get formAction() { return this.editing ? '/admin/menu/' + this.editing : this.createUrl; },
         get formMethod() { return this.editing ? 'PUT' : 'POST'; },
@@ -101,8 +151,20 @@ document.addEventListener('alpine:init', () => {
             if (!m) return;
             this.editing = m.id;
             this.form = { id: m.id, label: m.label, url: m.url || '', parent_id: m.parent_id || '', is_active: !!m.is_active };
+            this.linkType = 'custom';
         },
-        resetForm() { this.editing = null; this.form = { id: null, label: '', url: '', parent_id: '', is_active: true }; },
+        resetForm() { this.editing = null; this.form = { id: null, label: '', url: '', parent_id: '', is_active: true }; this.linkType = 'custom'; },
+        pickCategory(val) {
+            if (!val) return;
+            const [parent, child] = val.split('::');
+            this.form.url = '/danh-muc/' + (child || parent);
+            if (!this.form.label) { const c = this.categories.find(x => x.slug === parent); const cc = c && c.children.find(x => x.slug === child); this.form.label = cc ? cc.name : c.name; }
+        },
+        pickPage(val) {
+            if (!val) return;
+            this.form.url = val;
+            if (!this.form.label) { const p = this.pages.find(x => x.url === val); if (p) this.form.label = p.label; }
+        },
         up(id) { this.post('/admin/menu/' + id + '/up'); },
         down(id) { this.post('/admin/menu/' + id + '/down'); },
         post(url) { const f = document.createElement('form'); f.method='POST'; f.action=url; f.innerHTML='@csrf'; document.body.appendChild(f); f.submit(); },

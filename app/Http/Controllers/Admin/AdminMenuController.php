@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\MenuItem;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,20 @@ class AdminMenuController extends Controller
         $headerMenu = MenuItem::location('header')->orderBy('sort_order')->orderBy('id')->get();
         $footerMenu = MenuItem::location('footer')->orderBy('sort_order')->orderBy('id')->get();
 
-        return view('admin.menu.index', compact('headerMenu', 'footerMenu'));
+        $categories = Category::active()->with('children', fn ($q) => $q->active())->orderBy('sort_order')->get();
+
+        $pages = [
+            ['label' => 'Trang chủ', 'url' => '/'],
+            ['label' => 'Cửa hàng', 'url' => '/shop'],
+            ['label' => 'Blog', 'url' => '/blog'],
+            ['label' => 'Giới thiệu', 'url' => '/gioi-thieu'],
+            ['label' => 'Liên hệ', 'url' => '/lien-he'],
+            ['label' => 'Câu hỏi thường gặp', 'url' => '/hoi-dap'],
+            ['label' => 'Chính sách bảo mật', 'url' => '/chinh-sach-bao-mat'],
+            ['label' => 'Điều khoản sử dụng', 'url' => '/dieu-khoan'],
+        ];
+
+        return view('admin.menu.index', compact('headerMenu', 'footerMenu', 'categories', 'pages'));
     }
 
     public function store(Request $request)

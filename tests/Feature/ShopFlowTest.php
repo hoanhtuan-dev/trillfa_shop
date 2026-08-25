@@ -483,4 +483,25 @@ class ShopFlowTest extends TestCase
         $this->assertSame('Liên hệ Trillfa Fa', setting('contact_heading'));
         $this->get('/lien-he')->assertOk()->assertSee('Liên hệ Trillfa Fa');
     }
+
+
+    public function test_menu_multi_level_renders(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/menu', ['location' => 'header', 'label' => 'Parent', 'url' => '/shop', 'is_active' => '1'])->assertSessionHasNoErrors();
+        $parent = \App\Models\MenuItem::where('label', 'Parent')->first();
+
+        $this->post('/admin/menu', ['location' => 'header', 'label' => 'Child', 'url' => '/danh-muc/ao-nu', 'parent_id' => $parent->id, 'is_active' => '1'])->assertSessionHasNoErrors();
+        $child = \App\Models\MenuItem::where('label', 'Child')->first();
+
+        $this->post('/admin/menu', ['location' => 'header', 'label' => 'Grandchild', 'url' => '/danh-muc/ao-nu', 'parent_id' => $child->id, 'is_active' => '1'])->assertSessionHasNoErrors();
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Parent')
+            ->assertSee('Child')
+            ->assertSee('Grandchild');
+    }
 }
