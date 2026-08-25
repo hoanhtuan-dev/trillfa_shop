@@ -25,6 +25,17 @@
     ]" />
 
     <div class="mt-8 grid gap-10 lg:grid-cols-2" x-data="productDetail({ productId: {{ $product->id }}, hasVariants: {{ $hasVariants ? 'true' : 'false' }}, variants: {{ Js::from($variants) }}, minQty: 1, maxQty: {{ max((int) $product->total_stock, 1) }} })">
+    <!-- Sticky add-to-cart (mobile) -->
+    <div class="fixed inset-x-0 bottom-16 z-[65] border-t border-cream-200 bg-white/95 p-3 backdrop-blur md:hidden">
+        <div class="container-x flex items-center gap-3">
+            <img src="{{ $product->image_url ?: asset('images/placeholder.svg') }}" class="h-12 w-12 shrink-0 rounded-xl object-cover" alt="">
+            <div class="flex-1 min-w-0">
+                <p class="truncate text-sm font-medium text-ink-900">{{ $product->name }}</p>
+                <p class="text-sm font-semibold text-brand-700" x-text="$money(selectedPrice)"></p>
+            </div>
+            <button @click="addToCart()" :disabled="outOfStock" class="btn-brand btn-sm shrink-0" x-text="outOfStock ? 'Hết hàng' : 'Thêm giỏ'"></button>
+        </div>
+    </div>
         <!-- Gallery -->
         <div class="lg:sticky lg:top-24 lg:self-start" x-data="productGallery({ images: {{ Js::from($baseImages) }} })" @variant-image.window="images.unshift($event.detail); active = 0">
             <div class="relative overflow-hidden rounded-3xl bg-cream-100">
