@@ -445,6 +445,24 @@ document.addEventListener('alpine:init', () => {
     }));
 });
 
+    // Product collection picker with category filter (landing pages)
+    Alpine.data('productPicker', (products, selectedIds, categories) => ({
+        products,
+        categories,
+        selected: (selectedIds || []).map(Number),
+        filterCat: '',
+        shown() {
+            if (!this.filterCat) return this.products;
+            return this.products.filter((p) => String(p.category_id) === String(this.filterCat));
+        },
+        toggle(id) {
+            id = Number(id);
+            const i = this.selected.indexOf(id);
+            if (i >= 0) this.selected.splice(i, 1);
+            else this.selected.push(id);
+        },
+    }));
+
 // ---------- PWA / Service Worker ----------
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {

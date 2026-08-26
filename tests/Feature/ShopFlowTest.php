@@ -704,4 +704,36 @@ class ShopFlowTest extends TestCase
         $this->assertSame('danh-muc-tu-chinh', $cat->slug);
     }
 
+
+    public function test_menu_can_link_to_landing_page(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $page = \App\Models\CustomPage::create([
+            'title' => 'Bộ sưu tập thu đông 2026',
+            'slug' => 'bo-suu-tap-thu-dong-2026-'.uniqid(),
+            'template' => 'landing',
+            'content' => '<p>Nội dung.</p>',
+            'is_active' => true,
+            'published_at' => now(),
+        ]);
+
+        $this->post('/admin/menu', [
+            'location' => 'header',
+            'label' => $page->title,
+            'type' => 'landing_page',
+            'custom_page_id' => $page->id,
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $item = \App\Models\MenuItem::where('label', $page->title)->first();
+        $this->assertNotNull($item);
+        $this->assertSame('landing_page', $item->type);
+        $this->assertSame($page->url, $item->getUrl());
+
+        // Menu renders on the storefront header
+        $this->get('/')->assertOk()->assertSee($page->title);
+    }
+
 }

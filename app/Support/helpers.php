@@ -182,7 +182,7 @@ if (! function_exists('menu_tree')) {
     function menu_tree(string $location = 'header'): \Illuminate\Support\Collection
     {
         $items = \App\Models\MenuItem::location($location)->active()
-            ->with('category')->orderBy('sort_order')->orderBy('id')->get();
+            ->with(['category', 'customPage'])->orderBy('sort_order')->orderBy('id')->get();
 
         $byParent = $items->groupBy('parent_id');
 

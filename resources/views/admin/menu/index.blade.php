@@ -18,6 +18,7 @@
     }
     $categoriesJs = $categoriesJs->values();
     $pagesJs = collect($pages)->map(fn($p) => ['label'=>$p['label'],'url'=>$p['url']])->values();
+    $customPagesJs = collect($customPages)->map(fn($p) => ['id'=>$p->id,'label'=>$p->title,'slug'=>$p->slug])->values();
 
     $js = [];
     foreach ($locations as $loc => $info) {
@@ -29,7 +30,7 @@
             $depth[$it->id] = $d;
         }
         $js[$loc] = [
-            'items' => $info['items']->map(fn($m) => ['id'=>$m->id,'label'=>$m->label,'url'=>$m->url,'parent_id'=>$m->parent_id,'sort_order'=>$m->sort_order,'is_active'=>$m->is_active])->values(),
+            'items' => $info['items']->map(fn($m) => ['id'=>$m->id,'label'=>$m->label,'url'=>$m->url,'parent_id'=>$m->parent_id,'sort_order'=>$m->sort_order,'is_active'=>$m->is_active,'type'=>$m->type,'category_id'=>$m->category_id,'custom_page_id'=>$m->custom_page_id])->values(),
             'parents' => $info['items']->map(fn($m) => ['id'=>$m->id,'label'=>(str_repeat('— ', $depth[$m->id] ?? 0)).$m->label])->values(),
             'depth' => $depth,
             'url' => route('admin.menu.store'),
@@ -40,7 +41,7 @@
 <div class="space-y-8">
     @foreach($locations as $loc => $info)
         @php $cfg = $js[$loc]; @endphp
-        <div x-data="menuForm('{{ $loc }}', {{ Js::from($cfg) }}, {{ Js::from($categoriesJs) }}, {{ Js::from($pagesJs) }})" class="grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div x-data="menuForm('{{ $loc }}', {{ Js::from($cfg) }}, {{ Js::from($categoriesJs) }}, {{ Js::from($pagesJs) }}, {{ Js::from($customPagesJs) }})" class="grid gap-6 lg:grid-cols-[1fr_420px]">
             <!-- List -->
             <div class="card overflow-hidden">
                 <div class="border-b border-cream-200 p-5">
@@ -83,6 +84,7 @@
                     <input type="hidden" name="is_active" :value="form.is_active ? '1' : '0'">
                     <input type="hidden" name="type" :value="form.type">
                     <input type="hidden" name="category_id" :value="form.category_id || ''">
+                    <input type="hidden" name="custom_page_id" :value="form.custom_page_id || ''">
                     <div><label class="label">Nhãn *</label><input type="text" name="label" x-model="form.label" class="input" required></div>
                     <div>
                         <label class="label">Loại liên kết</label>
@@ -90,6 +92,7 @@
                             <option value="custom">Đường dẫn tùy chỉnh</option>
                             <option value="category">Danh mục sản phẩm</option>
                             <option value="page">Trang</option>
+                            <option value="landing_page">Trang đích</option>
                         </select>
                     </div>
                     <div x-show="linkType === 'custom'">
@@ -113,6 +116,16 @@
                                 <option :value="p.url" x-text="p.label"></option>
                             </template>
                         </select>
+                    </div>
+                    <div x-show="linkType === 'landing_page'">
+                        <label class="label">Chọn trang đích</label>
+                        <select @change="pickLandingPage($event.target.value)" class="input">
+                            <option value="">— Chọn trang đích —</option>
+                            <template x-for="p in customPages" :key="p.id">
+                                <option :value="p.id" x-text="p.label"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-xs text-ink-500">Liên kết tới /trang/{slug} của trang đích (vd bộ sưu tập thu đông 2026).</p>
                     </div>
                     <div>
                         <label class="label">Mục cha (để tạo submenu)</label>
@@ -138,24 +151,24 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('menuForm', (location, cfg, categories, pages) => ({
+    Alpine.data('menuForm', (location, cfg, categories, pages, customPages) => ({
         location,
         items: cfg.items, parents: cfg.parents, createUrl: cfg.url,
-        categories, pages,
+        categories, pages, customPages,
         editing: null,
         linkType: 'custom',
         get setType() { return this.linkType; },
-        form: { id: null, label: '', url: '', type: 'custom', category_id: '', parent_id: '', is_active: true },
+        form: { id: null, label: '', url: '', type: 'custom', category_id: '', custom_page_id: '', parent_id: '', is_active: true },
         get formAction() { return this.editing ? '/admin/menu/' + this.editing : this.createUrl; },
         get formMethod() { return this.editing ? 'PUT' : 'POST'; },
         edit(id) {
             const m = this.items.find(x => x.id === id);
             if (!m) return;
             this.editing = m.id;
-            this.form = { id: m.id, label: m.label, url: m.url || '', type: m.type || 'custom', category_id: m.category_id || '', parent_id: m.parent_id || '', is_active: !!m.is_active };
-            this.linkType = m.type === 'category' ? 'category' : (m.type === 'page' ? 'page' : 'custom');
+            this.form = { id: m.id, label: m.label, url: m.url || '', type: m.type || 'custom', category_id: m.category_id || '', custom_page_id: m.custom_page_id || '', parent_id: m.parent_id || '', is_active: !!m.is_active };
+            this.linkType = m.type === 'category' ? 'category' : (m.type === 'page' ? 'page' : (m.type === 'landing_page' ? 'landing_page' : 'custom'));
         },
-        resetForm() { this.editing = null; this.form = { id: null, label: '', url: '', type: 'custom', category_id: '', parent_id: '', is_active: true }; this.linkType = 'custom'; },
+        resetForm() { this.editing = null; this.form = { id: null, label: '', url: '', type: 'custom', category_id: '', custom_page_id: '', parent_id: '', is_active: true }; this.linkType = 'custom'; },
         pickCategory(val) {
             if (!val) return;
             const c = this.categories.find(x => x.id === Number(val));
@@ -170,7 +183,18 @@ document.addEventListener('alpine:init', () => {
             this.form.url = val;
             this.form.type = 'page';
             this.form.category_id = '';
+            this.form.custom_page_id = '';
             if (!this.form.label) { const p = this.pages.find(x => x.url === val); if (p) this.form.label = p.label; }
+        },
+        pickLandingPage(val) {
+            if (!val) return;
+            const p = this.customPages.find(x => x.id === Number(val));
+            if (!p) return;
+            this.form.custom_page_id = p.id;
+            this.form.type = 'landing_page';
+            this.form.url = '/trang/' + p.slug;
+            this.form.category_id = '';
+            if (!this.form.label) this.form.label = p.label;
         },
         up(id) { this.post('/admin/menu/' + id + '/up'); },
         down(id) { this.post('/admin/menu/' + id + '/down'); },

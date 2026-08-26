@@ -12,13 +12,18 @@ class MenuItem extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['location', 'parent_id', 'label', 'url', 'type', 'category_id', 'sort_order', 'is_active'];
+    protected $fillable = ['location', 'parent_id', 'label', 'url', 'type', 'category_id', 'custom_page_id', 'sort_order', 'is_active'];
 
     protected $casts = ['sort_order' => 'integer', 'is_active' => 'boolean'];
 
     public function category(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function customPage(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(CustomPage::class, 'custom_page_id');
     }
 
     public function parent(): BelongsTo
@@ -43,6 +48,14 @@ class MenuItem extends Model
 
     public function getUrl(): ?string
     {
+        if ($this->type === 'category' && $this->category) {
+            return route('shop.category', $this->category->slug);
+        }
+
+        if ($this->type === 'landing_page' && $this->customPage) {
+            return $this->customPage->url;
+        }
+
         return $this->url ? (str_starts_with($this->url, 'http') || str_starts_with($this->url, '/') ? $this->url : url($this->url)) : '#';
     }
 }

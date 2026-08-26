@@ -103,10 +103,28 @@
 
             <div class="card p-6 space-y-4">
                 <h2 class="font-display text-lg font-semibold text-ink-900">Bộ sưu tập sản phẩm</h2>
-                <p class="text-xs text-ink-500">Chọn các sản phẩm để hiển thị lưới sản phẩm trên trang đích (vd: bộ sưu tập mới).</p>
-                <select name="product_ids[]" multiple size="8" class="input !py-2">
-                    @foreach($products as $p)<option value="{{ $p->id }}" @selected(in_array($p->id, old('product_ids', $page->product_ids ?? [])))>{{ $p->name }}</option>@endforeach
-                </select>
+                <p class="text-xs text-ink-500">Chọn danh mục để lọc nhanh, rồi tích chọn sản phẩm hiển thị trên trang đích (vd: bộ sưu tập mới).</p>
+                @php
+                    $productPickerData = $products->map(fn($p) => ['id' => (int) $p->id, 'name' => $p->name, 'category_id' => $p->category_id])->values();
+                    $pickerSelected = old('product_ids', $page->product_ids ?? []);
+                @endphp
+                <div x-data="productPicker({{ Js::from($productPickerData) }}, {{ Js::from($pickerSelected) }}, {{ Js::from($categories->map(fn($c) => ['id' => (int) $c->id, 'name' => $c->name])) }})">
+                    <select x-model="filterCat" class="input !w-full sm:!w-80">
+                        <option value="">Tất cả danh mục</option>
+                        <template x-for="c in categories" :key="c.id">
+                            <option :value="c.id" x-text="c.name"></option>
+                        </template>
+                    </select>
+                    <p class="mt-2 text-xs text-ink-500" x-text="'Đang chọn: ' + selected.length + ' sản phẩm (hiển thị ' + shown().length + ' sản phẩm)'"></p>
+                    <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <template x-for="p in shown()" :key="p.id">
+                            <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-cream-200 px-3 py-2 text-sm transition hover:border-brand-400" :class="selected.includes(p.id) ? 'border-brand-600 bg-brand-50' : ''">
+                                <input type="checkbox" name="product_ids[]" :value="p.id" :checked="selected.includes(p.id)" @change="toggle(p.id)" class="h-4 w-4 shrink-0 accent-brand-600">
+                                <span x-text="p.name" class="truncate"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
             </div>
 
             <div class="card p-6 space-y-4">

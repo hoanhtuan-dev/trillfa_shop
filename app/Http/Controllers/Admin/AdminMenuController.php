@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\CustomPage;
 use App\Models\MenuItem;
 use Illuminate\Http\Request;
 
@@ -27,7 +28,9 @@ class AdminMenuController extends Controller
             ['label' => 'Điều khoản sử dụng', 'url' => '/dieu-khoan'],
         ];
 
-        return view('admin.menu.index', compact('headerMenu', 'footerMenu', 'categories', 'pages'));
+        $customPages = CustomPage::active()->orderBy('title')->get();
+
+        return view('admin.menu.index', compact('headerMenu', 'footerMenu', 'categories', 'pages', 'customPages'));
     }
 
     public function store(Request $request)
@@ -104,8 +107,9 @@ class AdminMenuController extends Controller
             'location' => ['required', 'in:header,footer'],
             'label' => ['required', 'string', 'max:255'],
             'url' => ['nullable', 'string', 'max:255'],
-            'type' => ['nullable', 'in:custom,category,page'],
+            'type' => ['nullable', 'in:custom,category,page,landing_page'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'custom_page_id' => ['nullable', 'integer', 'exists:custom_pages,id'],
             'parent_id' => ['nullable', 'integer', 'exists:menu_items,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -113,6 +117,7 @@ class AdminMenuController extends Controller
         $data['parent_id'] = $data['parent_id'] ?? null;
         $data['type'] = $data['type'] ?? 'custom';
         $data['category_id'] = $data['category_id'] ?? null;
+        $data['custom_page_id'] = $data['custom_page_id'] ?? null;
         $data['is_active'] = $request->boolean('is_active', true);
 
         return $data;
