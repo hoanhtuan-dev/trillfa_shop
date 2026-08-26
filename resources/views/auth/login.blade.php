@@ -6,7 +6,7 @@
 <div class="container-x flex min-h-[75vh] items-center justify-center py-16">
     <div class="grid w-full max-w-4xl overflow-hidden rounded-3xl border border-cream-200 bg-white lg:grid-cols-2">
         <div class="relative hidden lg:block">
-            <img src="{{ asset('samples/2aOboQqGJ4Pj8CanWSj6MFVJ1xiwOYY5srLPEBjk.jpg') }}" alt="" class="h-full w-full object-cover">
+            <img src="{{ asset('samples/2aOboQrGJ4Pj8CanWSj6MFVJ1xiwOYY5srLPEBjk.jpg') }}" alt="" class="h-full w-full object-cover">
             <div class="absolute inset-0 bg-gradient-to-tr from-ink-900/70 via-ink-900/20 to-transparent"></div>
             <div class="absolute bottom-0 p-8 text-white">
                 <p class="font-display text-2xl font-semibold">Chào mừng trở lại</p>
