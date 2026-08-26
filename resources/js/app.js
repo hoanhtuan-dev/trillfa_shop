@@ -401,6 +401,42 @@ document.addEventListener('alpine:init', () => {
             const url = window.prompt('Nhập địa chỉ liên kết (URL):');
             if (url) this.exec('createLink', url);
         },
+        pickImage() {
+            if (!this.imageInput) {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.className = 'hidden';
+                input.addEventListener('change', (e) => this.uploadImage(e));
+                this.$refs.editor.parentNode.appendChild(input);
+                this.imageInput = input;
+            }
+            this.imageInput.click();
+        },
+        async uploadImage(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            e.target.value = '';
+            this.savingImage = true;
+            try {
+                const form = new FormData();
+                form.append('image', file);
+                const res = await fetch('/admin/upload-image', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken() },
+                    body: form,
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.message || 'Không thể tải ảnh.');
+                this.$refs.editor.focus();
+                document.execCommand('insertImage', false, data.url);
+                this.sync();
+            } catch (err) {
+                Alpine.store('toast').show(err.message, 'error');
+            } finally {
+                this.savingImage = false;
+            }
+        },
         sync() { this.$refs.hidden.value = this.$refs.editor.innerHTML; },
         applyStyle(style) {
             this.$refs.editor.focus();

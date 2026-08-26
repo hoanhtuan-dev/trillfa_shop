@@ -29,6 +29,7 @@
                                 <button type="button" @click="exec('insertOrderedList')" class="grid h-8 w-8 place-items-center rounded-lg text-xs hover:bg-white">1.</button>
                                 <button type="button" @click="exec('formatBlock', 'blockquote')" class="px-2 text-sm hover:bg-white">❝</button>
                                 <button type="button" @click="addLink()" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Liên kết"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.81 15.312a4.5 4.5 0 01-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                                <button type="button" @click="pickImage()" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Chèn ảnh"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                                 <button type="button" @click="exec('undo')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 016 6v3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                             </div>
                             <div x-ref="editor" contenteditable @input="sync" class="prose-content min-h-[300px] px-4 py-3 text-sm outline-none"></div>
@@ -64,7 +65,15 @@
                                 </template>
                             </div>
                         </div>
-                        <div><label class="label">Liên kết nút hero</label><input type="text" name="hero_button_link" value="{{ old('hero_button_link', $page->hero_button_link) }}" class="input" placeholder="/shop"></div>
+                        <div>
+                            <label class="label">Nút hero — chọn danh mục</label>
+                            <select name="hero_button_category_id" class="input">
+                                <option value="">— Không (dùng liên kết tùy chỉnh) —</option>
+                                @foreach($categories as $cat)<option value="{{ $cat->id }}" @selected(old('hero_button_category_id', $page->hero_button_category_id) == $cat->id)>{{ $cat->name }}</option>@endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-ink-500">Ví dụ: với bộ sưu tập thu đông 2026, chọn danh mục “Thu đông 2026”.</p>
+                        </div>
+                        <div><label class="label">Hoặc liên kết tùy chỉnh</label><input type="text" name="hero_button_link" value="{{ old('hero_button_link', $page->hero_button_link) }}" class="input" placeholder="/shop"></div>
                     </div>
                 </div>
             </div>

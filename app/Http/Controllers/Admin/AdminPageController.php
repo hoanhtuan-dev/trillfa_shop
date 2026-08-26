@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\CustomPage;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -21,8 +22,9 @@ class AdminPageController extends Controller
     {
         $page = new CustomPage(['is_active' => true, 'template' => 'landing']);
         $products = Product::active()->orderBy('name')->get();
+        $categories = Category::active()->orderBy('name')->get();
 
-        return view('admin.custom-pages.form', compact('page', 'products'));
+        return view('admin.custom-pages.form', compact('page', 'products', 'categories'));
     }
 
     public function store(Request $request)
@@ -46,8 +48,9 @@ class AdminPageController extends Controller
     public function edit(CustomPage $page)
     {
         $products = Product::active()->orderBy('name')->get();
+        $categories = Category::active()->orderBy('name')->get();
 
-        return view('admin.custom-pages.form', compact('page', 'products'));
+        return view('admin.custom-pages.form', compact('page', 'products', 'categories'));
     }
 
     public function update(Request $request, CustomPage $page)
@@ -93,6 +96,7 @@ class AdminPageController extends Controller
             'hero_subtitle' => ['nullable', 'string', 'max:1000'],
             'hero_button_text' => ['nullable', 'string', 'max:255'],
             'hero_button_link' => ['nullable', 'string', 'max:255'],
+            'hero_button_category_id' => ['nullable', 'exists:categories,id'],
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],
             'template' => ['required', 'string', 'in:landing,basic'],

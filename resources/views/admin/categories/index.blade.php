@@ -6,7 +6,7 @@
 @section('content')
 @php
     $catItems = $categories->map(fn($c) => [
-        'id' => $c->id, 'name' => $c->name, 'parent_id' => $c->parent_id,
+        'id' => $c->id, 'name' => $c->name, 'slug' => $c->slug, 'parent_id' => $c->parent_id,
         'description' => $c->description, 'sort_order' => $c->sort_order,
         'is_active' => $c->is_active, 'image' => $c->image_url, 'icon' => $c->icon,
     ])->values();
@@ -56,7 +56,12 @@
             <input type="hidden" name="is_active" value="0">
             <div>
                 <label class="label">Tên *</label>
-                <input type="text" name="name" x-model="form.name" class="input" required>
+                <input type="text" name="name" x-model="form.name" @input="if(!editing && !form.slug) form.slug = slugify(form.name)" class="input" required>
+            </div>
+            <div>
+                <label class="label">Slug (đường dẫn)</label>
+                <input type="text" name="slug" x-model="form.slug" class="input" placeholder="thoi-trang-nam">
+                <p class="mt-1 text-xs text-ink-500">Để trống để tự động tạo từ tên. Ví dụ: <code class="rounded bg-cream-100 px-1">/danh-muc/{slug}</code></p>
             </div>
             <div>
                 <label class="label">Danh mục cha</label>
@@ -138,15 +143,18 @@ document.addEventListener('alpine:init', () => {
             const c = this.items.find(x => x.id === id);
             if (!c) return;
             this.editing = c.id;
-            this.form = { id: c.id, name: c.name, parent_id: c.parent_id || '', description: c.description || '', sort_order: c.sort_order || 0, is_active: !!c.is_active, icon: c.icon || 'tag' };
+            this.form = { id: c.id, name: c.name, slug: c.slug || '', parent_id: c.parent_id || '', description: c.description || '', sort_order: c.sort_order || 0, is_active: !!c.is_active, icon: c.icon || 'tag' };
             this.setImage(c.image || null);
             this.setIconPreview(c.icon_image || null);
         },
         reset() {
             this.editing = null;
-            this.form = { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true, icon: 'tag' };
+            this.form = { id: null, name: '', slug: '', parent_id: '', description: '', sort_order: 0, is_active: true, icon: 'tag' };
             this.setImage(null);
             this.setIconPreview(null);
+        },
+        slugify(s) {
+            return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         },
         setImage(url) {
             if (this.imagePreview) URL.revokeObjectURL(this.imagePreview);

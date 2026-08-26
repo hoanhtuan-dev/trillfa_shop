@@ -667,6 +667,7 @@ class ShopFlowTest extends TestCase
             'hero_subtitle' => 'Mô tả ngắn bộ sưu tập.',
             'hero_button_text' => 'Mua ngay',
             'hero_button_link' => '/shop',
+            'hero_button_category_id' => \App\Models\Category::first()->id,
             'is_active' => '1',
             'product_ids' => [Product::first()->id],
         ])->assertSessionHas('success');
@@ -679,7 +680,28 @@ class ShopFlowTest extends TestCase
         // Public render as guest
         $this->get('/trang/bo-suu-tap-moi')
             ->assertOk()
-            ->assertSee('Bộ sưu tập mới 2026');
+            ->assertSee('Bộ sưu tập mới 2026')
+            ->assertSee(route('shop.category', \App\Models\Category::first()->slug));
+    }
+
+
+    public function test_admin_can_create_category(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/admin/categories', [
+            'name' => 'Danh mục test create',
+            'slug' => 'danh-muc-tu-chinh',
+            'parent_id' => '',
+            'is_active' => '1',
+            'sort_order' => 3,
+            'icon' => 'tag',
+        ])->assertSessionHasNoErrors();
+
+        $cat = \App\Models\Category::where('name', 'Danh mục test create')->first();
+        $this->assertNotNull($cat);
+        $this->assertSame('danh-muc-tu-chinh', $cat->slug);
     }
 
 }

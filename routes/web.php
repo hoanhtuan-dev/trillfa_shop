@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\AdminPostController;
 use App\Http\Controllers\Admin\AdminProductController;
 use App\Http\Controllers\Admin\AdminReviewController;
 use App\Http\Controllers\Admin\AdminSettingController;
+use App\Http\Controllers\Admin\AdminUploadController;
 use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\Admin\AdminShippingController;
 use App\Http\Controllers\Admin\AdminUserController;
@@ -199,6 +200,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/banners/{banner}', [AdminBannerController::class, 'destroy'])->name('banners.destroy');
 
     Route::get('/settings', [AdminSettingController::class, 'index'])->name('settings.index');
+    Route::post('/upload-image', [AdminUploadController::class, 'image'])->name('upload.image');
     Route::get('/pages', [AdminPageController::class, 'index'])->name('pages.index');
     Route::get('/pages/create', [AdminPageController::class, 'create'])->name('pages.create');
     Route::post('/pages', [AdminPageController::class, 'store'])->name('pages.store');

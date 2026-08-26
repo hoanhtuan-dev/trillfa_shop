@@ -26,7 +26,7 @@
                 @endif
                 @if($page->hero_subtitle)<p class="mt-4 max-w-xl text-white/80">{{ $page->hero_subtitle }}</p>@endif
                 @if($page->hero_button_text)
-                    <a href="{{ $page->hero_button_link ?: route('shop.index') }}" class="btn-primary mt-8 !bg-white !text-ink-900 hover:!bg-brand-50">{{ $page->hero_button_text }}</a>
+                    <a href="{{ $page->hero_button_url }}" class="btn-primary mt-8 !bg-white !text-ink-900 hover:!bg-brand-50">{{ $page->hero_button_text }}</a>
                 @endif
             </div>
         </div>
