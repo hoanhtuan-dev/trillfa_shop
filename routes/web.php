@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AdminCouponController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminMenuController;
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminPageController;
 use App\Http\Controllers\Admin\AdminPageContentController;
 use App\Http\Controllers\Admin\AdminPaymentController;
 use App\Http\Controllers\Admin\AdminPostController;
@@ -113,6 +114,7 @@ Route::get('/gioi-thieu', [PageController::class, 'about'])->name('page.about');
 Route::get('/lien-he', [PageController::class, 'contact'])->name('page.contact');
 Route::post('/lien-he', [PageController::class, 'sendContact'])->name('page.contact.send');
 Route::post('/dang-ky-ban-tin', [NewsletterController::class, 'subscribe'])->name('newsletter.subscribe');
+Route::get('/trang/{slug}', [PageController::class, 'show'])->name('page.show');
 Route::get('/hoi-dap', [PageController::class, 'faq'])->name('page.faq');
 Route::get('/chinh-sach-bao-mat', [PageController::class, 'privacy'])->name('page.privacy');
 Route::get('/dieu-khoan', [PageController::class, 'terms'])->name('page.terms');
@@ -197,6 +199,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/banners/{banner}', [AdminBannerController::class, 'destroy'])->name('banners.destroy');
 
     Route::get('/settings', [AdminSettingController::class, 'index'])->name('settings.index');
+    Route::get('/pages', [AdminPageController::class, 'index'])->name('pages.index');
+    Route::get('/pages/create', [AdminPageController::class, 'create'])->name('pages.create');
+    Route::post('/pages', [AdminPageController::class, 'store'])->name('pages.store');
+    Route::get('/pages/{page}/edit', [AdminPageController::class, 'edit'])->name('pages.edit');
+    Route::put('/pages/{page}', [AdminPageController::class, 'update'])->name('pages.update');
+    Route::post('/pages/{page}/toggle', [AdminPageController::class, 'toggle'])->name('pages.toggle');
+    Route::delete('/pages/{page}', [AdminPageController::class, 'destroy'])->name('pages.destroy');
+
     Route::get('/pages/about', [AdminPageContentController::class, 'about'])->name('pages.about');
     Route::post('/pages/about', [AdminPageContentController::class, 'updateAbout'])->name('pages.about.update');
     Route::get('/pages/contact', [AdminPageContentController::class, 'contact'])->name('pages.contact');

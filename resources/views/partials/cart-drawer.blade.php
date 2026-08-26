@@ -1,4 +1,4 @@
-<div x-data x-show="$store.cart.open" @keydown.escape.window="$store.cart.closeDrawer()" class="fixed inset-0 z-[90]" style="display:none">
+<div x-data x-show="$store.cart.open" x-cloak @keydown.escape.window="$store.cart.closeDrawer()" class="fixed inset-0 z-[90]">
     <!-- Backdrop -->
     <div x-show="$store.cart.open" x-transition.opacity.duration.200ms @click="$store.cart.closeDrawer()" class="absolute inset-0 bg-ink-900/40 backdrop-blur-sm"></div>
 

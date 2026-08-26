@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CustomPage;
 use Illuminate\Http\Request;
 
 class PageController extends Controller
@@ -64,5 +65,21 @@ class PageController extends Controller
             ->canonical(route('page.terms'));
 
         return view('pages.terms');
+    }
+
+    /**
+     * Render a custom / landing page created in the admin.
+     */
+    public function show(string $slug)
+    {
+        $page = CustomPage::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        seo()->title(($page->meta_title ?: $page->hero_heading ?: $page->title).' | '.setting('site_name'))
+            ->description($page->meta_description ?: $page->excerpt)
+            ->canonical($page->url);
+
+        $products = $page->products();
+
+        return view('pages.custom', compact('page', 'products'));
     }
 }

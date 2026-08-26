@@ -142,3 +142,4 @@
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     .text-balance { text-wrap: balance; }
 }
+/* XCLOAK_RULE */ [x-cloak] { display: none !important; }

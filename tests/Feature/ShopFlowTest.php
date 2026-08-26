@@ -650,4 +650,36 @@ class ShopFlowTest extends TestCase
         $this->assertSame(12, (int) setting('widget_featured_limit'));
     }
 
+
+    public function test_admin_can_create_and_view_landing_page(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->get('/admin/pages')->assertOk();
+
+        $this->post('/admin/pages', [
+            'title' => 'Bộ sưu tập mới',
+            'slug' => 'bo-suu-tap-moi',
+            'template' => 'landing',
+            'content' => '<p>Khám phá bộ sưu tập mới của Trillfa Fa.</p>',
+            'hero_heading' => 'Bộ sưu tập mới 2026',
+            'hero_subtitle' => 'Mô tả ngắn bộ sưu tập.',
+            'hero_button_text' => 'Mua ngay',
+            'hero_button_link' => '/shop',
+            'is_active' => '1',
+            'product_ids' => [Product::first()->id],
+        ])->assertSessionHas('success');
+
+        $page = \App\Models\CustomPage::where('slug', 'bo-suu-tap-moi')->first();
+        $this->assertNotNull($page);
+        $this->assertSame('Bộ sưu tập mới', $page->title);
+        $this->assertSame('landing', $page->template);
+
+        // Public render as guest
+        $this->get('/trang/bo-suu-tap-moi')
+            ->assertOk()
+            ->assertSee('Bộ sưu tập mới 2026');
+    }
+
 }
