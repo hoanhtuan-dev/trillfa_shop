@@ -616,4 +616,38 @@ class ShopFlowTest extends TestCase
             ->assertOk()
             ->assertSee('Đăng ký để quản lý đơn tốt hơn');
     }
+
+    public function test_newsletter_subscribe_stores_email(): void
+    {
+        $this->post('/dang-ky-ban-tin', ['email' => 'subscriber@example.com'])
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('newsletter_subscribers', ['email' => 'subscriber@example.com']);
+    }
+
+    public function test_admin_can_update_widget_content(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->get('/admin/widgets')->assertOk();
+
+        $this->post('/admin/widgets', [
+            'enabled_announcement' => '1',
+            'widget_announcement_text' => 'Thanh thông báo mới',
+            'enabled_cta' => '1',
+            'widget_cta_title' => 'Tiêu đề CTA mới',
+            'widget_cta_subtitle' => 'Mô tả CTA mới',
+            'widget_cta_button_text' => 'Nút mới',
+            'widget_cta_button_link' => '/shop?sort=price_asc',
+            'enabled_featured' => '1',
+            'limit_featured' => 12,
+        ])->assertSessionHas('success');
+
+        $this->assertSame('Thanh thông báo mới', setting('widget_announcement_text'));
+        $this->assertSame('Tiêu đề CTA mới', setting('widget_cta_title'));
+        $this->assertSame('Nút mới', setting('widget_cta_button_text'));
+        $this->assertSame(12, (int) setting('widget_featured_limit'));
+    }
+
 }

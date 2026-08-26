@@ -123,7 +123,7 @@ Alpine.store('cart', {
             });
             await this.fetch();
             Alpine.store('toast').show('Đã thêm vào giỏ hàng');
-            this.open = true;
+            this.openDrawer();
         } catch (e) {
             Alpine.store('toast').show(e.message, 'error');
         } finally {
@@ -189,8 +189,8 @@ Alpine.store('cart', {
         }
     },
 
-    openDrawer() { this.open = true; },
-    closeDrawer() { this.open = false; },
+    openDrawer() { this.open = true; document.body.style.overflow = 'hidden'; },
+    closeDrawer() { this.open = false; document.body.style.overflow = ''; },
 });
 
 // ---------- Components ----------

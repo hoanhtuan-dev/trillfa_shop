@@ -73,10 +73,10 @@
     <section class="container-x py-8">
         <div class="mb-6 flex items-end justify-between">
             <div>
-                <p class="kicker mb-2">Danh mục</p>
-                <h2 class="section-title">Khám phá theo danh mục</h2>
+                <p class="kicker mb-2">{{ widget_field('categories', 'kicker', 'Danh mục') }}</p>
+                <h2 class="section-title">{{ widget_field('categories', 'title', 'Khám phá theo danh mục') }}</h2>
             </div>
-            <a href="{{ route('shop.index') }}" class="link text-sm">Xem tất cả</a>
+            <a href="{{ route('shop.index') }}" class="link text-sm">{{ widget_field('categories', 'link_text', 'Xem tất cả') }}</a>
         </div>
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             @foreach($categories as $cat)
@@ -96,10 +96,10 @@
     <section class="container-x py-12">
         <div class="mb-6 flex items-end justify-between">
             <div>
-                <p class="kicker mb-2">Tuyển chọn</p>
-                <h2 class="section-title">Sản phẩm nổi bật</h2>
+                <p class="kicker mb-2">{{ widget_field('featured', 'kicker', 'Tuyển chọn') }}</p>
+                <h2 class="section-title">{{ widget_field('featured', 'title', 'Sản phẩm nổi bật') }}</h2>
             </div>
-            <a href="{{ route('shop.index') }}" class="link text-sm">Xem tất cả</a>
+            <a href="{{ route('shop.index') }}" class="link text-sm">{{ widget_field('featured', 'link_text', 'Xem tất cả') }}</a>
         </div>
         <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
             @foreach($featured as $product)
@@ -135,10 +135,10 @@
     <section class="container-x py-12">
         <div class="mb-6 flex items-end justify-between">
             <div>
-                <p class="kicker mb-2">Mới về</p>
-                <h2 class="section-title">Hàng mới nhất</h2>
+                <p class="kicker mb-2">{{ widget_field('new', 'kicker', 'Mới về') }}</p>
+                <h2 class="section-title">{{ widget_field('new', 'title', 'Hàng mới nhất') }}</h2>
             </div>
-            <a href="{{ route('shop.index') }}" class="link text-sm">Xem tất cả</a>
+            <a href="{{ route('shop.index') }}" class="link text-sm">{{ widget_field('new', 'link_text', 'Xem tất cả') }}</a>
         </div>
         <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
             @foreach($newArrivals as $product)
@@ -154,8 +154,8 @@
         <div class="card relative overflow-hidden !rounded-[2.5rem] bg-ink-900 p-8 text-white sm:p-12">
             <div class="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-brand-600/30 blur-3xl"></div>
             <div class="relative">
-                <p class="kicker mb-2 !text-brand-300">Deal hot</p>
-                <h2 class="font-display text-3xl font-semibold sm:text-4xl">Ưu đãi đặc biệt &mdash; giảm sâu</h2>
+                <p class="kicker mb-2 !text-brand-300">{{ widget_field('sale', 'kicker', 'Deal hot') }}</p>
+                <h2 class="font-display text-3xl font-semibold sm:text-4xl">{!! widget_field('sale', 'title', 'Ưu đãi đặc biệt &mdash; giảm sâu') !!}</h2>
                 <div class="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4">
                     @foreach($onSale->take(4) as $product)
                         <x-product-card :product="$product" />
@@ -171,10 +171,10 @@
     <section class="container-x py-12">
         <div class="mb-6 flex items-end justify-between">
             <div>
-                <p class="kicker mb-2">Bán chạy</p>
-                <h2 class="section-title">Được yêu thích nhất</h2>
+                <p class="kicker mb-2">{{ widget_field('bestsellers', 'kicker', 'Bán chạy') }}</p>
+                <h2 class="section-title">{{ widget_field('bestsellers', 'title', 'Được yêu thích nhất') }}</h2>
             </div>
-            <a href="{{ route('shop.index') }}" class="link text-sm">Xem tất cả</a>
+            <a href="{{ route('shop.index') }}" class="link text-sm">{{ widget_field('bestsellers', 'link_text', 'Xem tất cả') }}</a>
         </div>
         <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
             @foreach($bestsellers as $product)
@@ -189,10 +189,10 @@
     <section class="container-x py-12">
         <div class="mb-6 flex items-end justify-between">
             <div>
-                <p class="kicker mb-2">Blog</p>
-                <h2 class="section-title">Câu chuyện & Phong cách</h2>
+                <p class="kicker mb-2">{{ widget_field('blog', 'kicker', 'Blog') }}</p>
+                <h2 class="section-title">{!! widget_field('blog', 'title', 'Câu chuyện & Phong cách') !!}</h2>
             </div>
-            <a href="{{ route('blog.index') }}" class="link text-sm">Đọc tất cả</a>
+            <a href="{{ route('blog.index') }}" class="link text-sm">{{ widget_field('blog', 'link_text', 'Đọc tất cả') }}</a>
         </div>
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             @foreach($latestPosts as $post)
@@ -222,9 +222,9 @@
     @if(widget_enabled('cta'))
     <section class="container-x py-12">
         <div class="card flex flex-col items-center gap-4 bg-brand-50 !border-brand-100 p-10 text-center">
-            <h2 class="font-display text-2xl font-semibold text-ink-900 sm:text-3xl">Sẵn sàng nâng cấp phong cách của bạn?</h2>
-            <p class="max-w-lg text-ink-500">Khám phá bộ sưu tập mới nhất và tận hưởng ưu đãi hấp dẫn dành riêng cho bạn.</p>
-            <a href="{{ route('shop.index') }}" class="btn-brand mt-2">Mua sắm ngay</a>
+            <h2 class="font-display text-2xl font-semibold text-ink-900 sm:text-3xl">{{ widget_field('cta', 'title', 'Sẵn sàng nâng cấp phong cách của bạn?') }}</h2>
+            <p class="max-w-lg text-ink-500">{{ widget_field('cta', 'subtitle', 'Khám phá bộ sưu tập mới nhất và tận hưởng ưu đãi hấp dẫn dành riêng cho bạn.') }}</p>
+            <a href="{{ widget_field('cta', 'button_link', '/shop') }}" class="btn-brand mt-2">{{ widget_field('cta', 'button_text', 'Mua sắm ngay') }}</a>
         </div>
     </section>
     @endif

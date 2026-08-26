@@ -158,6 +158,13 @@ if (! function_exists('widget_limit')) {
         return max(1, (int) setting('widget_'.$key.'_limit', $default));
     }
 }
+
+if (! function_exists('widget_field')) {
+    function widget_field(string $key, string $field, $default = ''): string
+    {
+        return (string) setting('widget_'.$key.'_'.$field, $default);
+    }
+}
 if (! function_exists('category_children_nodes')) {
     function category_children_nodes(\App\Models\Category $category): \Illuminate\Support\Collection
     {

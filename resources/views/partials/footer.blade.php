@@ -7,19 +7,25 @@
 
 <footer class="mt-24 border-t border-cream-200 bg-white">
     <!-- Newsletter -->
+    @if(widget_enabled('newsletter'))
     <div class="container-x py-12">
         <div class="card-hover card flex flex-col items-center gap-6 bg-brand-50 !border-brand-100 p-8 text-center sm:p-12">
             <div>
-                <p class="kicker mb-2">Nhận ưu đãi độc quyền</p>
-                <h3 class="font-display text-2xl font-semibold text-ink-900 sm:text-3xl">Đăng ký nhận bản tin Trillfa Fa</h3>
-                <p class="mt-2 text-ink-500">Thông tin mới nhất về bộ sưu tập, khuyến mãi và ưu đãi thành viên.</p>
+                <p class="kicker mb-2">{{ widget_field('newsletter', 'kicker', 'Nhận ưu đãi độc quyền') }}</p>
+                <h3 class="font-display text-2xl font-semibold text-ink-900 sm:text-3xl">{{ widget_field('newsletter', 'title', 'Đăng ký nhận bản tin Trillfa Fa') }}</h3>
+                <p class="mt-2 text-ink-500">{{ widget_field('newsletter', 'subtitle', 'Thông tin mới nhất về bộ sưu tập, khuyến mãi và ưu đãi thành viên.') }}</p>
             </div>
-            <form method="POST" action="#" @submit.prevent="$store.toast.show('Cảm ơn bạn đã đăng ký bản tin!')" class="flex w-full max-w-md flex-col gap-3 sm:flex-row">
-                <input type="email" required placeholder="Email của bạn" class="input flex-1">
-                <button type="submit" class="btn-brand">Đăng ký</button>
+            <form method="POST" action="{{ route('newsletter.subscribe') }}" class="flex w-full max-w-md flex-col gap-3 sm:flex-row">
+                @csrf
+                <input type="email" name="email" required placeholder="Email của bạn" value="{{ old('email') }}" class="input flex-1">
+                <button type="submit" class="btn-brand">{{ widget_field('newsletter', 'button_text', 'Đăng ký') }}</button>
             </form>
+            @if($errors->has('email'))
+                <p class="text-sm text-red-600">{{ $errors->first('email') }}</p>
+            @endif
         </div>
     </div>
+    @endif
 
     <div class="container-x grid grid-cols-2 gap-8 py-12 md:grid-cols-4 lg:grid-cols-5">
         <div class="col-span-2 lg:col-span-2">

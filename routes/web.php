@@ -26,6 +26,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuickCheckoutController;
 use App\Http\Controllers\ReviewController;
@@ -111,6 +112,7 @@ Route::prefix('blog')->name('blog.')->group(function () {
 Route::get('/gioi-thieu', [PageController::class, 'about'])->name('page.about');
 Route::get('/lien-he', [PageController::class, 'contact'])->name('page.contact');
 Route::post('/lien-he', [PageController::class, 'sendContact'])->name('page.contact.send');
+Route::post('/dang-ky-ban-tin', [NewsletterController::class, 'subscribe'])->name('newsletter.subscribe');
 Route::get('/hoi-dap', [PageController::class, 'faq'])->name('page.faq');
 Route::get('/chinh-sach-bao-mat', [PageController::class, 'privacy'])->name('page.privacy');
 Route::get('/dieu-khoan', [PageController::class, 'terms'])->name('page.terms');
