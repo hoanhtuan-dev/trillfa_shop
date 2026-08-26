@@ -736,4 +736,47 @@ class ShopFlowTest extends TestCase
         $this->get('/')->assertOk()->assertSee($page->title);
     }
 
+
+    public function test_quick_checkout_success_blocks_other_orders(): void
+    {
+        $this->withSession(['marker' => 'x']);
+        $product = Product::first();
+        $this->postJson('/api/cart/add', ['product_id' => $product->id, 'quantity' => 1])->assertOk();
+        $this->post('/thanh-toan-nhanh', ['name' => 'Khách A', 'phone' => '0912000001', 'terms' => '1'])->assertSessionHasNoErrors();
+        $order = \App\Models\Order::latest('id')->first();
+
+        // A different visitor (no matching session order id) is blocked.
+        session()->forget('quick_order_id');
+        $this->get(route('checkout.quick-success', $order))->assertNotFound();
+        $this->get(route('account.complete', $order))->assertNotFound();
+    }
+
+
+    public function test_non_admin_cannot_access_admin(): void
+    {
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($customer)->get('/admin')->assertForbidden();
+    }
+
+    public function test_draft_and_unpublished_posts_not_public(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $post = \App\Models\Post::create([
+            'title' => 'Nháp bí mật',
+            'slug' => 'nhap-bi-mat-'.uniqid(),
+            'status' => 'draft',
+            'excerpt' => 'x',
+            'body' => '<p>x</p>',
+            'author_id' => $admin->id,
+        ]);
+
+        $this->get('/blog/'.$post->slug)->assertNotFound();
+    }
+
+    public function test_guest_redirected_from_account(): void
+    {
+        $this->get('/tai-khoan')->assertRedirect(route('login'));
+        $this->get('/yeu-thich')->assertRedirect(route('login'));
+    }
+
 }

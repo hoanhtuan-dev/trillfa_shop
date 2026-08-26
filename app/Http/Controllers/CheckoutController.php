@@ -90,6 +90,11 @@ class CheckoutController extends Controller
 
     public function success(Order $order)
     {
+        // Prevent a logged-in user from viewing another customer's order.
+        if ($order->user_id && $order->user_id !== auth()->id()) {
+            abort(403);
+        }
+
         return view('checkout.success', compact('order'));
     }
 }

@@ -63,6 +63,7 @@ class QuickCheckoutController extends Controller
 
         $this->cart->clear();
         session()->forget('shipping_method');
+        session()->put('quick_order_id', $order->id);
 
         return redirect()->route('checkout.quick-success', $order);
     }
@@ -74,6 +75,8 @@ class QuickCheckoutController extends Controller
      */
     public function success(Order $order)
     {
+        $this->authorizeOrder($order);
+
         $pendingUser = ($order->user && ! $order->user->is_active) ? $order->user : null;
 
         return view('checkout.quick-success', compact('order', 'pendingUser'));
@@ -84,6 +87,8 @@ class QuickCheckoutController extends Controller
      */
     public function completeForm(Order $order)
     {
+        $this->authorizeOrder($order);
+
         $user = $order->user;
 
         if (! $user || $user->is_active) {
@@ -95,6 +100,8 @@ class QuickCheckoutController extends Controller
 
     public function completeStore(Request $request, Order $order)
     {
+        $this->authorizeOrder($order);
+
         $user = $order->user;
 
         if (! $user || $user->is_active) {
@@ -120,6 +127,20 @@ class QuickCheckoutController extends Controller
 
         return redirect()->route('account.dashboard')
             ->with('success', 'Tài khoản đã được hoàn thiện. Các đơn hàng của bạn được liên kết với tài khoản.');
+    }
+
+    /**
+     * Allow only the session that just placed this quick order (or the owning
+     * logged-in user) to access its confirmation / completion pages.
+     */
+    protected function authorizeOrder(Order $order): void
+    {
+        $ownsSessionOrder = (int) session('quick_order_id', 0) === $order->id;
+        $ownsAsUser = auth()->check() && $order->user_id === auth()->id();
+
+        if (! $ownsSessionOrder && ! $ownsAsUser) {
+            abort(404, 'Không tìm thấy đơn hàng.');
+        }
     }
 
     /**

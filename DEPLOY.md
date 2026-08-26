@@ -230,3 +230,18 @@ php artisan view:cache
 ```
 
 > **Lưu ý:** không dùng `php artisan serve` trên shared hosting (cần `proc_open`). Host dùng Apache/nginx, truy cập qua `https://domain` là đủ.
+## Checklist an toàn sản xuất (production)
+
+- [ ] Đặt `APP_ENV=production` và `APP_DEBUG=false` trong `.env` (không để lộ stack trace).
+- [ ] Đặt `APP_URL` đúng domain, chạy qua HTTPS.
+- [ ] Khi có HTTPS: `SESSION_SECURE_COOKIE=true` (tùy chọn `SESSION_ENCRYPT=true`, `SESSION_HTTP_ONLY=true`).
+- [ ] `APP_KEY` được set (đã sinh, không bao giờ đưa lên repo).
+- [ ] Dùng MySQL cho production: `DB_CONNECTION=mysql` + host/user/pass thật.
+- [ ] Chạy `php artisan migrate --force` để cập nhật schema (thêm bảng newsletter_subscribers, custom_pages; cột mới menu_items/custom_pages).
+- [ ] Bind storage: `ln -s ../storage/app/public public_html/storage` (đã có nếu copy nguyên project).
+- [ ] Cache cấu hình & route sau khi deploy: `php artisan config:cache` + `php artisan route:cache` (đảm bảo các route/cấu hình không dùng closure gây lỗi khi cache).
+  - Lưu ý: nếu gặp lỗi cache, chạy `php artisan config:clear && route:clear` rồi cache lại; `php artisan optimize` nếu ổn.
+- [ ] Không chạy `php artisan serve` trên Hostinger; dùng web root `public_html`.
+- [ ] Không bao giờ `php artisan db:seed` trên production trừ khi thật sự cần dữ liệu mẫu.
+- [ ] Kiểm tra `/san-pham/*`, menu header/footer, giỏ hàng, thanh toán nhanh, newsletter hoạt động sau deploy.
+- [ ] Bản build frontend `public_html/build` đã commit — không cần chạy Node trên server.

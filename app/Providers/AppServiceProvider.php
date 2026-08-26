@@ -46,7 +46,7 @@ class AppServiceProvider extends ServiceProvider
                 ]);
 
             // Pages that should not be indexed.
-            if (request()->is('gio-hang', 'thanh-toan*', 'tai-khoan*', 'yeu-thich*', 'dang-nhap', 'dang-ky', 'admin*')) {
+            if (request()->is('gio-hang', 'thanh-toan*', 'thanh-toan-nhanh*', 'tai-khoan*', 'yeu-thich*', 'dang-nhap', 'dang-ky', 'admin*')) {
                 app(Seo::class)->noindex();
             }
         });
