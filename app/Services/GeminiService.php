@@ -60,16 +60,16 @@ class GeminiService
 
     protected function callGemini(string $idea, array $injections, string $key): array
     {
-        $system = "You are a fashion creative director. Given a Vietnamese idea and optional preset tags, ".
-            "return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, keywords (array), mood, ".
-            "color_palette (array), style_notes.";
+        $system = 'You are a fashion creative director. Given a Vietnamese idea and optional preset tags, '.
+            'return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, keywords (array), mood, '.
+            'color_palette (array), style_notes.';
 
         $prompt = "Idea: {$idea}\nTags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
 
         try {
             $model = studio_config('prompt_model', 'gemini-1.5-flash');
 
-            $resp = Http::withToken($key)->timeout(60)
+            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(60)
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                     'contents' => [['parts' => [['text' => $system."\n\n".$prompt]]]],
                     'generationConfig' => ['responseMimeType' => 'application/json'],

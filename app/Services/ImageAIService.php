@@ -147,14 +147,18 @@ class ImageAIService
             $config['imageConfig'] = ['aspectRatio' => $aspect];
         }
 
-        $resp = Http::withToken($key)->timeout(180)
+        $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(180)
             ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                 'contents' => [['parts' => [['text' => $prompt]]]],
                 'generationConfig' => $config,
             ]);
 
         if (! $resp->successful()) {
-            throw new \RuntimeException('Gemini ('.$resp->status().'): '.Str::limit((string) $resp->body(), 240));
+            $msg = 'Gemini ('.$resp->status().'): '.Str::limit((string) $resp->body(), 240);
+            if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')) {
+                $msg .= ' — Model ảnh không đúng. Model Gemini hợp lệ: gemini-2.5-flash-image (hoặc gemini-2.0-flash-preview-image-generation / imagen-4.0-generate-001). Đổi trong Cài đặt → “Ảnh Gemini”.';
+            }
+            throw new \RuntimeException($msg);
         }
 
         $parts = collect(data_get($resp->json(), 'candidates.0.content.parts', []));
