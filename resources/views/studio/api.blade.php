@@ -5,7 +5,7 @@
     <h1 class="font-display text-2xl font-semibold text-ink-900">Quản lý API</h1>
     <p class="mt-1 text-sm text-ink-500">Nhập các khoá AI (mã hoá khi lưu). Để trống để giữ khoá hiện có; tick "Xoá" để xoá khoá.</p>
 
-    <form method="POST" action="{{ route('studio.api.update') }}" class="mt-6 space-y-4" x-data="{ testing: '', results: {}, async test(service) { this.testing = service; try { const res = await fetch('/studio/api/test/' + service, { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' } }); this.results[service] = await res.json().catch(() => ({})); } catch (e) { this.results[service] = { ok: false, message: e.message }; } finally { this.testing = ''; } } }">
+    <form method="POST" action="{{ route('studio.api.update') }}" class="mt-6 space-y-4" x-data="apiTester">> ({})); } catch (e) { this.results[service] = { ok: false, message: e.message }; } finally { this.testing = ''; } } }">
         @csrf
         @foreach($providers as $service => $p)
             <div class="card p-5">
@@ -36,4 +36,29 @@
         Khi nhập khoá, các service tự chuyển từ <strong>stub</strong> sang gọi API thật (Gemini tạo prompt; Fal/Replicate sinh ảnh; Wan/Veo render video).
     </div>
 </div>
+@push('scripts')
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('apiTester', () => ({
+        testing: '',
+        results: {},
+        async test(service) {
+            this.testing = service;
+            try {
+                const res = await fetch('/studio/api/test/' + service, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' },
+                });
+                this.results[service] = await res.json().catch(() => ({}));
+            } catch (e) {
+                this.results[service] = { ok: false, message: e.message };
+            } finally {
+                this.testing = '';
+            }
+        },
+    }));
+});
+</script>
+@endpush
+
 @endsection
