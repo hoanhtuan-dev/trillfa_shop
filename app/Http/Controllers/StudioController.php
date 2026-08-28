@@ -12,6 +12,7 @@ use App\Services\ImageAIService;
 use App\Services\StyleSuggestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 
 class StudioController extends Controller
 {
@@ -264,6 +265,61 @@ class StudioController extends Controller
         $result = app(StyleSuggestService::class)->suggest(storage_path('app/public/'.$path));
 
         return response()->json($result);
+    }
+
+    /**
+     * Test a provider API key with a lightweight, non-generating request.
+     */
+    public function testApi(string $service)
+    {
+        $key = studio_api_key($service);
+
+        if (! $key) {
+            return response()->json(['ok' => false, 'message' => 'Chưa cấu hình khoá cho '.$service.'.'], 422);
+        }
+
+        try {
+            $result = match ($service) {
+                'gemini' => $this->testGemini($key),
+                'replicate' => $this->testReplicate($key),
+                'fal' => ['ok' => true, 'message' => 'Fal.ai: khoá đã lưu (không có endpoint ping miễn phí).'],
+                'wan', 'qwen', 'dashscope' => $this->testDashscope($key),
+                default => ['ok' => false, 'message' => 'Không hỗ trợ test '.$service.'.'],
+            };
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()]);
+        }
+
+        return response()->json($result);
+    }
+
+    protected function testGemini(string $key): array
+    {
+        $resp = Http::timeout(20)->get('https://generativelanguage.googleapis.com/v1beta/models?key='.$key);
+
+        return $resp->successful()
+            ? ['ok' => true, 'message' => 'Gemini: kết nối OK ('.count($resp->json('models', []) ?: []).' models).']
+            : ['ok' => false, 'message' => 'Gemini: HTTP '.$resp->status().' — '.data_get($resp->json(), 'error.message', 'key không hợp lệ')];
+    }
+
+    protected function testReplicate(string $key): array
+    {
+        $resp = Http::withToken($key)->timeout(20)->get('https://api.replicate.com/v1/models');
+
+        return $resp->successful()
+            ? ['ok' => true, 'message' => 'Replicate: kết nối OK.']
+            : ['ok' => false, 'message' => 'Replicate: HTTP '.$resp->status().' — key không hợp lệ'];
+    }
+
+    protected function testDashscope(string $key): array
+    {
+        $resp = Http::withToken($key)->timeout(20)->get('https://dashscope-intl.aliyuncs.com/api/v1/models');
+
+        return match (true) {
+            $resp->successful() => ['ok' => true, 'message' => 'DashScope: kết nối OK.'],
+            $resp->status() === 401 || $resp->status() === 403 => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' — key không hợp lệ'],
+            default => ['ok' => true, 'message' => 'DashScope: khoá đã lưu (endpoint trả HTTP '.$resp->status().', chưa xác minh thêm — dùng khi sinh ảnh/video).'],
+        };
     }
 
     public function settings()

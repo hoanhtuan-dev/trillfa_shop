@@ -5,7 +5,7 @@
     <h1 class="font-display text-2xl font-semibold text-ink-900">Quản lý API</h1>
     <p class="mt-1 text-sm text-ink-500">Nhập các khoá AI (mã hoá khi lưu). Để trống để giữ khoá hiện có; tick "Xoá" để xoá khoá.</p>
 
-    <form method="POST" action="{{ route('studio.api.update') }}" class="mt-6 space-y-4">
+    <form method="POST" action="{{ route('studio.api.update') }}" class="mt-6 space-y-4" x-data="{ testing: '', results: {}, async test(service) { this.testing = service; try { const res = await fetch('/studio/api/test/' + service, { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' } }); this.results[service] = await res.json().catch(() => ({})); } catch (e) { this.results[service] = { ok: false, message: e.message }; } finally { this.testing = ''; } } }">
         @csrf
         @foreach($providers as $service => $p)
             <div class="card p-5">
@@ -19,7 +19,9 @@
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                     <input type="password" name="key_{{ $service }}" class="input flex-1" placeholder="{{ $p['configured'] ? '•••••••••••••• (giữ nguyên nếu bỏ trống)' : 'Nhập khoá ' . $p['hint'] }}" autocomplete="off">
                     <label class="flex items-center gap-2 text-sm text-ink-600"><input type="checkbox" name="clear_{{ $service }}" value="1" class="h-4 w-4 accent-red-600"> Xoá</label>
+                    <button type="button" @click="test('{{ $service }}')" :disabled="testing === '{{ $service }}'" class="btn-outline btn-sm shrink-0">{{ $p['configured'] ? 'Test' : 'Test' }}</button>
                 </div>
+                <div x-show="results['{{ $service }}']" x-text="results['{{ $service }}'].message" :class="results['{{ $service }}'].ok ? 'mt-2 text-xs text-brand-700' : 'mt-2 text-xs text-red-600'"></div>
             </div>
         @endforeach
 

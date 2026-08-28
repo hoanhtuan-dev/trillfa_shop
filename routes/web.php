@@ -120,6 +120,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::get('/api', [StudioController::class, 'api'])->name('api');
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');
+    Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
 });
 
 // Blog

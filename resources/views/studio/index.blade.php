@@ -82,14 +82,20 @@
                 <h2 class="mb-3 font-display text-lg font-semibold text-ink-900">2. Phong cách (Preset)</h2>
                 <div class="grid gap-3 sm:grid-cols-2">
                     <template x-for="group in presets" :key="group.category">
-                        <div>
+                        <div x-data="{ open: false }" class="relative">
                             <label class="label" x-text="catLabels[group.category] || group.category"></label>
-                            <select @change="setPreset(group.category, $event.target.value)" class="input !py-2">
-                                <option value="">— Không —</option>
+                            <button type="button" @click="open = !open" @click.outside="open = false" class="input !py-2 flex w-full items-center justify-between gap-2 text-left">
+                                <span class="truncate" x-text="selectedPresetText(group.category) || 'Chọn ' + (catLabels[group.category] || group.category)"></span>
+                                <svg class="h-4 w-4 shrink-0 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+                            </button>
+                            <div x-show="open" x-transition.opacity.duration.150ms class="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-cream-200 bg-white p-1 shadow-xl">
                                 <template x-for="item in group.items" :key="item.id">
-                                    <option :value="item.id" :selected="String(presetSel[group.category]) === String(item.id)" x-text="item.label"></option>
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-cream-100">
+                                        <input type="checkbox" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)" class="h-4 w-4 accent-brand-600">
+                                        <span x-text="item.label" class="truncate"></span>
+                                    </label>
                                 </template>
-                            </select>
+                            </div>
                         </div>
                     </template>
                 </div>
@@ -174,7 +180,7 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels) => ({
         presets, projects, catLabels,
-        idea: '', presetIds: [], presetSel: {},
+        idea: '', presetIds: [],
         loading: false, generating: false, videoBusy: false, refining: false,
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
         generations: gens, creditsLeft: Number(credits),
@@ -203,11 +209,18 @@ document.addEventListener('alpine:init', () => {
             return data;
         },
 
-        setPreset(cat, value) {
-            const prev = this.presetSel[cat];
-            if (prev) { const i = this.presetIds.indexOf(Number(prev)); if (i >= 0) this.presetIds.splice(i, 1); }
-            this.presetSel[cat] = value;
-            if (value && value !== '') this.presetIds.push(Number(value));
+        togglePreset(id) {
+            id = Number(id);
+            const i = this.presetIds.indexOf(id);
+            if (i >= 0) this.presetIds.splice(i, 1);
+            else this.presetIds.push(id);
+        },
+        selectedPresetText(cat) {
+            const grp = this.presets.find((g) => g.category === cat);
+            if (!grp) return '';
+            return grp.items
+                .filter((it) => this.presetIds.includes(it.id))
+                .map((it) => it.label).join(', ');
         },
 
         onRefChange(e) {
@@ -275,10 +288,8 @@ document.addEventListener('alpine:init', () => {
                 const form = new FormData(); form.append('image', this.refFile);
                 const data = await this.upload('/studio/suggest', form);
                 this.suggestResult = data;
-                this.presetIds = []; this.presetSel = {};
-                (data.preset_ids || []).forEach((id) => {
-                    for (const grp of this.presets) { const it = grp.items.find(x => x.id === Number(id)); if (it) { this.setPreset(grp.category, it.id); break; } }
-                });
+                this.presetIds = [];
+                (data.preset_ids || []).forEach((id) => { if (!this.presetIds.includes(Number(id))) this.presetIds.push(Number(id)); });
                 if (data.image_prompt_en) this.output.image_prompt_en = data.image_prompt_en;
                 Alpine.store('toast').show('Đã gợi ý phong cách & prompt.');
             } catch (e) { Alpine.store('toast').show(e.message, 'error'); }
