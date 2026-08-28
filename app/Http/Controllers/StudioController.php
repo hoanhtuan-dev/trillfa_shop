@@ -223,17 +223,23 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
+        // Run synchronously so it completes without a queue worker (stub/fast path).
+        // For long real AI jobs you can switch to ->dispatch() and run a worker.
         if ($type === 'video') {
-            RenderVideoJob::dispatch($generation->id);
+            RenderVideoJob::dispatchSync($generation->id);
         } else {
-            RenderImageJob::dispatch($generation->id);
+            RenderImageJob::dispatchSync($generation->id);
         }
 
+        $fresh = $generation->fresh();
+
         return response()->json([
-            'generation_id' => $generation->id,
-            'status' => 'processing',
-            'model' => $generation->model,
-            'provider' => $generation->provider,
+            'generation_id' => $fresh->id,
+            'status' => $fresh->status,
+            'model' => $fresh->model,
+            'provider' => $fresh->provider,
+            'media_url' => $fresh->media_url,
+            'error' => $fresh->error,
             'credits_left' => $user->fresh()->credits_balance,
         ]);
     }

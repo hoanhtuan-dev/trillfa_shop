@@ -80,7 +80,7 @@
             <!-- Presets as dropdowns -->
             <div class="card p-6">
                 <h2 class="mb-3 font-display text-lg font-semibold text-ink-900">2. Phong cách (Preset)</h2>
-                <div class="grid gap-3 sm:grid-cols-2">
+                <div class="grid gap-3">
                     <template x-for="group in presets" :key="group.category">
                         <div x-data="{ open: false }" class="relative">
                             <label class="label" x-text="catLabels[group.category] || group.category"></label>
@@ -257,7 +257,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.selectedImageId || !this.videoCamera || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.selectedImageId); const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera: this.videoCamera, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: 'pending', model: data.model, provider: data.provider, media_url: null, error: null, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.poll(data.generation_id); }
+            try { const src = this.generations.find(g => g.id === this.selectedImageId); const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera: this.videoCamera, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
@@ -265,7 +265,7 @@ document.addEventListener('alpine:init', () => {
         async refine() {
             if (!this.selectedImageId || !this.refinePrompt.trim() || this.refining) return;
             this.refining = true;
-            try { const data = await this.api('/studio/generations/' + this.selectedImageId + '/inpaint', { prompt: this.refinePrompt }); this.addGen({ id: data.generation_id, type: 'image', status: 'pending', model: data.model, provider: data.provider, media_url: null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.refinePrompt = ''; this.poll(data.generation_id); }
+            try { const data = await this.api('/studio/generations/' + this.selectedImageId + '/inpaint', { prompt: this.refinePrompt }); this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.refinePrompt = ''; this.maybePoll(data.generation_id, data.status); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.refining = false; }
         },
@@ -307,6 +307,8 @@ document.addEventListener('alpine:init', () => {
             if (g.status === 'cancelled') return 'Đã hủy';
             return g.type === 'video' ? 'Đang render video…' : 'Đang tạo ảnh…';
         },
+
+        maybePoll(id, status) { if (['completed','failed','cancelled'].includes(status)) return; this.poll(id); },
 
         poll(id) {
             if (this._timers[id]) return;
