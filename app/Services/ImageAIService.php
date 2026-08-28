@@ -23,6 +23,24 @@ class ImageAIService
         return studio_api_key('fal');
     }
 
+    /**
+     * Which image generator to use (flux | wan | qwen). Keys read from the
+     * Studio API page / env. The stub returns a bundled sample regardless.
+     */
+    protected function provider(): string
+    {
+        return (string) studio_config('image_provider', 'flux');
+    }
+
+    protected function providerKey(): ?string
+    {
+        return match ($this->provider()) {
+            'wan' => studio_api_key('wan'),
+            'qwen' => studio_api_key('qwen'),
+            default => studio_api_key('fal') ?: studio_api_key('replicate'),
+        };
+    }
+
     public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null): string
     {
         // Inpainting / updates reuse the source image for the stub.

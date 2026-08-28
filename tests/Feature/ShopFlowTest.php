@@ -860,16 +860,33 @@ class ShopFlowTest extends TestCase
             'image_credits' => 3,
             'video_credits' => 20,
             'max_generations' => 60,
+            'image_provider' => 'qwen',
         ])->assertSessionHas('success');
 
         $this->assertSame('3', setting('studio_image_credits'));
         $this->assertSame('20', setting('studio_video_credits'));
+        $this->assertSame('qwen', setting('studio_image_provider'));
 
         $this->post('/studio/api', ['key_gemini' => 'AIzaTestKey'])
             ->assertSessionHas('success');
 
         $this->assertSame('AIzaTestKey', studio_api_key('gemini'));
         $this->assertNull(studio_api_key('wan'));
+    }
+
+
+    public function test_studio_suggest_from_image(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $response = $this->post('/studio/suggest', [
+            'image' => \Illuminate\Http\UploadedFile::fake()->image('ref.jpg', 400, 500),
+        ])->assertOk();
+
+        $response->assertJsonStructure(['preset_ids', 'styles', 'image_prompt_en']);
+        $data = $response->json();
+        $this->assertNotEmpty($data['image_prompt_en']);
     }
 
 }

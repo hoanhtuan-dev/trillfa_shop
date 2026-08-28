@@ -113,6 +113,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::get('/generations/{generation}', [StudioController::class, 'show'])->name('generations.show');
+    Route::post('/suggest', [StudioController::class, 'suggest'])->name('suggest');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::get('/api', [StudioController::class, 'api'])->name('api');

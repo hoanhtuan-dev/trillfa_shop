@@ -534,6 +534,17 @@ class DatabaseSeeder extends Seeder
             ['camera', 'Từ dưới lên', 'low-angle dramatic shot'],
         ];
 
+        // Nạp thêm bộ Preset mở rộng (JSON) — style/background/pose.
+        $file = database_path('data/fashion_presets.json');
+        if (file_exists($file)) {
+            $extra = json_decode(file_get_contents($file), true) ?: [];
+            foreach (['styles' => 'style', 'backgrounds' => 'background', 'poses' => 'pose'] as $key => $cat) {
+                foreach ($extra[$key] ?? [] as $item) {
+                    $presets[] = [$cat, $item['label'], $item['prompt']];
+                }
+            }
+        }
+
         $sort = 0;
         foreach ($presets as [$category, $label, $injection]) {
             Preset::updateOrCreate(

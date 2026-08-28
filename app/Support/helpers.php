@@ -198,6 +198,7 @@ if (! function_exists('studio_api_key')) {
             'replicate' => 'replicate_token',
             'wan' => 'wan_key',
             'veo' => 'veo_key',
+            'qwen' => 'qwen_key',
         ];
 
         $key = $configKeys[$service] ?? null;

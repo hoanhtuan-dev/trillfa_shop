@@ -53,6 +53,30 @@
                 <textarea x-model="idea" rows="3" class="input" placeholder="VD: Váy dạ hội biển xanh" @keydown.enter.prevent="ideate()"></textarea>
             </div>
 
+            <!-- Suggest from image -->
+            <div class="card p-6">
+                <h2 class="mb-1 font-display text-lg font-semibold text-ink-900">Gợi ý từ ảnh tham khảo</h2>
+                <p class="mb-3 text-xs text-ink-500">Tải ảnh lên → hệ thống gợi ý phong cách + prompt phù hợp.</p>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm flex-1">Chọn ảnh tham khảo</button>
+                    <button type="button" @click="suggestStyle()" :disabled="suggesting || !refFile" class="btn-brand btn-sm">
+                        <span x-show="!suggesting">Gợi ý</span><span x-show="suggesting">…</span>
+                    </button>
+                </div>
+                <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
+                <template x-if="refImage">
+                    <div class="relative mt-3 overflow-hidden rounded-xl">
+                        <img :src="refImage" class="h-40 w-full bg-cream-100 object-cover" alt="Ảnh tham khảo">
+                        <button type="button" @click="refFile=null, refImage=null" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button>
+                    </div>
+                </template>
+                <template x-if="suggestResult.styles.length">
+                    <div class="mt-3 rounded-xl bg-brand-50 p-3 text-xs text-brand-800">
+                        <p><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></p>
+                    </div>
+                </template>
+            </div>
+
             <!-- Presets -->
             <div class="card p-6">
                 <h2 class="mb-3 font-display text-lg font-semibold text-ink-900">2. Phong cách (Preset)</h2>
@@ -162,6 +186,8 @@ document.addEventListener('alpine:init', () => {
         generations: gens, creditsLeft: Number(credits),
         currentProjectId: currentProject, selectedImageId: null, videoCamera: '',
         newProjectName: '', showNewProject: false, refinePrompt: '',
+        refFile: null, refImage: null, suggesting: false,
+        suggestResult: { styles: [], background: '', image_prompt_en: '' },
         _timers: {},
 
         async api(url, body) {
@@ -176,6 +202,46 @@ document.addEventListener('alpine:init', () => {
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
             return data;
+        },
+
+        onRefChange(e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            if (this.refImage) URL.revokeObjectURL(this.refImage);
+            this.refFile = f;
+            this.refImage = URL.createObjectURL(f);
+        },
+
+        async upload(url, form) {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
+                    Accept: 'application/json',
+                },
+                body: form,
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
+            return data;
+        },
+
+        async suggestStyle() {
+            if (!this.refFile || this.suggesting) return;
+            this.suggesting = true;
+            try {
+                const form = new FormData();
+                form.append('image', this.refFile);
+                const data = await this.upload('/studio/suggest', form);
+                this.suggestResult = data;
+                (data.preset_ids || []).forEach((id) => this.togglePreset(id));
+                if (data.image_prompt_en) this.output.image_prompt_en = data.image_prompt_en;
+                Alpine.store('toast').show('Đã gợi ý phong cách & prompt.');
+            } catch (e) {
+                Alpine.store('toast').show(e.message, 'error');
+            } finally {
+                this.suggesting = false;
+            }
         },
 
         togglePreset(id) {

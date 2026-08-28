@@ -9,6 +9,7 @@ use App\Models\Preset;
 use App\Models\Project;
 use App\Services\GeminiService;
 use App\Services\ImageAIService;
+use App\Services\StyleSuggestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 
@@ -188,12 +189,29 @@ class StudioController extends Controller
     }
 
 
+    /**
+     * Reverse-prompt: analyse a reference image and suggest style/prompt.
+     */
+    public function suggest(Request $request)
+    {
+        $request->validate([
+            'image' => ['required', 'image', 'max:8192'],
+        ]);
+
+        $path = $request->file('image')->store('studio/ref', 'public');
+
+        $result = app(StyleSuggestService::class)->suggest(storage_path('app/public/'.$path));
+
+        return response()->json($result);
+    }
+
     public function settings()
     {
         return view('studio.settings', [
             'image_credits' => setting('studio_image_credits', config('studio.image_credits')),
             'video_credits' => setting('studio_video_credits', config('studio.video_credits')),
             'max_generations' => setting('studio_max_generations', 50),
+            'image_provider' => setting('studio_image_provider', config('studio.image_provider')),
         ]);
     }
 
@@ -203,11 +221,13 @@ class StudioController extends Controller
             'image_credits' => ['required', 'integer', 'min:0', 'max:1000'],
             'video_credits' => ['required', 'integer', 'min:0', 'max:1000'],
             'max_generations' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'image_provider' => ['required', 'string', 'in:flux,wan,qwen'],
         ]);
 
         set_setting('studio_image_credits', (string) $data['image_credits']);
         set_setting('studio_video_credits', (string) $data['video_credits']);
         set_setting('studio_max_generations', (string) ($data['max_generations'] ?? 50));
+        set_setting('studio_image_provider', $data['image_provider']);
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }
@@ -220,6 +240,7 @@ class StudioController extends Controller
             'replicate' => ['label' => 'Replicate — Flux (ảnh)', 'hint' => 'REPLICATE_API_TOKEN', 'configured' => (bool) studio_api_key('replicate')],
             'wan' => ['label' => 'Wan AI — video', 'hint' => 'WAN_API_KEY', 'configured' => (bool) studio_api_key('wan')],
             'veo' => ['label' => 'Google Veo — video', 'hint' => 'GOOGLE_VEO_KEY', 'configured' => (bool) studio_api_key('veo')],
+            'qwen' => ['label' => 'Qwen AI — ảnh (Alibaba)', 'hint' => 'QWEN_API_KEY', 'configured' => (bool) studio_api_key('qwen')],
         ];
 
         return view('studio.api', compact('providers'));
@@ -227,7 +248,7 @@ class StudioController extends Controller
 
     public function updateApi(Request $request)
     {
-        $services = ['gemini', 'fal', 'replicate', 'wan', 'veo'];
+        $services = ['gemini', 'fal', 'replicate', 'wan', 'veo', 'qwen'];
 
         foreach ($services as $service) {
             // Clear if requested, else store a new encrypted key, else keep.

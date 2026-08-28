@@ -11,6 +11,8 @@ return [
     */
     'image_credits' => (int) env('STUDIO_IMAGE_CREDITS', 1),
     'video_credits' => (int) env('STUDIO_VIDEO_CREDITS', 10),
+    'image_provider' => env('STUDIO_IMAGE_PROVIDER', 'flux'), // flux | wan | qwen
+    'image_model' => env('STUDIO_IMAGE_MODEL', ''),
 
     /*
     |--------------------------------------------------------------------------
@@ -24,4 +26,5 @@ return [
     'replicate_token' => env('REPLICATE_API_TOKEN', ''),
     'wan_key' => env('WAN_API_KEY', ''),
     'veo_key' => env('GOOGLE_VEO_KEY', ''),
+    'qwen_key' => env('QWEN_API_KEY', ''),
 ];

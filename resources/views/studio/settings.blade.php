@@ -21,6 +21,15 @@
             <label class="label">Giới hạn số generation mỗi project</label>
             <input type="number" name="max_generations" value="{{ old('max_generations', $max_generations) }}" min="1" max="500" class="input">
         </div>
+        <div>
+            <label class="label">Nhà cung cấp sinh ảnh</label>
+            <select name="image_provider" class="input">
+                <option value="flux" @selected(old('image_provider', $image_provider) === 'flux')>Flux (Fal.ai / Replicate)</option>
+                <option value="wan" @selected(old('image_provider', $image_provider) === 'wan')>Wan AI</option>
+                <option value="qwen" @selected(old('image_provider', $image_provider) === 'qwen')>Qwen AI</option>
+            </select>
+            <p class="mt-1 text-xs text-ink-500">Chọn mô hình sinh ảnh; bỏ trống key thì vẫn dùng stub.</p>
+        </div>
         <div class="flex items-center gap-3">
             <button type="submit" class="btn-brand">Lưu cài đặt</button>
             <a href="{{ route('studio.index') }}" class="btn-ghost">Quay lại</a>
