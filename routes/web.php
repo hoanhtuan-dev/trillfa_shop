@@ -121,6 +121,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::get('/generations/{generation}/download', [StudioController::class, 'download'])->name('generations.download');
     Route::get('/generations/{generation}/palette', [StudioController::class, 'palette'])->name('generations.palette');
     Route::get('/references', [StudioController::class, 'references'])->name('references');
+    Route::get('/latest', [StudioController::class, 'latest'])->name('latest');
     Route::get('/presets', [StudioController::class, 'presets'])->name('presets');
     Route::post('/presets', [StudioController::class, 'storePreset'])->name('presets.store');
     Route::put('/presets/{preset}', [StudioController::class, 'updatePreset'])->name('presets.update');

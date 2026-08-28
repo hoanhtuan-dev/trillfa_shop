@@ -120,8 +120,8 @@
             </div>
 
             <!-- Prompt + generate -->
-            <div class="card p-5" x-show="output.image_prompt_en || output.video_prompt_en" x-transition.opacity>
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tiếng Anh <span class="text-xs font-normal text-ink-500">(sửa tay)</span></h2>
+            <div class="card p-5">
+                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tiếng Anh <span class="text-xs font-normal text-ink-500">(nhập trực tiếp hoặc bấm “Tạo Prompt”)</span></h2>
                 <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
                 <div class="mt-2"><label class="label">Video prompt</label><textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs"></textarea></div>
                 <div class="mt-3 grid grid-cols-2 gap-2">
@@ -477,7 +477,8 @@ document.addEventListener('alpine:init', () => {
             finally { this.suggesting = false; }
         },
 
-        addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else this.generations.unshift(gen); this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); },
+        addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else this.generations.unshift(gen); this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
+        async syncLatest() { try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); if (d && d.items) this.generations = d.items; } catch (e) {} },
         selectImage(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.selectedImageId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn.'); },
 
         statusLabel(s) { return { pending:'Đang chờ', processing:'Đang tạo', completed:'Hoàn tất', failed:'Lỗi', cancelled:'Đã hủy' }[s] || s; },

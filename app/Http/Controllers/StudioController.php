@@ -754,6 +754,23 @@ class StudioController extends Controller
     }
 
     /**
+     * Latest generations (JSON) — used to re-sync the Studio output grid reliably.
+     */
+    public function latest()
+    {
+        $items = auth()->user()->generations()->with('project')->latest()->limit(20)->get()
+            ->map(fn ($g) => [
+                'id' => $g->id, 'type' => $g->type, 'status' => $g->status,
+                'model' => $g->model, 'provider' => $g->provider,
+                'media_url' => $g->media_url, 'error' => $g->error,
+                'credits_cost' => $g->credits_cost, 'project_id' => $g->project_id,
+                'created_at' => $g->created_at?->format('d/m H:i'),
+            ])->values();
+
+        return response()->json(['items' => $items]);
+    }
+
+    /**
      * Process the user's queued generations synchronously (no worker / cron needed).
      * Best for quick jobs (stub / Gemini / short renders); long async jobs (Wan/Qwen)
      * are better handled by the queue worker via cron.

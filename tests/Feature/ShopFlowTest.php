@@ -873,6 +873,12 @@ class ShopFlowTest extends TestCase
         $this->assertSame('15', $vg->duration);
     }
 
+    public function test_studio_latest_endpoint(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin)->getJson('/studio/latest')->assertOk()->assertJsonStructure(['items' => []]);
+    }
+
     public function test_studio_pattern_and_tryon_pages(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
