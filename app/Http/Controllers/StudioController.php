@@ -230,7 +230,14 @@ class StudioController extends Controller
         ]);
 
         // Processing mode: 'sync' (default, no worker) or 'queue' (async + worker).
-        if (studio_config('processing', 'sync') === 'queue') {
+        // Async image models (qwen-image / qwen-image-plus) and real AI calls must run
+        // on a queue worker — submitting + polling can exceed the PHP execution limit.
+        $hasProviderKey = $type === 'video'
+            ? (bool) (studio_api_key('wan') || studio_api_key('veo') || studio_api_key('dashscope'))
+            : (bool) (studio_api_key('qwen') || studio_api_key('wan') || studio_api_key('dashscope') || studio_api_key('fal') || studio_api_key('replicate'));
+        $useQueue = studio_config('processing', 'sync') === 'queue' || $hasProviderKey;
+
+        if ($useQueue) {
             if ($type === 'video') {
                 RenderVideoJob::dispatch($generation->id);
             } else {
