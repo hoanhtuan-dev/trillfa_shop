@@ -136,10 +136,65 @@ class StudioController extends Controller
             'id' => $generation->id,
             'type' => $generation->type,
             'status' => $generation->status,
+            'model' => $generation->model,
+            'provider' => $generation->provider,
             'media_url' => $generation->media_url,
             'error' => $generation->error,
             'credits_cost' => $generation->credits_cost,
         ]);
+    }
+
+    /**
+     * Resolve the provider + model for a generation type.
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected function defaultProviderModel(string $type): array
+    {
+        if ($type === 'video') {
+            return ['wan', (string) studio_config('video_model', 'wan2.5-t2v')];
+        }
+
+        $provider = (string) studio_config('image_provider', 'flux');
+        $model = match ($provider) {
+            'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
+            'qwen' => (string) studio_config('qwen_model', 'qwen-image'),
+            default => (string) studio_config('image_model', 'flux-1.1-schnell'),
+        };
+
+        return [$provider, $model];
+    }
+
+    /**
+     * Cancel a pending/processing generation and refund its credits.
+     */
+    public function cancel(Generation $generation)
+    {
+        abort_unless($generation->user_id === auth()->id(), 403);
+
+        if (! in_array($generation->status, ['pending', 'processing'])) {
+            return response()->json(['message' => 'Nhiệm vụ đã kết thúc.'], 422);
+        }
+
+        $generation->update(['status' => Generation::STATUS_CANCELLED]);
+
+        if ($generation->credits_cost > 0) {
+            $generation->user?->increment('credits_balance', $generation->credits_cost);
+        }
+
+        return response()->json(['status' => 'cancelled']);
+    }
+
+    /**
+     * Delete a generation (and its stored media).
+     */
+    public function destroy(Generation $generation)
+    {
+        abort_unless($generation->user_id === auth()->id(), 403);
+
+        $generation->delete();
+
+        return response()->json(['message' => 'Đã xóa nhiệm vụ.']);
     }
 
     protected function queueGeneration(string $type, array $data, int $cost, ?Generation $source = null)
@@ -152,12 +207,16 @@ class StudioController extends Controller
 
         $user->decrement('credits_balance', $cost);
 
+        [$provider, $model] = $this->defaultProviderModel($type);
+
         $generation = $user->generations()->create([
             'project_id' => $data['project_id'] ?? null,
             'prompts_history_id' => $data['history_id'] ?? null,
             'type' => $type,
             'status' => 'pending',
             'prompt' => $data['prompt'] ?? null,
+            'provider' => $provider,
+            'model' => $model,
             'base_image' => $data['base_image'] ?? $source?->media_url,
             'mask_image' => $data['mask_image'] ?? null,
             'credits_cost' => $cost,
@@ -172,6 +231,8 @@ class StudioController extends Controller
         return response()->json([
             'generation_id' => $generation->id,
             'status' => 'processing',
+            'model' => $generation->model,
+            'provider' => $generation->provider,
             'credits_left' => $user->fresh()->credits_balance,
         ]);
     }

@@ -21,7 +21,7 @@ return [
     | the defaults and are also read from env.
     */
     'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-1.5-flash'),
-    'image_model' => env('STUDIO_IMAGE_MODEL', ''),
+    'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),

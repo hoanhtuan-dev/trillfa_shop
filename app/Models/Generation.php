@@ -12,8 +12,10 @@ class Generation extends Model
 
     protected $fillable = [
         'user_id', 'project_id', 'prompts_history_id', 'type', 'status',
-        'prompt', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost',
+        'prompt', 'model', 'provider', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost',
     ];
+
+    public const STATUS_CANCELLED = 'cancelled';
 
     public function user(): BelongsTo
     {

@@ -897,4 +897,24 @@ class ShopFlowTest extends TestCase
         $this->assertNotEmpty($data['image_prompt_en']);
     }
 
+
+    public function test_studio_cancel_and_delete_generation(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Cancel a pending generation -> cancelled + refund.
+        $gen = $admin->generations()->create([
+            'type' => 'image', 'status' => 'pending', 'prompt' => 'x', 'credits_cost' => 5,
+        ]);
+        $this->postJson('/studio/generations/'.$gen->id.'/cancel')->assertOk();
+        $this->assertSame('cancelled', $gen->fresh()->status);
+        $this->assertSame(1005, $admin->fresh()->credits_balance);
+
+        // Delete a generation.
+        $g2 = $admin->generations()->create(['type' => 'image', 'status' => 'completed', 'prompt' => 'x']);
+        $this->deleteJson('/studio/generations/'.$g2->id)->assertOk();
+        $this->assertNull(\App\Models\Generation::find($g2->id));
+    }
+
 }

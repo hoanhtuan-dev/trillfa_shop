@@ -33,6 +33,10 @@ class RenderImageJob implements ShouldQueue
         $generation->update(['status' => 'processing']);
 
         try {
+            if ($generation->fresh()->status === 'cancelled') {
+                return;
+            }
+
             $url = $images->generate(
                 (string) $generation->prompt,
                 $generation->base_image,

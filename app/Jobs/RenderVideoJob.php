@@ -33,6 +33,10 @@ class RenderVideoJob implements ShouldQueue
         $generation->update(['status' => 'processing']);
 
         try {
+            if ($generation->fresh()->status === 'cancelled') {
+                return;
+            }
+
             // Simulate the async nature of a real video provider for the demo.
             sleep(2);
 
