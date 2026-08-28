@@ -31,9 +31,9 @@
     @endphp
 </head>
 <body class="min-h-screen bg-cream-100 text-ink-900 antialiased">
-    <div class="flex min-h-screen">
+    <div class="flex min-h-screen" x-data="{ sidebarCollapsed: false }">
         <!-- ===== Left sidebar ===== -->
-        <aside class="hidden w-60 shrink-0 flex-col border-r border-cream-200 bg-white lg:flex">
+        <aside class="hidden w-60 shrink-0 flex-col border-r border-cream-200 bg-white" :class="sidebarCollapsed ? 'lg:hidden' : 'lg:flex'">
             <a href="{{ route('studio.index') }}" class="flex items-center gap-2 border-b border-cream-200 px-4 py-4">
                 <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
@@ -82,6 +82,7 @@
         <div class="flex min-w-0 flex-1 flex-col">
             <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-cream-200 bg-white/90 px-4 backdrop-blur">
                 <div class="flex items-center gap-2 text-sm">
+                    <button @click="sidebarCollapsed = !sidebarCollapsed" class="btn-outline btn-sm" :title="sidebarCollapsed ? 'Hiện thanh bên' : 'Ẩn thanh bên'"><span x-text="sidebarCollapsed ? '»' : '«'"></span></button>
                     <span class="font-display text-sm font-semibold text-ink-900">@yield('title', 'Trillfa Studio')</span>
                     <span class="hidden badge bg-cream-200 text-ink-500 sm:inline-flex">{{ $connected ? 'AI Connected' : 'Stub' }}</span>
                 </div>

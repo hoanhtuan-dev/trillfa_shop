@@ -43,7 +43,6 @@
     <!-- Toolbar -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-            <button @click="showLeft = !showLeft" class="btn-outline btn-sm" :title="showLeft ? 'Ẩn bảng điều khiển trái' : 'Hiện bảng điều khiển trái'"><span x-text="showLeft ? '«' : '»'"></span></button>
             <label class="label mb-0">Dự án:</label>
             <div class="w-56"><select x-model="currentProjectId" class="input !py-2">
                 <option value="">— Dự án mới (không lưu) —</option>
@@ -64,11 +63,11 @@
         </div>
     </div>
 
-    <div class="grid gap-4" :class="showLeft ? 'lg:grid-cols-[300px_minmax(0,1fr)_280px]' : 'lg:grid-cols-[minmax(0,1fr)_280px]'">
+    <div class="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)_280px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="showLeft" x-transition.opacity.duration.150ms>
+        <div class="space-y-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1">
             <!-- Idea -->
             <div class="card p-5">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Text-to-Image · Ý tưởng</h2>
@@ -160,7 +159,7 @@
                 </div>
 
                 <!-- Media area -->
-                <div class="relative h-[58vh] cursor-grab overflow-hidden bg-cream-100 active:cursor-grabbing" @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan">
+                <div class="relative h-[58vh] cursor-grab overflow-hidden bg-cream-100 active:cursor-grabbing" @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)">
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url">
@@ -222,7 +221,7 @@
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select>
                         <select x-model="videoRes" class="input !py-2"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select>
-                        <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId || !videoCamera" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!videoBusy">Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
+                        <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!videoBusy">Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
                     </div>
                     <p class="mt-2 text-[10px] text-ink-500" x-text="selectedImageId ? 'Nguồn ảnh #' + selectedImageId : 'Chọn ảnh nguồn trước khi Render.'"></p>
                 </div>
@@ -270,14 +269,7 @@
                 <p class="text-[10px] text-ink-500" x-show="!palette.length">Chọn một ảnh ở Outputs để trích màu chủ đạo.</p>
             </div>
 
-            <!-- Render video primary -->
-            <div class="card p-4" x-show="output.video_prompt_en || selectedImageId">
-                <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">Render Video</h2>
-                <p class="mb-2 text-[10px] text-ink-500">Chọn camera ở timeline, sau đó Render.</p>
-                <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId || !videoCamera" class="btn-brand w-full"><span x-show="!videoBusy">Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
-                <p class="mt-1 text-[10px] text-ink-500">~1–2 phút · {{ $imgKeySet ? 'AI' : 'Stub' }}</p>
-            </div>
-        </div>
+                    </div>
     </div>
 
     <!-- Reference product picker modal -->
@@ -320,7 +312,7 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
-        zoom: 1, pan: { x: 0, y: 0 }, palette: [], showLeft: true, _drag: null,
+        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null,
         _timers: {},
 
         init() { const f = this.generations.find(g => g.status === 'completed'); if (f) { this.previewId = f.id; this.loadPalette(f.id); } },
@@ -333,6 +325,7 @@ document.addEventListener('alpine:init', () => {
         startPan(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
         movePan(e) { if (!this._drag) return; this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); },
         endPan() { this._drag = null; },
+        onWheel(e) { const delta = e.deltaY > 0 ? -0.25 : 0.25; this.zoom = Math.min(4, Math.max(0.6, +(this.zoom + delta).toFixed(2))); },
         get cameraOptions() { const g = this.presets.find(x => x.category === 'camera'); return g ? g.items.map(i => i.label) : []; },
         async loadPalette(id) {
             if (!id) { this.palette = []; return; }
@@ -437,9 +430,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         async renderVideo() {
-            if (!this.selectedImageId || !this.videoCamera || this.videoBusy) return;
+            if (!this.selectedImageId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.selectedImageId); const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera: this.videoCamera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
+            try { const src = this.generations.find(g => g.id === this.selectedImageId); const camera = this.videoCamera || 'slow tracking shot'; const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
