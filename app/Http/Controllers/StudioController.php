@@ -313,24 +313,38 @@ class StudioController extends Controller
 
     protected function testDashscope(string $key): array
     {
-        // Wan (image & video) + Qwen run on Alibaba DashScope with one key.
-        // Use an INVALID model so the request fails at validation (no cost):
-        // 401/403 = key wrong; 400/404/422 = auth passed, key valid.
-        $resp = Http::withToken($key)->timeout(20)
-            ->post(studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com').'/api/v1/services/aigc/multimodal-generation/generation', [
-                'model' => '__auth_check__',
-                'input' => ['messages' => [['role' => 'user', 'content' => [['text' => 'test']]]]],
-                'parameters' => [],
-            ]);
+        // Wan (image & video) + Qwen run on Alibaba DashScope. Auto-detect the
+        // region: try the configured base, then the other one. An INVALID model
+        // makes the request fail at validation (no cost).
+        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
+        $alt = str_contains($base, 'dashscope-intl') ? 'https://dashscope.aliyuncs.com' : 'https://dashscope-intl.aliyuncs.com';
 
-        return match (true) {
-            $resp->successful() => ['ok' => true, 'message' => 'DashScope: kết nối OK.'],
-            in_array($resp->status(), [401, 403]) => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' ('.data_get($resp->json(), 'code', 'AuthError').') — key bị từ chối. Key sai hoặc sai vùng.'],
-            $resp->status() === 404 => ['ok' => false, 'message' => 'DashScope: HTTP 404 — sai đường dẫn base URL. DashScope base chỉ gồm host, ví dụ https://dashscope-intl.aliyuncs.com (không thêm /apps/...).'],
-            in_array($resp->status(), [400, 422]) => ['ok' => true, 'message' => 'DashScope: khoá hợp lệ (HTTP '.$resp->status().' — tham số bị từ chối, auth đã qua).'],
-            default => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' — chưa xác minh được.'],
-        };
+        $lastStatus = null;
+        foreach (array_unique([$base, $alt]) as $host) {
+            $resp = Http::withToken($key)->timeout(20)
+                ->post($host.'/api/v1/services/aigc/multimodal-generation/generation', [
+                    'model' => '__auth_check__',
+                    'input' => ['messages' => [['role' => 'user', 'content' => [['text' => 'test']]]]],
+                    'parameters' => [],
+                ]);
+
+            if ($resp->successful()) {
+                return ['ok' => true, 'message' => 'DashScope: kết nối OK ('.$host.').'];
+            }
+            if (in_array($resp->status(), [400, 422])) {
+                $region = str_contains($host, 'intl') ? 'quốc tế' : 'Trung Quốc';
+                $extra = $host !== $base ? ' (đặt DashScope base URL = '.$host.')' : '';
+                return ['ok' => true, 'message' => 'DashScope: khoá hợp lệ — vùng '.$region.' ('.$host.')'.$extra];
+            }
+            if ($resp->status() === 404) {
+                return ['ok' => false, 'message' => 'DashScope: HTTP 404 ở '.$host.' — sai đường dẫn base URL (chỉ gồm host, không thêm /apps/...).'];
+            }
+            $lastStatus = $resp->status();
+        }
+
+        return ['ok' => false, 'message' => 'DashScope: key bị từ chối (HTTP '.$lastStatus.'). Lưu ý: key từ home.qwencloud.com là key QwenCloud — nền tảng riêng, KHÔNG chạy trên endpoint DashScope. Hãy dùng DASHSCOPE_API_KEY lấy từ Alibaba Cloud Model Studio (Bailian console), bật model Wan/Qwen.'];
     }
+
 
     public function settings()
     {
