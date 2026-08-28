@@ -160,7 +160,11 @@
                 </div>
 
                 <!-- Media area -->
-                <div class="relative h-[58vh] cursor-grab overflow-hidden bg-cream-100 active:cursor-grabbing" @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)">
+                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-cream-100 active:cursor-grabbing" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)">
+                    <!-- interaction legend -->
+                    <div class="pointer-events-none absolute bottom-2 left-2 z-10 rounded-lg bg-ink-900/70 px-2 py-1 text-[10px] text-white">
+                        <span class="mr-2">🖱 Lăn chuột: Thu phóng</span><span class="mr-2">✋ Kéo / Nhấn phải: Di chuyển</span><span>Zoom <b x-text="zoom.toFixed(2)"></b>x</span>
+                    </div>
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url">
@@ -316,7 +320,11 @@ document.addEventListener('alpine:init', () => {
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null,
         _timers: {},
 
-        init() { const f = this.generations.find(g => g.status === 'completed'); if (f) { this.previewId = f.id; this.loadPalette(f.id); } },
+        init() {
+            const f = this.generations.find(g => g.status === 'completed');
+            if (f) { this.previewId = f.id; this.loadPalette(f.id); }
+            this.generations.forEach(g => { if (this.isActive(g.status)) this.poll(g.id); });
+        },
         get preview() { return this.generations.find(g => g.id === this.previewId) || null; },
         setPreview(g) { if (g) { this.previewId = g.id; this.loadPalette(g.id); } },
         zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25).toFixed(2)); },
@@ -502,7 +510,7 @@ document.addEventListener('alpine:init', () => {
                     if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; }
                     if (['completed','failed','cancelled'].includes(g.status)) { clearInterval(this._timers[id]); delete this._timers[id]; }
                 } catch (e) {}
-            }, 3000);
+            }, 2000);
         },
     }));
 });

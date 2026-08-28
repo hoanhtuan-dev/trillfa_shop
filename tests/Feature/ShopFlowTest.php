@@ -807,6 +807,9 @@ class ShopFlowTest extends TestCase
         ])->assertOk()->json();
 
         $gen = \App\Models\Generation::find($image['generation_id']);
+        $this->assertSame('pending', $gen->status); // lazy: processed on poll/show
+        $this->getJson('/studio/generations/'.$gen->id)->assertOk(); // triggers lazy processing
+        $gen->refresh();
         $this->assertSame('completed', $gen->status);
         $this->assertSame('image', $gen->type);
         $this->assertNotNull($gen->media_url);
@@ -821,6 +824,9 @@ class ShopFlowTest extends TestCase
         ])->assertOk()->json();
 
         $vgen = \App\Models\Generation::find($video['generation_id']);
+        $this->assertSame('pending', $vgen->status);
+        $this->getJson('/studio/generations/'.$vgen->id)->assertOk();
+        $vgen->refresh();
         $this->assertSame('completed', $vgen->status);
         $this->assertSame('video', $vgen->type);
         $this->assertNotNull($vgen->media_url);
@@ -889,11 +895,16 @@ class ShopFlowTest extends TestCase
 
         $p = $this->postJson('/studio/pattern', ['prompt' => 'floral toile vintage'])->assertOk();
         $this->assertNotEmpty($p->json('generation_id'));
-        $this->assertSame('completed', $p->json('status'));
+        $pg = \App\Models\Generation::find($p->json('generation_id'));
+        $this->assertSame('pending', $pg->status);
+        $this->getJson('/studio/generations/'.$pg->id)->assertOk();
+        $this->assertSame('completed', $pg->fresh()->status);
 
         $t = $this->postJson('/studio/tryon', ['prompt' => 'silk a-line dress'])->assertOk();
         $this->assertNotEmpty($t->json('generation_id'));
-        $this->assertSame('completed', $t->json('status'));
+        $tg = \App\Models\Generation::find($t->json('generation_id'));
+        $this->getJson('/studio/generations/'.$tg->id)->assertOk();
+        $this->assertSame('completed', $tg->fresh()->status);
     }
 
     public function test_studio_preset_manager_and_references(): void

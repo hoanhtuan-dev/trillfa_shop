@@ -138,15 +138,34 @@ class StudioController extends Controller
     {
         abort_unless($generation->user_id === auth()->id(), 403);
 
+        // Lazy worker: if this generation is still pending (not picked up by a worker), process it
+        // inline now so the polling request returns the completed result. This lets the create request
+        // return fast (Canvas shows "Đang tạo" instantly) and slow providers finish without SSH/cron.
+        if ($generation->status === 'pending') {
+            set_time_limit(600);
+            $generation->update(['status' => 'processing']);
+            try {
+                if ($generation->type === 'video') {
+                    RenderVideoJob::dispatchSync($generation->id);
+                } else {
+                    RenderImageJob::dispatchSync($generation->id);
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
+            }
+        }
+
+        $g = $generation->fresh();
+
         return response()->json([
-            'id' => $generation->id,
-            'type' => $generation->type,
-            'status' => $generation->status,
-            'model' => $generation->model,
-            'provider' => $generation->provider,
-            'media_url' => $generation->media_url,
-            'error' => $generation->error,
-            'credits_cost' => $generation->credits_cost,
+            'id' => $g->id,
+            'type' => $g->type,
+            'status' => $g->status,
+            'model' => $g->model,
+            'provider' => $g->provider,
+            'media_url' => $g->media_url,
+            'error' => $g->error,
+            'credits_cost' => $g->credits_cost,
         ]);
     }
 
@@ -165,7 +184,7 @@ class StudioController extends Controller
         $model = match ($provider) {
             'gemini' => (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image'),
             'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
-            'qwen' => (string) studio_config('qwen_model', 'qwen-image'),
+            'qwen' => (string) studio_config('qwen_model', 'qwen-image-3.0-pro'),
             default => (string) studio_config('image_model', 'flux-1.1-schnell'),
         };
 
@@ -232,26 +251,10 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
-        // Always run the job inline so it completes automatically in the request — the admin does not
-        // need SSH/cron or the queue worker. Extend the PHP execution time so slower providers
-        // (async Qwen / video) can finish before the request times out.
-        set_time_limit(600);
-        $useQueue = false;
-
-        if ($useQueue) {
-            if ($type === 'video') {
-                RenderVideoJob::dispatch($generation->id);
-            } else {
-                RenderImageJob::dispatch($generation->id);
-            }
-        } else {
-            if ($type === 'video') {
-                RenderVideoJob::dispatchSync($generation->id);
-            } else {
-                RenderImageJob::dispatchSync($generation->id);
-            }
-        }
-
+        // The job is NOT run here — it is processed lazily when the client polls this generation
+        // (show), or via the "Xử lý ngay" button / studio:process. This keeps the create request
+        // fast so the Canvas shows "Đang tạo" instantly, and lets slow providers finish without
+        // blocking (or timing out) the request — no SSH / queue worker needed.
         $fresh = $generation->fresh();
 
         return response()->json([
