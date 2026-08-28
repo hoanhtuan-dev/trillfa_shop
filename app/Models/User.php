@@ -15,7 +15,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'phone', 'avatar', 'is_active',
+        'name', 'email', 'password', 'role', 'phone', 'avatar', 'is_active', 'credits_balance',
     ];
 
     protected $hidden = [
@@ -59,5 +59,22 @@ class User extends Authenticatable
     public function posts(): HasMany
     {
         return $this->hasMany(Post::class, 'author_id');
+    }
+
+    // ---------- Trillfa Studio ----------
+
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
+
+    public function prompts(): HasMany
+    {
+        return $this->hasMany(PromptsHistory::class);
+    }
+
+    public function generations(): HasMany
+    {
+        return $this->hasMany(Generation::class);
     }
 }

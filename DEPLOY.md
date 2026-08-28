@@ -245,3 +245,11 @@ php artisan view:cache
 - [ ] Không bao giờ `php artisan db:seed` trên production trừ khi thật sự cần dữ liệu mẫu.
 - [ ] Kiểm tra `/san-pham/*`, menu header/footer, giỏ hàng, thanh toán nhanh, newsletter hoạt động sau deploy.
 - [ ] Bản build frontend `public_html/build` đã commit — không cần chạy Node trên server.
+## Trillfa Studio (AI sinh ảnh/video)
+
+- Studio là module dành cho người dùng đăng nhập: `/studio`. Ý tưởng + Preset -> Gemini tạo prompt -> sinh ảnh (2D) / video (catwalk) qua **Queue**.
+- **Bắt buộc chạy worker để xử lý job**: `php artisan queue:work --timeout=600` (chạy nền/cron). Nếu không có worker, job giữ trạng thái `pending`.
+- Hiện dùng **stub** (không cần API key) — sinh ảnh dùng ảnh mẫu, video dùng video demo đóng gói. Khi có key: set `GEMINI_API_KEY`, `FAL_KEY`/`REPLICATE_API_TOKEN`, `WAN_API_KEY`/`GOOGLE_VEO_KEY` trong `.env` (services tự chuyển sang gọi thật).
+- Tín dụng (credits): trừ 1 cho ảnh, 10 cho video (cấu hình `STUDIO_IMAGE_CREDITS`/`STUDIO_VIDEO_CREDITS`).
+- Lưu file: media lưu trong `storage/app/public/studio`, phục vụ qua symlink `public_html/storage` (đã có).
+- Queue dùng `database` (đã cấu hình) — không cần Redis.

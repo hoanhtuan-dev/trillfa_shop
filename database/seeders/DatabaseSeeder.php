@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentMethod;
 use App\Models\Post;
+use App\Models\Preset;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Review;
@@ -81,6 +82,7 @@ class DatabaseSeeder extends Seeder
         $this->menus();
         $this->reviews();
         $this->orders();
+        $this->presets();
 
         $this->command?->info('Seeded Trillfa Fa successfully.');
     }
@@ -113,6 +115,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'role' => 'admin',
             'phone' => '0900000000',
+            'credits_balance' => 1000,
             'email_verified_at' => now(),
         ]);
 
@@ -121,6 +124,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'role' => 'customer',
             'phone' => '0912345678',
+            'credits_balance' => 200,
             'email_verified_at' => now(),
         ]);
 
@@ -500,4 +504,43 @@ class DatabaseSeeder extends Seeder
             \App\Models\MenuItem::create(['location' => 'footer', 'label' => $label, 'url' => $url, 'sort_order' => $fsort++]);
         }
     }
+    protected function presets(): void
+    {
+        $presets = [
+            // Chất liệu (fabric)
+            ['fabric', 'Lụa bóng', 'silk satin fabric with a subtle sheen'],
+            ['fabric', 'Voan mỏng', 'sheer chiffon fabric'],
+            ['fabric', 'Cotton cao cấp', 'premium organic cotton'],
+            ['fabric', 'Tweed', 'structured tweed fabric'],
+            ['fabric', 'Da lộn', 'soft suede leather'],
+            ['fabric', 'Organza', 'stiff organza fabric'],
+            // Phom dáng (silhouette)
+            ['silhouette', 'Phom chữ A', 'A-line silhouette'],
+            ['silhouette', 'Đầm dạ hội', 'elegant evening gown silhouette'],
+            ['silhouette', 'Ống suông', 'slim column silhouette'],
+            ['silhouette', 'Váy xòe', 'flared skirt silhouette'],
+            ['silhouette', 'Đầm ôm', 'body-hugging mermaid silhouette'],
+            // Phong cách (style)
+            ['style', 'Tối giản', 'minimalist luxury style'],
+            ['style', 'Cổ điển', 'classic timeless style'],
+            ['style', 'Lãng mạn', 'romantic feminine style'],
+            ['style', 'Phóng khoáng', 'bohemian free-spirited style'],
+            ['style', 'Đương đại', 'modern contemporary style'],
+            // Góc máy (camera)
+            ['camera', 'Xoay 360 độ', '360 degree rotating camera shot'],
+            ['camera', 'Bước tới', 'camera tracking forward with the model'],
+            ['camera', 'Cận cảnh', 'extreme close-up detail shot'],
+            ['camera', 'Chạy đà', 'dynamic runway walk shot'],
+            ['camera', 'Từ dưới lên', 'low-angle dramatic shot'],
+        ];
+
+        $sort = 0;
+        foreach ($presets as [$category, $label, $injection]) {
+            Preset::updateOrCreate(
+                ['category' => $category, 'ui_label' => $label],
+                ['prompt_injection' => $injection, 'sort_order' => $sort++],
+            );
+        }
+    }
+
 }

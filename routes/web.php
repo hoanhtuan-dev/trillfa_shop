@@ -34,6 +34,7 @@ use App\Http\Controllers\QuickCheckoutController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\StudioController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
@@ -101,6 +102,17 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function
     Route::put('/dia-chi/{address}', [AccountController::class, 'updateAddress'])->name('addresses.update');
     Route::delete('/dia-chi/{address}', [AccountController::class, 'deleteAddress'])->name('addresses.delete');
     Route::get('/danh-gia', [AccountController::class, 'reviews'])->name('reviews');
+});
+
+// Trillfa Studio (AI fashion design — auth)
+Route::middleware('auth')->prefix('studio')->name('studio.')->group(function () {
+    Route::get('/', [StudioController::class, 'index'])->name('index');
+    Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
+    Route::post('/ideate', [StudioController::class, 'ideate'])->name('ideate');
+    Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
+    Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
+    Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
+    Route::get('/generations/{generation}', [StudioController::class, 'show'])->name('generations.show');
 });
 
 // Blog

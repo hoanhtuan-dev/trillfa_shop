@@ -779,4 +779,52 @@ class ShopFlowTest extends TestCase
         $this->get('/yeu-thich')->assertRedirect(route('login'));
     }
 
+
+    public function test_studio_requires_auth(): void
+    {
+        $this->get('/studio')->assertRedirect(route('login'));
+    }
+
+    public function test_studio_ideate_returns_prompts(): void
+    {
+        $this->actingAs(User::where('email', 'customer@trillfa.com')->first());
+
+        $this->postJson('/studio/ideate', [
+            'idea' => 'Váy dạ hội biển xanh',
+            'preset_ids' => [],
+        ])->assertOk()->assertJsonStructure(['history_id', 'image_prompt_en', 'video_prompt_en']);
+    }
+
+    public function test_studio_generate_image_and_video(): void
+    {
+        $user = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($user);
+
+        // 2D image (cost 1) runs synchronously in tests.
+        $image = $this->postJson('/studio/generate', [
+            'prompt' => 'photo of a blue evening gown',
+            'history_id' => null,
+        ])->assertOk()->json();
+
+        $gen = \App\Models\Generation::find($image['generation_id']);
+        $this->assertSame('completed', $gen->status);
+        $this->assertSame('image', $gen->type);
+        $this->assertNotNull($gen->media_url);
+        $this->assertSame(199, $user->fresh()->credits_balance);
+
+        // Video (cost 10).
+        $video = $this->postJson('/studio/video', [
+            'prompt' => 'catwalk video of a blue evening gown',
+            'base_image' => $gen->media_url,
+            'camera' => '360 degree rotating camera shot',
+            'history_id' => null,
+        ])->assertOk()->json();
+
+        $vgen = \App\Models\Generation::find($video['generation_id']);
+        $this->assertSame('completed', $vgen->status);
+        $this->assertSame('video', $vgen->type);
+        $this->assertNotNull($vgen->media_url);
+        $this->assertSame(189, $user->fresh()->credits_balance);
+    }
+
 }
