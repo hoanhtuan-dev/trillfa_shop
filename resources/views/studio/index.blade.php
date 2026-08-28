@@ -438,9 +438,19 @@ document.addEventListener('alpine:init', () => {
         async generateImage() {
             if (!this.output.image_prompt_en || this.generating) return;
             this.generating = true;
-            try { const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
-            catch (e) { Alpine.store('toast').show(e.message, 'error'); }
-            finally { this.generating = false; }
+            const tmpId = 'tmp-' + Date.now();
+            this.addGen({ id: tmpId, type: 'image', status: 'processing', model: '', provider: this.imgProvider || '', media_url: null, error: null, credits_cost: 1, created_at: 'Đang tạo' });
+            try {
+                const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null });
+                this.generations = this.generations.filter(g => g.id !== tmpId);
+                this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' });
+                this.creditsLeft = data.credits_left;
+                if (data.status === 'completed') Alpine.store('toast').show('Đã tạo xong ảnh #' + data.generation_id);
+                this.maybePoll(data.generation_id, data.status);
+            } catch (e) {
+                this.generations = this.generations.filter(g => g.id !== tmpId);
+                Alpine.store('toast').show(e.message || 'Lỗi.', 'error');
+            } finally { this.generating = false; }
         },
 
         async renderVideo() {
@@ -482,10 +492,8 @@ document.addEventListener('alpine:init', () => {
                     data = await this.api('/studio/suggest', { reference_url: this.refUrl });
                 }
                 this.suggestResult = data;
-                this.presetIds = [];
-                (data.preset_ids || []).forEach((id) => { if (!this.presetIds.includes(Number(id))) this.presetIds.push(Number(id)); });
                 if (data.image_prompt_en) this.output.image_prompt_en = data.image_prompt_en;
-                Alpine.store('toast').show('Đã gợi ý phong cách & prompt.');
+                Alpine.store('toast').show(data.preset_ids && data.preset_ids.length ? 'Đã gợi ý prompt từ ảnh (AI).' : 'Đã gợi ý prompt từ ảnh.');
             } catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.suggesting = false; }
         },

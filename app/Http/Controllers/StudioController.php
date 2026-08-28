@@ -98,7 +98,7 @@ class StudioController extends Controller
     {
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:4000'],
-            'base_image' => ['required', 'string', 'max:2048'],
+            'base_image' => ['nullable', 'string', 'max:2048'],
             'camera' => ['nullable', 'string', 'max:255'],
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
             'duration' => ['nullable', 'string', 'in:5,8,10,15,20'],
@@ -251,10 +251,16 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
-        // The job is NOT run here — it is processed lazily when the client polls this generation
-        // (show), or via the "Xử lý ngay" button / studio:process. This keeps the create request
-        // fast so the Canvas shows "Đang tạo" instantly, and lets slow providers finish without
-        // blocking (or timing out) the request — no SSH / queue worker needed.
+        // Run the job inline so the create request returns a completed result (reliable). The
+        // front-end shows an optimistic "Đang tạo" placeholder while the model runs. Extend the
+        // PHP execution time so a provider that takes up to ~120s can finish.
+        set_time_limit(600);
+        if ($type === 'video') {
+            RenderVideoJob::dispatchSync($generation->id);
+        } else {
+            RenderImageJob::dispatchSync($generation->id);
+        }
+
         $fresh = $generation->fresh();
 
         return response()->json([
