@@ -230,13 +230,12 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
-        // Processing mode: 'sync' (default, no worker) or 'queue' (async + worker).
-        // Async image models (qwen-image / qwen-image-plus) and real AI calls must run
-        // on a queue worker — submitting + polling can exceed the PHP execution limit.
-        $hasProviderKey = $type === 'video'
-            ? (bool) (studio_api_key('wan') || studio_api_key('veo') || studio_api_key('dashscope'))
-            : (bool) (studio_api_key('gemini') || studio_api_key('qwen') || studio_api_key('wan') || studio_api_key('dashscope') || studio_api_key('fal') || studio_api_key('replicate'));
-        $useQueue = studio_config('processing', 'sync') === 'queue' || $hasProviderKey;
+        // Sync image models (Gemini, qwen-image-3.0-pro / max, Flux) run instantly and need no
+        // worker. Only async-only image models (qwen-image / qwen-image-plus), video, and an explicit
+        // "queue" processing mode dispatch to the queue worker.
+        $useQueue = studio_config('processing', 'sync') === 'queue'
+            || $type === 'video'
+            || ($type === 'image' && in_array((string) $model, ['qwen-image', 'qwen-image-plus'], true));
 
         if ($useQueue) {
             if ($type === 'video') {
@@ -375,35 +374,49 @@ class StudioController extends Controller
             'https://coding-intl.dashscope.aliyuncs.com',
         ]);
 
-        $lastStatus = null;
+        // Use a REAL image model (matching the generation fallback chain) instead of a made-up
+        // name: on plan hosts a non-existent model can return 401 and wrongly look like a bad key.
+        $models = ['qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image', 'wan2.7-image-pro'];
+
+        $last = null;
         foreach ($candidates as $host) {
-            $resp = Http::withToken($key)->timeout(20)
-                ->post($host.'/api/v1/services/aigc/multimodal-generation/generation', [
-                    'model' => '__auth_check__',
-                    'input' => ['messages' => [['role' => 'user', 'content' => [['text' => 'test']]]]],
-                    'parameters' => [],
-                ]);
+            $unpurchased = [];
+            foreach ($models as $model) {
+                try {
+                    $resp = Http::withToken($key)->timeout(25)
+                        ->post($host.'/api/v1/services/aigc/multimodal-generation/generation', [
+                            'model' => $model,
+                            'input' => ['messages' => [['role' => 'user', 'content' => [['text' => 'a minimalist premium fashion editorial photo']]]]],
+                            'parameters' => ['n' => 1, 'size' => '1328*1328', 'watermark' => false],
+                        ]);
+                } catch (\Throwable $e) {
+                    continue;
+                }
 
-            if ($resp->successful()) {
-                return ['ok' => true, 'message' => 'DashScope: kết nối OK ('.$host.').'];
-            }
-            if (in_array($resp->status(), [400, 422])) {
-                $kind = match ($host) {
-                    'https://token-plan.ap-southeast-1.maas.aliyuncs.com' => 'Token Plan',
-                    'https://coding-intl.dashscope.aliyuncs.com' => 'Coding Plan',
-                    default => str_contains($host, 'intl') ? 'quốc tế' : 'Trung Quốc',
-                };
-                $extra = $host !== $configured ? ' — đặt DashScope base URL = '.$host : '';
+                if ($resp->successful()) {
+                    return ['ok' => true, 'message' => 'DashScope: khóa hợp lệ tại '.$host.' — model '.$model.' dùng được (đã tạo thử 1 ảnh).'];
+                }
+                $status = $resp->status();
+                $body = strtolower((string) $resp->body());
 
-                return ['ok' => true, 'message' => 'DashScope: khoá hợp lệ ('.$kind.') '.$host.$extra.' — KHÁO HỢP LỆ chỉ xác nhận key; model ảnh (Qwen-Image/Wan) còn cần được bật/mua riêng trong QwenCloud Model Center, nếu không sẽ báo AccessDenied.Unpurchased.'];
+                if (in_array($status, [400, 422])) {
+                    return ['ok' => true, 'message' => 'DashScope: khóa hợp lệ tại '.$host.' — model '.$model.' dùng được.'];
+                }
+                if ($status === 403 || str_contains($body, 'unpurchased') || str_contains($body, 'eligible')) {
+                    $unpurchased[] = $model;
+
+                    continue;
+                }
+                // 401 / other auth issues on this host — try the next host/model.
+                $last = ['status' => $status, 'host' => $host];
             }
-            if ($resp->status() === 404) {
-                continue; // wrong path for this host — try the next one
+
+            if ($unpurchased) {
+                return ['ok' => false, 'message' => 'DashScope: khóa hợp lệ tại '.$host.' — nhưng model ảnh ('.implode(', ', $unpurchased).') CHƯA được mua trên tài khoản (403 Unpurchased). Hãy bật/mua một model Qwen-Image trong QwenCloud Model Center, hoặc dùng Gemini.'];
             }
-            $lastStatus = $resp->status();
         }
 
-        return ['ok' => false, 'message' => 'DashScope: KEY bị từ chối trên mọi host (HTTP '.$lastStatus.') — tức key KHÔNG được server chấp nhận (sai / hết hạn / không đúng loại). Cách sửa: vào https://home.qwencloud.com/api-keys → tạo key mới, copy ĐẦY ĐỦ và dán lại. Phân loại: key sk-xxxxx → base https://dashscope-intl.aliyuncs.com; key sk-sp-xxxxx (Token/Coding Plan) → base https://token-plan.ap-southeast-1.maas.aliyuncs.com (hoặc coding-intl.dashscope.aliyuncs.com). Lưu ý khác với 403 Unpurchased: 403 = key OK nhưng model ảnh chưa được mua trên tài khoản. Gợi ý ổn định hơn: dùng Gemini (Google AI Studio key) để tạo ảnh — đã tích hợp sẵn.'];
+        return ['ok' => false, 'message' => 'DashScope: key chưa được chấp nhận (HTTP '.($last['status'] ?? '…').' tại '.($last['host'] ?? '…').'). Tạo key mới tại https://home.qwencloud.com/api-keys và dán đầy đủ. Gợi ý ổn định: dùng Gemini (Google AI Studio key) để tạo ảnh.'];
     }
 
     /**
