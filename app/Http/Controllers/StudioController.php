@@ -394,7 +394,7 @@ class StudioController extends Controller
                 };
                 $extra = $host !== $configured ? ' — đặt DashScope base URL = '.$host : '';
 
-                return ['ok' => true, 'message' => 'DashScope: khoá hợp lệ ('.$kind.') '.$host.$extra];
+                return ['ok' => true, 'message' => 'DashScope: khoá hợp lệ ('.$kind.') '.$host.$extra.' — KHÁO HỢP LỆ chỉ xác nhận key; model ảnh (Qwen-Image/Wan) còn cần được bật/mua riêng trong QwenCloud Model Center, nếu không sẽ báo AccessDenied.Unpurchased.'];
             }
             if ($resp->status() === 404) {
                 continue; // wrong path for this host — try the next one

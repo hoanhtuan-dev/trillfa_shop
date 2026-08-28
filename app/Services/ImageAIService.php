@@ -100,7 +100,9 @@ class ImageAIService
         $msg = $this->dashscopeError ?: 'Không thể gọi nhà cung cấp AI. Kiểm tra key / model / độ phân giải trong Cài đặt.';
 
         if (str_contains($msg, 'Unpurchased') || str_contains($msg, 'eligible')) {
-            $msg .= ' — Model chưa được kích hoạt trên tài khoản. Hãy bật model ở trang QwenCloud, hoặc trong Cài đặt đổi “Ảnh Qwen” sang qwen-image / qwen-image-plus và đặt Chế độ xử lý = Queue.';
+            $msg = 'Khóa QwenCloud hợp lệ, nhưng model ảnh chưa được kích hoạt/mua trên tài khoản (AccessDenied.Unpurchased). '
+                .'Vào https://home.qwencloud.com → Model Center → bật / mua một model Qwen-Image (Qwen-Image, Qwen-Image-Max, Qwen-Image-Plus, Qwen-Image-3.0). '
+                .'Tài khoản này hiện chỉ có model giọng nói (ASR/TTS). Sau khi bật, chọn lại “Ảnh Qwen” trong Cài đặt.';
         }
 
         return $msg;
