@@ -40,6 +40,7 @@ class RenderImageJob implements ShouldQueue
                 $generation->base_image,
                 $generation->mask_image,
                 $generation->resolution,
+                $generation->ratio,
             );
 
             $generation->update(['status' => 'completed', 'media_url' => $url]);

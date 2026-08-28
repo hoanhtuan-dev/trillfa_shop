@@ -44,6 +44,7 @@ class RenderVideoJob implements ShouldQueue
                 (string) $generation->base_image,
                 (string) $camera,
                 $generation->resolution,
+                $generation->duration,
             );
 
             $generation->update(['status' => 'completed', 'media_url' => $url]);

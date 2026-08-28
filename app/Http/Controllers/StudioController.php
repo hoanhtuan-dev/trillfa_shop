@@ -79,6 +79,7 @@ class StudioController extends Controller
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:4000'],
             'resolution' => ['nullable', 'string', 'in:1K,2K'],
+            'ratio' => ['nullable', 'string', 'in:1:1,4:3,3:4,16:9,9:16,4:5,21:9,19:6'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
@@ -98,6 +99,7 @@ class StudioController extends Controller
             'base_image' => ['required', 'string', 'max:2048'],
             'camera' => ['nullable', 'string', 'max:255'],
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
+            'duration' => ['nullable', 'string', 'in:5,8,10,15,20'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
@@ -220,6 +222,8 @@ class StudioController extends Controller
             'provider' => $provider,
             'model' => $model,
             'resolution' => $data['resolution'] ?? null,
+            'ratio' => $data['ratio'] ?? null,
+            'duration' => $data['duration'] ?? null,
             'base_image' => $data['base_image'] ?? $source?->media_url,
             'mask_image' => $data['mask_image'] ?? null,
             'credits_cost' => $cost,
@@ -521,6 +525,8 @@ class StudioController extends Controller
             'processing' => setting('studio_processing', config('studio.processing')),
             'image_resolution' => setting('studio_image_resolution', config('studio.image_resolution')),
             'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
+            'image_ratio' => setting('studio_image_ratio', config('studio.image_ratio')),
+            'video_duration' => setting('studio_video_duration', config('studio.video_duration')),
         ]);
     }
 
@@ -541,6 +547,8 @@ class StudioController extends Controller
             'processing' => ['required', 'string', 'in:sync,queue'],
             'image_resolution' => ['required', 'string', 'in:1K,2K'],
             'video_resolution' => ['required', 'string', 'in:480,720,1080'],
+            'image_ratio' => ['required', 'string', 'in:1:1,4:3,3:4,16:9,9:16,4:5,21:9,19:6'],
+            'video_duration' => ['required', 'string', 'in:5,8,10,15,20'],
         ]);
 
         set_setting('studio_image_credits', (string) $data['image_credits']);
@@ -557,6 +565,8 @@ class StudioController extends Controller
         set_setting('studio_processing', $data['processing']);
         set_setting('studio_image_resolution', $data['image_resolution']);
         set_setting('studio_video_resolution', $data['video_resolution']);
+        set_setting('studio_image_ratio', $data['image_ratio']);
+        set_setting('studio_video_duration', $data['video_duration']);
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }

@@ -22,6 +22,8 @@
     $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy'];
     $imageResolution = studio_config('image_resolution', '2K');
     $videoResolution = studio_config('video_resolution', '720');
+    $imageRatio = studio_config('image_ratio', '1:1');
+    $videoDuration = studio_config('video_duration', '10');
 @endphp
 
 @section('content')
@@ -33,7 +35,9 @@
     {{ Js::from($projects->isEmpty() ? null : $projects->first()->id) }},
     {{ Js::from($catLabels) }},
     {{ Js::from($imageResolution) }},
-    {{ Js::from($videoResolution) }}
+    {{ Js::from($videoResolution) }},
+  {{ Js::from($imageRatio) }},
+  {{ Js::from($videoDuration) }}
 )">
     <!-- Toolbar -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -117,7 +121,8 @@
                 <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
                 <div class="mt-2"><label class="label">Video prompt</label><textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs"></textarea></div>
                 <div class="mt-3 flex items-center gap-2">
-                    <div class="w-28 shrink-0"><select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select></div>
+                    <div class="w-28 shrink-0"><select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select></div>
+                    <div class="w-24 shrink-0"><select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select></div>
                     <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand flex-1"><span x-show="!generating">Generate Design (Tạo 2D)</span><span x-show="generating">Đang gửi…</span></button>
                 </div>
             </div>
@@ -218,6 +223,7 @@
                         </template>
                     </div>
                     <div class="mt-3 flex items-center gap-2">
+                        <div class="w-24 shrink-0"><select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select></div>
                         <div class="w-28 shrink-0"><select x-model="videoRes" class="input !py-2"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select></div>
                         <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId || !videoCamera" class="btn-brand flex-1"><span x-show="!videoBusy">Render Catwalk Video</span><span x-show="videoBusy">Đang gửi…</span></button>
                         <span class="text-[10px] text-ink-500" x-text="selectedImageId ? 'Nguồn #' + selectedImageId : 'Chọn ảnh nguồn'"></span>
@@ -305,9 +311,9 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels, imageRes, videoRes) => ({
+    Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels, imageRes, videoRes, imageRatio, videoDuration) => ({
         presets, projects, catLabels,
-        imageRes: imageRes || '2K', videoRes: videoRes || '720',
+        imageRes: imageRes || '2K', videoRes: videoRes || '720', imageRatio: imageRatio || '1:1', videoDuration: videoDuration || '10',
         idea: '', presetIds: [],
         loading: false, generating: false, videoBusy: false, refining: false,
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
@@ -416,7 +422,7 @@ document.addEventListener('alpine:init', () => {
         async generateImage() {
             if (!this.output.image_prompt_en || this.generating) return;
             this.generating = true;
-            try { const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'image', status: 'pending', model: data.model, provider: data.provider, media_url: null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.poll(data.generation_id); }
+            try { const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'image', status: 'pending', model: data.model, provider: data.provider, media_url: null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.poll(data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.generating = false; }
         },
@@ -424,7 +430,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.selectedImageId || !this.videoCamera || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.selectedImageId); const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera: this.videoCamera, resolution: this.videoRes, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
+            try { const src = this.generations.find(g => g.id === this.selectedImageId); const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera: this.videoCamera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },

@@ -49,6 +49,31 @@
                 <p class="mt-1 text-xs text-ink-500">Độ phân giải video catwalk khi render với model AI thật.</p>
             </div>
         </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+                <label class="label">Tỉ lệ khung hình Ảnh</label>
+                <select name="image_ratio" class="input !py-2">
+                    <option value="1:1" @selected(old('image_ratio', $image_ratio) === '1:1')>1:1 (vuông)</option>
+                    <option value="4:3" @selected(old('image_ratio', $image_ratio) === '4:3')>4:3</option>
+                    <option value="3:4" @selected(old('image_ratio', $image_ratio) === '3:4')>3:4</option>
+                    <option value="9:16" @selected(old('image_ratio', $image_ratio) === '9:16')>9:16 (dọc)</option>
+                    <option value="16:9" @selected(old('image_ratio', $image_ratio) === '16:9')>16:9 (ngang)</option>
+                    <option value="4:5" @selected(old('image_ratio', $image_ratio) === '4:5')>4:5</option>
+                    <option value="21:9" @selected(old('image_ratio', $image_ratio) === '21:9')>21:9 (rạp phim)</option>
+                    <option value="19:6" @selected(old('image_ratio', $image_ratio) === '19:6')>19:6</option>
+                </select>
+            </div>
+            <div>
+                <label class="label">Độ dài Video</label>
+                <select name="video_duration" class="input !py-2">
+                    <option value="5" @selected(old('video_duration', $video_duration) === '5')>5 giây</option>
+                    <option value="8" @selected(old('video_duration', $video_duration) === '8')>8 giây</option>
+                    <option value="10" @selected(old('video_duration', $video_duration) === '10')>10 giây</option>
+                    <option value="15" @selected(old('video_duration', $video_duration) === '15')>15 giây</option>
+                    <option value="20" @selected(old('video_duration', $video_duration) === '20')>20 giây</option>
+                </select>
+            </div>
+        </div>
         <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
             <h3 class="mb-3 font-display text-sm font-semibold text-ink-900">Model AI theo tác vụ</h3>
             <div>

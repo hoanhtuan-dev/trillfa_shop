@@ -850,6 +850,29 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin)->get('/studio')->assertOk()->assertSee('workflowSteps')->assertSee('previewId');
     }
 
+    public function test_studio_generation_resolution_ratio_duration(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $img = $this->postJson('/studio/generate', ['prompt' => 'a silk gown', 'resolution' => '2K', 'ratio' => '9:16'])->assertOk();
+        $gen = \App\Models\Generation::find($img->json('generation_id'));
+        $this->assertSame('2K', $gen->resolution);
+        $this->assertSame('9:16', $gen->ratio);
+
+        $src = $admin->generations()->create([
+            'type' => 'image', 'status' => 'completed', 'prompt' => 'src',
+            'media_url' => '/storage/studio/test.jpg', 'credits_cost' => 1,
+        ]);
+        $vid = $this->postJson('/studio/video', [
+            'prompt' => 'walk', 'base_image' => '/storage/studio/test.jpg',
+            'camera' => 'runway', 'resolution' => '1080', 'duration' => '15',
+        ])->assertOk();
+        $vg = \App\Models\Generation::find($vid->json('generation_id'));
+        $this->assertSame('1080', $vg->resolution);
+        $this->assertSame('15', $vg->duration);
+    }
+
     public function test_studio_preset_manager_and_references(): void
     {
         $customer = User::where('email', 'customer@trillfa.com')->first();
@@ -905,6 +928,8 @@ class ShopFlowTest extends TestCase
             'processing' => 'queue',
             'image_resolution' => '1K',
             'video_resolution' => '1080',
+            'image_ratio' => '9:16',
+            'video_duration' => '15',
         ])->assertSessionHas('success');
 
         $this->assertSame('3', setting('studio_image_credits'));
@@ -916,6 +941,8 @@ class ShopFlowTest extends TestCase
         $this->assertSame('queue', setting('studio_processing'));
         $this->assertSame('1K', setting('studio_image_resolution'));
         $this->assertSame('1080', setting('studio_video_resolution'));
+        $this->assertSame('9:16', setting('studio_image_ratio'));
+        $this->assertSame('15', setting('studio_video_duration'));
 
         $this->post('/studio/api', ['key_gemini' => 'AIzaTestKey'])
             ->assertSessionHas('success');

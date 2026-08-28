@@ -9,7 +9,7 @@ namespace App\Services;
  */
 class VideoAIService
 {
-    public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null): string
+    public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null, ?string $duration = null): string
     {
         // Real provider uses this model (Wan / Veo) — stub returns a demo file.
         $model = studio_config('video_model', 'wan2.5-t2v');
