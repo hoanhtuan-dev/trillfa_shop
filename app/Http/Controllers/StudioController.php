@@ -212,6 +212,12 @@ class StudioController extends Controller
             'video_credits' => setting('studio_video_credits', config('studio.video_credits')),
             'max_generations' => setting('studio_max_generations', 50),
             'image_provider' => setting('studio_image_provider', config('studio.image_provider')),
+            'prompt_model' => setting('studio_prompt_model', config('studio.prompt_model')),
+            'image_model' => setting('studio_image_model', config('studio.image_model')),
+            'wan_model' => setting('studio_wan_model', config('studio.wan_model')),
+            'qwen_model' => setting('studio_qwen_model', config('studio.qwen_model')),
+            'video_model' => setting('studio_video_model', config('studio.video_model')),
+            'vision_model' => setting('studio_vision_model', config('studio.vision_model')),
         ]);
     }
 
@@ -222,12 +228,24 @@ class StudioController extends Controller
             'video_credits' => ['required', 'integer', 'min:0', 'max:1000'],
             'max_generations' => ['nullable', 'integer', 'min:1', 'max:500'],
             'image_provider' => ['required', 'string', 'in:flux,wan,qwen'],
+            'prompt_model' => ['required', 'string', 'max:255'],
+            'image_model' => ['nullable', 'string', 'max:255'],
+            'wan_model' => ['required', 'string', 'max:255'],
+            'qwen_model' => ['required', 'string', 'max:255'],
+            'video_model' => ['required', 'string', 'max:255'],
+            'vision_model' => ['required', 'string', 'max:255'],
         ]);
 
         set_setting('studio_image_credits', (string) $data['image_credits']);
         set_setting('studio_video_credits', (string) $data['video_credits']);
         set_setting('studio_max_generations', (string) ($data['max_generations'] ?? 50));
         set_setting('studio_image_provider', $data['image_provider']);
+        set_setting('studio_prompt_model', $data['prompt_model']);
+        set_setting('studio_image_model', $data['image_model'] ?? '');
+        set_setting('studio_wan_model', $data['wan_model']);
+        set_setting('studio_qwen_model', $data['qwen_model']);
+        set_setting('studio_video_model', $data['video_model']);
+        set_setting('studio_vision_model', $data['vision_model']);
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }

@@ -67,8 +67,10 @@ class GeminiService
         $prompt = "Idea: {$idea}\nTags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
 
         try {
+            $model = studio_config('prompt_model', 'gemini-1.5-flash');
+
             $resp = Http::withToken($key)->timeout(60)
-                ->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', [
+                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                     'contents' => [['parts' => [['text' => $system."\n\n".$prompt]]]],
                     'generationConfig' => ['responseMimeType' => 'application/json'],
                 ]);

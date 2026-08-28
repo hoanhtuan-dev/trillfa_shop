@@ -12,7 +12,20 @@ return [
     'image_credits' => (int) env('STUDIO_IMAGE_CREDITS', 1),
     'video_credits' => (int) env('STUDIO_VIDEO_CREDITS', 10),
     'image_provider' => env('STUDIO_IMAGE_PROVIDER', 'flux'), // flux | wan | qwen
+
+    /*
+    |--------------------------------------------------------------------------
+    | Models per task
+    |--------------------------------------------------------------------------
+    | You can override each on the Studio Settings page; the values below are
+    | the defaults and are also read from env.
+    */
+    'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-1.5-flash'),
     'image_model' => env('STUDIO_IMAGE_MODEL', ''),
+    'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
+    'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image'),
+    'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
+    'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-1.5-flash'),
 
     /*
     |--------------------------------------------------------------------------

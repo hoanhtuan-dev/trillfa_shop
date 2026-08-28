@@ -13,6 +13,9 @@ class StyleSuggestService
 {
     public function suggest(string $imagePath): array
     {
+        // Vision model used when a real vision key (Gemini/Qwen) is provided.
+        $visionModel = studio_config('vision_model', 'gemini-1.5-flash');
+
         $styles = Preset::category('style')->get();
         $backgrounds = Preset::category('background')->get();
         $poses = Preset::category('pose')->get();

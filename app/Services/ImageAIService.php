@@ -88,8 +88,11 @@ class ImageAIService
     /**
      * Alibaba DashScope multimodal image generation (Wan / Qwen image).
      */
-    protected function callDashscope(string $prompt, string $model, string $key): ?string
+    protected function callDashscope(string $prompt, string $provider, string $key): ?string
     {
+        $model = $provider === 'wan'
+            ? studio_config('wan_model', 'wan2.7-image-pro')
+            : studio_config('qwen_model', 'qwen-image');
         $resp = \Illuminate\Support\Facades\Http::withToken($key)
             ->timeout(180)
             ->post('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', [

@@ -861,11 +861,19 @@ class ShopFlowTest extends TestCase
             'video_credits' => 20,
             'max_generations' => 60,
             'image_provider' => 'qwen',
+            'prompt_model' => 'gemini-2.5-flash',
+            'image_model' => 'flux-1.1-schnell',
+            'wan_model' => 'wan2.7-image-pro',
+            'qwen_model' => 'qwen-image-plus',
+            'video_model' => 'wan2.5-t2v',
+            'vision_model' => 'qwen-vl-plus',
         ])->assertSessionHas('success');
 
         $this->assertSame('3', setting('studio_image_credits'));
         $this->assertSame('20', setting('studio_video_credits'));
         $this->assertSame('qwen', setting('studio_image_provider'));
+        $this->assertSame('gemini-2.5-flash', setting('studio_prompt_model'));
+        $this->assertSame('qwen-image-plus', setting('studio_qwen_model'));
 
         $this->post('/studio/api', ['key_gemini' => 'AIzaTestKey'])
             ->assertSessionHas('success');
