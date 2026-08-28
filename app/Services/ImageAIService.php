@@ -18,6 +18,11 @@ class ImageAIService
         '2aOboQqrxsGkdZ6pa9L6NUdw4tpnrB3zWyUdfTk8G.jpg',
     ];
 
+    protected function falKey(): ?string
+    {
+        return studio_api_key('fal');
+    }
+
     public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null): string
     {
         // Inpainting / updates reuse the source image for the stub.

@@ -1,0 +1,31 @@
+@extends('layouts.studio')
+@section('title', 'Cài đặt Studio')
+@section('content')
+<div class="mx-auto max-w-2xl">
+    <h1 class="font-display text-2xl font-semibold text-ink-900">Cài đặt Studio</h1>
+    <p class="mt-1 text-sm text-ink-500">Tinh chỉnh tín dụng và giới hạn cho công cụ AI nội bộ.</p>
+
+    <form method="POST" action="{{ route('studio.settings.update') }}" class="card mt-6 space-y-5 p-6">
+        @csrf
+        <div>
+            <label class="label">Tín dụng / ảnh</label>
+            <input type="number" name="image_credits" value="{{ old('image_credits', $image_credits) }}" min="0" max="1000" class="input">
+            <p class="mt-1 text-xs text-ink-500">Số tín dụng trừ khi tạo 1 ảnh.</p>
+        </div>
+        <div>
+            <label class="label">Tín dụng / video</label>
+            <input type="number" name="video_credits" value="{{ old('video_credits', $video_credits) }}" min="0" max="1000" class="input">
+            <p class="mt-1 text-xs text-ink-500">Số tín dụng trừ khi render 1 video.</p>
+        </div>
+        <div>
+            <label class="label">Giới hạn số generation mỗi project</label>
+            <input type="number" name="max_generations" value="{{ old('max_generations', $max_generations) }}" min="1" max="500" class="input">
+        </div>
+        <div class="flex items-center gap-3">
+            <button type="submit" class="btn-brand">Lưu cài đặt</button>
+            <a href="{{ route('studio.index') }}" class="btn-ghost">Quay lại</a>
+        </div>
+        @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
+    </form>
+</div>
+@endsection

@@ -165,6 +165,47 @@ if (! function_exists('widget_field')) {
         return (string) setting('widget_'.$key.'_'.$field, $default);
     }
 }
+if (! function_exists('studio_config')) {
+    function studio_config(string $key, $default = null)
+    {
+        // Prefer a DB setting override (set via the Studio admin), fall back to config.
+        $stored = setting('studio_'.$key);
+
+        return $stored !== null ? (string) $stored : config('studio.'.$key, $default);
+    }
+}
+
+if (! function_exists('studio_api_key')) {
+    /**
+     * Read a provider API key. Prefers the encrypted DB value managed from the
+     * Studio API page; falls back to the env/config value.
+     */
+    function studio_api_key(string $service): ?string
+    {
+        $stored = setting('api_'.$service.'_key');
+
+        if ($stored) {
+            try {
+                return \Illuminate\Support\Facades\Crypt::decryptString($stored);
+            } catch (\Throwable $e) {
+                return $stored;
+            }
+        }
+
+        $configKeys = [
+            'gemini' => 'gemini_key',
+            'fal' => 'fal_key',
+            'replicate' => 'replicate_token',
+            'wan' => 'wan_key',
+            'veo' => 'veo_key',
+        ];
+
+        $key = $configKeys[$service] ?? null;
+
+        return $key ? config('studio.'.$key) ?: null : null;
+    }
+}
+
 if (! function_exists('category_children_nodes')) {
     function category_children_nodes(\App\Models\Category $category): \Illuminate\Support\Collection
     {

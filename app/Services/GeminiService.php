@@ -15,7 +15,7 @@ class GeminiService
 {
     public function generateCreativeDirector(string $idea, array $injections = []): array
     {
-        $key = config('services.gemini.key');
+        $key = studio_api_key('gemini');
 
         if ($key) {
             return $this->callGemini($idea, $injections, $key);

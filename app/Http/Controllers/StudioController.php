@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Services\GeminiService;
 use App\Services\ImageAIService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 
 class StudioController extends Controller
 {
@@ -31,7 +32,11 @@ class StudioController extends Controller
             'base_concept' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        auth()->user()->projects()->create($data);
+        $project = auth()->user()->projects()->create($data);
+
+        if ($request->wantsJson()) {
+            return response()->json(['project_id' => $project->id, 'name' => $project->name]);
+        }
 
         return redirect()->route('studio.index')->with('success', 'Đã tạo dự án.');
     }
@@ -76,7 +81,7 @@ class StudioController extends Controller
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
 
-        $cost = (int) config('studio.image_credits', 1);
+        $cost = (int) studio_config('image_credits', 1);
 
         return $this->queueGeneration('image', $data, $cost);
     }
@@ -94,7 +99,7 @@ class StudioController extends Controller
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
 
-        $cost = (int) config('studio.video_credits', 10);
+        $cost = (int) studio_config('video_credits', 10);
 
         return $this->queueGeneration('video', $data, $cost);
     }
@@ -114,7 +119,7 @@ class StudioController extends Controller
             $data['base_image'] = $generation->media_url;
         }
 
-        $cost = (int) config('studio.image_credits', 1);
+        $cost = (int) studio_config('image_credits', 1);
 
         return $this->queueGeneration('image', $data, $cost, $generation);
     }
@@ -181,4 +186,64 @@ class StudioController extends Controller
             return $group->pluck('prompt_injection')->filter()->implode(', ');
         })->all();
     }
+
+
+    public function settings()
+    {
+        return view('studio.settings', [
+            'image_credits' => setting('studio_image_credits', config('studio.image_credits')),
+            'video_credits' => setting('studio_video_credits', config('studio.video_credits')),
+            'max_generations' => setting('studio_max_generations', 50),
+        ]);
+    }
+
+    public function updateSettings(Request $request)
+    {
+        $data = $request->validate([
+            'image_credits' => ['required', 'integer', 'min:0', 'max:1000'],
+            'video_credits' => ['required', 'integer', 'min:0', 'max:1000'],
+            'max_generations' => ['nullable', 'integer', 'min:1', 'max:500'],
+        ]);
+
+        set_setting('studio_image_credits', (string) $data['image_credits']);
+        set_setting('studio_video_credits', (string) $data['video_credits']);
+        set_setting('studio_max_generations', (string) ($data['max_generations'] ?? 50));
+
+        return back()->with('success', 'Đã lưu cài đặt Studio.');
+    }
+
+    public function api()
+    {
+        $providers = [
+            'gemini' => ['label' => 'Gemini — Giám đốc sáng tạo', 'hint' => 'GEMINI_API_KEY', 'configured' => (bool) studio_api_key('gemini')],
+            'fal' => ['label' => 'Fal.ai — Flux (ảnh)', 'hint' => 'FAL_KEY', 'configured' => (bool) studio_api_key('fal')],
+            'replicate' => ['label' => 'Replicate — Flux (ảnh)', 'hint' => 'REPLICATE_API_TOKEN', 'configured' => (bool) studio_api_key('replicate')],
+            'wan' => ['label' => 'Wan AI — video', 'hint' => 'WAN_API_KEY', 'configured' => (bool) studio_api_key('wan')],
+            'veo' => ['label' => 'Google Veo — video', 'hint' => 'GOOGLE_VEO_KEY', 'configured' => (bool) studio_api_key('veo')],
+        ];
+
+        return view('studio.api', compact('providers'));
+    }
+
+    public function updateApi(Request $request)
+    {
+        $services = ['gemini', 'fal', 'replicate', 'wan', 'veo'];
+
+        foreach ($services as $service) {
+            // Clear if requested, else store a new encrypted key, else keep.
+            if ($request->boolean('clear_'.$service)) {
+                set_setting('api_'.$service.'_key', '');
+                continue;
+            }
+
+            $value = trim((string) $request->input('key_'.$service, ''));
+
+            if ($value !== '') {
+                set_setting('api_'.$service.'_key', Crypt::encryptString($value));
+            }
+        }
+
+        return back()->with('success', 'Đã lưu cấu hình API.');
+    }
+
 }

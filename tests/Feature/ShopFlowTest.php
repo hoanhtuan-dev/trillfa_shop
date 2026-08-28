@@ -837,4 +837,39 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin)->get('/studio')->assertOk();
     }
 
+
+    public function test_studio_settings_and_api_admin_only(): void
+    {
+        $this->get('/studio/settings')->assertRedirect(route('login'));
+        $this->get('/studio/api')->assertRedirect(route('login'));
+
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($customer)->get('/studio/settings')->assertForbidden();
+
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin)->get('/studio/settings')->assertOk();
+        $this->actingAs($admin)->get('/studio/api')->assertOk();
+    }
+
+    public function test_studio_update_settings_and_api_key(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->post('/studio/settings', [
+            'image_credits' => 3,
+            'video_credits' => 20,
+            'max_generations' => 60,
+        ])->assertSessionHas('success');
+
+        $this->assertSame('3', setting('studio_image_credits'));
+        $this->assertSame('20', setting('studio_video_credits'));
+
+        $this->post('/studio/api', ['key_gemini' => 'AIzaTestKey'])
+            ->assertSessionHas('success');
+
+        $this->assertSame('AIzaTestKey', studio_api_key('gemini'));
+        $this->assertNull(studio_api_key('wan'));
+    }
+
 }
