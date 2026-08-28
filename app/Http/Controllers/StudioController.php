@@ -313,12 +313,20 @@ class StudioController extends Controller
 
     protected function testDashscope(string $key): array
     {
-        $resp = Http::withToken($key)->timeout(20)->get('https://dashscope-intl.aliyuncs.com/api/v1/models');
+        // Wan (image & video) + Qwen run on Alibaba DashScope with one key.
+        // Use an INVALID model so the request fails at validation (no cost):
+        // 401/403 = key wrong; 400/404/422 = auth passed, key valid.
+        $resp = Http::withToken($key)->timeout(20)
+            ->post('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', [
+                'model' => '__auth_check__',
+                'input' => ['messages' => [['role' => 'user', 'content' => [['text' => 'test']]]]],
+                'parameters' => [],
+            ]);
 
         return match (true) {
             $resp->successful() => ['ok' => true, 'message' => 'DashScope: kết nối OK.'],
-            $resp->status() === 401 || $resp->status() === 403 => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' — key không hợp lệ'],
-            default => ['ok' => true, 'message' => 'DashScope: khoá đã lưu (endpoint trả HTTP '.$resp->status().', chưa xác minh thêm — dùng khi sinh ảnh/video).'],
+            in_array($resp->status(), [401, 403]) => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' — DASHSCOPE_API_KEY không hợp lệ. Kiểm tra lại key (Wan ảnh/video & Qwen dùng chung key này).'],
+            default => ['ok' => true, 'message' => 'DashScope: khoá hợp lệ (HTTP '.$resp->status().' — tham số bị từ chối, auth đã qua).'],
         };
     }
 
@@ -373,10 +381,10 @@ class StudioController extends Controller
             'gemini' => ['label' => 'Gemini — Giám đốc sáng tạo', 'hint' => 'GEMINI_API_KEY', 'configured' => (bool) studio_api_key('gemini')],
             'fal' => ['label' => 'Fal.ai — Flux (ảnh)', 'hint' => 'FAL_KEY', 'configured' => (bool) studio_api_key('fal')],
             'replicate' => ['label' => 'Replicate — Flux (ảnh)', 'hint' => 'REPLICATE_API_TOKEN', 'configured' => (bool) studio_api_key('replicate')],
-            'wan' => ['label' => 'Wan AI — video', 'hint' => 'WAN_API_KEY', 'configured' => (bool) studio_api_key('wan')],
+            'wan' => ['label' => 'Wan AI — video (dùng DASHSCOPE_API_KEY)', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY', 'configured' => (bool) (studio_api_key('wan') ?: studio_api_key('dashscope'))],
             'veo' => ['label' => 'Google Veo — video', 'hint' => 'GOOGLE_VEO_KEY', 'configured' => (bool) studio_api_key('veo')],
             'qwen' => ['label' => 'Qwen AI — ảnh (Alibaba)', 'hint' => 'QWEN_API_KEY', 'configured' => (bool) studio_api_key('qwen')],
-            'dashscope' => ['label' => 'DashScope — Wan/Qwen image (Alibaba)', 'hint' => 'DASHSCOPE_API_KEY', 'configured' => (bool) studio_api_key('dashscope')],
+            'dashscope' => ['label' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'hint' => 'DASHSCOPE_API_KEY', 'configured' => (bool) studio_api_key('dashscope')],
         ];
 
         return view('studio.api', compact('providers'));

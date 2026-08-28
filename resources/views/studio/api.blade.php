@@ -5,7 +5,7 @@
     <h1 class="font-display text-2xl font-semibold text-ink-900">Quản lý API</h1>
     <p class="mt-1 text-sm text-ink-500">Nhập các khoá AI (mã hoá khi lưu). Để trống để giữ khoá hiện có; tick "Xoá" để xoá khoá.</p>
 
-    <form method="POST" action="{{ route('studio.api.update') }}" class="mt-6 space-y-4" x-data="apiTester">> ({})); } catch (e) { this.results[service] = { ok: false, message: e.message }; } finally { this.testing = ''; } } }">
+    <form method="POST" action="{{ route('studio.api.update') }}" class="mt-6 space-y-4" x-data="apiTester">
         @csrf
         @foreach($providers as $service => $p)
             <div class="card p-5">
