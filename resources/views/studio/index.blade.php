@@ -92,26 +92,21 @@
             <!-- Presets -->
             <div class="card p-5">
                 <div class="mb-3 flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(key: value)</span></h2>
+                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(bấm chip để chọn)</span></h2>
                     <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
                 </div>
-                <div class="grid gap-3">
+                <div class="space-y-4">
                     <template x-for="group in presets" :key="group.category">
-                        <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                        <div>
                             <label class="label" x-text="catLabels[group.category] || group.category"></label>
-                            <button type="button" @click="open = !open" class="input !py-2 flex w-full items-center justify-between gap-2 text-left">
-                                <span class="truncate" x-text="selectedPresetText(group.category) || 'Chọn ' + (catLabels[group.category] || group.category)"></span>
-                                <svg class="h-4 w-4 shrink-0 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
-                            </button>
-                            <div x-show="open" x-transition.opacity.duration.150ms class="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-cream-200 bg-white p-1 shadow-xl">
+                            <div class="flex flex-wrap gap-1.5">
                                 <template x-for="item in group.items" :key="item.id">
-                                    <label class="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-cream-100">
-                                        <span class="min-w-0 flex-1">
-                                            <span class="block truncate font-medium" x-text="item.key || item.label"></span>
-                                            <span class="block truncate text-[10px] text-ink-500" x-text="item.value"></span>
-                                        </span>
-                                        <input type="checkbox" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)" class="h-4 w-4 accent-brand-600">
-                                    </label>
+                                    <button type="button" @click="togglePreset(item.id)"
+                                        :title="item.key + ': ' + item.value"
+                                        class="rounded-full border px-3 py-1.5 text-xs transition-colors"
+                                        :class="presetIds.includes(item.id) ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800' : 'border-cream-300 text-ink-700 hover:border-brand-400 hover:text-brand-700'">
+                                        <span x-text="item.key || item.label"></span>
+                                    </button>
                                 </template>
                             </div>
                         </div>
@@ -134,7 +129,17 @@
             <!-- Refine -->
             <div class="card p-5" x-show="selectedImageId" x-transition.opacity>
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Chỉnh sửa ảnh (Inpaint)</h2>
-                <textarea x-model="refinePrompt" rows="2" class="input" placeholder="VD: add puffy sleeve"></textarea>
+                <template x-if="selectedImageId">
+                    <div class="mb-3 flex items-center gap-2 rounded-xl border border-cream-200 bg-cream-50 p-2">
+                        <img :src="(generations.find(g => g.id === selectedImageId) || {}).media_url" class="h-14 w-14 rounded-lg bg-white object-cover" onerror="this.src='/images/placeholder.svg'">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-semibold text-ink-900">Ảnh nguồn #<span x-text="selectedImageId"></span></p>
+                            <p class="truncate text-[10px] text-ink-500" x-text="((generations.find(g => g.id === selectedImageId) || {}).model || '') + ' · ' + ((generations.find(g => g.id === selectedImageId) || {}).provider || '')"></p>
+                        </div>
+                        <button type="button" @click="selectedImageId = null" class="btn-outline btn-sm">Bỏ</button>
+                    </div>
+                </template>
+                <textarea x-model="refinePrompt" rows="2" class="input" placeholder="VD: add puffy sleeve (sẽ chỉnh trên ảnh nguồn trên)"></textarea>
                 <button @click="refine()" :disabled="refining || !refinePrompt" class="btn-outline mt-3 w-full"><span x-show="!refining">Cập nhật Ảnh</span><span x-show="refining">Đang gửi…</span></button>
             </div>
         </div>

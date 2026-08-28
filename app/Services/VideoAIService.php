@@ -34,7 +34,10 @@ class VideoAIService
 
         $input = ['prompt' => trim(trim($prompt).' '.$cameraPreset)];
         if ($imageUrl && str_starts_with($imageUrl, '/')) {
-            $input['img_url'] = url($imageUrl);
+            $abs = url($imageUrl);
+            // Some i2v models (e.g. happyhorse-1.1-i2v) require input.media; others use img_url.
+            $input['img_url'] = $abs;
+            $input['media'] = [$abs];
         }
 
         $submit = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)

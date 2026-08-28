@@ -3,19 +3,101 @@
 namespace App\Services;
 
 use App\Models\Preset;
+use Illuminate\Support\Facades\Http;
 
 /**
- * Image → prompt / style suggestion. Analyses a reference image (GD) and
- * suggests matching style / background / pose presets plus an English prompt.
- * If a vision key (Gemini / Qwen) is set it can be upgraded to a real call.
+ * Image → prompt / style suggestion. When a Gemini vision key is available it asks the
+ * model to deeply analyse the reference image (style, fabric, silhouette, colours, pose,
+ * background) and produce a rich English prompt + matching presets. Otherwise it falls
+ * back to a lightweight GD colour analysis so the stub still works offline.
  */
 class StyleSuggestService
 {
     public function suggest(string $imagePath): array
     {
-        // Vision model used when a real vision key (Gemini/Qwen) is provided.
-        $visionModel = studio_config('vision_model', 'gemini-1.5-flash');
+        $key = studio_api_key('gemini');
 
+        if ($key) {
+            try {
+                return $this->suggestViaVision($imagePath, $key);
+            } catch (\Throwable $e) {
+                logger()->error('Vision suggest failed: '.$e->getMessage());
+            }
+        }
+
+        return $this->suggestViaColor($imagePath);
+    }
+
+    protected function suggestViaVision(string $imagePath, string $key): array
+    {
+        $model = (string) studio_config('vision_model', 'gemini-1.5-flash');
+        $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
+        $b64 = base64_encode((string) file_get_contents($imagePath));
+
+        $prompt = 'Analyze this fashion model photo and its garment. Return ONLY valid JSON with keys: '
+            .'"styles" (1-3 style labels), "background" (one label), "pose" (one label), '
+            .'"fabric" (one label), "silhouette" (one label), "camera" (one label), '
+            .'"image_prompt_en" (a detailed, ready-to-use English image-generation prompt describing the outfit, fabric, colors, fit and setting).';
+
+        $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
+            ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
+                'contents' => [['parts' => [
+                    ['text' => $prompt],
+                    ['inlineData' => ['mimeType' => $mime, 'data' => $b64]],
+                ]]],
+                'generationConfig' => ['responseMimeType' => 'application/json'],
+            ]);
+
+        if (! $resp->successful()) {
+            throw new \RuntimeException('Vision ('.$resp->status().'): '.$resp->body());
+        }
+
+        $json = json_decode(trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text')), true);
+        if (! is_array($json)) {
+            throw new \RuntimeException('Không phân tích được JSON từ vision.');
+        }
+
+        return [
+            'preset_ids' => $this->matchPresets($json),
+            'styles' => array_values(array_filter((array) ($json['styles'] ?? []))),
+            'background' => (string) ($json['background'] ?? ''),
+            'pose' => (string) ($json['pose'] ?? ''),
+            'image_prompt_en' => (string) ($json['image_prompt_en'] ?? 'High-fashion editorial photo, premium, ultra detailed, 4k'),
+        ];
+    }
+
+    protected function matchPresets(array $json): array
+    {
+        $wants = collect([
+            'style' => $json['styles'] ?? [],
+            'background' => [$json['background'] ?? null],
+            'pose' => [$json['pose'] ?? null],
+            'fabric' => [$json['fabric'] ?? null],
+            'silhouette' => [$json['silhouette'] ?? null],
+            'camera' => [$json['camera'] ?? null],
+        ])->filter(fn ($v) => ! empty($v));
+
+        $ids = [];
+
+        foreach ($wants as $category => $labels) {
+            foreach ($labels as $label) {
+                if (! is_string($label) || $label === '') {
+                    continue;
+                }
+                $found = Preset::category($category)->get()
+                    ->first(fn ($p) => str_contains(mb_strtolower($p->ui_label ?? ''), mb_strtolower($label))
+                        || str_contains(mb_strtolower($label), mb_strtolower($p->ui_label ?? '')));
+                if ($found) {
+                    $ids[] = $found->id;
+                }
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    protected function suggestViaColor(string $imagePath): array
+    {
         $styles = Preset::category('style')->get();
         $backgrounds = Preset::category('background')->get();
         $poses = Preset::category('pose')->get();
