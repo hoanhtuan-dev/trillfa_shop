@@ -95,7 +95,7 @@ class ImageAIService
             : studio_config('qwen_model', 'qwen-image');
         $resp = \Illuminate\Support\Facades\Http::withToken($key)
             ->timeout(180)
-            ->post('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', [
+            ->post(studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com').'/api/v1/services/aigc/multimodal-generation/generation', [
                 'model' => $model,
                 'input' => ['messages' => [['role' => 'user', 'content' => [['text' => $prompt]]]]],
                 'parameters' => ['n' => 1, 'size' => '2K'],

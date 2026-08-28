@@ -317,7 +317,7 @@ class StudioController extends Controller
         // Use an INVALID model so the request fails at validation (no cost):
         // 401/403 = key wrong; 400/404/422 = auth passed, key valid.
         $resp = Http::withToken($key)->timeout(20)
-            ->post('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', [
+            ->post(studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com').'/api/v1/services/aigc/multimodal-generation/generation', [
                 'model' => '__auth_check__',
                 'input' => ['messages' => [['role' => 'user', 'content' => [['text' => 'test']]]]],
                 'parameters' => [],
@@ -325,7 +325,7 @@ class StudioController extends Controller
 
         return match (true) {
             $resp->successful() => ['ok' => true, 'message' => 'DashScope: kết nối OK.'],
-            in_array($resp->status(), [401, 403]) => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' — DASHSCOPE_API_KEY không hợp lệ. Kiểm tra lại key (Wan ảnh/video & Qwen dùng chung key này).'],
+            in_array($resp->status(), [401, 403]) => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' ('.data_get($resp->json(), 'code', 'AuthError').') — key bị từ chối. Key sai hoặc sai vùng: nếu key là bản Trung Quốc, đổi DashScope base thành https://dashscope.aliyuncs.com.'],
             default => ['ok' => true, 'message' => 'DashScope: khoá hợp lệ (HTTP '.$resp->status().' — tham số bị từ chối, auth đã qua).'],
         };
     }
@@ -343,6 +343,7 @@ class StudioController extends Controller
             'qwen_model' => setting('studio_qwen_model', config('studio.qwen_model')),
             'video_model' => setting('studio_video_model', config('studio.video_model')),
             'vision_model' => setting('studio_vision_model', config('studio.vision_model')),
+            'dashscope_base' => setting('studio_dashscope_base', config('studio.dashscope_base')),
         ]);
     }
 
@@ -359,6 +360,7 @@ class StudioController extends Controller
             'qwen_model' => ['required', 'string', 'max:255'],
             'video_model' => ['required', 'string', 'max:255'],
             'vision_model' => ['required', 'string', 'max:255'],
+            'dashscope_base' => ['required', 'string', 'url', 'max:255'],
         ]);
 
         set_setting('studio_image_credits', (string) $data['image_credits']);
@@ -371,6 +373,7 @@ class StudioController extends Controller
         set_setting('studio_qwen_model', $data['qwen_model']);
         set_setting('studio_video_model', $data['video_model']);
         set_setting('studio_vision_model', $data['vision_model']);
+        set_setting('studio_dashscope_base', $data['dashscope_base']);
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }

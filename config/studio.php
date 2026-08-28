@@ -41,4 +41,5 @@ return [
     'veo_key' => env('GOOGLE_VEO_KEY', ''),
     'qwen_key' => env('QWEN_API_KEY', ''),
     'dashscope_key' => env('DASHSCOPE_API_KEY', ''),
+    'dashscope_base' => env('DASHSCOPE_BASE', 'https://dashscope-intl.aliyuncs.com'), // intl = quốc tế; dashscope.aliyuncs.com = Trung Quốc
 ];

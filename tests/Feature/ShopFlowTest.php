@@ -867,6 +867,7 @@ class ShopFlowTest extends TestCase
             'qwen_model' => 'qwen-image-plus',
             'video_model' => 'wan2.5-t2v',
             'vision_model' => 'qwen-vl-plus',
+            'dashscope_base' => 'https://dashscope-intl.aliyuncs.com',
         ])->assertSessionHas('success');
 
         $this->assertSame('3', setting('studio_image_credits'));
@@ -874,6 +875,7 @@ class ShopFlowTest extends TestCase
         $this->assertSame('qwen', setting('studio_image_provider'));
         $this->assertSame('gemini-2.5-flash', setting('studio_prompt_model'));
         $this->assertSame('qwen-image-plus', setting('studio_qwen_model'));
+        $this->assertSame('https://dashscope-intl.aliyuncs.com', setting('studio_dashscope_base'));
 
         $this->post('/studio/api', ['key_gemini' => 'AIzaTestKey'])
             ->assertSessionHas('success');
