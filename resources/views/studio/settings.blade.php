@@ -30,6 +30,25 @@
             </select>
             <p class="mt-1 text-xs text-ink-500">Chọn mô hình sinh ảnh; bỏ trống key thì vẫn dùng stub.</p>
         </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+                <label class="label">Độ phân giải Ảnh</label>
+                <select name="image_resolution" class="input !py-2">
+                    <option value="1K" @selected(old('image_resolution', $image_resolution) === '1K')>1K (1024×1024)</option>
+                    <option value="2K" @selected(old('image_resolution', $image_resolution) === '2K')>2K (2048×2048)</option>
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Chất lượng ảnh đầu ra khi render với model AI thật.</p>
+            </div>
+            <div>
+                <label class="label">Độ phân giải Video</label>
+                <select name="video_resolution" class="input !py-2">
+                    <option value="480" @selected(old('video_resolution', $video_resolution) === '480')>480p</option>
+                    <option value="720" @selected(old('video_resolution', $video_resolution) === '720')>720p</option>
+                    <option value="1080" @selected(old('video_resolution', $video_resolution) === '1080')>1080p</option>
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Độ phân giải video catwalk khi render với model AI thật.</p>
+            </div>
+        </div>
         <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
             <h3 class="mb-3 font-display text-sm font-semibold text-ink-900">Model AI theo tác vụ</h3>
             <div>

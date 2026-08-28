@@ -12,7 +12,7 @@ class Generation extends Model
 
     protected $fillable = [
         'user_id', 'project_id', 'prompts_history_id', 'type', 'status',
-        'prompt', 'model', 'provider', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost',
+        'prompt', 'model', 'provider', 'resolution', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost',
     ];
 
     public const STATUS_CANCELLED = 'cancelled';

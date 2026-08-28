@@ -3,7 +3,7 @@
 @section('title', 'Trillfa Studio')
 
 @php
-    $presetJs = $presets->map(fn($group, $cat) => ['category' => $cat, 'items' => $group->map(fn($p) => ['id' => $p->id, 'label' => $p->ui_label])->values()])->values();
+    $presetJs = $presets->map(fn($group, $cat) => ['category' => $cat, 'items' => $group->map(fn($p) => ['id' => $p->id, 'key' => $p->ui_label, 'label' => $p->ui_label, 'value' => $p->prompt_injection])->values()])->values();
     $gensJs = $latest->map(fn($g) => [
         'id' => $g->id, 'type' => $g->type, 'status' => $g->status,
         'model' => $g->model, 'provider' => $g->provider,
@@ -20,6 +20,8 @@
         default => (bool) (studio_api_key('fal') ?: studio_api_key('replicate')),
     };
     $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy'];
+    $imageResolution = studio_config('image_resolution', '2K');
+    $videoResolution = studio_config('video_resolution', '720');
 @endphp
 
 @section('content')
@@ -29,7 +31,9 @@
     {{ Js::from($projectsJs) }},
     {{ auth()->user()->credits_balance }},
     {{ Js::from($projects->isEmpty() ? null : $projects->first()->id) }},
-    {{ Js::from($catLabels) }}
+    {{ Js::from($catLabels) }},
+    {{ Js::from($imageResolution) }},
+    {{ Js::from($videoResolution) }}
 )">
     <!-- Toolbar -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -61,19 +65,28 @@
             <div class="card p-5">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Text-to-Image · Ý tưởng</h2>
                 <textarea x-model="idea" rows="3" class="input" placeholder="VD: A flowing silk evening gown with sequin…" @keydown.enter.prevent="ideate()"></textarea>
-                <!-- Suggest from reference image -->
-                <div class="mt-4 flex items-center gap-2">
-                    <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm flex-1">Ảnh tham khảo</button>
-                    <button type="button" @click="suggestStyle()" :disabled="suggesting || !refFile" class="btn-brand btn-sm"><span x-show="!suggesting">Gợi ý</span><span x-show="suggesting">…</span></button>
+                <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full"><span x-show="!loading">✨ Tạo Prompt Chuyên Nghiệp</span><span x-show="loading">Đang tạo…</span></button>
+
+                <!-- Reference source -->
+                <div class="mt-4 rounded-xl border border-cream-200 bg-cream-50 p-3">
+                    <p class="mb-2 text-xs font-semibold text-ink-700">Gợi ý từ ảnh tham khảo</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm flex-1">Tải ảnh</button>
+                        <button type="button" @click="openRefPicker()" class="btn-outline btn-sm flex-1">Từ sản phẩm</button>
+                        <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm"><span x-show="!suggesting">Gợi ý</span><span x-show="suggesting">…</span></button>
+                    </div>
+                    <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
+                    <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-white object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
+                    <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-50 p-3 text-xs text-brand-800"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
                 </div>
-                <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
-                <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-32 w-full bg-cream-100 object-cover" alt="Ảnh tham khảo"><button type="button" @click="refFile=null, refImage=null" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
-                <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-50 p-3 text-xs text-brand-800"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
             </div>
 
             <!-- Presets -->
             <div class="card p-5">
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Presets</h2>
+                <div class="mb-3 flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(key: value)</span></h2>
+                    <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
+                </div>
                 <div class="grid gap-3">
                     <template x-for="group in presets" :key="group.category">
                         <div x-data="{ open: false }" class="relative">
@@ -85,7 +98,10 @@
                             <div x-show="open" x-transition.opacity.duration.150ms class="absolute z-20 mt-1 w-full max-h-48 overflow-auto rounded-xl border border-cream-200 bg-white p-1 shadow-xl">
                                 <template x-for="item in group.items" :key="item.id">
                                     <label class="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-cream-100">
-                                        <span x-text="item.label" class="truncate"></span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate font-medium" x-text="item.key || item.label"></span>
+                                            <span class="block truncate text-[10px] text-ink-500" x-text="item.value"></span>
+                                        </span>
                                         <input type="checkbox" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)" class="h-4 w-4 accent-brand-600">
                                     </label>
                                 </template>
@@ -100,7 +116,10 @@
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tiếng Anh <span class="text-xs font-normal text-ink-500">(sửa tay)</span></h2>
                 <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
                 <div class="mt-2"><label class="label">Video prompt</label><textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs"></textarea></div>
-                <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand mt-3 w-full"><span x-show="!generating">Generate Design (Tạo 2D)</span><span x-show="generating">Đang gửi…</span></button>
+                <div class="mt-3 flex items-center gap-2">
+                    <div class="w-28 shrink-0"><select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select></div>
+                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand flex-1"><span x-show="!generating">Generate Design (Tạo 2D)</span><span x-show="generating">Đang gửi…</span></button>
+                </div>
             </div>
 
             <!-- Refine -->
@@ -199,6 +218,7 @@
                         </template>
                     </div>
                     <div class="mt-3 flex items-center gap-2">
+                        <div class="w-28 shrink-0"><select x-model="videoRes" class="input !py-2"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select></div>
                         <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId || !videoCamera" class="btn-brand flex-1"><span x-show="!videoBusy">Render Catwalk Video</span><span x-show="videoBusy">Đang gửi…</span></button>
                         <span class="text-[10px] text-ink-500" x-text="selectedImageId ? 'Nguồn #' + selectedImageId : 'Chọn ảnh nguồn'"></span>
                     </div>
@@ -256,19 +276,45 @@
             </div>
         </div>
     </div>
+
+    <!-- Reference product picker modal -->
+    <template x-if="refOpen">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-ink-900/60" @click="closeRefPicker()"></div>
+            <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3">
+                    <h3 class="font-display text-sm font-semibold text-ink-900">Chọn ảnh sản phẩm làm nguồn</h3>
+                    <button @click="closeRefPicker()" class="grid h-8 w-8 place-items-center rounded-full bg-cream-100 text-ink-500 hover:text-ink-900">×</button>
+                </div>
+                <div class="max-h-[70vh] overflow-auto p-4">
+                    <p class="mb-3 text-xs text-ink-500" x-show="refLoading">Đang tải…</p>
+                    <div class="grid grid-cols-3 gap-3 sm:grid-cols-4" x-show="!refLoading">
+                        <template x-for="item in refProducts" :key="item.id">
+                            <button type="button" @click="chooseProduct(item)" class="overflow-hidden rounded-xl border border-cream-200 text-left hover:border-brand-500">
+                                <img :src="item.url" class="aspect-[3/4] w-full object-cover" onerror="this.src='/images/placeholder.svg'">
+                                <span class="block truncate px-2 py-1 text-[10px] text-ink-500" x-text="item.name"></span>
+                            </button>
+                        </template>
+                    </div>
+                    <div class="text-center text-xs text-ink-500" x-show="!refLoading && !refProducts.length">Không có sản phẩm nào có ảnh.</div>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels) => ({
+    Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels, imageRes, videoRes) => ({
         presets, projects, catLabels,
+        imageRes: imageRes || '2K', videoRes: videoRes || '720',
         idea: '', presetIds: [],
         loading: false, generating: false, videoBusy: false, refining: false,
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
         generations: gens, creditsLeft: Number(credits),
         currentProjectId: currentProject, selectedImageId: null, videoCamera: '',
         newProjectName: '', showNewProject: false, refinePrompt: '',
-        refFile: null, refImage: null, suggesting: false,
+        refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [],
@@ -325,14 +371,30 @@ document.addEventListener('alpine:init', () => {
             if (!grp) return '';
             return grp.items
                 .filter((it) => this.presetIds.includes(it.id))
-                .map((it) => it.label).join(', ');
+                .map((it) => it.key || it.label).join(', ');
         },
 
         onRefChange(e) {
             const f = e.target.files && e.target.files[0];
             if (!f) return;
-            if (this.refImage) URL.revokeObjectURL(this.refImage);
-            this.refFile = f; this.refImage = URL.createObjectURL(f);
+            if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
+            this.refFile = f; this.refImage = URL.createObjectURL(f); this.refUrl = null;
+        },
+        clearPresets() { this.presetIds = []; },
+        async openRefPicker() {
+            this.refOpen = true; this.refLoading = true;
+            try { const res = await fetch('/studio/references', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.refProducts = d.items || []; }
+            catch (e) { this.refProducts = []; }
+            finally { this.refLoading = false; }
+        },
+        closeRefPicker() { this.refOpen = false; },
+        chooseProduct(item) {
+            if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
+            this.refUrl = item.url; this.refImage = item.url; this.refFile = null; this.refOpen = false;
+        },
+        clearRef() {
+            if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
+            this.refImage = null; this.refFile = null; this.refUrl = null;
         },
 
         async createProject() {
@@ -354,7 +416,7 @@ document.addEventListener('alpine:init', () => {
         async generateImage() {
             if (!this.output.image_prompt_en || this.generating) return;
             this.generating = true;
-            try { const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'image', status: 'pending', model: data.model, provider: data.provider, media_url: null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.poll(data.generation_id); }
+            try { const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'image', status: 'pending', model: data.model, provider: data.provider, media_url: null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.poll(data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.generating = false; }
         },
@@ -362,7 +424,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.selectedImageId || !this.videoCamera || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.selectedImageId); const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera: this.videoCamera, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
+            try { const src = this.generations.find(g => g.id === this.selectedImageId); const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera: this.videoCamera, resolution: this.videoRes, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
@@ -387,11 +449,16 @@ document.addEventListener('alpine:init', () => {
         },
 
         async suggestStyle() {
-            if (!this.refFile || this.suggesting) return;
+            if ((!this.refFile && !this.refUrl) || this.suggesting) return;
             this.suggesting = true;
             try {
-                const form = new FormData(); form.append('image', this.refFile);
-                const data = await this.upload('/studio/suggest', form);
+                let data;
+                if (this.refFile) {
+                    const form = new FormData(); form.append('image', this.refFile);
+                    data = await this.upload('/studio/suggest', form);
+                } else {
+                    data = await this.api('/studio/suggest', { reference_url: this.refUrl });
+                }
                 this.suggestResult = data;
                 this.presetIds = [];
                 (data.preset_ids || []).forEach((id) => { if (!this.presetIds.includes(Number(id))) this.presetIds.push(Number(id)); });

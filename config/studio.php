@@ -27,6 +27,8 @@ return [
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-1.5-flash'),
+    'image_resolution' => env('STUDIO_IMAGE_RESOLUTION', '2K'), // 1K | 2K
+    'video_resolution' => env('STUDIO_VIDEO_RESOLUTION', '720'), // 480 | 720 | 1080
 
     /*
     |--------------------------------------------------------------------------

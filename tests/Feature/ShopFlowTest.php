@@ -850,6 +850,28 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin)->get('/studio')->assertOk()->assertSee('workflowSteps')->assertSee('previewId');
     }
 
+    public function test_studio_preset_manager_and_references(): void
+    {
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($customer)->get('/studio/presets')->assertForbidden();
+
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin)->get('/studio/presets')->assertOk()->assertSee('Prompt Templates');
+
+        $this->actingAs($admin)->getJson('/studio/references')
+            ->assertOk()
+            ->assertJsonStructure(['items' => []]);
+
+        $this->actingAs($admin)->post('/studio/presets', [
+            'category' => 'style',
+            'ui_label' => 'Test Key',
+            'prompt_injection' => 'test value, elegant',
+            'sort_order' => 99,
+        ])->assertSessionHas('success');
+
+        $this->assertDatabaseHas('presets', ['ui_label' => 'Test Key', 'category' => 'style']);
+    }
+
     public function test_studio_settings_and_api_admin_only(): void
     {
         $this->get('/studio/settings')->assertRedirect(route('login'));
@@ -881,6 +903,8 @@ class ShopFlowTest extends TestCase
             'vision_model' => 'qwen-vl-plus',
             'dashscope_base' => 'https://dashscope-intl.aliyuncs.com',
             'processing' => 'queue',
+            'image_resolution' => '1K',
+            'video_resolution' => '1080',
         ])->assertSessionHas('success');
 
         $this->assertSame('3', setting('studio_image_credits'));
@@ -890,6 +914,8 @@ class ShopFlowTest extends TestCase
         $this->assertSame('qwen-image-plus', setting('studio_qwen_model'));
         $this->assertSame('https://dashscope-intl.aliyuncs.com', setting('studio_dashscope_base'));
         $this->assertSame('queue', setting('studio_processing'));
+        $this->assertSame('1K', setting('studio_image_resolution'));
+        $this->assertSame('1080', setting('studio_video_resolution'));
 
         $this->post('/studio/api', ['key_gemini' => 'AIzaTestKey'])
             ->assertSessionHas('success');

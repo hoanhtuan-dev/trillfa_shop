@@ -18,9 +18,7 @@ class RenderImageJob implements ShouldQueue
      */
     public int $timeout = 300;
 
-    public function __construct(public int $generationId)
-    {
-    }
+    public function __construct(public int $generationId) {}
 
     public function handle(ImageAIService $images): void
     {
@@ -41,6 +39,7 @@ class RenderImageJob implements ShouldQueue
                 (string) $generation->prompt,
                 $generation->base_image,
                 $generation->mask_image,
+                $generation->resolution,
             );
 
             $generation->update(['status' => 'completed', 'media_url' => $url]);

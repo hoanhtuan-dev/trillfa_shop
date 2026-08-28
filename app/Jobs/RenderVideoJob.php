@@ -18,9 +18,7 @@ class RenderVideoJob implements ShouldQueue
      */
     public int $timeout = 600;
 
-    public function __construct(public int $generationId)
-    {
-    }
+    public function __construct(public int $generationId) {}
 
     public function handle(VideoAIService $videos): void
     {
@@ -45,6 +43,7 @@ class RenderVideoJob implements ShouldQueue
                 (string) $generation->prompt,
                 (string) $generation->base_image,
                 (string) $camera,
+                $generation->resolution,
             );
 
             $generation->update(['status' => 'completed', 'media_url' => $url]);

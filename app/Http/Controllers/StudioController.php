@@ -6,6 +6,7 @@ use App\Jobs\RenderImageJob;
 use App\Jobs\RenderVideoJob;
 use App\Models\Generation;
 use App\Models\Preset;
+use App\Models\Product;
 use App\Services\GeminiService;
 use App\Services\StyleSuggestService;
 use Illuminate\Http\Request;
@@ -77,6 +78,7 @@ class StudioController extends Controller
     {
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:4000'],
+            'resolution' => ['nullable', 'string', 'in:1K,2K'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
@@ -95,6 +97,7 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'base_image' => ['required', 'string', 'max:2048'],
             'camera' => ['nullable', 'string', 'max:255'],
+            'resolution' => ['nullable', 'string', 'in:480,720,1080'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
@@ -216,6 +219,7 @@ class StudioController extends Controller
             'prompt' => $data['prompt'] ?? null,
             'provider' => $provider,
             'model' => $model,
+            'resolution' => $data['resolution'] ?? null,
             'base_image' => $data['base_image'] ?? $source?->media_url,
             'mask_image' => $data['mask_image'] ?? null,
             'credits_cost' => $cost,
@@ -266,15 +270,40 @@ class StudioController extends Controller
      */
     public function suggest(Request $request)
     {
-        $request->validate([
-            'image' => ['required', 'image', 'max:8192'],
+        $data = $request->validate([
+            'image' => ['nullable', 'image', 'max:8192'],
+            'reference_url' => ['nullable', 'string', 'max:2048'],
         ]);
 
-        $path = $request->file('image')->store('studio/ref', 'public');
+        $imagePath = null;
 
-        $result = app(StyleSuggestService::class)->suggest(storage_path('app/public/'.$path));
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $path = $request->file('image')->store('studio/ref', 'public');
+            $imagePath = storage_path('app/public/'.$path);
+        } elseif (! empty($data['reference_url'])) {
+            $imagePath = $this->resolveReferencePath($data['reference_url']);
+        }
+
+        if (! $imagePath || ! is_file($imagePath)) {
+            return response()->json(['message' => 'Không đọc được ảnh nguồn. Vui lòng tải ảnh hoặc chọn ảnh sản phẩm.'], 422);
+        }
+
+        $result = app(StyleSuggestService::class)->suggest($imagePath);
 
         return response()->json($result);
+    }
+
+    protected function resolveReferencePath(string $url): ?string
+    {
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+
+        foreach ([public_path($path), storage_path('app/public/'.$path)] as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -490,6 +519,8 @@ class StudioController extends Controller
             'vision_model' => setting('studio_vision_model', config('studio.vision_model')),
             'dashscope_base' => setting('studio_dashscope_base', config('studio.dashscope_base')),
             'processing' => setting('studio_processing', config('studio.processing')),
+            'image_resolution' => setting('studio_image_resolution', config('studio.image_resolution')),
+            'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
         ]);
     }
 
@@ -508,6 +539,8 @@ class StudioController extends Controller
             'vision_model' => ['required', 'string', 'max:255'],
             'dashscope_base' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
             'processing' => ['required', 'string', 'in:sync,queue'],
+            'image_resolution' => ['required', 'string', 'in:1K,2K'],
+            'video_resolution' => ['required', 'string', 'in:480,720,1080'],
         ]);
 
         set_setting('studio_image_credits', (string) $data['image_credits']);
@@ -522,6 +555,8 @@ class StudioController extends Controller
         set_setting('studio_vision_model', $data['vision_model']);
         set_setting('studio_dashscope_base', $data['dashscope_base']);
         set_setting('studio_processing', $data['processing']);
+        set_setting('studio_image_resolution', $data['image_resolution']);
+        set_setting('studio_video_resolution', $data['video_resolution']);
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }
@@ -561,5 +596,64 @@ class StudioController extends Controller
         }
 
         return back()->with('success', 'Đã lưu cấu hình API.');
+    }
+
+    /**
+     * Active products with an image — used as reference-image sources in Studio.
+     */
+    public function references()
+    {
+        $items = Product::where('is_active', true)->whereNotNull('image')
+            ->latest()->limit(40)->get(['id', 'name', 'image'])
+            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'url' => $p->image_url])
+            ->filter(fn ($i) => ! empty($i['url']))
+            ->values();
+
+        return response()->json(['items' => $items]);
+    }
+
+    /**
+     * Prompt template (preset) manager — admin CRUD.
+     */
+    public function presets()
+    {
+        $presets = Preset::orderBy('sort_order')->get()->groupBy('category');
+        $categories = ['fabric', 'silhouette', 'style', 'background', 'pose', 'camera'];
+
+        return view('studio.presets', compact('presets', 'categories'));
+    }
+
+    public function storePreset(Request $request)
+    {
+        $data = $request->validate([
+            'category' => ['required', 'string', 'max:40'],
+            'ui_label' => ['required', 'string', 'max:120'],
+            'prompt_injection' => ['required', 'string', 'max:1000'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        Preset::create($data + ['sort_order' => $data['sort_order'] ?? 0]);
+
+        return back()->with('success', 'Đã thêm preset.');
+    }
+
+    public function updatePreset(Request $request, Preset $preset)
+    {
+        $data = $request->validate([
+            'ui_label' => ['required', 'string', 'max:120'],
+            'prompt_injection' => ['required', 'string', 'max:1000'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $preset->update($data + ['sort_order' => $data['sort_order'] ?? 0]);
+
+        return back()->with('success', 'Đã cập nhật preset.');
+    }
+
+    public function destroyPreset(Preset $preset)
+    {
+        $preset->delete();
+
+        return back()->with('success', 'Đã xóa preset.');
     }
 }

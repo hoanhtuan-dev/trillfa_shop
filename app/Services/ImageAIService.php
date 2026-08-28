@@ -34,7 +34,7 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null): string
     {
         $provider = $this->provider();
 
@@ -42,7 +42,7 @@ class ImageAIService
             $key = $this->providerKey();
             if ($key) {
                 try {
-                    $url = $this->callDashscope($prompt, $provider === 'wan' ? 'wan2.7-image-pro' : 'qwen-image', $key);
+                    $url = $this->callDashscope($prompt, $provider === 'wan' ? 'wan2.7-image-pro' : 'qwen-image', $key, $resolution);
                     if ($url) {
                         return $url;
                     }
@@ -81,17 +81,18 @@ class ImageAIService
         return $files ? $files[array_rand($files)] : null;
     }
 
-    protected function callDashscope(string $prompt, string $provider, string $key): ?string
+    protected function callDashscope(string $prompt, string $provider, string $key, ?string $resolution = null): ?string
     {
         $model = $provider === 'wan'
             ? studio_config('wan_model', 'wan2.7-image-pro')
             : studio_config('qwen_model', 'qwen-image');
+        $size = $resolution === '1K' ? '1024*1024' : '2048*2048';
         $resp = Http::withToken($key)
             ->timeout(180)
             ->post(studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com').'/api/v1/services/aigc/multimodal-generation/generation', [
                 'model' => $model,
                 'input' => ['messages' => [['role' => 'user', 'content' => [['text' => $prompt]]]]],
-                'parameters' => ['n' => 1, 'size' => '2K'],
+                'parameters' => ['n' => 1, 'size' => $size],
             ]);
 
         $url = collect(data_get($resp->json(), 'output.choices.0.message.content', []))

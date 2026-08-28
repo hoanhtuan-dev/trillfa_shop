@@ -47,6 +47,7 @@
                 <a href="{{ route('studio.index') }}" class="studio-nav {{ $routeName === 'studio.index' ? 'is-active' : '' }}">Garment Gen <span class="ml-auto text-[10px] text-brand-600">Tạo trang phục</span></a>
                 <span class="studio-nav cursor-not-allowed opacity-50" title="Cần model AI riêng — sắp ra mắt">Pattern Maker <span class="ml-auto badge bg-cream-200 text-ink-500">Sớm</span></span>
                 <span class="studio-nav cursor-not-allowed opacity-50" title="Cần model AI riêng — sắp ra mắt">Virtual Try-On <span class="ml-auto badge bg-cream-200 text-ink-500">Sớm</span></span>
+                <a href="{{ route('studio.presets') }}" class="studio-nav {{ $routeName === 'studio.presets' ? 'is-active' : '' }}">Prompt Templates <span class="ml-auto text-[10px] text-brand-600">Key:Value</span></a>
 
                 <div class="studio-nav-head">Project Manager</div>
                 <a href="{{ route('studio.index') }}" class="studio-nav {{ $routeName === 'studio.index' ? 'is-active' : '' }}">Active <span class="ml-auto text-[10px] text-ink-500">{{ $u?->projects()->count() }} dự án</span></a>

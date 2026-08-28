@@ -115,6 +115,11 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::get('/library', [StudioController::class, 'library'])->name('library');
     Route::get('/generations/{generation}/download', [StudioController::class, 'download'])->name('generations.download');
     Route::get('/generations/{generation}/palette', [StudioController::class, 'palette'])->name('generations.palette');
+    Route::get('/references', [StudioController::class, 'references'])->name('references');
+    Route::get('/presets', [StudioController::class, 'presets'])->name('presets');
+    Route::post('/presets', [StudioController::class, 'storePreset'])->name('presets.store');
+    Route::put('/presets/{preset}', [StudioController::class, 'updatePreset'])->name('presets.update');
+    Route::delete('/presets/{preset}', [StudioController::class, 'destroyPreset'])->name('presets.destroy');
     Route::get('/generations/{generation}', [StudioController::class, 'show'])->name('generations.show');
     Route::post('/generations/{generation}/cancel', [StudioController::class, 'cancel'])->name('generations.cancel');
     Route::delete('/generations/{generation}', [StudioController::class, 'destroy'])->name('generations.destroy');
