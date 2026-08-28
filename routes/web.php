@@ -104,8 +104,8 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function
     Route::get('/danh-gia', [AccountController::class, 'reviews'])->name('reviews');
 });
 
-// Trillfa Studio (AI fashion design — auth)
-Route::middleware('auth')->prefix('studio')->name('studio.')->group(function () {
+// Trillfa Studio — INTERNAL only (admin team). Not a public customer service.
+Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(function () {
     Route::get('/', [StudioController::class, 'index'])->name('index');
     Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
     Route::post('/ideate', [StudioController::class, 'ideate'])->name('ideate');

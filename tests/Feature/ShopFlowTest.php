@@ -787,7 +787,7 @@ class ShopFlowTest extends TestCase
 
     public function test_studio_ideate_returns_prompts(): void
     {
-        $this->actingAs(User::where('email', 'customer@trillfa.com')->first());
+        $this->actingAs(User::where('email', 'admin@trillfa.com')->first());
 
         $this->postJson('/studio/ideate', [
             'idea' => 'Váy dạ hội biển xanh',
@@ -797,7 +797,7 @@ class ShopFlowTest extends TestCase
 
     public function test_studio_generate_image_and_video(): void
     {
-        $user = User::where('email', 'customer@trillfa.com')->first();
+        $user = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($user);
 
         // 2D image (cost 1) runs synchronously in tests.
@@ -810,7 +810,7 @@ class ShopFlowTest extends TestCase
         $this->assertSame('completed', $gen->status);
         $this->assertSame('image', $gen->type);
         $this->assertNotNull($gen->media_url);
-        $this->assertSame(199, $user->fresh()->credits_balance);
+        $this->assertSame(999, $user->fresh()->credits_balance);
 
         // Video (cost 10).
         $video = $this->postJson('/studio/video', [
@@ -824,7 +824,17 @@ class ShopFlowTest extends TestCase
         $this->assertSame('completed', $vgen->status);
         $this->assertSame('video', $vgen->type);
         $this->assertNotNull($vgen->media_url);
-        $this->assertSame(189, $user->fresh()->credits_balance);
+        $this->assertSame(989, $user->fresh()->credits_balance);
+    }
+
+
+    public function test_studio_is_admin_only(): void
+    {
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($customer)->get('/studio')->assertForbidden();
+
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin)->get('/studio')->assertOk();
     }
 
 }
