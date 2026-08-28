@@ -58,6 +58,7 @@
             <span class="badge {{ $aiStub ? 'bg-amber-100 text-amber-700' : 'bg-brand-600 text-white' }}">Prompt: {{ $aiStub ? 'Mô phỏng' : 'Gemini' }}</span>
             <span class="badge bg-cream-200 text-ink-700">Ảnh: {{ $imgProvider }}{{ $imgKeySet ? '' : ' (stub)' }}</span>
             <span class="text-ink-500">Tín dụng: <b class="font-semibold text-ink-900" x-text="creditsLeft"></b></span>
+            <button @click="processNow()" class="btn-outline btn-sm whitespace-nowrap" title="Xử lý các công việc đang chờ trong hàng đợi">Xử lý ngay</button>
         </div>
     </div>
 
@@ -402,6 +403,15 @@ document.addEventListener('alpine:init', () => {
         clearRef() {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refImage = null; this.refFile = null; this.refUrl = null;
+        },
+
+        async processNow() {
+            try {
+                const res = await fetch('/studio/process', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' } });
+                const d = await res.json();
+                Alpine.store('toast').show(d.message || 'Đã xử lý.');
+                if (d.processed && d.processed > 0) location.reload();
+            } catch (e) { Alpine.store('toast').show('Lỗi: ' + e.message, 'error'); }
         },
 
         async createProject() {

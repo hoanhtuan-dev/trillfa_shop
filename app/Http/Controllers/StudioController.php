@@ -688,4 +688,32 @@ class StudioController extends Controller
 
         return back()->with('success', 'Đã xóa preset.');
     }
+
+    /**
+     * Process the user's queued generations synchronously (no worker / cron needed).
+     * Best for quick jobs (stub / Gemini / short renders); long async jobs (Wan/Qwen)
+     * are better handled by the queue worker via cron.
+     */
+    public function processQueue()
+    {
+        $pending = auth()->user()->generations()
+            ->whereIn('status', ['pending', 'processing'])
+            ->orderBy('id')->limit(5)->get();
+
+        $n = 0;
+        foreach ($pending as $gen) {
+            try {
+                if ($gen->type === 'video') {
+                    RenderVideoJob::dispatchSync($gen->id);
+                } else {
+                    RenderImageJob::dispatchSync($gen->id);
+                }
+                $n++;
+            } catch (Throwable $e) {
+                logger()->error('Process queue failed for generation #'.$gen->id.': '.$e->getMessage());
+            }
+        }
+
+        return response()->json(['processed' => $n, 'message' => 'Đã xử lý '.$n.' công việc đang chờ.']);
+    }
 }
