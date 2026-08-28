@@ -15,6 +15,8 @@ use Illuminate\Support\Str;
  */
 class ImageAIService
 {
+    protected ?string $dashscopeError = null;
+
     protected function falKey(): ?string
     {
         return studio_api_key('fal');
@@ -38,13 +40,15 @@ class ImageAIService
     {
         $provider = $this->provider();
         $dashscopeKey = studio_api_key('dashscope');
+        $triedReal = false;
 
         if (in_array($provider, ['wan', 'qwen'])) {
             $key = $this->providerKey();
             if ($key) {
+                $triedReal = true;
                 $model = $provider === 'wan'
                     ? (string) studio_config('wan_model', 'wan2.7-image-pro')
-                    : (string) studio_config('qwen_model', 'qwen-image');
+                    : (string) studio_config('qwen_model', 'qwen-image-3.0-pro');
 
                 $url = $this->tryDashscope($prompt, $model, $key, $resolution, $ratio);
                 if ($url) {
@@ -52,8 +56,9 @@ class ImageAIService
                 }
             }
         } elseif (! studio_api_key('fal') && ! studio_api_key('replicate') && $dashscopeKey) {
-            // Flux/default without a Fal/Replicate key: use DashScope (Wan image) so a valid
-            // DashScope key produces a real AI image instead of the stub.
+            $triedReal = true;
+            // Flux/default without a Fal/Replicate key: use the Qwen image model so a valid
+            // QwenCloud / DashScope key produces a real AI image.
             $model = (string) studio_config('qwen_model', 'qwen-image-3.0-pro');
             $url = $this->tryDashscope($prompt, $model, $dashscopeKey, $resolution, $ratio);
             if ($url) {
@@ -61,19 +66,30 @@ class ImageAIService
             }
         }
 
-        // Stub: for an edit (base image present) reuse the source image; otherwise a clean sample.
+        if ($triedReal) {
+            // A real key was configured but the provider call failed: surface the reason
+            // instead of silently returning a stub image.
+            throw new \RuntimeException($this->dashscopeError ?: 'Không thể gọi nhà cung cấp AI. Kiểm tra key / model / độ phân giải trong Cài đặt.');
+        }
+
+        // No real key configured -> stub (reuse the source image for edits, sample otherwise).
         return $this->copySample($prompt, $baseImage);
     }
 
     protected function tryDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
     {
         try {
-            return $this->callDashscope($prompt, $model, $key, $resolution, $ratio);
+            $url = $this->callDashscope($prompt, $model, $key, $resolution, $ratio);
+            if ($url) {
+                return $url;
+            }
+            $this->dashscopeError = 'Nhà cung cấp AI không trả về ảnh. Kiểm tra model / độ phân giải (Qwen-Image chỉ hỗ trợ size cố định như 1328*1328, 928*1664…).';
         } catch (\Throwable $e) {
+            $this->dashscopeError = $e->getMessage();
             logger()->error('DashScope image generation failed: '.$e->getMessage());
-
-            return null;
         }
+
+        return null;
     }
 
     protected function copySample(string $prompt, ?string $preferred): string
@@ -117,6 +133,10 @@ class ImageAIService
                 ],
             ]);
 
+        if (! $resp->successful()) {
+            throw new \RuntimeException('DashScope ('.$resp->status().'): '.Str::limit((string) $resp->body(), 240));
+        }
+
         $url = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
             ->pluck('image')->first();
 
@@ -137,17 +157,15 @@ class ImageAIService
 
     protected function sizeFor(?string $resolution, ?string $ratio): string
     {
-        $twoK = $resolution === '2K';
-
+        // Qwen-Image only accepts a fixed set of sizes; map the ratio (and the extra
+        // ratios) onto the nearest supported one so the provider call succeeds.
         return match ($ratio) {
-            '16:9' => $twoK ? '2048*1152' : '1280*720',
-            '9:16' => $twoK ? '1152*2048' : '720*1280',
-            '4:3' => $twoK ? '2048*1536' : '1024*768',
-            '3:4' => $twoK ? '1536*2048' : '768*1024',
-            '4:5' => $twoK ? '1638*2048' : '1024*1280',
-            '21:9' => $twoK ? '2048*878' : '1280*549',
-            '19:6' => $twoK ? '2048*647' : '1280*405',
-            default => $twoK ? '2048*2048' : '1024*1024',
+            '16:9', '21:9', '19:6' => '1664*928',
+            '4:3' => '1472*1104',
+            '1:1' => '1328*1328',
+            '3:4', '4:5' => '1104*1472',
+            '9:16' => '928*1664',
+            default => '1328*1328',
         };
     }
 
