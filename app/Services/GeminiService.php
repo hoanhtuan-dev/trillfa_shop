@@ -29,6 +29,8 @@ class GeminiService
         $fabric = $injections['fabric'] ?? '';
         $silhouette = $injections['silhouette'] ?? '';
         $style = $injections['style'] ?? '';
+        $background = $injections['background'] ?? '';
+        $pose = $injections['pose'] ?? '';
         $camera = $injections['camera'] ?? '';
 
         $subject = trim($idea ?: 'a high-end fashion outfit', ' .,');
@@ -37,12 +39,16 @@ class GeminiService
             .($fabric ? ', crafted from '.$fabric : '')
             .($silhouette ? ', '.$silhouette.' silhouette' : '')
             .($style ? ', '.$style.' aesthetic' : '')
+            .($background ? ', '.$background.' background' : '')
+            .($pose ? ', '.$pose.' pose' : '')
             .', clean studio background, soft diffused lighting, premium Vogue editorial, ultra detailed, 4k');
 
         $videoPrompt = $this->clean('Cinematic fashion show. A model walks the runway wearing '.$subject
             .($fabric ? ', made of '.$fabric : '')
             .($silhouette ? ', '.$silhouette.' cut' : '')
             .($style ? ', '.$style.' style' : '')
+            .($background ? ', '.$background.' backdrop' : '')
+            .($pose ? ', '.$pose.' pose' : '')
             .($camera ? ', camera: '.$camera : ', slow tracking shot')
             .', dramatic runway lighting, slow motion, 4k');
 

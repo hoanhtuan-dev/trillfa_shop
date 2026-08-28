@@ -232,9 +232,11 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
-        // Default: run the job inline (sync) so clicking "Tạo ảnh/video" completes it automatically.
-        // Only an explicit "queue" processing mode dispatches to the queue worker.
-        $useQueue = studio_config('processing', 'sync') === 'queue';
+        // Always run the job inline so it completes automatically in the request — the admin does not
+        // need SSH/cron or the queue worker. Extend the PHP execution time so slower providers
+        // (async Qwen / video) can finish before the request times out.
+        set_time_limit(600);
+        $useQueue = false;
 
         if ($useQueue) {
             if ($type === 'video') {

@@ -106,9 +106,10 @@
         </div>
         <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
             <h3 class="mb-2 font-display text-sm font-semibold text-ink-900">Worker tự động (Hàng đợi)</h3>
-            <p class="text-xs text-ink-500">Khi dùng AI thật (Gemini/Wan/Qwen), generation chạy nền (Queue). Để <strong>tự động chạy worker</strong>, thêm cron (Hostinger → Cron Jobs) mỗi phút với lệnh:</p>
+            <p class="text-xs text-ink-500">Studio <strong>tự động chạy job ngay</strong> khi bạn bấm Tạo ảnh / Video — <strong>không cần SSH, không cần cron, không cần <code class="rounded bg-white px-1">php artisan queue:work</code></strong>. Kết quả cập nhật ngay trên Canvas / Outputs.</p>
+            <p class="mt-2 text-xs text-ink-500">Các việc <strong>rất dài</strong> (video AI thật) có thể đưa sang worker nền để không chờ trong trang — chỉ dành cho người dùng nâng cao:</p>
             <div class="mt-2 break-all rounded-xl bg-white p-3 font-mono text-xs text-ink-900">php artisan queue:work --stop-when-empty --timeout=200</div>
-            <p class="mt-2 text-xs text-ink-500">Đang chờ: <b class="text-ink-900">{{ $pending_count }}</b> · Driver: <b class="text-ink-900">{{ $queue_driver }}</b>. Worker xử lý hết hàng đợi rồi thoát; cron sẽ mở lại ở phút kế tiếp — <strong>không cần chạy mãi mãi</strong>.</p>
+            <p class="mt-2 text-xs text-ink-500">Đang chờ (nâng cao): <b class="text-ink-900">{{ $pending_count }}</b> · Driver: <b class="text-ink-900">{{ $queue_driver }}</b></p>
             <p class="mt-1 text-xs text-ink-500">Nếu chỉ muốn chạy thủ công: <code class="rounded bg-white px-1">php artisan studio:process</code>.</p>
         </div>
         <div class="flex items-center gap-3">

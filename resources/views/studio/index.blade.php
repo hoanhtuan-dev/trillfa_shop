@@ -425,7 +425,7 @@ document.addEventListener('alpine:init', () => {
         async generateImage() {
             if (!this.output.image_prompt_en || this.generating) return;
             this.generating = true;
-            try { const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'image', status: 'pending', model: data.model, provider: data.provider, media_url: null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.poll(data.generation_id); }
+            try { const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.generating = false; }
         },
