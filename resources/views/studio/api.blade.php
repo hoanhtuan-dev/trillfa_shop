@@ -33,6 +33,14 @@
     </form>
 
     <div class="mt-6 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
+        <p class="font-semibold">Gợi ý lấy key:</p>
+        <ul class="mt-1 list-inside list-disc space-y-0.5">
+            <li>Gemini: <code class="rounded bg-white px-1">aistudio.google.com</code> → API key.</li>
+            <li>Qwen / Wan (ảnh & video): <code class="rounded bg-white px-1">home.qwencloud.com/api-keys</code> (<code class="rounded bg-white px-1">QWEN_API_KEY</code>) hoặc <code class="rounded bg-white px-1">DASHSCOPE_API_KEY</code> (Alibaba Model Studio) — cả hai trỏ cùng endpoint DashScope.</li>
+            <li>Replicate: <code class="rounded bg-white px-1">replicate.com/account/api-tokens</code>.</li>
+        </ul>
+    </div>
+    <div class="mt-3 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
         Khi nhập khoá, các service tự chuyển từ <strong>stub</strong> sang gọi API thật (Gemini tạo prompt; Fal/Replicate sinh ảnh; Wan/Veo render video).
     </div>
 </div>

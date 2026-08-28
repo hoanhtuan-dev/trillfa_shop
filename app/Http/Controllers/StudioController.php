@@ -383,7 +383,7 @@ class StudioController extends Controller
             'replicate' => ['label' => 'Replicate — Flux (ảnh)', 'hint' => 'REPLICATE_API_TOKEN', 'configured' => (bool) studio_api_key('replicate')],
             'wan' => ['label' => 'Wan AI — video (dùng DASHSCOPE_API_KEY)', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY', 'configured' => (bool) (studio_api_key('wan') ?: studio_api_key('dashscope'))],
             'veo' => ['label' => 'Google Veo — video', 'hint' => 'GOOGLE_VEO_KEY', 'configured' => (bool) studio_api_key('veo')],
-            'qwen' => ['label' => 'Qwen AI — ảnh (Alibaba)', 'hint' => 'QWEN_API_KEY', 'configured' => (bool) studio_api_key('qwen')],
+            'qwen' => ['label' => 'Qwen — ảnh (QwenCloud / DashScope)', 'hint' => 'QWEN_API_KEY (home.qwencloud.com/api-keys)', 'configured' => (bool) studio_api_key('qwen')],
             'dashscope' => ['label' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'hint' => 'DASHSCOPE_API_KEY', 'configured' => (bool) studio_api_key('dashscope')],
         ];
 
