@@ -403,7 +403,7 @@ class StudioController extends Controller
             $lastStatus = $resp->status();
         }
 
-        return ['ok' => false, 'message' => 'DashScope: key bị từ chối trên mọi host (HTTP '.$lastStatus.'). Key bắt đầu bằng sk-sp- là key Token/Coding Plan → cần base URL tương ứng (token-plan.ap-southeast-1.maas.aliyuncs.com hoặc coding-intl.dashscope.aliyuncs.com). Key dạng sk-xxxxx → dùng https://dashscope-intl.aliyuncs.com.'];
+        return ['ok' => false, 'message' => 'DashScope: KEY bị từ chối trên mọi host (HTTP '.$lastStatus.') — tức key KHÔNG được server chấp nhận (sai / hết hạn / không đúng loại). Cách sửa: vào https://home.qwencloud.com/api-keys → tạo key mới, copy ĐẦY ĐỦ và dán lại. Phân loại: key sk-xxxxx → base https://dashscope-intl.aliyuncs.com; key sk-sp-xxxxx (Token/Coding Plan) → base https://token-plan.ap-southeast-1.maas.aliyuncs.com (hoặc coding-intl.dashscope.aliyuncs.com). Lưu ý khác với 403 Unpurchased: 403 = key OK nhưng model ảnh chưa được mua trên tài khoản. Gợi ý ổn định hơn: dùng Gemini (Google AI Studio key) để tạo ảnh — đã tích hợp sẵn.'];
     }
 
     /**
