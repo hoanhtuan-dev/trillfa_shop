@@ -61,7 +61,7 @@ class ImageAIService
                     ? array_values(array_unique([(string) studio_config('wan_model', 'wan2.7-image-pro'), 'wan2.7-image-pro', 'wan2.1-image-pro']))
                     : array_values(array_unique([(string) studio_config('qwen_model', 'qwen-image-3.0-pro'), 'qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image']));
 
-                $url = $this->tryModels($prompt, $models, $key, $resolution, $ratio);
+                $url = $this->tryModels($prompt, $models, $key, $resolution, $ratio, $faceRef);
                 if ($url) {
                     return $url;
                 }
@@ -89,7 +89,7 @@ class ImageAIService
      * Try each model in order until one returns an image (handles model eligibility
      * differences between accounts). The last error is kept for the user.
      */
-    protected function tryModels(string $prompt, array $models, string $key, ?string $resolution = null, ?string $ratio = null): ?string
+    protected function tryModels(string $prompt, array $models, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
     {
         $last = null;
 
