@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -141,17 +142,25 @@ class ImageAIService
     protected function callGeminiImage(string $prompt, string $key, ?string $ratio = null): ?string
     {
         $model = (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
+
+        if (! $this->isGeminiImageModel($model)) {
+            throw new \RuntimeException('Model “'.$model.'” không phải model tạo ảnh. Trong Cài đặt → “Ảnh Gemini”, hãy dùng gemini-2.5-flash-image (hoặc gemini-2.0-flash-preview-image-generation / imagen-4.0-generate-001).');
+        }
+
         $config = ['responseModalities' => ['TEXT', 'IMAGE']];
         $aspect = $this->geminiAspectRatio($ratio);
         if ($aspect) {
             $config['imageConfig'] = ['aspectRatio' => $aspect];
         }
 
-        $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(180)
-            ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
-                'contents' => [['parts' => [['text' => $prompt]]]],
-                'generationConfig' => $config,
-            ]);
+        $resp = $this->geminiGenerate($model, $prompt, $key, $config);
+
+        // Some image models don't support the aspect-ratio config — retry without it.
+        if (! $resp->successful() && isset($config['imageConfig'])
+            && $resp->status() === 400 && str_contains(strtolower((string) $resp->body()), 'aspect ratio')) {
+            unset($config['imageConfig']);
+            $resp = $this->geminiGenerate($model, $prompt, $key, $config);
+        }
 
         if (! $resp->successful()) {
             $msg = 'Gemini ('.$resp->status().'): '.Str::limit((string) $resp->body(), 240);
@@ -183,6 +192,20 @@ class ImageAIService
         }
 
         return null;
+    }
+
+    protected function geminiGenerate(string $model, string $prompt, string $key, array $config): Response
+    {
+        return Http::withHeaders(['x-goog-api-key' => $key])->timeout(180)
+            ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
+                'contents' => [['parts' => [['text' => $prompt]]]],
+                'generationConfig' => $config,
+            ]);
+    }
+
+    protected function isGeminiImageModel(string $model): bool
+    {
+        return str_contains($model, 'image') || str_contains($model, 'imagen');
     }
 
     protected function geminiAspectRatio(?string $ratio): ?string
