@@ -43,11 +43,58 @@ class RenderImageJob implements ShouldQueue
                 $generation->ratio,
             );
 
+            // Stamp the brand logo onto the generated image (bottom-right).
+            $url = $this->applyBrandLogo($url);
+
             $generation->update(['status' => 'completed', 'media_url' => $url]);
         } catch (\Throwable $e) {
             $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
             $this->refund($generation);
         }
+    }
+
+    protected function applyBrandLogo(string $url): string
+    {
+        $logoUrl = (string) setting('studio_brand_logo', '');
+        if (! $logoUrl || ! str_starts_with($logoUrl, '/storage/')) {
+            return $url;
+        }
+
+        $rel = ltrim((string) parse_url($logoUrl, PHP_URL_PATH), '/');
+        $logoPath = storage_path('app/public/'.str_replace('storage/', '', $rel));
+        if (! is_file($logoPath)) {
+            return $url;
+        }
+
+        $relImg = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $imgPath = storage_path('app/public/'.str_replace('storage/', '', $relImg));
+        if (! is_file($imgPath)) {
+            return $url;
+        }
+
+        $img = @imagecreatefromstring((string) file_get_contents($imgPath));
+        $logo = @imagecreatefromstring((string) file_get_contents($logoPath));
+        if (! $img || ! $logo) {
+            return $url;
+        }
+
+        $iw = imagesx($img);
+        $lh = imagesy($logo);
+        $lw = imagesx($logo);
+        $targetW = max(40, (int) round($iw * 0.18));
+        $targetH = max(1, (int) round($lh * ($targetW / $lw)));
+        $pad = max(12, (int) round($iw * 0.03));
+        imagecopyresampled($img, $logo, $iw - $targetW - $pad, imagesy($img) - $targetH - $pad, 0, 0, $targetW, $targetH, $lw, $lh);
+
+        if (str_ends_with($relImg, '.png')) {
+            imagepng($img, $imgPath);
+        } else {
+            imagejpeg($img, $imgPath, 92);
+        }
+        imagedestroy($img);
+        imagedestroy($logo);
+
+        return $url;
     }
 
     protected function refund(Generation $generation): void

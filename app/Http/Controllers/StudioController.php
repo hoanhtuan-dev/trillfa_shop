@@ -562,6 +562,8 @@ class StudioController extends Controller
             'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
             'image_ratio' => setting('studio_image_ratio', config('studio.image_ratio')),
             'video_duration' => setting('studio_video_duration', config('studio.video_duration')),
+            'brand_logo' => setting('studio_brand_logo', ''),
+            'face_ref' => setting('studio_face_ref', ''),
             'pending_count' => auth()->user()->generations()->whereIn('status', ['pending', 'processing'])->count(),
             'queue_driver' => config('queue.default'),
         ]);
@@ -606,6 +608,13 @@ class StudioController extends Controller
         set_setting('studio_video_resolution', $data['video_resolution']);
         set_setting('studio_image_ratio', $data['image_ratio']);
         set_setting('studio_video_duration', $data['video_duration']);
+
+        if ($request->hasFile('brand_logo') && $request->file('brand_logo')->isValid()) {
+            set_setting('studio_brand_logo', '/storage/'.$request->file('brand_logo')->store('studio/logo', 'public'));
+        }
+        if ($request->hasFile('face_ref') && $request->file('face_ref')->isValid()) {
+            set_setting('studio_face_ref', '/storage/'.$request->file('face_ref')->store('studio/ref', 'public'));
+        }
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }

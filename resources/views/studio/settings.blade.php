@@ -5,7 +5,7 @@
     <h1 class="font-display text-2xl font-semibold text-ink-900">Cài đặt Studio</h1>
     <p class="mt-1 text-sm text-ink-500">Tinh chỉnh tín dụng và giới hạn cho công cụ AI nội bộ.</p>
 
-    <form method="POST" action="{{ route('studio.settings.update') }}" class="card mt-6 space-y-5 p-6">
+    <form method="POST" action="{{ route('studio.settings.update') }}" enctype="multipart/form-data" class="card mt-6 space-y-5 p-6">
         @csrf
         <div>
             <label class="label">Tín dụng / ảnh</label>
@@ -100,7 +100,13 @@
                 <div><label class="label">Ảnh Wan</label><input type="text" name="wan_model" value="{{ old('wan_model', $wan_model) }}" class="input !py-2" placeholder="wan2.7-image-pro"></div>
                 <div><label class="label">Ảnh Qwen</label><input type="text" name="qwen_model" value="{{ old('qwen_model', $qwen_model) }}" class="input !py-2" placeholder="qwen-image-3.0-pro"></div>
                 <div><label class="label">Ảnh Gemini</label><input type="text" name="gemini_image_model" value="{{ old('gemini_image_model', $gemini_image_model) }}" class="input !py-2" placeholder="gemini-2.5-flash-image"><p class="mt-1 text-xs text-ink-500">Model hợp lệ: <code class="rounded bg-white px-1">gemini-2.5-flash-image</code> · <code class="rounded bg-white px-1">gemini-2.0-flash-preview-image-generation</code> · <code class="rounded bg-white px-1">imagen-4.0-generate-001</code>. Key dùng <code class="rounded bg-white px-1">x-goog-api-key</code> (lấy tại <code class="rounded bg-white px-1">aistudio.google.com/apikey</code>).</p></div>
-                <div><label class="label">Video (Wan/Veo)</label><input type="text" name="video_model" value="{{ old('video_model', $video_model) }}" class="input !py-2" placeholder="wan2.5-t2v"></div>
+                <div>
+                    <label class="label">Video (Wan / Veo)</label>
+                    <input type="text" name="video_model" list="video-model-list" value="{{ old('video_model', $video_model) }}" class="input !py-2" placeholder="wan2.5-t2v">
+                    <datalist id="video-model-list">
+                        <option value="wan2.5-t2v"><option value="wan2.2-i2v"><option value="happyhorse-1.1-i2v"><option value="wan2.1-i2v-turbo"><option value="veo-3.1">
+                    </datalist>
+                </div>
                 <div><label class="label">Vision (gợi ý từ ảnh)</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-1.5-flash"></div>
             </div>
         </div>
@@ -111,6 +117,22 @@
             <div class="mt-2 break-all rounded-xl bg-white p-3 font-mono text-xs text-ink-900">php artisan queue:work --stop-when-empty --timeout=200</div>
             <p class="mt-2 text-xs text-ink-500">Đang chờ (nâng cao): <b class="text-ink-900">{{ $pending_count }}</b> · Driver: <b class="text-ink-900">{{ $queue_driver }}</b></p>
             <p class="mt-1 text-xs text-ink-500">Nếu chỉ muốn chạy thủ công: <code class="rounded bg-white px-1">php artisan studio:process</code>.</p>
+        </div>
+        <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
+            <h3 class="mb-2 font-display text-sm font-semibold text-ink-900">Thương hiệu & Khuôn mặt mẫu</h3>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="label">Logo thương hiệu (chèn vào hậu cảnh ảnh)</label>
+                    <input type="file" name="brand_logo" accept="image/*" class="input !py-2">
+                    @if($brand_logo)<img src="{{ $brand_logo }}" class="mt-2 h-10 w-40 rounded bg-white object-contain" alt="Logo">@endif
+                </div>
+                <div>
+                    <label class="label">Khuôn mặt mẫu (đồng bộ nhân vật)</label>
+                    <input type="file" name="face_ref" accept="image/*" class="input !py-2">
+                    @if($face_ref)<img src="{{ $face_ref }}" class="mt-2 h-16 w-16 rounded-full bg-white object-cover" alt="Mặt mẫu">@endif
+                </div>
+            </div>
+            <p class="mt-2 text-xs text-ink-500">Logo được dán vào góc ảnh khi tạo ảnh nền shop; khuôn mặt mẫu dùng làm tham chiếu cho nhất quán nhân vật (nếu model ảnh hỗ trợ).</p>
         </div>
         <div class="flex items-center gap-3">
             <button type="submit" class="btn-brand">Lưu cài đặt</button>

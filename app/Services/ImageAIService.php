@@ -38,7 +38,7 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): string
     {
         $provider = $this->provider();
         $dashscopeKey = studio_api_key('dashscope');
@@ -94,7 +94,7 @@ class ImageAIService
         $last = null;
 
         foreach ($models as $model) {
-            $url = $this->tryDashscope($prompt, $model, $key, $resolution, $ratio);
+            $url = $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef);
             if ($url) {
                 return $url;
             }
@@ -218,7 +218,7 @@ class ImageAIService
         };
     }
 
-    protected function tryDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
+    protected function tryDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
     {
         try {
             $url = $this->callDashscope($prompt, $model, $key, $resolution, $ratio);
@@ -276,7 +276,7 @@ class ImageAIService
         return $configured;
     }
 
-    protected function callDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
+    protected function callDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
     {
         // qwen-image / qwen-image-plus are async-only (submit a task, then poll).
         if (in_array($model, ['qwen-image', 'qwen-image-plus'], true)) {
@@ -289,7 +289,7 @@ class ImageAIService
             ->timeout(180)
             ->post($base.'/services/aigc/multimodal-generation/generation', [
                 'model' => $model,
-                'input' => ['messages' => [['role' => 'user', 'content' => [['text' => $prompt]]]]],
+                'input' => ['messages' => [['role' => 'user', 'content' => $this->dashscopeContent($prompt, $faceRef)]]],
                 'parameters' => [
                     'negative_prompt' => '',
                     'prompt_extend' => true,
@@ -306,6 +306,18 @@ class ImageAIService
             ->pluck('image')->first();
 
         return $url ? $this->storeRemoteImage($url) : null;
+    }
+
+    protected function dashscopeContent(string $prompt, ?string $faceRef): array
+    {
+        $parts = [];
+        $face = $faceRef ?: (string) setting('studio_face_ref', '');
+        if ($face && str_starts_with($face, '/storage/')) {
+            $parts[] = ['image' => url($face)];
+        }
+        $parts[] = ['text' => $prompt];
+
+        return $parts;
     }
 
     protected function callDashscopeAsync(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
