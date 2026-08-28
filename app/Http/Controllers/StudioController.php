@@ -22,8 +22,10 @@ class StudioController extends Controller
         $projects = $user->projects()->withCount('generations')->latest()->get();
         $presets = Preset::orderBy('sort_order')->get()->groupBy('category');
         $latest = $user->generations()->with('project')->latest()->limit(12)->get();
+        $creditsUsed = (int) $user->generations()->where('status', 'completed')->sum('credits_cost');
+        $pendingCount = (int) $user->generations()->whereIn('status', ['pending', 'processing'])->count();
 
-        return view('studio.index', compact('projects', 'presets', 'latest'));
+        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount'));
     }
 
     public function storeProject(Request $request)
@@ -230,12 +232,9 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
-        // Sync image models (Gemini, qwen-image-3.0-pro / max, Flux) run instantly and need no
-        // worker. Only async-only image models (qwen-image / qwen-image-plus), video, and an explicit
-        // "queue" processing mode dispatch to the queue worker.
-        $useQueue = studio_config('processing', 'sync') === 'queue'
-            || $type === 'video'
-            || ($type === 'image' && in_array((string) $model, ['qwen-image', 'qwen-image-plus'], true));
+        // Default: run the job inline (sync) so clicking "Tạo ảnh/video" completes it automatically.
+        // Only an explicit "queue" processing mode dispatches to the queue worker.
+        $useQueue = studio_config('processing', 'sync') === 'queue';
 
         if ($useQueue) {
             if ($type === 'video') {
@@ -700,6 +699,56 @@ class StudioController extends Controller
         $preset->delete();
 
         return back()->with('success', 'Đã xóa preset.');
+    }
+
+    /**
+     * Pattern Maker — generate a seamless fabric pattern via the configured image provider.
+     */
+    public function patternPage()
+    {
+        return view('studio.pattern', [
+            'latest' => auth()->user()->generations()->where('type', 'image')->latest()->limit(8)->get(),
+        ]);
+    }
+
+    public function tryonPage()
+    {
+        return view('studio.tryon', [
+            'latest' => auth()->user()->generations()->where('type', 'image')->latest()->limit(8)->get(),
+        ]);
+    }
+
+    public function pattern(Request $request)
+    {
+        $data = $request->validate([
+            'prompt' => ['required', 'string', 'max:2000'],
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
+        ]);
+        $data['prompt'] = 'Seamless textile fabric pattern, '.$data['prompt'].', high detail, repeatable tile, premium fashion, 4k';
+        $cost = (int) studio_config('image_credits', 1);
+
+        return $this->queueGeneration('image', $data, $cost);
+    }
+
+    /**
+     * Virtual Try-On — best-effort try-on using the image provider (upload a person photo).
+     */
+    public function tryon(Request $request)
+    {
+        $data = $request->validate([
+            'prompt' => ['required', 'string', 'max:2000'],
+            'image' => ['nullable', 'image', 'max:8192'],
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
+        ]);
+        $cost = (int) studio_config('image_credits', 1);
+
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $data['base_image'] = '/storage/'.$request->file('image')->store('studio/ref', 'public');
+        }
+
+        return $this->queueGeneration('image', $data, $cost);
     }
 
     /**

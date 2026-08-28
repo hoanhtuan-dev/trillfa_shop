@@ -18,6 +18,7 @@
         $u = auth()->user();
         $credits = $u?->credits_balance ?? 0;
         $pendingCount = $u ? $u->generations()->whereIn('status', ['pending', 'processing'])->count() : 0;
+        $creditsUsed = $u ? (int) $u->generations()->where('status', 'completed')->sum('credits_cost') : 0;
         $connected = (bool) (studio_api_key('gemini') || studio_api_key('fal') || studio_api_key('replicate')
             || studio_api_key('wan') || studio_api_key('qwen') || studio_api_key('dashscope') || studio_api_key('veo'));
         $active = [
@@ -45,8 +46,8 @@
 
                 <div class="studio-nav-head">AI Design Tools</div>
                 <a href="{{ route('studio.index') }}" class="studio-nav {{ $routeName === 'studio.index' ? 'is-active' : '' }}">Garment Gen <span class="ml-auto text-[10px] text-brand-600">Tạo trang phục</span></a>
-                <span class="studio-nav cursor-not-allowed opacity-50" title="Cần model AI riêng — sắp ra mắt">Pattern Maker <span class="ml-auto badge bg-cream-200 text-ink-500">Sớm</span></span>
-                <span class="studio-nav cursor-not-allowed opacity-50" title="Cần model AI riêng — sắp ra mắt">Virtual Try-On <span class="ml-auto badge bg-cream-200 text-ink-500">Sớm</span></span>
+                <a href="{{ route('studio.pattern') }}" class="studio-nav {{ $routeName === 'studio.pattern' ? 'is-active' : '' }}">Pattern Maker</a>
+                <a href="{{ route('studio.tryon') }}" class="studio-nav {{ $routeName === 'studio.tryon' ? 'is-active' : '' }}">Virtual Try-On <span class="ml-auto text-[10px] text-brand-600">Beta</span></a>
                 <a href="{{ route('studio.presets') }}" class="studio-nav {{ $routeName === 'studio.presets' ? 'is-active' : '' }}">Prompt Templates <span class="ml-auto text-[10px] text-brand-600">Key:Value</span></a>
 
                 <div class="studio-nav-head">Project Manager</div>
@@ -101,6 +102,7 @@
             <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-cream-200 bg-white px-4 py-2 text-[11px] text-ink-500">
                 <span>User: <b class="text-ink-900">{{ $u?->name }}</b></span>
                 <span>Credits: <b class="text-ink-900">{{ $credits }}</b></span>
+                <span>Used: <b class="text-ink-900">{{ $creditsUsed }}</b></span>
                 <span>Job Queue: <b class="text-ink-900">{{ $pendingCount }}</b> pending</span>
                 <span>Sync Status: <b class="{{ $connected ? 'text-emerald-600' : 'text-amber-600' }}">{{ $connected ? 'Connected' : 'Stub' }}</b></span>
                 <span class="ml-auto"><a href="{{ route('studio.settings') }}" class="link">Trợ giúp</a></span>

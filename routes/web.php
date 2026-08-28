@@ -113,6 +113,11 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
+    Route::get('/pattern', [StudioController::class, 'patternPage'])->name('pattern');
+    Route::post('/pattern', [StudioController::class, 'pattern'])->name('pattern');
+    Route::get('/tryon', [StudioController::class, 'tryonPage'])->name('tryon');
+    Route::post('/tryon', [StudioController::class, 'tryon'])->name('tryon');
+    Route::post('/tryon', [StudioController::class, 'tryon'])->name('tryon');
     Route::get('/library', [StudioController::class, 'library'])->name('library');
     Route::get('/generations/{generation}/download', [StudioController::class, 'download'])->name('generations.download');
     Route::get('/generations/{generation}/palette', [StudioController::class, 'palette'])->name('generations.palette');

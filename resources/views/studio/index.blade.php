@@ -43,6 +43,7 @@
     <!-- Toolbar -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
+            <button @click="showLeft = !showLeft" class="btn-outline btn-sm" :title="showLeft ? 'Ẩn bảng điều khiển trái' : 'Hiện bảng điều khiển trái'"><span x-text="showLeft ? '«' : '»'"></span></button>
             <label class="label mb-0">Dự án:</label>
             <div class="w-56"><select x-model="currentProjectId" class="input !py-2">
                 <option value="">— Dự án mới (không lưu) —</option>
@@ -58,15 +59,16 @@
             <span class="badge {{ $aiStub ? 'bg-amber-100 text-amber-700' : 'bg-brand-600 text-white' }}">Prompt: {{ $aiStub ? 'Mô phỏng' : 'Gemini' }}</span>
             <span class="badge bg-cream-200 text-ink-700">Ảnh: {{ $imgProvider }}{{ $imgKeySet ? '' : ' (stub)' }}</span>
             <span class="text-ink-500">Tín dụng: <b class="font-semibold text-ink-900" x-text="creditsLeft"></b></span>
+            <span class="text-ink-500">Đã dùng: <b class="font-semibold text-ink-900">{{ $creditsUsed }}</b></span>
             <button @click="processNow()" class="btn-outline btn-sm whitespace-nowrap" title="Xử lý các công việc đang chờ trong hàng đợi">Xử lý ngay</button>
         </div>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)_280px]">
+    <div class="grid gap-4" :class="showLeft ? 'lg:grid-cols-[300px_minmax(0,1fr)_280px]' : 'lg:grid-cols-[minmax(0,1fr)_280px]'">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1">
+        <div class="space-y-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="showLeft" x-transition.opacity.duration.150ms>
             <!-- Idea -->
             <div class="card p-5">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Text-to-Image · Ý tưởng</h2>
@@ -150,18 +152,15 @@
                     </span>
                     <span class="flex items-center gap-1">
                         <button @click="zoomOut()" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">−</button>
-                        <button @click="resetZoom()" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 px-2 hover:bg-cream-100">1:1</button>
+                        <button @click="resetZoom()" class="rounded-lg border border-cream-200 px-2 hover:bg-cream-100" title="Vừa khung">Vừa</button>
                         <button @click="zoomIn()" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">+</button>
                         <span class="mx-1 h-4 w-px bg-cream-200"></span>
-                        <button @click="panBy(-30,0)" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">←</button>
-                        <button @click="panBy(30,0)" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">→</button>
-                        <button @click="panBy(0,-30)" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">↑</button>
-                        <button @click="panBy(0,30)" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">↓</button>
+                        <span class="hidden text-[10px] text-ink-500 sm:inline">Kéo để di chuyển</span>
                     </span>
                 </div>
 
                 <!-- Media area -->
-                <div class="relative h-[58vh] overflow-hidden bg-cream-100">
+                <div class="relative h-[58vh] cursor-grab overflow-hidden bg-cream-100 active:cursor-grabbing" @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan">
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url">
@@ -212,17 +211,13 @@
                     <div class="relative mb-1 h-4 rounded bg-cream-100 px-1 text-[9px] leading-4 text-ink-500">
                         <span class="absolute left-0">0s</span><span class="absolute left-1/4">15s</span><span class="absolute left-1/2">30s</span><span class="absolute left-3/4">45s</span><span class="absolute right-0">60s</span>
                     </div>
-                    <!-- camera tracks -->
-                    <div class="space-y-1">
-                        <template x-for="cam in cameraOptions" :key="cam">
-                            <button type="button" @click="videoCamera = (videoCamera === cam ? '' : cam)"
-                                class="flex w-full items-center gap-2 rounded-lg border px-2 py-1 text-xs"
-                                :class="videoCamera === cam ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-cream-200 text-ink-500 hover:bg-cream-100'">
-                                <span class="grid h-4 w-4 place-items-center rounded-full border" :class="videoCamera === cam ? 'border-brand-600 bg-brand-600 text-white' : 'border-cream-300'"><template x-if="videoCamera === cam">✓</template></span>
-                                <span class="flex-1 min-w-0 truncate font-medium">Camera · <span x-text="cam"></span></span>
-                                <span class="ml-auto h-1.5 rounded-full bg-brand-600/70" style="width:60%"></span>
-                            </button>
-                        </template>
+                    <!-- camera dropdown -->
+                    <div>
+                        <label class="label">Camera (video)</label>
+                        <select x-model="videoCamera" class="input !py-2">
+                            <option value="">— Chọn góc máy —</option>
+                            <template x-for="cam in cameraOptions" :key="cam"><option :value="cam" x-text="cam"></option></template>
+                        </select>
                     </div>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select>
@@ -325,7 +320,7 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
-        zoom: 1, pan: { x: 0, y: 0 }, palette: [],
+        zoom: 1, pan: { x: 0, y: 0 }, palette: [], showLeft: true, _drag: null,
         _timers: {},
 
         init() { const f = this.generations.find(g => g.status === 'completed'); if (f) { this.previewId = f.id; this.loadPalette(f.id); } },
@@ -335,6 +330,9 @@ document.addEventListener('alpine:init', () => {
         zoomOut() { this.zoom = Math.max(0.6, +(this.zoom - 0.25).toFixed(2)); },
         resetZoom() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
         panBy(dx, dy) { this.pan.x += dx; this.pan.y += dy; },
+        startPan(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
+        movePan(e) { if (!this._drag) return; this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); },
+        endPan() { this._drag = null; },
         get cameraOptions() { const g = this.presets.find(x => x.category === 'camera'); return g ? g.items.map(i => i.label) : []; },
         async loadPalette(id) {
             if (!id) { this.palette = []; return; }

@@ -873,6 +873,23 @@ class ShopFlowTest extends TestCase
         $this->assertSame('15', $vg->duration);
     }
 
+    public function test_studio_pattern_and_tryon_pages(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->get('/studio/pattern')->assertOk()->assertSee('Pattern Maker');
+        $this->get('/studio/tryon')->assertOk()->assertSee('Virtual Try-On');
+
+        $p = $this->postJson('/studio/pattern', ['prompt' => 'floral toile vintage'])->assertOk();
+        $this->assertNotEmpty($p->json('generation_id'));
+        $this->assertSame('completed', $p->json('status'));
+
+        $t = $this->postJson('/studio/tryon', ['prompt' => 'silk a-line dress'])->assertOk();
+        $this->assertNotEmpty($t->json('generation_id'));
+        $this->assertSame('completed', $t->json('status'));
+    }
+
     public function test_studio_preset_manager_and_references(): void
     {
         $customer = User::where('email', 'customer@trillfa.com')->first();
