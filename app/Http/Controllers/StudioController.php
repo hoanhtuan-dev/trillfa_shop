@@ -545,6 +545,8 @@ class StudioController extends Controller
             'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
             'image_ratio' => setting('studio_image_ratio', config('studio.image_ratio')),
             'video_duration' => setting('studio_video_duration', config('studio.video_duration')),
+            'pending_count' => auth()->user()->generations()->whereIn('status', ['pending', 'processing'])->count(),
+            'queue_driver' => config('queue.default'),
         ]);
     }
 

@@ -104,6 +104,13 @@
                 <div><label class="label">Vision (gợi ý từ ảnh)</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-1.5-flash"></div>
             </div>
         </div>
+        <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
+            <h3 class="mb-2 font-display text-sm font-semibold text-ink-900">Worker tự động (Hàng đợi)</h3>
+            <p class="text-xs text-ink-500">Khi dùng AI thật (Gemini/Wan/Qwen), generation chạy nền (Queue). Để <strong>tự động chạy worker</strong>, thêm cron (Hostinger → Cron Jobs) mỗi phút với lệnh:</p>
+            <div class="mt-2 break-all rounded-xl bg-white p-3 font-mono text-xs text-ink-900">php artisan queue:work --stop-when-empty --timeout=200</div>
+            <p class="mt-2 text-xs text-ink-500">Đang chờ: <b class="text-ink-900">{{ $pending_count }}</b> · Driver: <b class="text-ink-900">{{ $queue_driver }}</b>. Worker xử lý hết hàng đợi rồi thoát; cron sẽ mở lại ở phút kế tiếp — <strong>không cần chạy mãi mãi</strong>.</p>
+            <p class="mt-1 text-xs text-ink-500">Nếu chỉ muốn chạy thủ công: <code class="rounded bg-white px-1">php artisan studio:process</code>.</p>
+        </div>
         <div class="flex items-center gap-3">
             <button type="submit" class="btn-brand">Lưu cài đặt</button>
             <a href="{{ route('studio.index') }}" class="btn-ghost">Quay lại</a>
