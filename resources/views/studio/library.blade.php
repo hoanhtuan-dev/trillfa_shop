@@ -18,10 +18,10 @@
 @endphp
 
 @section('content')
-<div x-data="{ sel:null, q:'', open(i){ this.sel=i; document.body.classList.add('overflow-hidden'); }, close(){ this.sel=null; document.body.classList.remove('overflow-hidden'); } }">
+<div x-data="{ sel:null, q:'', items: {{ Js::from($items) }}, total: {{ $generations->total() }}, open(i){ this.sel=i; document.body.classList.add('overflow-hidden'); }, close(){ this.sel=null; document.body.classList.remove('overflow-hidden'); }, async del(item){ try { const res = await fetch('/studio/generations/' + item.id, { method:'DELETE', headers:{ 'X-CSRF-TOKEN':(document.querySelector('meta[name=csrf-token]')||{}).content||'', Accept:'application/json' } }); const d = await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.message||'Lỗi khi xóa.'); this.items = this.items.filter(x => x.id !== item.id); this.total = Math.max(0, this.total - 1); this.close(); Alpine.store('toast').show(d.message || 'Đã xóa.'); } catch(e){ Alpine.store('toast').show(e.message, 'error'); } } }">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 class="font-display text-2xl font-bold text-ink-900">Thư viện</h1>
-        <span class="text-sm text-ink-500">{{ $generations->total() }} mục</span>
+        <span class="text-sm text-ink-500"><span x-text="total"></span> mục</span>
     </div>
 
     <!-- Filters -->
@@ -58,7 +58,7 @@
         </div>
     @else
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-            <template x-for="i in {{ Js::from($items) }}" :key="i.id">
+            <template x-for="i in items" :key="i.id">
                 <div class="card overflow-hidden cursor-pointer" @click="open(i)">
                     <div class="relative block w-full">
                         <template x-if="i.status === 'completed' && i.media_url && i.type === 'image'">
@@ -117,11 +117,7 @@
                     <div class="flex flex-wrap gap-2">
                         <a :href="'/studio/generations/' + sel.id + '/download'" class="btn-brand btn-sm" x-show="sel.media_url">Tải xuống</a>
                         <a href="{{ route('studio.index') }}" class="btn-outline btn-sm">Mở trong Studio</a>
-                                                <form method="POST" :action="'/studio/generations/' + sel.id">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn-outline btn-sm text-red-600">Xóa</button>
-                        </form>
+                        <button type="button" @click="del(sel)" class="btn-outline btn-sm text-red-600">Xóa</button>
                     </div>
                 </div>
             </div>

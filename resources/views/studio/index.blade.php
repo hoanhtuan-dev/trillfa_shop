@@ -57,6 +57,7 @@
         <div class="flex flex-wrap items-center gap-2 text-xs">
             <span class="badge {{ $aiStub ? 'bg-amber-100 text-amber-700' : 'bg-brand-600 text-white' }}">Prompt: {{ $aiStub ? 'Mô phỏng' : 'Gemini' }}</span>
             <span class="badge bg-cream-200 text-ink-700">Ảnh: {{ $imgProvider }}{{ $imgKeySet ? '' : ' (stub)' }}</span>
+            <span class="badge {{ studio_config('processing') === 'queue' ? 'bg-amber-100 text-amber-700' : 'bg-cream-200 text-ink-700' }}">{{ studio_config('processing') === 'queue' ? 'Queue: cần worker' : 'Đồng bộ' }}</span>
             <span class="text-ink-500">Tín dụng: <b class="font-semibold text-ink-900" x-text="creditsLeft"></b></span>
             <span class="text-ink-500">Đã dùng: <b class="font-semibold text-ink-900">{{ $creditsUsed }}</b></span>
             <button @click="processNow()" class="btn-outline btn-sm whitespace-nowrap" title="Xử lý các công việc đang chờ trong hàng đợi">Xử lý ngay</button>
@@ -96,9 +97,9 @@
                 </div>
                 <div class="grid gap-3">
                     <template x-for="group in presets" :key="group.category">
-                        <div x-data="{ open: false }" class="relative">
+                        <div x-data="{ open: false }" class="relative" @click.outside="open = false">
                             <label class="label" x-text="catLabels[group.category] || group.category"></label>
-                            <button type="button" @click="open = !open" @click.outside="open = false" class="input !py-2 flex w-full items-center justify-between gap-2 text-left">
+                            <button type="button" @click="open = !open" class="input !py-2 flex w-full items-center justify-between gap-2 text-left">
                                 <span class="truncate" x-text="selectedPresetText(group.category) || 'Chọn ' + (catLabels[group.category] || group.category)"></span>
                                 <svg class="h-4 w-4 shrink-0 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
                             </button>
