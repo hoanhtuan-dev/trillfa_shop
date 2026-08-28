@@ -37,6 +37,14 @@
                 <input type="url" name="dashscope_base" value="{{ old('dashscope_base', $dashscope_base) }}" class="input !py-2" placeholder="https://dashscope-intl.aliyuncs.com">
                 <p class="mt-1 text-xs text-ink-500">Chỉ nhập <strong>host</strong> (không thêm <code class="rounded bg-white px-1">/apps/...</code>). Đây là <strong>API endpoint</strong> — mở trực tiếp trong trình duyệt sẽ <strong>404 (bình thường)</strong>, đừng dùng trình duyệt để kiểm tra. Quốc tế: <code class="rounded bg-white px-1">https://dashscope-intl.aliyuncs.com</code> · Trung Quốc: <code class="rounded bg-white px-1">https://dashscope.aliyuncs.com</code>. Kiểm tra bằng nút <strong>Test</strong> trong Quản lý API.</p>
             </div>
+            <div>
+                <label class="label">Chế độ xử lý</label>
+                <select name="processing" class="input !py-2">
+                    <option value="sync" @selected(old('processing', $processing) === 'sync')>Đồng bộ (ra ảnh/video ngay, không cần worker)</option>
+                    <option value="queue" @selected(old('processing', $processing) === 'queue')>Queue (nền — cần worker, phù hợp AI thật lâu)</option>
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Queue: chạy <code class="rounded bg-white px-1">php artisan queue:work</code> hoặc <code class="rounded bg-white px-1">php artisan studio:process</code> để xử lý.</p>
+            </div>
             <div class="grid gap-3 sm:grid-cols-2">
                 <div><label class="label">Prompt (Gemini)</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-1.5-flash"></div>
                 <div><label class="label">Ảnh Flux</label><input type="text" name="image_model" value="{{ old('image_model', $image_model) }}" class="input !py-2" placeholder="flux-1.1-schnell"></div>

@@ -838,6 +838,18 @@ class ShopFlowTest extends TestCase
     }
 
 
+    public function test_studio_library_renders_for_admin(): void
+    {
+        $this->get('/studio/library')->assertRedirect(route('login'));
+
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($customer)->get('/studio/library')->assertForbidden();
+
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin)->get('/studio/library')->assertOk()->assertSee('Thư viện');
+        $this->actingAs($admin)->get('/studio')->assertOk()->assertSee('workflowSteps')->assertSee('previewId');
+    }
+
     public function test_studio_settings_and_api_admin_only(): void
     {
         $this->get('/studio/settings')->assertRedirect(route('login'));
@@ -868,6 +880,7 @@ class ShopFlowTest extends TestCase
             'video_model' => 'wan2.5-t2v',
             'vision_model' => 'qwen-vl-plus',
             'dashscope_base' => 'https://dashscope-intl.aliyuncs.com',
+            'processing' => 'queue',
         ])->assertSessionHas('success');
 
         $this->assertSame('3', setting('studio_image_credits'));
@@ -876,6 +889,7 @@ class ShopFlowTest extends TestCase
         $this->assertSame('gemini-2.5-flash', setting('studio_prompt_model'));
         $this->assertSame('qwen-image-plus', setting('studio_qwen_model'));
         $this->assertSame('https://dashscope-intl.aliyuncs.com', setting('studio_dashscope_base'));
+        $this->assertSame('queue', setting('studio_processing'));
 
         $this->post('/studio/api', ['key_gemini' => 'AIzaTestKey'])
             ->assertSessionHas('success');

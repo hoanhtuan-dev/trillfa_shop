@@ -6,9 +6,7 @@ use App\Jobs\RenderImageJob;
 use App\Jobs\RenderVideoJob;
 use App\Models\Generation;
 use App\Models\Preset;
-use App\Models\Project;
 use App\Services\GeminiService;
-use App\Services\ImageAIService;
 use App\Services\StyleSuggestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -223,12 +221,19 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
-        // Run synchronously so it completes without a queue worker (stub/fast path).
-        // For long real AI jobs you can switch to ->dispatch() and run a worker.
-        if ($type === 'video') {
-            RenderVideoJob::dispatchSync($generation->id);
+        // Processing mode: 'sync' (default, no worker) or 'queue' (async + worker).
+        if (studio_config('processing', 'sync') === 'queue') {
+            if ($type === 'video') {
+                RenderVideoJob::dispatch($generation->id);
+            } else {
+                RenderImageJob::dispatch($generation->id);
+            }
         } else {
-            RenderImageJob::dispatchSync($generation->id);
+            if ($type === 'video') {
+                RenderVideoJob::dispatchSync($generation->id);
+            } else {
+                RenderImageJob::dispatchSync($generation->id);
+            }
         }
 
         $fresh = $generation->fresh();
@@ -255,7 +260,6 @@ class StudioController extends Controller
             return $group->pluck('prompt_injection')->filter()->implode(', ');
         })->all();
     }
-
 
     /**
      * Reverse-prompt: analyse a reference image and suggest style/prompt.
@@ -340,6 +344,7 @@ class StudioController extends Controller
             if (in_array($resp->status(), [400, 422])) {
                 $region = str_contains($host, 'intl') ? 'quốc tế' : 'Trung Quốc';
                 $extra = $host !== $base ? ' (đặt DashScope base URL = '.$host.')' : '';
+
                 return ['ok' => true, 'message' => 'DashScope: khoá hợp lệ — vùng '.$region.' ('.$host.')'.$extra];
             }
             if ($resp->status() === 404) {
@@ -351,6 +356,50 @@ class StudioController extends Controller
         return ['ok' => false, 'message' => 'DashScope: key bị từ chối (HTTP '.$lastStatus.'). Lưu ý: key từ home.qwencloud.com là key QwenCloud — nền tảng riêng, KHÔNG chạy trên endpoint DashScope. Hãy dùng DASHSCOPE_API_KEY lấy từ Alibaba Cloud Model Studio (Bailian console), bật model Wan/Qwen.'];
     }
 
+    /**
+     * Library — browse & manage all generated assets.
+     */
+    public function library(Request $request)
+    {
+        $query = auth()->user()->generations()->with('project')->latest();
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->input('type'));
+        }
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->input('project_id'));
+        }
+        if ($request->filled('q')) {
+            $query->where('prompt', 'like', '%'.$request->input('q').'%');
+        }
+
+        $generations = $query->paginate(24)->withQueryString();
+        $projects = auth()->user()->projects()->orderBy('name')->get();
+
+        return view('studio.library', compact('generations', 'projects'));
+    }
+
+    /**
+     * Download a generated asset.
+     */
+    public function download(Generation $generation)
+    {
+        abort_unless($generation->user_id === auth()->id(), 403);
+
+        if (! $generation->media_url) {
+            abort(404);
+        }
+
+        $path = ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/');
+        $path = str_replace('storage/', '', $path);
+        $abs = storage_path('app/public/'.$path);
+
+        if (! is_file($abs)) {
+            abort(404);
+        }
+
+        return response()->download($abs, basename($abs));
+    }
 
     public function settings()
     {
@@ -366,6 +415,7 @@ class StudioController extends Controller
             'video_model' => setting('studio_video_model', config('studio.video_model')),
             'vision_model' => setting('studio_vision_model', config('studio.vision_model')),
             'dashscope_base' => setting('studio_dashscope_base', config('studio.dashscope_base')),
+            'processing' => setting('studio_processing', config('studio.processing')),
         ]);
     }
 
@@ -383,6 +433,7 @@ class StudioController extends Controller
             'video_model' => ['required', 'string', 'max:255'],
             'vision_model' => ['required', 'string', 'max:255'],
             'dashscope_base' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
+            'processing' => ['required', 'string', 'in:sync,queue'],
         ]);
 
         set_setting('studio_image_credits', (string) $data['image_credits']);
@@ -396,6 +447,7 @@ class StudioController extends Controller
         set_setting('studio_video_model', $data['video_model']);
         set_setting('studio_vision_model', $data['vision_model']);
         set_setting('studio_dashscope_base', $data['dashscope_base']);
+        set_setting('studio_processing', $data['processing']);
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }
@@ -423,6 +475,7 @@ class StudioController extends Controller
             // Clear if requested, else store a new encrypted key, else keep.
             if ($request->boolean('clear_'.$service)) {
                 set_setting('api_'.$service.'_key', '');
+
                 continue;
             }
 
@@ -435,5 +488,4 @@ class StudioController extends Controller
 
         return back()->with('success', 'Đã lưu cấu hình API.');
     }
-
 }

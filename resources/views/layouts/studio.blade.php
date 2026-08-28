@@ -26,6 +26,7 @@
             </a>
             <nav class="flex items-center gap-1 text-sm">
                 <a href="{{ route('studio.index') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.index') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">Tạo mới</a>
+                <a href="{{ route('studio.library') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.library') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">Thư viện</a>
                 <a href="{{ route('studio.settings') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.settings') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">Cài đặt</a>
                 <a href="{{ route('studio.api') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.api') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">API</a>
                 <a href="{{ route('admin.dashboard') }}" class="hidden rounded-lg px-3 py-1.5 text-ink-700 hover:bg-cream-100 sm:inline">Quản trị</a>

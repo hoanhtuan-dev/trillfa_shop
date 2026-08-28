@@ -11,6 +11,7 @@ return [
     */
     'image_credits' => (int) env('STUDIO_IMAGE_CREDITS', 1),
     'video_credits' => (int) env('STUDIO_VIDEO_CREDITS', 10),
+    'processing' => env('STUDIO_PROCESSING', 'sync'), // sync | queue (async + worker)
     'image_provider' => env('STUDIO_IMAGE_PROVIDER', 'flux'), // flux | wan | qwen
 
     /*
