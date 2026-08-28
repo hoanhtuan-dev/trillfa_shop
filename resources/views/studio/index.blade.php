@@ -69,15 +69,15 @@
             <div class="card p-5">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Text-to-Image · Ý tưởng</h2>
                 <textarea x-model="idea" rows="3" class="input" placeholder="VD: A flowing silk evening gown with sequin…" @keydown.enter.prevent="ideate()"></textarea>
-                <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full"><span x-show="!loading">✨ Tạo Prompt Chuyên Nghiệp</span><span x-show="loading">Đang tạo…</span></button>
+                <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
 
                 <!-- Reference source -->
                 <div class="mt-4 rounded-xl border border-cream-200 bg-cream-50 p-3">
                     <p class="mb-2 text-xs font-semibold text-ink-700">Gợi ý từ ảnh tham khảo</p>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm flex-1">Tải ảnh</button>
-                        <button type="button" @click="openRefPicker()" class="btn-outline btn-sm flex-1">Từ sản phẩm</button>
-                        <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm"><span x-show="!suggesting">Gợi ý</span><span x-show="suggesting">…</span></button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh</button>
+                        <button type="button" @click="openRefPicker()" class="btn-outline btn-sm whitespace-nowrap">Từ sản phẩm</button>
+                        <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm col-span-2 whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
                     </div>
                     <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
                     <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-white object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
@@ -120,10 +120,10 @@
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tiếng Anh <span class="text-xs font-normal text-ink-500">(sửa tay)</span></h2>
                 <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
                 <div class="mt-2"><label class="label">Video prompt</label><textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs"></textarea></div>
-                <div class="mt-3 flex items-center gap-2">
-                    <div class="w-28 shrink-0"><select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select></div>
-                    <div class="w-24 shrink-0"><select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select></div>
-                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand flex-1"><span x-show="!generating">Generate Design (Tạo 2D)</span><span x-show="generating">Đang gửi…</span></button>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select>
+                    <select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
+                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
                 </div>
             </div>
 
@@ -192,7 +192,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 border-t border-cream-200 px-4 py-3 text-xs" x-show="preview">
                     <span class="truncate text-ink-500" x-text="preview ? (preview.created_at || '') + ' · ' + preview.credits_cost + ' token' : ''"></span>
                     <span class="flex flex-wrap items-center gap-2">
-                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm" x-show="preview && preview.type === 'image'">Chỉnh sửa / Video</button>
+                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'">Sửa · Video</button>
                         <a :href="'/studio/generations/' + preview.id + '/download'" class="btn-outline btn-sm" x-show="preview && preview.media_url">Tải xuống</a>
                         <button @click="cancelGeneration(preview)" :disabled="!preview || !isActive(preview.status)" class="btn-outline btn-sm text-red-600" x-show="preview && isActive(preview.status)">Dừng</button>
                         <button @click="removeGeneration(preview)" class="btn-outline btn-sm text-red-600">Xóa</button>
@@ -217,17 +217,17 @@
                                 class="flex w-full items-center gap-2 rounded-lg border px-2 py-1 text-xs"
                                 :class="videoCamera === cam ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-cream-200 text-ink-500 hover:bg-cream-100'">
                                 <span class="grid h-4 w-4 place-items-center rounded-full border" :class="videoCamera === cam ? 'border-brand-600 bg-brand-600 text-white' : 'border-cream-300'"><template x-if="videoCamera === cam">✓</template></span>
-                                <span class="font-medium">Camera Move · <span x-text="cam"></span></span>
+                                <span class="flex-1 min-w-0 truncate font-medium">Camera · <span x-text="cam"></span></span>
                                 <span class="ml-auto h-1.5 rounded-full bg-brand-600/70" style="width:60%"></span>
                             </button>
                         </template>
                     </div>
-                    <div class="mt-3 flex items-center gap-2">
-                        <div class="w-24 shrink-0"><select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select></div>
-                        <div class="w-28 shrink-0"><select x-model="videoRes" class="input !py-2"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select></div>
-                        <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId || !videoCamera" class="btn-brand flex-1"><span x-show="!videoBusy">Render Catwalk Video</span><span x-show="videoBusy">Đang gửi…</span></button>
-                        <span class="text-[10px] text-ink-500" x-text="selectedImageId ? 'Nguồn #' + selectedImageId : 'Chọn ảnh nguồn'"></span>
+                    <div class="mt-3 grid grid-cols-2 gap-2">
+                        <select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select>
+                        <select x-model="videoRes" class="input !py-2"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select>
+                        <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId || !videoCamera" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!videoBusy">Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
                     </div>
+                    <p class="mt-2 text-[10px] text-ink-500" x-text="selectedImageId ? 'Nguồn ảnh #' + selectedImageId : 'Chọn ảnh nguồn trước khi Render.'"></p>
                 </div>
             </div>
         </div>

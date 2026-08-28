@@ -54,7 +54,7 @@ class ImageAIService
         } elseif (! studio_api_key('fal') && ! studio_api_key('replicate') && $dashscopeKey) {
             // Flux/default without a Fal/Replicate key: use DashScope (Wan image) so a valid
             // DashScope key produces a real AI image instead of the stub.
-            $model = (string) studio_config('wan_model', 'wan2.7-image-pro');
+            $model = (string) studio_config('qwen_model', 'qwen-image-3.0-pro');
             $url = $this->tryDashscope($prompt, $model, $dashscopeKey, $resolution, $ratio);
             if ($url) {
                 return $url;
@@ -109,7 +109,12 @@ class ImageAIService
             ->post(studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com').'/api/v1/services/aigc/multimodal-generation/generation', [
                 'model' => $model,
                 'input' => ['messages' => [['role' => 'user', 'content' => [['text' => $prompt]]]]],
-                'parameters' => ['n' => 1, 'size' => $size],
+                'parameters' => [
+                    'negative_prompt' => '',
+                    'prompt_extend' => true,
+                    'watermark' => false,
+                    'size' => $size,
+                ],
             ]);
 
         $url = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
