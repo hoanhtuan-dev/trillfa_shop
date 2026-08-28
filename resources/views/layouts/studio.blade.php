@@ -14,35 +14,98 @@
         <style>body{font-family:system-ui,sans-serif;background:#f4f2ec}.wrap{max-width:1200px;margin:auto;padding:24px}</style>
     @endif
     @stack('head')
+    @php
+        $u = auth()->user();
+        $credits = $u?->credits_balance ?? 0;
+        $pendingCount = $u ? $u->generations()->whereIn('status', ['pending', 'processing'])->count() : 0;
+        $connected = (bool) (studio_api_key('gemini') || studio_api_key('fal') || studio_api_key('replicate')
+            || studio_api_key('wan') || studio_api_key('qwen') || studio_api_key('dashscope') || studio_api_key('veo'));
+        $active = [
+            'studio.index' => 'Garment Gen',
+            'studio.library' => 'Asset Library',
+            'studio.settings' => 'Cài đặt',
+            'studio.api' => 'API',
+        ];
+        $routeName = request()->route()?->getName();
+    @endphp
 </head>
 <body class="min-h-screen bg-cream-100 text-ink-900 antialiased">
-    <header class="sticky top-0 z-40 border-b border-cream-200 bg-white/90 backdrop-blur">
-        <div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
-            <a href="{{ route('studio.index') }}" class="flex items-center gap-2">
-                <span class="grid h-8 w-8 place-items-center rounded-xl bg-brand-600 text-white">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+    <div class="flex min-h-screen">
+        <!-- ===== Left sidebar ===== -->
+        <aside class="hidden w-60 shrink-0 flex-col border-r border-cream-200 bg-white lg:flex">
+            <a href="{{ route('studio.index') }}" class="flex items-center gap-2 border-b border-cream-200 px-4 py-4">
+                <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
                 </span>
                 <span class="font-display text-lg font-bold tracking-tight">Trillfa<span class="text-brand-600"> Studio</span></span>
             </a>
-            <nav class="flex items-center gap-1 text-sm">
-                <a href="{{ route('studio.index') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.index') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">Tạo mới</a>
-                <a href="{{ route('studio.library') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.library') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">Thư viện</a>
-                <a href="{{ route('studio.settings') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.settings') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">Cài đặt</a>
-                <a href="{{ route('studio.api') }}" class="rounded-lg px-3 py-1.5 {{ request()->routeIs('studio.api') ? 'bg-cream-100 font-semibold text-ink-900' : 'text-ink-700 hover:bg-cream-100' }}">API</a>
-                <a href="{{ route('admin.dashboard') }}" class="hidden rounded-lg px-3 py-1.5 text-ink-700 hover:bg-cream-100 sm:inline">Quản trị</a>
-            </nav>
-            <div class="flex items-center gap-3">
-                <span class="badge bg-brand-50 text-brand-800">Tín dụng: <span class="font-bold">{{ auth()->user()->credits_balance }}</span></span>
-                <form method="POST" action="{{ route('logout') }}">@csrf
-                    <button type="submit" class="btn-outline btn-sm">Đăng xuất</button>
-                </form>
-            </div>
-        </div>
-    </header>
 
-    <main class="mx-auto max-w-7xl px-4 py-6">
-        @yield('content')
-    </main>
+            <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-3 text-sm">
+                <a href="{{ route('studio.index') }}" class="studio-nav {{ $routeName === 'studio.index' ? 'is-active' : '' }}">Dashboard</a>
+
+                <div class="studio-nav-head">AI Design Tools</div>
+                <a href="{{ route('studio.index') }}" class="studio-nav {{ $routeName === 'studio.index' ? 'is-active' : '' }}">Garment Gen <span class="ml-auto text-[10px] text-brand-600">Tạo trang phục</span></a>
+                <span class="studio-nav cursor-not-allowed opacity-50" title="Cần model AI riêng — sắp ra mắt">Pattern Maker <span class="ml-auto badge bg-cream-200 text-ink-500">Sớm</span></span>
+                <span class="studio-nav cursor-not-allowed opacity-50" title="Cần model AI riêng — sắp ra mắt">Virtual Try-On <span class="ml-auto badge bg-cream-200 text-ink-500">Sớm</span></span>
+
+                <div class="studio-nav-head">Project Manager</div>
+                <a href="{{ route('studio.index') }}" class="studio-nav {{ $routeName === 'studio.index' ? 'is-active' : '' }}">Active <span class="ml-auto text-[10px] text-ink-500">{{ $u?->projects()->count() }} dự án</span></a>
+                <a href="{{ route('studio.library') }}" class="studio-nav {{ $routeName === 'studio.library' ? 'is-active' : '' }}">Collections</a>
+
+                <div class="studio-nav-head">Catwalk Renderer</div>
+                <a href="{{ route('studio.index') }}#catwalk" class="studio-nav">Catwalk Video <span class="ml-auto text-[10px] text-ink-500">{{ $connected ? 'AI' : 'Stub' }}</span></a>
+
+                <div class="studio-nav-head">Asset Library</div>
+                <a href="{{ route('studio.library') }}" class="studio-nav {{ $routeName === 'studio.library' ? 'is-active' : '' }}">Fabrics / Models / Poses</a>
+
+                <div class="studio-nav-head">Hệ thống</div>
+                <a href="{{ route('studio.settings') }}" class="studio-nav {{ $routeName === 'studio.settings' ? 'is-active' : '' }}">Cài đặt</a>
+                <a href="{{ route('studio.api') }}" class="studio-nav {{ $routeName === 'studio.api' ? 'is-active' : '' }}">API Keys</a>
+                <a href="{{ route('admin.dashboard') }}" class="studio-nav">Quản trị shop</a>
+            </nav>
+
+            <div class="border-t border-cream-200 px-4 py-3">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-ink-500">Tín dụng</span>
+                    <span class="font-semibold text-ink-900">{{ $credits }}</span>
+                </div>
+                <div class="mt-1 flex items-center gap-1 text-[11px] text-ink-500">
+                    <span class="inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
+                    {{ $connected ? 'Kết nối AI' : 'Chế độ Stub' }}
+                </div>
+            </div>
+        </aside>
+
+        <!-- ===== Main region ===== -->
+        <div class="flex min-w-0 flex-1 flex-col">
+            <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-cream-200 bg-white/90 px-4 backdrop-blur">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="font-display text-sm font-semibold text-ink-900">@yield('title', 'Trillfa Studio')</span>
+                    <span class="hidden badge bg-cream-200 text-ink-500 sm:inline-flex">{{ $connected ? 'AI Connected' : 'Stub' }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="badge bg-brand-50 text-brand-800">Tín dụng: <span class="font-bold">{{ $credits }}</span></span>
+                    <span class="hidden text-xs text-ink-500 md:inline">{{ $u?->name }}</span>
+                    <form method="POST" action="{{ route('logout') }}">@csrf
+                        <button type="submit" class="btn-outline btn-sm">Đăng xuất</button>
+                    </form>
+                </div>
+            </header>
+
+            <main class="flex-1 p-4 sm:p-6">
+                @yield('content')
+            </main>
+
+            <!-- ===== Status bar ===== -->
+            <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-cream-200 bg-white px-4 py-2 text-[11px] text-ink-500">
+                <span>User: <b class="text-ink-900">{{ $u?->name }}</b></span>
+                <span>Credits: <b class="text-ink-900">{{ $credits }}</b></span>
+                <span>Job Queue: <b class="text-ink-900">{{ $pendingCount }}</b> pending</span>
+                <span>Sync Status: <b class="{{ $connected ? 'text-emerald-600' : 'text-amber-600' }}">{{ $connected ? 'Connected' : 'Stub' }}</b></span>
+                <span class="ml-auto"><a href="{{ route('studio.settings') }}" class="link">Trợ giúp</a></span>
+            </footer>
+        </div>
+    </div>
 
     @include('partials.toasts')
     @stack('scripts')

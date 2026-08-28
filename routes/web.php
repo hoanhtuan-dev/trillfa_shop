@@ -114,6 +114,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::get('/library', [StudioController::class, 'library'])->name('library');
     Route::get('/generations/{generation}/download', [StudioController::class, 'download'])->name('generations.download');
+    Route::get('/generations/{generation}/palette', [StudioController::class, 'palette'])->name('generations.palette');
     Route::get('/generations/{generation}', [StudioController::class, 'show'])->name('generations.show');
     Route::post('/generations/{generation}/cancel', [StudioController::class, 'cancel'])->name('generations.cancel');
     Route::delete('/generations/{generation}', [StudioController::class, 'destroy'])->name('generations.destroy');

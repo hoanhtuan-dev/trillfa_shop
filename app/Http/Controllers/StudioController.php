@@ -401,6 +401,80 @@ class StudioController extends Controller
         return response()->download($abs, basename($abs));
     }
 
+    /**
+     * Extract dominant colors from a generated image (for the color palette).
+     */
+    public function palette(Generation $generation)
+    {
+        abort_unless($generation->user_id === auth()->id(), 403);
+
+        if (! $generation->media_url) {
+            return response()->json(['colors' => []]);
+        }
+
+        $rel = ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/');
+        $rel = str_replace('storage/', '', $rel);
+        $abs = storage_path('app/public/'.$rel);
+
+        if (! is_file($abs)) {
+            return response()->json(['colors' => []]);
+        }
+
+        return response()->json(['colors' => $this->extractPalette($abs, 6)]);
+    }
+
+    protected function extractPalette(string $file, int $count = 6): array
+    {
+        $src = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $src) {
+            return [];
+        }
+
+        $W = imagesx($src);
+        $H = imagesy($src);
+        if ($W <= 0 || $H <= 0) {
+            return [];
+        }
+
+        $w = 64;
+        $h = max(1, (int) round($H * ($w / $W)));
+        $thumb = imagecreatetruecolor($w, $h);
+        imagecopyresampled($thumb, $src, 0, 0, 0, 0, $w, $h, $W, $H);
+
+        $buckets = [];
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $c = imagecolorat($thumb, $x, $y);
+                $r = ($c >> 16) & 0xFF;
+                $g = ($c >> 8) & 0xFF;
+                $b = $c & 0xFF;
+                $key = ((int) ($r / 32)).','.((int) ($g / 32)).','.((int) ($b / 32));
+                if (! isset($buckets[$key])) {
+                    $buckets[$key] = ['n' => 0, 'r' => 0, 'g' => 0, 'b' => 0];
+                }
+                $buckets[$key]['n']++;
+                $buckets[$key]['r'] += $r;
+                $buckets[$key]['g'] += $g;
+                $buckets[$key]['b'] += $b;
+            }
+        }
+
+        imagedestroy($thumb);
+        imagedestroy($src);
+
+        uasort($buckets, fn ($a, $b) => $b['n'] <=> $a['n']);
+
+        $colors = [];
+        foreach (array_slice($buckets, 0, $count) as $bk) {
+            $r = (int) round($bk['r'] / $bk['n']);
+            $g = (int) round($bk['g'] / $bk['n']);
+            $b = (int) round($bk['b'] / $bk['n']);
+            $colors[] = sprintf('#%02X%02X%02X', $r, $g, $b);
+        }
+
+        return $colors;
+    }
+
     public function settings()
     {
         return view('studio.settings', [
