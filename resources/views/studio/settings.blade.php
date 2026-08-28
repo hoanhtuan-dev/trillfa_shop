@@ -35,7 +35,7 @@
             <div>
                 <label class="label">DashScope base URL</label>
                 <input type="url" name="dashscope_base" value="{{ old('dashscope_base', $dashscope_base) }}" class="input !py-2" placeholder="https://dashscope-intl.aliyuncs.com">
-                <p class="mt-1 text-xs text-ink-500">Quốc tế: <code class="rounded bg-white px-1">dashscope-intl.aliyuncs.com</code> · Trung Quốc: <code class="rounded bg-white px-1">dashscope.aliyuncs.com</code>. Nếu key bị 401, thử đổi vùng này.</p>
+                <p class="mt-1 text-xs text-ink-500">Chỉ nhập <strong>host</strong> (không thêm <code class="rounded bg-white px-1">/apps/...</code>). Quốc tế: <code class="rounded bg-white px-1">https://dashscope-intl.aliyuncs.com</code> · Trung Quốc: <code class="rounded bg-white px-1">https://dashscope.aliyuncs.com</code>. Nếu key bị 401, thử đổi vùng.</p>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
                 <div><label class="label">Prompt (Gemini)</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-1.5-flash"></div>

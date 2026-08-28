@@ -325,8 +325,10 @@ class StudioController extends Controller
 
         return match (true) {
             $resp->successful() => ['ok' => true, 'message' => 'DashScope: kết nối OK.'],
-            in_array($resp->status(), [401, 403]) => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' ('.data_get($resp->json(), 'code', 'AuthError').') — key bị từ chối. Key sai hoặc sai vùng: nếu key là bản Trung Quốc, đổi DashScope base thành https://dashscope.aliyuncs.com.'],
-            default => ['ok' => true, 'message' => 'DashScope: khoá hợp lệ (HTTP '.$resp->status().' — tham số bị từ chối, auth đã qua).'],
+            in_array($resp->status(), [401, 403]) => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' ('.data_get($resp->json(), 'code', 'AuthError').') — key bị từ chối. Key sai hoặc sai vùng.'],
+            $resp->status() === 404 => ['ok' => false, 'message' => 'DashScope: HTTP 404 — sai đường dẫn base URL. DashScope base chỉ gồm host, ví dụ https://dashscope-intl.aliyuncs.com (không thêm /apps/...).'],
+            in_array($resp->status(), [400, 422]) => ['ok' => true, 'message' => 'DashScope: khoá hợp lệ (HTTP '.$resp->status().' — tham số bị từ chối, auth đã qua).'],
+            default => ['ok' => false, 'message' => 'DashScope: HTTP '.$resp->status().' — chưa xác minh được.'],
         };
     }
 
@@ -360,7 +362,7 @@ class StudioController extends Controller
             'qwen_model' => ['required', 'string', 'max:255'],
             'video_model' => ['required', 'string', 'max:255'],
             'vision_model' => ['required', 'string', 'max:255'],
-            'dashscope_base' => ['required', 'string', 'url', 'max:255'],
+            'dashscope_base' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
         ]);
 
         set_setting('studio_image_credits', (string) $data['image_credits']);
