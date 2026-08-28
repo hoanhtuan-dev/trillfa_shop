@@ -25,6 +25,7 @@ return [
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image-3.0-pro'),
+    'gemini_image_model' => env('STUDIO_GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-1.5-flash'),
     'image_resolution' => env('STUDIO_IMAGE_RESOLUTION', '2K'), // 1K | 2K

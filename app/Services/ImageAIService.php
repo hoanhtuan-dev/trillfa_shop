@@ -30,6 +30,7 @@ class ImageAIService
     protected function providerKey(): ?string
     {
         return match ($this->provider()) {
+            'gemini' => studio_api_key('gemini'),
             'wan' => studio_api_key('wan') ?: studio_api_key('dashscope'),
             'qwen' => studio_api_key('qwen') ?: studio_api_key('dashscope'),
             default => studio_api_key('fal') ?: studio_api_key('replicate'),
@@ -42,7 +43,16 @@ class ImageAIService
         $dashscopeKey = studio_api_key('dashscope');
         $triedReal = false;
 
-        if (in_array($provider, ['wan', 'qwen'])) {
+        if ($provider === 'gemini') {
+            $key = $this->providerKey();
+            if ($key) {
+                $triedReal = true;
+                $url = $this->tryGeminiImage($prompt, $key, $resolution, $ratio);
+                if ($url) {
+                    return $url;
+                }
+            }
+        } elseif (in_array($provider, ['wan', 'qwen'])) {
             $key = $this->providerKey();
             if ($key) {
                 $triedReal = true;
@@ -106,6 +116,79 @@ class ImageAIService
         }
 
         return $msg;
+    }
+
+    protected function tryGeminiImage(string $prompt, string $key, ?string $resolution = null, ?string $ratio = null): ?string
+    {
+        try {
+            $url = $this->callGeminiImage($prompt, $key, $ratio);
+            if ($url) {
+                return $url;
+            }
+            $this->dashscopeError = 'Gemini không trả về ảnh. Kiểm tra model ảnh (Cài đặt → Ảnh Gemini) và hạn mức.';
+        } catch (\Throwable $e) {
+            $this->dashscopeError = $e->getMessage();
+            logger()->error('Gemini image generation failed: '.$e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Gemini image generation via generateContent with responseModalities IMAGE.
+     * The image is returned as a base64 inlineData part.
+     */
+    protected function callGeminiImage(string $prompt, string $key, ?string $ratio = null): ?string
+    {
+        $model = (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
+        $config = ['responseModalities' => ['TEXT', 'IMAGE']];
+        $aspect = $this->geminiAspectRatio($ratio);
+        if ($aspect) {
+            $config['imageConfig'] = ['aspectRatio' => $aspect];
+        }
+
+        $resp = Http::withToken($key)->timeout(180)
+            ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
+                'contents' => [['parts' => [['text' => $prompt]]]],
+                'generationConfig' => $config,
+            ]);
+
+        if (! $resp->successful()) {
+            throw new \RuntimeException('Gemini ('.$resp->status().'): '.Str::limit((string) $resp->body(), 240));
+        }
+
+        $parts = collect(data_get($resp->json(), 'candidates.0.content.parts', []));
+
+        foreach ($parts as $part) {
+            $inline = $part['inlineData'] ?? null;
+            if (! is_array($inline) || empty($inline['data'])) {
+                continue;
+            }
+
+            $data = base64_decode((string) $inline['data'], true);
+            if ($data === false) {
+                continue;
+            }
+
+            $mime = $inline['mimeType'] ?? 'image/png';
+            $ext = str_contains($mime, 'jpeg') ? 'jpg' : (str_contains($mime, 'webp') ? 'webp' : 'png');
+            $name = Str::uuid().'.'.$ext;
+            Storage::disk('public')->put('studio/'.$name, $data);
+
+            return '/storage/studio/'.$name;
+        }
+
+        return null;
+    }
+
+    protected function geminiAspectRatio(?string $ratio): ?string
+    {
+        return match ($ratio) {
+            '1:1', '3:4', '4:3', '9:16', '16:9', '21:9' => $ratio,
+            '4:5' => '3:4',
+            '19:6' => '21:9',
+            default => null,
+        };
     }
 
     protected function tryDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string

@@ -27,6 +27,7 @@
                 <option value="flux" @selected(old('image_provider', $image_provider) === 'flux')>Flux (Fal.ai / Replicate)</option>
                 <option value="wan" @selected(old('image_provider', $image_provider) === 'wan')>Wan AI</option>
                 <option value="qwen" @selected(old('image_provider', $image_provider) === 'qwen')>Qwen AI</option>
+                <option value="gemini" @selected(old('image_provider', $image_provider) === 'gemini')>Gemini (Flash Image)</option>
             </select>
             <p class="mt-1 text-xs text-ink-500">Chọn mô hình sinh ảnh; bỏ trống key thì vẫn dùng stub.</p>
         </div>
@@ -98,6 +99,7 @@
                 <div><label class="label">Ảnh Flux</label><input type="text" name="image_model" value="{{ old('image_model', $image_model) }}" class="input !py-2" placeholder="flux-1.1-schnell"></div>
                 <div><label class="label">Ảnh Wan</label><input type="text" name="wan_model" value="{{ old('wan_model', $wan_model) }}" class="input !py-2" placeholder="wan2.7-image-pro"></div>
                 <div><label class="label">Ảnh Qwen</label><input type="text" name="qwen_model" value="{{ old('qwen_model', $qwen_model) }}" class="input !py-2" placeholder="qwen-image-3.0-pro"></div>
+                <div><label class="label">Ảnh Gemini</label><input type="text" name="gemini_image_model" value="{{ old('gemini_image_model', $gemini_image_model) }}" class="input !py-2" placeholder="gemini-2.5-flash-image"></div>
                 <div><label class="label">Video (Wan/Veo)</label><input type="text" name="video_model" value="{{ old('video_model', $video_model) }}" class="input !py-2" placeholder="wan2.5-t2v"></div>
                 <div><label class="label">Vision (gợi ý từ ảnh)</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-1.5-flash"></div>
             </div>

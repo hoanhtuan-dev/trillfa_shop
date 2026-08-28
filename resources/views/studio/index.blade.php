@@ -17,6 +17,7 @@
     $imgKeySet = match ($imgProvider) {
         'wan' => (bool) (studio_api_key('wan') ?: studio_api_key('dashscope')),
         'qwen' => (bool) (studio_api_key('qwen') ?: studio_api_key('dashscope')),
+        'gemini' => (bool) (studio_api_key('gemini')),
         default => (bool) (studio_api_key('fal') ?: studio_api_key('replicate')),
     };
     $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy'];

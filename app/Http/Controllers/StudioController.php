@@ -161,6 +161,7 @@ class StudioController extends Controller
 
         $provider = (string) studio_config('image_provider', 'flux');
         $model = match ($provider) {
+            'gemini' => (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image'),
             'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
             'qwen' => (string) studio_config('qwen_model', 'qwen-image'),
             default => (string) studio_config('image_model', 'flux-1.1-schnell'),
@@ -234,7 +235,7 @@ class StudioController extends Controller
         // on a queue worker — submitting + polling can exceed the PHP execution limit.
         $hasProviderKey = $type === 'video'
             ? (bool) (studio_api_key('wan') || studio_api_key('veo') || studio_api_key('dashscope'))
-            : (bool) (studio_api_key('qwen') || studio_api_key('wan') || studio_api_key('dashscope') || studio_api_key('fal') || studio_api_key('replicate'));
+            : (bool) (studio_api_key('gemini') || studio_api_key('qwen') || studio_api_key('wan') || studio_api_key('dashscope') || studio_api_key('fal') || studio_api_key('replicate'));
         $useQueue = studio_config('processing', 'sync') === 'queue' || $hasProviderKey;
 
         if ($useQueue) {
@@ -535,6 +536,7 @@ class StudioController extends Controller
             'image_model' => setting('studio_image_model', config('studio.image_model')),
             'wan_model' => setting('studio_wan_model', config('studio.wan_model')),
             'qwen_model' => setting('studio_qwen_model', config('studio.qwen_model')),
+            'gemini_image_model' => setting('studio_gemini_image_model', config('studio.gemini_image_model')),
             'video_model' => setting('studio_video_model', config('studio.video_model')),
             'vision_model' => setting('studio_vision_model', config('studio.vision_model')),
             'dashscope_base' => setting('studio_dashscope_base', config('studio.dashscope_base')),
@@ -552,11 +554,12 @@ class StudioController extends Controller
             'image_credits' => ['required', 'integer', 'min:0', 'max:1000'],
             'video_credits' => ['required', 'integer', 'min:0', 'max:1000'],
             'max_generations' => ['nullable', 'integer', 'min:1', 'max:500'],
-            'image_provider' => ['required', 'string', 'in:flux,wan,qwen'],
+            'image_provider' => ['required', 'string', 'in:flux,wan,qwen,gemini'],
             'prompt_model' => ['required', 'string', 'max:255'],
             'image_model' => ['nullable', 'string', 'max:255'],
             'wan_model' => ['required', 'string', 'max:255'],
             'qwen_model' => ['required', 'string', 'max:255'],
+            'gemini_image_model' => ['nullable', 'string', 'max:255'],
             'video_model' => ['required', 'string', 'max:255'],
             'vision_model' => ['required', 'string', 'max:255'],
             'dashscope_base' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
@@ -575,6 +578,7 @@ class StudioController extends Controller
         set_setting('studio_image_model', $data['image_model'] ?? '');
         set_setting('studio_wan_model', $data['wan_model']);
         set_setting('studio_qwen_model', $data['qwen_model']);
+        set_setting('studio_gemini_image_model', $data['gemini_image_model'] ?? '');
         set_setting('studio_video_model', $data['video_model']);
         set_setting('studio_vision_model', $data['vision_model']);
         set_setting('studio_dashscope_base', $data['dashscope_base']);
