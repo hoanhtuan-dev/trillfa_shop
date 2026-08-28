@@ -363,14 +363,19 @@ class StudioController extends Controller
 
     protected function testDashscope(string $key): array
     {
-        // Wan (image & video) + Qwen run on Alibaba DashScope. Auto-detect the
-        // region: try the configured base, then the other one. An INVALID model
-        // makes the request fail at validation (no cost).
-        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
-        $alt = str_contains($base, 'dashscope-intl') ? 'https://dashscope.aliyuncs.com' : 'https://dashscope-intl.aliyuncs.com';
+        // Wan (image & video) + Qwen run on a DashScope-compatible endpoint. Try every
+        // candidate host (classic region + QwenCloud Token/Coding Plan) because a
+        // QwenCloud key is bound to a specific base URL by key type.
+        $configured = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
+        $candidates = array_unique([
+            $configured,
+            str_contains($configured, 'intl') ? 'https://dashscope.aliyuncs.com' : 'https://dashscope-intl.aliyuncs.com',
+            'https://token-plan.ap-southeast-1.maas.aliyuncs.com',
+            'https://coding-intl.dashscope.aliyuncs.com',
+        ]);
 
         $lastStatus = null;
-        foreach (array_unique([$base, $alt]) as $host) {
+        foreach ($candidates as $host) {
             $resp = Http::withToken($key)->timeout(20)
                 ->post($host.'/api/v1/services/aigc/multimodal-generation/generation', [
                     'model' => '__auth_check__',
@@ -382,18 +387,22 @@ class StudioController extends Controller
                 return ['ok' => true, 'message' => 'DashScope: kết nối OK ('.$host.').'];
             }
             if (in_array($resp->status(), [400, 422])) {
-                $region = str_contains($host, 'intl') ? 'quốc tế' : 'Trung Quốc';
-                $extra = $host !== $base ? ' (đặt DashScope base URL = '.$host.')' : '';
+                $kind = match ($host) {
+                    'https://token-plan.ap-southeast-1.maas.aliyuncs.com' => 'Token Plan',
+                    'https://coding-intl.dashscope.aliyuncs.com' => 'Coding Plan',
+                    default => str_contains($host, 'intl') ? 'quốc tế' : 'Trung Quốc',
+                };
+                $extra = $host !== $configured ? ' — đặt DashScope base URL = '.$host : '';
 
-                return ['ok' => true, 'message' => 'DashScope: khoá hợp lệ — vùng '.$region.' ('.$host.')'.$extra];
+                return ['ok' => true, 'message' => 'DashScope: khoá hợp lệ ('.$kind.') '.$host.$extra];
             }
             if ($resp->status() === 404) {
-                return ['ok' => false, 'message' => 'DashScope: HTTP 404 ở '.$host.' — sai đường dẫn base URL (chỉ gồm host, không thêm /apps/...).'];
+                continue; // wrong path for this host — try the next one
             }
             $lastStatus = $resp->status();
         }
 
-        return ['ok' => false, 'message' => 'DashScope: key bị từ chối (HTTP '.$lastStatus.'). Lưu ý: key từ home.qwencloud.com là key QwenCloud — nền tảng riêng, KHÔNG chạy trên endpoint DashScope. Hãy dùng DASHSCOPE_API_KEY lấy từ Alibaba Cloud Model Studio (Bailian console), bật model Wan/Qwen.'];
+        return ['ok' => false, 'message' => 'DashScope: key bị từ chối trên mọi host (HTTP '.$lastStatus.'). Key bắt đầu bằng sk-sp- là key Token/Coding Plan → cần base URL tương ứng (token-plan.ap-southeast-1.maas.aliyuncs.com hoặc coding-intl.dashscope.aliyuncs.com). Key dạng sk-xxxxx → dùng https://dashscope-intl.aliyuncs.com.'];
     }
 
     /**

@@ -147,6 +147,23 @@ class ImageAIService
         return $files ? $files[array_rand($files)] : null;
     }
 
+    /**
+     * QwenCloud keys are bound to a base URL by key type. A "sk-sp-…" key (Token /
+     * Coding Plan) cannot be used on the classic pay-as-you-go DashScope host, so
+     * auto-switch to the plan host unless the admin set a custom base URL.
+     */
+    protected function dashscopeBase(string $key): string
+    {
+        $configured = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
+        $classic = ['https://dashscope-intl.aliyuncs.com', 'https://dashscope.aliyuncs.com'];
+
+        if (str_starts_with($key, 'sk-sp-') && in_array($configured, $classic, true)) {
+            return 'https://token-plan.ap-southeast-1.maas.aliyuncs.com';
+        }
+
+        return $configured;
+    }
+
     protected function callDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
     {
         // qwen-image / qwen-image-plus are async-only (submit a task, then poll).
@@ -154,7 +171,7 @@ class ImageAIService
             return $this->callDashscopeAsync($prompt, $model, $key, $resolution, $ratio);
         }
 
-        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/api/v1';
+        $base = $base = rtrim($this->dashscopeBase($key), '/').'/api/v1';
         $size = $this->sizeFor($resolution, $ratio);
         $resp = Http::withToken($key)
             ->timeout(180)
@@ -181,7 +198,7 @@ class ImageAIService
 
     protected function callDashscopeAsync(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
     {
-        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/api/v1';
+        $base = $base = rtrim($this->dashscopeBase($key), '/').'/api/v1';
         $size = $this->sizeFor($resolution, $ratio);
 
         $submit = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)
