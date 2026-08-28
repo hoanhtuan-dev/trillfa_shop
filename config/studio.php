@@ -27,4 +27,5 @@ return [
     'wan_key' => env('WAN_API_KEY', ''),
     'veo_key' => env('GOOGLE_VEO_KEY', ''),
     'qwen_key' => env('QWEN_API_KEY', ''),
+    'dashscope_key' => env('DASHSCOPE_API_KEY', ''),
 ];

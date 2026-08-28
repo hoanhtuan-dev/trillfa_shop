@@ -241,6 +241,7 @@ class StudioController extends Controller
             'wan' => ['label' => 'Wan AI — video', 'hint' => 'WAN_API_KEY', 'configured' => (bool) studio_api_key('wan')],
             'veo' => ['label' => 'Google Veo — video', 'hint' => 'GOOGLE_VEO_KEY', 'configured' => (bool) studio_api_key('veo')],
             'qwen' => ['label' => 'Qwen AI — ảnh (Alibaba)', 'hint' => 'QWEN_API_KEY', 'configured' => (bool) studio_api_key('qwen')],
+            'dashscope' => ['label' => 'DashScope — Wan/Qwen image (Alibaba)', 'hint' => 'DASHSCOPE_API_KEY', 'configured' => (bool) studio_api_key('dashscope')],
         ];
 
         return view('studio.api', compact('providers'));
@@ -248,7 +249,7 @@ class StudioController extends Controller
 
     public function updateApi(Request $request)
     {
-        $services = ['gemini', 'fal', 'replicate', 'wan', 'veo', 'qwen'];
+        $services = ['gemini', 'fal', 'replicate', 'wan', 'veo', 'qwen', 'dashscope'];
 
         foreach ($services as $service) {
             // Clear if requested, else store a new encrypted key, else keep.

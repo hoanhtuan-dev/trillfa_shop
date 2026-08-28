@@ -35,8 +35,8 @@ class ImageAIService
     protected function providerKey(): ?string
     {
         return match ($this->provider()) {
-            'wan' => studio_api_key('wan'),
-            'qwen' => studio_api_key('qwen'),
+            'wan' => studio_api_key('wan') ?: studio_api_key('dashscope'),
+            'qwen' => studio_api_key('qwen') ?: studio_api_key('dashscope'),
             default => studio_api_key('fal') ?: studio_api_key('replicate'),
         };
     }
@@ -46,6 +46,23 @@ class ImageAIService
         // Inpainting / updates reuse the source image for the stub.
         if ($baseImage && $maskImage) {
             return $this->copySample($prompt, $baseImage);
+        }
+
+        $provider = $this->provider();
+
+        // Wan / Qwen run on Alibaba DashScope (multimodal-generation).
+        if (in_array($provider, ['wan', 'qwen'])) {
+            $key = $this->providerKey();
+            if ($key) {
+                try {
+                    $url = $this->callDashscope($prompt, $provider === 'wan' ? 'wan2.7-image-pro' : 'qwen-image', $key);
+                    if ($url) {
+                        return $url;
+                    }
+                } catch (\Throwable $e) {
+                    logger()->error('DashScope image generation failed: '.$e->getMessage());
+                }
+            }
         }
 
         return $this->copySample($prompt, null);
@@ -66,6 +83,37 @@ class ImageAIService
 
         // Relative URL so it resolves against whatever host serves the page.
         return '/storage/studio/'.$name;
+    }
+
+    /**
+     * Alibaba DashScope multimodal image generation (Wan / Qwen image).
+     */
+    protected function callDashscope(string $prompt, string $model, string $key): ?string
+    {
+        $resp = \Illuminate\Support\Facades\Http::withToken($key)
+            ->timeout(180)
+            ->post('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', [
+                'model' => $model,
+                'input' => ['messages' => [['role' => 'user', 'content' => [['text' => $prompt]]]]],
+                'parameters' => ['n' => 1, 'size' => '2K'],
+            ]);
+
+        $url = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
+            ->pluck('image')->first();
+
+        if ($url) {
+            $contents = @file_get_contents($url);
+            if ($contents) {
+                $name = \Illuminate\Support\Str::uuid().'.png';
+                \Illuminate\Support\Facades\Storage::disk('public')->put('studio/'.$name, $contents);
+
+                return '/storage/studio/'.$name;
+            }
+
+            return $url;
+        }
+
+        return null;
     }
 
     protected function placeholder(): string

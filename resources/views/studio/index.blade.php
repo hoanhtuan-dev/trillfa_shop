@@ -10,6 +10,15 @@
         'project_id' => $g->project_id, 'created_at' => $g->created_at?->format('d/m H:i'),
     ])->values();
     $projectsJs = $projects->map(fn($p) => ['id' => $p->id, 'name' => $p->name])->values();
+
+    // AI status
+    $aiStub = ! studio_api_key('gemini');
+    $imgProvider = studio_config('image_provider', 'flux');
+    $imgKeySet = match ($imgProvider) {
+        'wan' => (bool) (studio_api_key('wan') ?: studio_api_key('dashscope')),
+        'qwen' => (bool) (studio_api_key('qwen') ?: studio_api_key('dashscope')),
+        default => (bool) (studio_api_key('fal') ?: studio_api_key('replicate')),
+    };
 @endphp
 
 @section('content')
@@ -42,6 +51,12 @@
             <span class="text-sm text-ink-500">Tín dụng:</span>
             <span class="font-bold text-brand-700" x-text="creditsLeft"></span>
         </div>
+    </div>
+
+    <div class="mb-4 flex flex-wrap items-center gap-2 text-xs">
+        <span class="badge {{ $aiStub ? 'bg-amber-100 text-amber-700' : 'bg-brand-600 text-white' }}">Prompt: {{ $aiStub ? 'Mô phỏng (stub)' : 'Gemini AI' }}</span>
+        <span class="badge bg-cream-200 text-ink-700">Ảnh: {{ $imgProvider }}{{ $imgKeySet ? '' : ' (stub)' }}</span>
+        <span class="text-ink-400">Nhập API key trong <a href="{{ route('studio.api') }}" class="link">Quản lý API</a> để dùng AI thật.</span>
     </div>
 
     <div class="grid gap-8 lg:grid-cols-[380px_1fr]">
