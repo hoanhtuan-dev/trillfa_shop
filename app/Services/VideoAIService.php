@@ -120,7 +120,10 @@ class VideoAIService
     protected function promptHasCamera(string $prompt): bool
     {
         $lower = strtolower($prompt);
-        foreach (['camera', 'shot', 'orbit', 'tracking', 'panning', 'pan ', 'zoom', 'dolly', 'pov', 'crane', 'slow motion', 'slow-motion', 'close-up', 'close up'] as $kw) {
+        // Only skip appending the "Kịch bản quay" when the prompt genuinely describes a CONFLICTING camera
+        // technique (rare in image/editorial prompts). Generic style words ("slow motion", "4k", "shot",
+        // "runway") must NOT suppress the chosen scene — the base prompt no longer hardcodes a camera.
+        foreach (['orbit', 'tracking', 'dolly shot', 'panning', 'crane shot', 'aerial shot', 'drone shot', 'pov', 'arc shot', 'zoom in', 'zoom out', 'tilt-up', 'tilt down', 'jib'] as $kw) {
             if (str_contains($lower, $kw)) {
                 return true;
             }
