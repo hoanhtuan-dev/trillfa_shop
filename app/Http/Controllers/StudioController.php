@@ -909,7 +909,7 @@ class StudioController extends Controller
                 'credits_cost' => $g->credits_cost, 'project_id' => $g->project_id,
                 'created_at' => $g->created_at?->format('d/m H:i'),
                 'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
-                'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta,
+                'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta, 'prompt' => $g->prompt,
             ])->values();
 
         return response()->json(['items' => $items]);

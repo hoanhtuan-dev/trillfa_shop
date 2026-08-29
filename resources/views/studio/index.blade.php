@@ -10,7 +10,7 @@
         'media_url' => $g->media_url, 'error' => $g->error, 'credits_cost' => $g->credits_cost,
         'project_id' => $g->project_id, 'created_at' => $g->created_at?->format('d/m H:i'),
         'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
-        'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta,
+        'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta, 'prompt' => $g->prompt,
     ])->values();
     $projectsJs = $projects->map(fn($p) => ['id' => $p->id, 'name' => $p->name])->values();
 
@@ -255,6 +255,7 @@
                             <option value="">— Chọn kịch bản quay —</option>
                             <template x-for="scene in videoScenes" :key="scene.id"><option :value="scene.value" :title="scene.note" x-text="scene.label + (scene.note ? ' · ' + scene.note : '')"></option></template>
                         </select>
+                        <p class="mt-1 text-[10px] text-brand-700" x-show="videoScene" x-text="'Kịch bản quay sẽ được áp dụng: ' + videoSceneLabel"></p>
                     </div>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select>
@@ -463,6 +464,7 @@ document.addEventListener('alpine:init', () => {
         lbMovePan(e) { if (!this._lbDrag) return; this.lbPan.x = this._lbDrag.px + (e.clientX - this._lbDrag.x); this.lbPan.y = this._lbDrag.py + (e.clientY - this._lbDrag.y); },
         lbEndPan() { this._lbDrag = null; },
         get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
+        get videoSceneLabel() { const s = this.videoScenes.find(x => x.value === this.videoScene); return s ? (s.label + (s.note ? ' · ' + s.note : '')) : ''; },
         get presetGroups() { return this.presets.filter(g => g.category !== 'video_scene'); },
         async loadPalette(id) {
             if (!id) { this.palette = []; return; }
@@ -585,7 +587,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.videoSourceId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; const basePrompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; const prompt = basePrompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video'; const data = await this.api('/studio/video', { prompt, base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
+            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
