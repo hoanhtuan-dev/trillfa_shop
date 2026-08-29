@@ -57,9 +57,9 @@ class VideoAIService
         $input = ['prompt' => $prompt];
         if ($imageUrl && str_starts_with($imageUrl, '/')) {
             $abs = url($imageUrl);
-            // Some i2v models (e.g. happyhorse-1.1-i2v) require input.media; others use img_url.
+            // i2v models require input.media items with a 'type'; some also accept img_url.
             $input['img_url'] = $abs;
-            $input['media'] = [['url' => $abs]];
+            $input['media'] = [['type' => 'image', 'url' => $abs]];
         }
 
         $t0 = microtime(true);
