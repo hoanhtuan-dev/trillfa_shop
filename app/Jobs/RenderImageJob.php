@@ -22,6 +22,7 @@ class RenderImageJob implements ShouldQueue
 
     public function handle(ImageAIService $images): void
     {
+        $t0 = microtime(true);
         $generation = Generation::find($this->generationId);
 
         if (! $generation) {
@@ -36,12 +37,23 @@ class RenderImageJob implements ShouldQueue
             }
 
             // Face sync (no edit model): describe the reference face via the vision provider, then
-            // inject that description into the prompt so the model reproduces the face.
+            // inject that description into the prompt so the model reproduces the face. The face is
+            // static, so the description is cached — a ~90s vision call should NOT run on every image.
             $prompt = (string) $generation->prompt;
             $faceRef = (string) setting('studio_face_ref', '');
             if ($faceRef && str_starts_with($faceRef, '/storage/')) {
-                $faceDesc = $images->describeFace($faceRef);
-                if ($faceDesc) {
+                $hash = md5($faceRef);
+                $faceDesc = ((string) setting('studio_face_desc_hash', '') === $hash)
+                    ? (string) setting('studio_face_desc', '')
+                    : '';
+                if ($faceDesc === '') {
+                    $faceDesc = (string) ($images->describeFace($faceRef) ?? '');
+                    if ($faceDesc !== '') {
+                        set_setting('studio_face_desc', $faceDesc);
+                        set_setting('studio_face_desc_hash', $hash);
+                    }
+                }
+                if ($faceDesc !== '') {
                     $prompt = 'The model has this face: '.$faceDesc.'. '.$prompt;
                     $generation->update(['prompt' => $prompt]);
                 }
@@ -61,9 +73,17 @@ class RenderImageJob implements ShouldQueue
             }
 
             $generation->update(['status' => 'completed', 'media_url' => $url]);
+            logger()->info('Image generation completed', [
+                'generation_id' => $generation->id, 'provider' => $generation->provider,
+                'model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
+            ]);
         } catch (\Throwable $e) {
             $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
             $this->refund($generation);
+            logger()->warning('Image generation failed', [
+                'generation_id' => $generation->id, 'total_s' => round(microtime(true) - $t0, 2),
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

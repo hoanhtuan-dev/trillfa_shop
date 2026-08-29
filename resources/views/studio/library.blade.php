@@ -18,7 +18,7 @@
 @endphp
 
 @section('content')
-<div x-data="{ sel:null, q:'', items: {{ Js::from($items) }}, total: {{ $generations->total() }}, open(i){ this.sel=i; document.body.classList.add('overflow-hidden'); }, close(){ this.sel=null; document.body.classList.remove('overflow-hidden'); }, async del(item){ try { const res = await fetch('/studio/generations/' + item.id, { method:'DELETE', headers:{ 'X-CSRF-TOKEN':(document.querySelector('meta[name=csrf-token]')||{}).content||'', Accept:'application/json' } }); const d = await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.message||'Lỗi khi xóa.'); this.items = this.items.filter(x => x.id !== item.id); this.total = Math.max(0, this.total - 1); this.close(); Alpine.store('toast').show(d.message || 'Đã xóa.'); } catch(e){ Alpine.store('toast').show(e.message, 'error'); } } }">
+<div x-data="{ sel:null, q:'', items: {{ Js::from($items) }}, total: {{ $generations->total() }}, lbZoom:1, lbPan:{x:0,y:0}, _lbDrag:null, open(i){ this.sel=i; this.lbZoom=1; this.lbPan={x:0,y:0}; document.body.classList.add('overflow-hidden'); }, close(){ this.sel=null; document.body.classList.remove('overflow-hidden'); }, lbZin(){ this.lbZoom=Math.min(8, +(this.lbZoom+0.5).toFixed(2)); }, lbZout(){ this.lbZoom=Math.max(0.6, +(this.lbZoom-0.5).toFixed(2)); }, lbReset(){ this.lbZoom=1; this.lbPan={x:0,y:0}; }, onLbWheel(e){ e.preventDefault(); const d=e.deltaY>0?-0.5:0.5; this.lbZoom=Math.min(8, Math.max(0.6, +(this.lbZoom+d).toFixed(2))); }, lbStartPan(e){ this._lbDrag={x:e.clientX,y:e.clientY,px:this.lbPan.x,py:this.lbPan.y}; }, lbMovePan(e){ if(!this._lbDrag) return; this.lbPan.x=this._lbDrag.px+(e.clientX-this._lbDrag.x); this.lbPan.y=this._lbDrag.py+(e.clientY-this._lbDrag.y); }, lbEndPan(){ this._lbDrag=null; }, async del(item){ try { const res = await fetch('/studio/generations/' + item.id, { method:'DELETE', headers:{ 'X-CSRF-TOKEN':(document.querySelector('meta[name=csrf-token]')||{}).content||'', Accept:'application/json' } }); const d = await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.message||'Lỗi khi xóa.'); this.items = this.items.filter(x => x.id !== item.id); this.total = Math.max(0, this.total - 1); this.close(); Alpine.store('toast').show(d.message || 'Đã xóa.'); } catch(e){ Alpine.store('toast').show(e.message, 'error'); } } }">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 class="font-display text-2xl font-bold text-ink-900">Thư viện</h1>
         <span class="text-sm text-ink-500"><span x-text="total"></span> mục</span>
@@ -87,7 +87,7 @@
 
     <!-- Preview modal -->
     <template x-if="sel">
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4" @wheel.prevent="onLbWheel($event)">
             <div class="absolute inset-0 bg-ink-900/60" @click="close()"></div>
             <div class="relative z-10 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
                 <div class="relative bg-cream-100">
@@ -95,7 +95,17 @@
                         <video :src="sel.media_url" class="mx-auto max-h-[60vh] w-full object-contain" controls loop muted playsinline></video>
                     </template>
                     <template x-if="sel.type==='image' && sel.media_url">
-                        <img :src="sel.media_url" class="mx-auto max-h-[60vh] w-full object-contain" onerror="this.src='/images/placeholder.svg'">
+                        <div class="relative h-[60vh] w-full overflow-hidden bg-cream-100">
+                            <img :src="sel.media_url" class="h-full w-full cursor-grab select-none object-contain active:cursor-grabbing"
+                                 :style="{ transform: 'translate(' + lbPan.x + 'px, ' + lbPan.y + 'px) scale(' + lbZoom + ')', transformOrigin: 'center' }"
+                                 @pointerdown="lbStartPan($event)" @pointermove="lbMovePan($event)" @pointerup="lbEndPan" @pointerleave="lbEndPan"
+                                 onerror="this.src='/images/placeholder.svg'">
+                            <div class="absolute bottom-3 right-3 z-10 flex items-center gap-1">
+                                <button @click="lbZout()" class="grid h-8 w-8 place-items-center rounded-lg border border-cream-200 bg-white/90 text-ink-700 hover:bg-white" title="Thu nhỏ">−</button>
+                                <button @click="lbReset()" class="rounded-lg border border-cream-200 bg-white/90 px-2 py-1 text-xs text-ink-700 hover:bg-white" title="Vừa khung">Vừa</button>
+                                <button @click="lbZin()" class="grid h-8 w-8 place-items-center rounded-lg border border-cream-200 bg-white/90 text-ink-700 hover:bg-white" title="Phóng to">+</button>
+                            </div>
+                        </div>
                     </template>
                     <template x-if="sel.status !== 'completed'">
                         <div class="grid min-h-[40vh] place-items-center text-center">

@@ -40,6 +40,7 @@ class VideoAIService
             $input['media'] = [['url' => $abs]];
         }
 
+        $t0 = microtime(true);
         $submit = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)
             ->post($base.'/services/aigc/video-generation/video-synthesis', [
                 'model' => $model,
@@ -56,7 +57,10 @@ class VideoAIService
             throw new \RuntimeException('DashScope không trả về task_id video.');
         }
 
-        $deadline = microtime(true) + 300;
+        logger()->info('Video task submitted', ['task_id' => $taskId, 'model' => $model, 'size' => $size, 'duration' => (int) ($duration ?: 10), 'wait_s' => round(microtime(true) - $t0, 2)]);
+
+        $deadline = microtime(true) + 600; // allow generous time; job timeout is 600s
+        $lastStatus = '';
 
         while (microtime(true) < $deadline) {
             sleep(5);
@@ -67,7 +71,11 @@ class VideoAIService
                 throw new \RuntimeException('DashScope ('.$q->status().'): '.Str::limit((string) $q->body(), 240));
             }
 
-            $status = data_get($q->json(), 'output.task_status');
+            $status = (string) data_get($q->json(), 'output.task_status');
+            if ($status !== $lastStatus && $status !== '') {
+                logger()->info('Video task status', ['task_id' => $taskId, 'status' => $status, 'elapsed_s' => round(microtime(true) - $t0, 2)]);
+                $lastStatus = $status;
+            }
 
             if ($status === 'SUCCEEDED') {
                 $url = data_get($q->json(), 'output.video_url') ?: data_get($q->json(), 'output.results.0.url');
@@ -82,16 +90,19 @@ class VideoAIService
 
                 $name = Str::uuid().'.mp4';
                 Storage::disk('public')->put('studio/'.$name, $contents);
+                logger()->info('Video done', ['task_id' => $taskId, 'total_s' => round(microtime(true) - $t0, 2)]);
 
                 return '/storage/studio/'.$name;
             }
 
             if ($status === 'FAILED') {
-                throw new \RuntimeException('DashScope: '.(string) data_get($q->json(), 'output.message', 'Tạo video thất bại.'));
+                $msg = (string) data_get($q->json(), 'output.message', 'Tạo video thất bại.');
+                logger()->error('Video task FAILED', ['task_id' => $taskId, 'message' => $msg, 'elapsed_s' => round(microtime(true) - $t0, 2)]);
+                throw new \RuntimeException('DashScope: '.$msg);
             }
         }
 
-        throw new \RuntimeException('Hết thời gian chờ tạo video (task '.$taskId.').');
+        throw new \RuntimeException('Hết thời gian chờ tạo video (task '.$taskId.', '.(int) round(microtime(true) - $t0).'s).');
     }
 
     protected function videoSize(?string $resolution): string

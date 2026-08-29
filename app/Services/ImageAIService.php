@@ -94,7 +94,12 @@ class ImageAIService
         $last = null;
 
         foreach ($models as $model) {
+            $t = microtime(true);
             $url = $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef);
+            logger()->info('Image model attempt', [
+                'model' => $model, 'ok' => (bool) $url, 's' => round(microtime(true) - $t, 2),
+                'err' => $url ? null : $this->dashscopeError,
+            ]);
             if ($url) {
                 return $url;
             }

@@ -675,6 +675,9 @@ class StudioController extends Controller
         }
         if ($request->hasFile('face_ref') && $request->file('face_ref')->isValid()) {
             set_setting('studio_face_ref', '/storage/'.$request->file('face_ref')->store('studio/ref', 'public'));
+            // New face -> invalidate the cached face description so it is re-described once.
+            set_setting('studio_face_desc', '');
+            set_setting('studio_face_desc_hash', '');
         }
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');

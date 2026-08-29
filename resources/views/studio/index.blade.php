@@ -182,7 +182,7 @@
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url">
-                            <img :src="preview.media_url" class="max-h-full max-w-full cursor-zoom-in object-contain" onerror="this.src='/images/placeholder.svg'" @click="lightbox = true">
+                            <img :src="preview.media_url" class="max-h-full max-w-full cursor-zoom-in object-contain" onerror="this.src='/images/placeholder.svg'" @click="openLightbox()">
                         </template>
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'video' && preview.media_url">
                             <video :src="preview.media_url" class="max-h-full max-w-full object-contain" controls loop muted playsinline></video>
@@ -317,12 +317,22 @@
         </div>
     </template>
 
-    <!-- Fullscreen lightbox -->
+    <!-- Fullscreen lightbox (self-contained zoom/pan; captures wheel & drag, blocks the layer below) -->
     <template x-if="lightbox && preview && preview.media_url">
-        <div class="fixed inset-0 z-[80] flex items-center justify-center bg-ink-900/90 p-4" @click.self="lightbox = false">
-            <button @click="lightbox = false" class="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-ink-900/80 text-cream-200 hover:text-white">×</button>
-            <img :src="preview.media_url" class="max-h-[92vh] max-w-[94vw] rounded-xl object-contain" onerror="this.src='/images/placeholder.svg'" @wheel.prevent="onWheel($event)">
-            <div class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-ink-900/80 px-3 py-1 text-xs text-cream-200">Lăn chuột: Thu phóng · Zoom <b x-text="zoom.toFixed(2)"></b>x</div>
+        <div class="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden bg-ink-900/95 p-4"
+             @wheel.prevent="onLbWheel($event)" @click.self="closeLightbox()">
+            <button @click="closeLightbox()" class="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-ink-900/80 text-cream-200 hover:text-white">×</button>
+            <div class="absolute left-4 top-4 z-20 flex items-center gap-1">
+                <button @click="lbZoomOut()" class="grid h-9 w-9 place-items-center rounded-lg border border-cream-200 bg-ink-900/70 text-cream-100 hover:bg-ink-700" title="Thu nhỏ">−</button>
+                <button @click="lbReset()" class="rounded-lg border border-cream-200 bg-ink-900/70 px-2.5 py-1.5 text-xs text-cream-100 hover:bg-ink-700" title="Vừa khung">Vừa</button>
+                <button @click="lbZoomIn()" class="grid h-9 w-9 place-items-center rounded-lg border border-cream-200 bg-ink-900/70 text-cream-100 hover:bg-ink-700" title="Phóng to">+</button>
+            </div>
+            <img :src="preview.media_url"
+                 class="max-h-[92vh] max-w-[94vw] cursor-grab select-none rounded-xl object-contain shadow-2xl active:cursor-grabbing"
+                 :style="{ transform: 'translate(' + lbPan.x + 'px, ' + lbPan.y + 'px) scale(' + lbZoom + ')', transformOrigin: 'center' }"
+                 @pointerdown="lbStartPan($event)" @pointermove="lbMovePan($event)" @pointerup="lbEndPan" @pointerleave="lbEndPan"
+                 onerror="this.src='/images/placeholder.svg'">
+            <div class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-ink-900/80 px-3 py-1 text-xs text-cream-200">Lăn chuột / +− : Thu phóng · Kéo: di chuyển · Zoom <b x-text="lbZoom.toFixed(2)"></b>x</div>
         </div>
     </template>
 </div>
@@ -343,6 +353,7 @@ document.addEventListener('alpine:init', () => {
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false,
+        lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {},
 
         async init() {
@@ -391,6 +402,15 @@ document.addEventListener('alpine:init', () => {
         movePan(e) { if (!this._drag) return; this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); },
         endPan() { this._drag = null; },
         onWheel(e) { const delta = e.deltaY > 0 ? -0.25 : 0.25; this.zoom = Math.min(4, Math.max(0.6, +(this.zoom + delta).toFixed(2))); },
+        openLightbox() { this.lbZoom = 1; this.lbPan = { x: 0, y: 0 }; this.lightbox = true; document.body.style.overflow = 'hidden'; },
+        closeLightbox() { this.lightbox = false; document.body.style.overflow = ''; },
+        lbZoomIn() { this.lbZoom = Math.min(8, +(this.lbZoom + 0.5).toFixed(2)); },
+        lbZoomOut() { this.lbZoom = Math.max(0.6, +(this.lbZoom - 0.5).toFixed(2)); },
+        lbReset() { this.lbZoom = 1; this.lbPan = { x: 0, y: 0 }; },
+        onLbWheel(e) { const d = e.deltaY > 0 ? -0.5 : 0.5; this.lbZoom = Math.min(8, Math.max(0.6, +(this.lbZoom + d).toFixed(2))); },
+        lbStartPan(e) { this._lbDrag = { x: e.clientX, y: e.clientY, px: this.lbPan.x, py: this.lbPan.y }; },
+        lbMovePan(e) { if (!this._lbDrag) return; this.lbPan.x = this._lbDrag.px + (e.clientX - this._lbDrag.x); this.lbPan.y = this._lbDrag.py + (e.clientY - this._lbDrag.y); },
+        lbEndPan() { this._lbDrag = null; },
         get cameraOptions() { const g = this.presets.find(x => x.category === 'camera'); return g ? g.items.map(i => i.label) : []; },
         async loadPalette(id) {
             if (!id) { this.palette = []; return; }
@@ -568,8 +588,9 @@ document.addEventListener('alpine:init', () => {
 
         poll(id) {
             if (this._timers[id]) return;
-            const started = Date.now();
-            const maxWait = (this.generations.find(g => g.id === Number(id)) || {}).type === 'video' ? 300000 : 150000;
+            // Single-flight: never fire overlapping requests (a superseded poll request could abort
+            // the in-flight lazy job). The provider status is authoritative; the backend heals stuck
+            // jobs (show()) so polling always resolves to a terminal status.
             const tick = async () => {
                 try {
                     const res = await fetch('/studio/generations/' + id, { headers: { Accept: 'application/json' } });
@@ -579,18 +600,6 @@ document.addEventListener('alpine:init', () => {
                     if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; }
                     if (['completed','failed','cancelled'].includes(g.status)) { clearTimeout(this._timers[id]); delete this._timers[id]; return; }
                 } catch (e) { clearTimeout(this._timers[id]); delete this._timers[id]; return; }
-                // Watchdog: a generation that never resolves (e.g. a killed request) stops spinning
-                // and surfaces an actionable error + auto-retry instead of "Đang tạo" forever.
-                if (Date.now() - started > maxWait) {
-                    clearTimeout(this._timers[id]); delete this._timers[id];
-                    const item = this.generations.find(x => x.id === Number(id));
-                    if (item && this.isActive(item.status)) {
-                        item.status = 'failed';
-                        item.error = 'Quá lâu chưa xong (có thể đã bị ngắt). Bấm “Xử lý ngay” hoặc tải lại trang để thử.';
-                        Alpine.store('toast').show('Nhiệm vụ #' + id + ' có vẻ bị treo — bấm “Xử lý ngay”.', 'error');
-                    }
-                    return;
-                }
                 this._timers[id] = setTimeout(tick, 2000);
             };
             this._timers[id] = setTimeout(tick, 2000);
