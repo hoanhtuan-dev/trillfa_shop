@@ -28,6 +28,7 @@ return [
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image-3.0-pro'),
     'qwen_edit_model' => env('STUDIO_QWEN_EDIT_MODEL', 'qwen-image-edit'),
     'brand_name' => env('STUDIO_BRAND_NAME', ''),
+    'brand_logo_enabled' => false, // disable brand-logo stamping (opt-in)
     'gemini_image_model' => env('STUDIO_GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
     'vision_provider' => env('STUDIO_VISION_PROVIDER', 'gemini'), // gemini | qwen

@@ -43,8 +43,21 @@ class RenderImageJob implements ShouldQueue
                 $generation->ratio,
             );
 
-            // Stamp the brand logo onto the generated image (bottom-right).
-            $url = $this->applyBrandLogo($url);
+            // Brand logo stamping is disabled for now (opt-in via studio.brand_logo_enabled).
+            if (studio_config('brand_logo_enabled', false)) {
+                $url = $this->applyBrandLogo($url);
+            }
+
+            // Best-effort face consistency: apply the reference face to the generated image.
+            if (! $generation->base_image || ! $generation->mask_image) {
+                $faceRef = (string) setting('studio_face_ref', '');
+                if ($faceRef && str_starts_with($faceRef, '/storage/')) {
+                    $faced = $images->applyFace($url, $faceRef);
+                    if ($faced) {
+                        $url = $faced;
+                    }
+                }
+            }
 
             $generation->update(['status' => 'completed', 'media_url' => $url]);
         } catch (\Throwable $e) {

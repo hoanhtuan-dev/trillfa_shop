@@ -122,6 +122,10 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
         ]);
 
+        $data['prompt'] = 'Edit this fashion image precisely. Only apply the requested change and keep the '
+            .'model, pose, outfit, fabric, colours, lighting, composition and background exactly as in the '
+            .'original. Requested edit: '.$request->input('prompt');
+
         if ($generation->media_url) {
             $data['base_image'] = $generation->media_url;
         }

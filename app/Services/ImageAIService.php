@@ -371,6 +371,46 @@ class ImageAIService
         throw new \RuntimeException('Hết thời gian chờ tạo ảnh (task '.$taskId.').');
     }
 
+    /**
+     * Re-edit a generated image so the model's face matches the reference face
+     * (best-effort via the qwen-edit image model). Returns null on failure so the
+     * original image is kept.
+     */
+    public function applyFace(string $imageUrl, string $faceRef): ?string
+    {
+        $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        if (! $key) {
+            return null;
+        }
+        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/api/v1';
+
+        try {
+            $resp = Http::withToken($key)->timeout(180)
+                ->post($base.'/services/aigc/multimodal-generation/generation', [
+                    'model' => $model,
+                    'input' => ['messages' => [['role' => 'user', 'content' => [
+                        ['image' => url($imageUrl)],
+                        ['image' => url($faceRef)],
+                        ['text' => 'Keep the outfit, pose, background, colours and lighting exactly as in the first image. Replace the person\'s face with the face from the second reference image, naturally and consistently.'],
+                    ]]]],
+                    'parameters' => ['watermark' => false],
+                ]);
+
+            if (! $resp->successful()) {
+                return null;
+            }
+            $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
+                ->pluck('image')->first();
+
+            return $editUrl ? $this->storeRemoteImage($editUrl) : null;
+        } catch (\Throwable $e) {
+            logger()->error('Face sync failed: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
     protected function storeRemoteImage(string $url): ?string
     {
         $contents = @file_get_contents($url);
