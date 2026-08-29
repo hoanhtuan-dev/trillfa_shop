@@ -46,7 +46,7 @@ class ImageAIService
 
         // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
         // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
-        if ($baseImage && ($this->providerKey() || $dashscopeKey)) {
+        if ($baseImage && (studio_api_key('qwen_edit') || $this->providerKey() || $dashscopeKey)) {
             $edited = $this->editImage($prompt, $baseImage);
             if ($edited) {
                 return $edited;
@@ -531,7 +531,8 @@ class ImageAIService
     protected function editImage(string $prompt, string $imageUrl): ?string
     {
         $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
-        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        // Model edit chuyên dụng dùng KHOA RIÊNG (qwen_edit_key) — mỗi gói có bộ model edit khác nhau.
+        $key = studio_api_key('qwen_edit') ?: studio_api_key('qwen') ?: studio_api_key('dashscope');
         if (! $key) {
             return null;
         }

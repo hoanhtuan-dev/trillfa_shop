@@ -199,6 +199,7 @@ if (! function_exists('studio_api_key')) {
             'wan' => 'wan_key',
             'veo' => 'veo_key',
             'qwen' => 'qwen_key',
+            'qwen_edit' => 'qwen_edit_key',
             'dashscope' => 'dashscope_key',
         ];
 

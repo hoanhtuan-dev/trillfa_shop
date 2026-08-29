@@ -1036,6 +1036,21 @@ class ShopFlowTest extends TestCase
     }
 
 
+    public function test_studio_api_qwen_edit_key(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // The API page shows a dedicated card for the Qwen image-edit key.
+        $this->get('/studio/api')->assertOk()->assertSee('Qwen Edit')
+            ->assertSee('QWEN_EDIT_KEY');
+
+        // studio_api_key('qwen_edit') resolves the dedicated setting (encrypted).
+        set_setting('api_qwen_edit_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-edit-123456'));
+        $this->assertSame('sk-edit-123456', studio_api_key('qwen_edit'));
+    }
+
+
     public function test_studio_dashscope_base_url_routing(): void
     {
         // Pay-As-You-Go (sk-…) -> dashscope-intl host.

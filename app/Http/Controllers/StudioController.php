@@ -394,7 +394,7 @@ class StudioController extends Controller
                 'gemini' => $this->testGemini($key),
                 'replicate' => $this->testReplicate($key),
                 'fal' => ['ok' => true, 'message' => 'Fal.ai: khoá đã lưu (không có endpoint ping miễn phí).'],
-                'wan', 'qwen', 'dashscope' => $this->testDashscope($key),
+                'wan', 'qwen', 'qwen_edit', 'dashscope' => $this->testDashscope($key),
                 default => ['ok' => false, 'message' => 'Không hỗ trợ test '.$service.'.'],
             };
         } catch (\Throwable $e) {
@@ -704,6 +704,7 @@ class StudioController extends Controller
             'wan' => ['label' => 'Wan AI — video (dùng DASHSCOPE_API_KEY)', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY', 'configured' => (bool) (studio_api_key('wan') ?: studio_api_key('dashscope'))],
             'veo' => ['label' => 'Google Veo — video', 'hint' => 'GOOGLE_VEO_KEY', 'configured' => (bool) studio_api_key('veo')],
             'qwen' => ['label' => 'Qwen — ảnh (QwenCloud, dùng endpoint DashScope)', 'hint' => 'QWEN_API_KEY (home.qwencloud.com/api-keys) · model qwen-image', 'configured' => (bool) studio_api_key('qwen')],
+            'qwen_edit' => ['label' => 'Qwen Edit — chỉnh sửa ảnh / Inpaint', 'hint' => 'QWEN_EDIT_KEY · model edit (qwen-image-edit, wanx2.1-imageedit…)', 'configured' => (bool) studio_api_key('qwen_edit')],
             'dashscope' => ['label' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'hint' => 'DASHSCOPE_API_KEY', 'configured' => (bool) studio_api_key('dashscope')],
         ];
 
@@ -712,7 +713,7 @@ class StudioController extends Controller
 
     public function updateApi(Request $request)
     {
-        $services = ['gemini', 'fal', 'replicate', 'wan', 'veo', 'qwen', 'dashscope'];
+        $services = ['gemini', 'fal', 'replicate', 'wan', 'veo', 'qwen', 'qwen_edit', 'dashscope'];
 
         foreach ($services as $service) {
             // Clear if requested, else store a new encrypted key, else keep.
