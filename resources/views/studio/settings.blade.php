@@ -108,7 +108,17 @@
                 <div><label class="label">Ảnh Flux</label><input type="text" name="image_model" value="{{ old('image_model', $image_model) }}" class="input !py-2" placeholder="flux-1.1-schnell"></div>
                 <div><label class="label">Ảnh Wan</label><input type="text" name="wan_model" value="{{ old('wan_model', $wan_model) }}" class="input !py-2" placeholder="wan2.7-image-pro"></div>
                 <div><label class="label">Ảnh Qwen</label><input type="text" name="qwen_model" value="{{ old('qwen_model', $qwen_model) }}" class="input !py-2" placeholder="qwen-image-3.0-pro"></div>
-                <div><label class="label">Qwen Edit (chỉnh sửa ảnh)</label><input type="text" name="qwen_edit_model" value="{{ old('qwen_edit_model', $qwen_edit_model) }}" class="input !py-2" placeholder="qwen-image-edit"></div>
+                <div>
+                    <label class="label">Qwen Edit (chỉnh sửa ảnh / Inpaint)</label>
+                    <input type="text" name="qwen_edit_model" value="{{ old('qwen_edit_model', $qwen_edit_model) }}" class="input !py-2" placeholder="qwen-image-edit" list="qwen-edit-models">
+                    <datalist id="qwen-edit-models">
+                        <option value="qwen-image-edit"></option>
+                        <option value="qwen-image-edit-plus"></option>
+                        <option value="wanx2.1-imageedit"></option>
+                        <option value="wanx2.1-imageedit-plus"></option>
+                    </datalist>
+                    <p class="mt-1 text-xs text-ink-500">Có nhiều model edit ảnh chuyên dụng của Qwen (qwen-image-edit, qwen-image-edit-plus, wanx2.1-imageedit…). Nhập đúng model tài khoản bạn hỗ trợ; dùng chung khoá <strong>Qwen / Wan</strong> ở trang API.</p>
+                </div>
                 <div><label class="label">Ảnh Gemini</label><input type="text" name="gemini_image_model" value="{{ old('gemini_image_model', $gemini_image_model) }}" class="input !py-2" placeholder="gemini-2.5-flash-image"><p class="mt-1 text-xs text-ink-500">Model hợp lệ: <code class="rounded bg-white px-1">gemini-2.5-flash-image</code> · <code class="rounded bg-white px-1">gemini-2.0-flash-preview-image-generation</code> · <code class="rounded bg-white px-1">imagen-4.0-generate-001</code>. Key dùng <code class="rounded bg-white px-1">x-goog-api-key</code> (lấy tại <code class="rounded bg-white px-1">aistudio.google.com/apikey</code>).</p></div>
                 <div>
                     <label class="label">Video (Wan / Veo)</label>

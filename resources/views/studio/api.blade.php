@@ -36,7 +36,7 @@
         <p class="font-semibold">Gợi ý lấy key:</p>
         <ul class="mt-1 list-inside list-disc space-y-0.5">
             <li>Gemini: <code class="rounded bg-white px-1">aistudio.google.com</code> → API key.</li>
-            <li>Qwen / Wan (ảnh & video): dùng <code class="rounded bg-white px-1">DASHSCOPE_API_KEY</code> lấy tại <strong>Alibaba Cloud Model Studio</strong> (Bailian console) — endpoint <code class="rounded bg-white px-1">dashscope-intl.aliyuncs.com</code> (quốc tế) hoặc <code class="rounded bg-white px-1">dashscope.aliyuncs.com</code> (Trung Quốc).</li>
+            <li>Qwen / Wan (ảnh, <strong>chỉnh sửa ảnh</strong> & video): dùng <code class="rounded bg-white px-1">DASHSCOPE_API_KEY</code> lấy tại <strong>Alibaba Cloud Model Studio</strong> (Bailian console) — endpoint <code class="rounded bg-white px-1">dashscope-intl.aliyuncs.com</code> (quốc tế) hoặc <code class="rounded bg-white px-1">dashscope.aliyuncs.com</code> (Trung Quốc). Khoá này dùng chung cho model tạo ảnh, <strong>model edit (qwen-image-edit / qwen-image-edit-plus / wanx2.1-imageedit…)</strong> và video; model edit được chọn trong Cài đặt.</li>
         <li><strong>Lưu ý:</strong> key từ <code class="rounded bg-white px-1">home.qwencloud.com/api-keys</code> là <strong>key Qwen Cloud — nền tảng riêng</strong>, KHÔNG chạy trên endpoint DashScope (test sẽ báo InvalidApiKey). Nếu dùng QwenCloud, cần tích hợp endpoint QwenCloud riêng.</li>
             <li>Replicate: <code class="rounded bg-white px-1">replicate.com/account/api-tokens</code>.</li>
         </ul>

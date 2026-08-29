@@ -655,8 +655,7 @@ document.addEventListener('alpine:init', () => {
             const t = g.type === 'video' ? 'VIDEO' : 'ẢNH';
             const md = this.genInfoLine(g);
             const p = g.prompt ? 'Prompt: ' + g.prompt : '';
-            return t + (md ? ' — ' + md : '') + (p ? '
-' + p : '');
+            return t + (md ? ' — ' + md : '') + (p ? String.fromCharCode(10) + p : '');
         },
 
         maybePoll(id, status) { if (['completed','failed','cancelled'].includes(status)) return; this.poll(id); },
