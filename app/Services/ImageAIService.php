@@ -498,7 +498,7 @@ class ImageAIService
         return null;
     }
 
-    protected function downscaleImageBase64(string $path): array
+    protected function downscaleImageBase64(string $path, int $max = 768): array
     {
         $img = @imagecreatefromstring((string) file_get_contents($path));
         if (! $img) {
@@ -506,7 +506,6 @@ class ImageAIService
         }
         $w = imagesx($img);
         $h = imagesy($img);
-        $max = 768;
         if ($w > $max || $h > $max) {
             $scale = min($max / $w, $max / $h);
             $nw = max(1, (int) ($w * $scale));
@@ -528,6 +527,31 @@ class ImageAIService
      * Inpaint using the Qwen image-edit model with the source image as input.
      * Returns null on failure so the caller falls back to normal generation.
      */
+    /**
+     * Return the source image as a base64 data URI so the edit model is guaranteed to receive it
+     * (a URL the provider can't fetch makes the model fall back to text2image -> creates a new image).
+     */
+    protected function imageDataUri(string $url): ?string
+    {
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
+            if (is_file($c)) {
+                $file = $c;
+                break;
+            }
+        }
+        if (! $file) {
+            return null;
+        }
+        [$b64, $mime] = $this->downscaleImageBase64($file, 1600);
+        if ($b64 === '') {
+            return null;
+        }
+
+        return 'data:'.$mime.';base64,'.$b64;
+    }
+
     protected function editImage(string $prompt, string $imageUrl): ?string
     {
         $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
@@ -539,11 +563,17 @@ class ImageAIService
         $base = dashscope_base_url($key).'/api/v1';
 
         try {
+            $source = $this->imageDataUri($imageUrl);
+            if (! $source) {
+                logger()->warning('Edit: cannot read source image', ['url' => $imageUrl]);
+                return null;
+            }
+
             $resp = Http::withToken($key)->timeout(180)
                 ->post($base.'/services/aigc/multimodal-generation/generation', [
                     'model' => $model,
                     'input' => ['messages' => [['role' => 'user', 'content' => [
-                        ['image' => url($imageUrl)],
+                        ['image' => $source],
                         ['text' => $prompt],
                     ]]]],
                     'parameters' => ['watermark' => false],
