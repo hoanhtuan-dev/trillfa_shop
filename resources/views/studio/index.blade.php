@@ -399,7 +399,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
-        _timers: {},
+        _timers: {}, now: Date.now(),
 
         async init() {
             const q = new URLSearchParams(location.search).get('gen');
@@ -428,7 +428,9 @@ document.addEventListener('alpine:init', () => {
             } else {
                 this.openGem(this.generations.find(g => g.status === 'completed') || null);
             }
-            this.generations.forEach(g => { if (this.isActive(g.status)) this.poll(g.id); });
+            this.generations.forEach(g => { if (this.isActive(g.status)) { g._t0 = g._t0 || Date.now(); this.poll(g.id); } });
+            // Live clock so the status text shows a running "(Xs)" while a task is generating.
+            setInterval(() => { this.now = Date.now(); }, 1000);
         },
         openGem(g) {
             if (!g) { this.previewId = null; this.selectedImageId = null; this.palette = []; return; }
@@ -623,7 +625,7 @@ document.addEventListener('alpine:init', () => {
             finally { this.suggesting = false; }
         },
 
-        addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else this.generations.unshift(gen); this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
+        addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else { gen._t0 = Date.now(); this.generations.unshift(gen); } this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
         async syncLatest() { try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); if (d && d.items) this.generations = d.items; } catch (e) {} },
         selectImage(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.selectedImageId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Chỉnh sửa.'); },
         selectVideo(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.videoSourceId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Video.'); },
@@ -634,7 +636,8 @@ document.addEventListener('alpine:init', () => {
         statusText(g) {
             if (g.status === 'failed') return 'Lỗi: ' + (g.error || 'không xác định');
             if (g.status === 'cancelled') return 'Đã hủy';
-            return g.type === 'video' ? 'Đang render video…' : 'Đang tạo ảnh…';
+            const el = (g._t0 && this.isActive(g.status)) ? ' (' + this.fmtElapsed(this.now - g._t0) + ')' : '';
+            return (g.type === 'video' ? 'Đang render video…' : 'Đang tạo ảnh…') + el;
         },
         fmtElapsed(ms) {
             ms = Number(ms) || 0;
