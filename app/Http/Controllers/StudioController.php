@@ -18,6 +18,7 @@ class StudioController extends Controller
     public function index()
     {
         $user = auth()->user();
+        $this->reconcileStuckCredits($user);
 
         $projects = $user->projects()->withCount('generations')->latest()->get();
         $presets = Preset::orderBy('sort_order')->get()->groupBy('category');
@@ -228,14 +229,31 @@ class StudioController extends Controller
         return response()->json(['message' => 'Đã xóa nhiệm vụ.']);
     }
 
+    /**
+     * Refund credits held by jobs stuck in 'processing' (e.g. the web request was killed mid-run),
+     * so the balance reflects reality and creation is not blocked by phantom usage.
+     */
+    protected function reconcileStuckCredits($user): void
+    {
+        $stuck = $user->generations()
+            ->where('status', 'processing')
+            ->where('updated_at', '<', now()->subMinutes(30))
+            ->get();
+
+        foreach ($stuck as $g) {
+            $g->update(['status' => 'failed', 'error' => 'Hết thời gian xử lý (job bị ngắt).']);
+            if ($g->credits_cost > 0) {
+                $g->user?->increment('credits_balance', $g->credits_cost);
+            }
+        }
+    }
+
     protected function queueGeneration(string $type, array $data, int $cost, ?Generation $source = null)
     {
         $user = auth()->user();
 
-        if ($user->credits_balance < $cost) {
-            return response()->json(['message' => 'Bạn không đủ tín dụng. Yêu cầu '.$cost.' tín dụng.'], 422);
-        }
-
+        // Internal admin tool: never hard-block on credits. Track usage (balance may go negative).
+        $this->reconcileStuckCredits($user);
         $user->decrement('credits_balance', $cost);
 
         if (! empty($data['edit'])) {
