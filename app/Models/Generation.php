@@ -12,8 +12,15 @@ class Generation extends Model
 
     protected $fillable = [
         'user_id', 'project_id', 'prompts_history_id', 'type', 'status',
-        'prompt', 'model', 'provider', 'resolution', 'ratio', 'duration', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost',
+        'prompt', 'model', 'provider', 'resolution', 'ratio', 'duration', 'media_url', 'base_image', 'mask_image', 'job_id', 'error', 'credits_cost', 'elapsed_ms', 'meta',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'meta' => 'array',
+        ];
+    }
 
     public const STATUS_CANCELLED = 'cancelled';
 

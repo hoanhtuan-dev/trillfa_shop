@@ -834,6 +834,9 @@ class ShopFlowTest extends TestCase
         $this->assertSame('image', $gen->type);
         $this->assertNotNull($gen->fresh()->media_url);
         $this->assertSame(999, $user->fresh()->credits_balance);
+        // Creation metadata recorded (real elapsed time + info used).
+        $this->assertNotNull($gen->fresh()->elapsed_ms);
+        $this->assertSame('image', ($gen->fresh()->meta['type'] ?? null));
 
         // Video (cost 10).
         $video = $this->postJson('/studio/video', [
@@ -850,6 +853,9 @@ class ShopFlowTest extends TestCase
         $this->assertSame('video', $vgen->type);
         $this->assertNotNull($vgen->fresh()->media_url);
         $this->assertSame(989, $user->fresh()->credits_balance);
+        // Video metadata recorded.
+        $this->assertNotNull($vgen->fresh()->elapsed_ms);
+        $this->assertSame('video', ($vgen->fresh()->meta['type'] ?? null));
     }
 
 

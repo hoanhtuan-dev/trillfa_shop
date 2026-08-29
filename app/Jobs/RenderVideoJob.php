@@ -22,6 +22,7 @@ class RenderVideoJob implements ShouldQueue
 
     public function handle(VideoAIService $videos): void
     {
+        $t0 = microtime(true);
         $generation = Generation::find($this->generationId);
 
         if (! $generation) {
@@ -55,9 +56,30 @@ class RenderVideoJob implements ShouldQueue
                 $generation->duration,
             );
 
-            $generation->update(['status' => 'completed', 'media_url' => $url]);
+            $generation->update([
+                'status' => 'completed',
+                'media_url' => $url,
+                'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
+                'meta' => [
+                    'type' => 'video',
+                    'provider' => $generation->provider,
+                    'model' => $generation->model,
+                    'resolution' => $generation->resolution,
+                    'duration' => $generation->duration,
+                    'camera' => $camera,
+                    'creative_level' => $pr['creative_level'] ?? null,
+                    'adherence' => $pr['adherence'] ?? null,
+                    'negative_prompt' => $pr['negative_prompt'] ?? null,
+                    'base_image' => $generation->base_image,
+                ],
+            ]);
+            logger()->info('Video generation completed', [
+                'generation_id' => $generation->id, 'provider' => $generation->provider,
+                'model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
+                'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
+            ]);
         } catch (\Throwable $e) {
-            $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
+            $generation->update(['status' => 'failed', 'error' => $e->getMessage(), 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000)]);
             $this->refund($generation);
         }
     }

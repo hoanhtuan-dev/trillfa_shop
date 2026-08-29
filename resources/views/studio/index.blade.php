@@ -9,6 +9,8 @@
         'model' => $g->model, 'provider' => $g->provider,
         'media_url' => $g->media_url, 'error' => $g->error, 'credits_cost' => $g->credits_cost,
         'project_id' => $g->project_id, 'created_at' => $g->created_at?->format('d/m H:i'),
+        'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
+        'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta,
     ])->values();
     $projectsJs = $projects->map(fn($p) => ['id' => $p->id, 'name' => $p->name])->values();
 
@@ -210,7 +212,10 @@
 
                 <!-- Action bar -->
                 <div class="flex flex-wrap items-center justify-between gap-2 border-t border-cream-200 px-4 py-3 text-xs" x-show="preview">
-                    <span class="truncate text-ink-500" x-text="preview ? (preview.created_at || '') + ' · ' + preview.credits_cost + ' token' : ''"></span>
+                    <span class="flex min-w-0 items-center gap-2 text-ink-500">
+                        <span class="badge text-[10px] font-bold" :class="preview && preview.type === 'video' ? 'bg-ink-900 text-white' : 'bg-cream-200 text-ink-700'" x-text="preview && preview.type === 'video' ? '▶ VIDEO' : (preview ? 'ẢNH' : '')"></span>
+                        <span class="truncate text-[11px]" x-text="preview ? genInfoLine(preview) + ' · ' + preview.credits_cost + ' token' : ''"></span>
+                    </span>
                     <span class="flex flex-wrap items-center gap-2">
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Chỉnh sửa (Inpaint) ở bảng bên trái.">✏️ Sửa ảnh <span x-show="selectedImageId === preview.id" class="ml-0.5 text-[10px]">✓</span></button>
                         <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Render Video catwalk ở bảng bên dưới.">🎬 Tạo video <span x-show="videoSourceId === preview.id" class="ml-0.5 text-[10px] text-brand-700">✓</span></button>
@@ -264,11 +269,17 @@
                 </div>
                 <div class="grid max-h-[64vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
                     <template x-for="g in generations" :key="g.id">
-                        <button type="button" @click="setPreview(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'">
+                        <button type="button" @click="setPreview(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
                             <div class="relative">
-                                <template x-if="g.status === 'completed' && g.media_url"><img :src="g.media_url" class="aspect-[3/4] w-full object-cover" onerror="this.src='/images/placeholder.svg'"></template>
+                                <template x-if="g.status === 'completed' && g.media_url">
+                                    <div class="relative aspect-[3/4] w-full bg-cream-100">
+                                        <img :src="g.media_url" class="absolute inset-0 h-full w-full object-cover" onerror="this.src='/images/placeholder.svg'">
+                                        <template x-if="g.type === 'video'"><div class="absolute inset-0 grid place-items-center"><span class="grid h-10 w-10 place-items-center rounded-full bg-ink-900/70 text-white">▶</span></div></template>
+                                    </div>
+                                </template>
                                 <template x-if="g.status !== 'completed'"><div class="grid aspect-[3/4] w-full place-items-center bg-cream-100"><span x-show="isActive(g.status)" class="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></span></div></template>
                                 <span class="absolute left-1 top-1 badge text-[9px]" :class="badgeClass(g.status)" x-text="statusLabel(g.status)"></span>
+                                <span class="absolute right-1 top-1 badge text-[9px] font-bold" :class="g.type === 'video' ? 'bg-ink-900/85 text-white' : 'bg-cream-200 text-ink-700'" x-text="g.type === 'video' ? (g.duration ? 'VIDEO ' + g.duration + 's' : 'VIDEO') : 'ẢNH'"></span>
                             </div>
                         </button>
                     </template>
@@ -587,6 +598,33 @@ document.addEventListener('alpine:init', () => {
             if (g.status === 'failed') return 'Lỗi: ' + (g.error || 'không xác định');
             if (g.status === 'cancelled') return 'Đã hủy';
             return g.type === 'video' ? 'Đang render video…' : 'Đang tạo ảnh…';
+        },
+        fmtElapsed(ms) {
+            ms = Number(ms) || 0;
+            if (!ms) return '';
+            const s = Math.max(0, Math.round(ms / 1000));
+            return s < 60 ? s + 's' : Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+        },
+        genInfoLine(g) {
+            if (!g) return '';
+            const parts = [];
+            if (g.provider) parts.push(g.provider);
+            if (g.model) parts.push(g.model);
+            if (g.type === 'video' && g.duration) parts.push('⏱ ' + g.duration + 's');
+            if (g.ratio) parts.push(g.ratio);
+            if (g.resolution) parts.push(g.resolution);
+            if (g.elapsed_ms) parts.push('tạo ' + this.fmtElapsed(g.elapsed_ms));
+            if (g.meta && g.meta.creative_level) parts.push('sáng tạo ' + g.meta.creative_level + '/10');
+            if (g.created_at) parts.push(g.created_at);
+            return parts.join(' · ');
+        },
+        gTitle(g) {
+            if (!g) return '';
+            const t = g.type === 'video' ? 'VIDEO' : 'ẢNH';
+            const md = this.genInfoLine(g);
+            const p = g.prompt ? 'Prompt: ' + g.prompt : '';
+            return t + (md ? ' — ' + md : '') + (p ? '
+' + p : '');
         },
 
         maybePoll(id, status) { if (['completed','failed','cancelled'].includes(status)) return; this.poll(id); },

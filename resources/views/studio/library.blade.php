@@ -14,11 +14,13 @@
         'credits_cost' => $g->credits_cost,
         'project' => $g->project?->name,
         'created_at' => $g->created_at?->format('d/m/Y H:i'),
+        'duration' => $g->duration, 'resolution' => $g->resolution, 'ratio' => $g->ratio,
+        'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta,
     ])->values();
 @endphp
 
 @section('content')
-<div x-data="{ sel:null, q:'', items: {{ Js::from($items) }}, total: {{ $generations->total() }}, lbZoom:1, lbPan:{x:0,y:0}, _lbDrag:null, open(i){ this.sel=i; this.lbZoom=1; this.lbPan={x:0,y:0}; document.body.classList.add('overflow-hidden'); }, close(){ this.sel=null; document.body.classList.remove('overflow-hidden'); }, lbZin(){ this.lbZoom=Math.min(8, +(this.lbZoom+0.5).toFixed(2)); }, lbZout(){ this.lbZoom=Math.max(0.6, +(this.lbZoom-0.5).toFixed(2)); }, lbReset(){ this.lbZoom=1; this.lbPan={x:0,y:0}; }, onLbWheel(e){ e.preventDefault(); const d=e.deltaY>0?-0.5:0.5; this.lbZoom=Math.min(8, Math.max(0.6, +(this.lbZoom+d).toFixed(2))); }, lbStartPan(e){ this._lbDrag={x:e.clientX,y:e.clientY,px:this.lbPan.x,py:this.lbPan.y}; }, lbMovePan(e){ if(!this._lbDrag) return; this.lbPan.x=this._lbDrag.px+(e.clientX-this._lbDrag.x); this.lbPan.y=this._lbDrag.py+(e.clientY-this._lbDrag.y); }, lbEndPan(){ this._lbDrag=null; }, async del(item){ try { const res = await fetch('/studio/generations/' + item.id, { method:'DELETE', headers:{ 'X-CSRF-TOKEN':(document.querySelector('meta[name=csrf-token]')||{}).content||'', Accept:'application/json' } }); const d = await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.message||'Lỗi khi xóa.'); this.items = this.items.filter(x => x.id !== item.id); this.total = Math.max(0, this.total - 1); this.close(); Alpine.store('toast').show(d.message || 'Đã xóa.'); } catch(e){ Alpine.store('toast').show(e.message, 'error'); } } }">
+<div x-data="{ sel:null, q:'', items: {{ Js::from($items) }}, total: {{ $generations->total() }}, lbZoom:1, lbPan:{x:0,y:0}, _lbDrag:null, open(i){ this.sel=i; this.lbZoom=1; this.lbPan={x:0,y:0}; document.body.classList.add('overflow-hidden'); }, close(){ this.sel=null; document.body.classList.remove('overflow-hidden'); }, lbZin(){ this.lbZoom=Math.min(8, +(this.lbZoom+0.5).toFixed(2)); }, lbZout(){ this.lbZoom=Math.max(0.6, +(this.lbZoom-0.5).toFixed(2)); }, lbReset(){ this.lbZoom=1; this.lbPan={x:0,y:0}; }, onLbWheel(e){ e.preventDefault(); const d=e.deltaY>0?-0.5:0.5; this.lbZoom=Math.min(8, Math.max(0.6, +(this.lbZoom+d).toFixed(2))); }, lbStartPan(e){ this._lbDrag={x:e.clientX,y:e.clientY,px:this.lbPan.x,py:this.lbPan.y}; }, lbMovePan(e){ if(!this._lbDrag) return; this.lbPan.x=this._lbDrag.px+(e.clientX-this._lbDrag.x); this.lbPan.y=this._lbDrag.py+(e.clientY-this._lbDrag.y); }, lbEndPan(){ this._lbDrag=null; }, fmtElapsed(ms){ ms=Number(ms)||0; if(!ms) return ''; const s=Math.max(0,Math.round(ms/1000)); return s<60? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s'; }, genMeta(i){ const p=[]; if(i.provider)p.push(i.provider); if(i.model)p.push(i.model); if(i.type==='video'&&i.duration)p.push('⏱ '+i.duration+'s'); if(i.ratio)p.push(i.ratio); if(i.resolution)p.push(i.resolution); if(i.elapsed_ms)p.push('tạo '+this.fmtElapsed(i.elapsed_ms)); if(i.created_at)p.push(i.created_at); return p.join(' · '); }, async del(item){ try { const res = await fetch('/studio/generations/' + item.id, { method:'DELETE', headers:{ 'X-CSRF-TOKEN':(document.querySelector('meta[name=csrf-token]')||{}).content||'', Accept:'application/json' } }); const d = await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.message||'Lỗi khi xóa.'); this.items = this.items.filter(x => x.id !== item.id); this.total = Math.max(0, this.total - 1); this.close(); Alpine.store('toast').show(d.message || 'Đã xóa.'); } catch(e){ Alpine.store('toast').show(e.message, 'error'); } } }">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 class="font-display text-2xl font-bold text-ink-900">Thư viện</h1>
         <span class="text-sm text-ink-500"><span x-text="total"></span> mục</span>
@@ -73,7 +75,8 @@
                             </div>
                         </template>
                         <span class="absolute left-2 top-2 badge" :class="i.status==='completed' ? 'bg-brand-600 text-white' : (i.status==='failed' ? 'bg-red-100 text-red-600' : (i.status==='cancelled' ? 'bg-cream-200 text-ink-500' : 'bg-amber-100 text-amber-700'))" x-text="i.status==='completed'?'Hoàn tất':(i.status==='failed'?'Lỗi':(i.status==='cancelled'?'Đã hủy':'Đang tạo'))"></span>
-                        <span x-show="i.type==='video'" class="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-ink-900/70 text-white" title="Video">▶</span>
+                        <span x-show="i.type==='video'" class="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-ink-900/70 text-white" title="Video">▶</span>
+                        <span class="absolute right-2 bottom-2 badge text-[9px] font-bold" :class="i.type==='video' ? 'bg-ink-900/85 text-white' : 'bg-cream-200 text-ink-700'" x-text="i.type==='video' ? (i.duration ? 'VIDEO '+i.duration+'s' : 'VIDEO') : 'ẢNH'"></span>
                     </div>
                     <div class="flex items-center justify-between gap-1 border-t border-cream-200 px-3 py-2 text-xs text-ink-500">
                         <span class="truncate" x-text="i.created_at || ''"></span>
@@ -118,8 +121,11 @@
                 <div class="space-y-3 p-5">
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                            <h2 class="font-display text-lg font-semibold text-ink-900">Mục #<span x-text="sel.id"></span></h2>
-                            <p class="text-xs text-ink-500" x-text="(sel.provider || '') + ' · ' + (sel.model || '') + ' · ' + (sel.created_at || '')"></p>
+                            <div class="flex items-center gap-2">
+                                <h2 class="font-display text-lg font-semibold text-ink-900">Mục #<span x-text="sel.id"></span></h2>
+                                <span class="badge text-[10px] font-bold" :class="sel.type==='video' ? 'bg-ink-900 text-white' : 'bg-cream-200 text-ink-700'" x-text="sel.type==='video' ? '▶ VIDEO' : 'ẢNH'"></span>
+                            </div>
+                            <p class="mt-1 text-xs text-ink-500" x-text="genMeta(sel)"></p>
                         </div>
                         <span class="badge bg-cream-200 text-ink-700"><span x-text="sel.credits_cost || 0"></span> token</span>
                     </div>

@@ -195,6 +195,11 @@ class StudioController extends Controller
             'media_url' => $g->media_url,
             'error' => $g->error,
             'credits_cost' => $g->credits_cost,
+            'resolution' => $g->resolution,
+            'ratio' => $g->ratio,
+            'duration' => $g->duration,
+            'elapsed_ms' => $g->elapsed_ms,
+            'meta' => $g->meta,
         ]);
     }
 
@@ -848,6 +853,8 @@ class StudioController extends Controller
                 'media_url' => $g->media_url, 'error' => $g->error,
                 'credits_cost' => $g->credits_cost, 'project_id' => $g->project_id,
                 'created_at' => $g->created_at?->format('d/m H:i'),
+                'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
+                'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta,
             ])->values();
 
         return response()->json(['items' => $items]);

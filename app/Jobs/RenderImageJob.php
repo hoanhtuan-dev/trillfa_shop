@@ -42,6 +42,7 @@ class RenderImageJob implements ShouldQueue
             $prompt = (string) $generation->prompt;
             $faceRef = (string) setting('studio_face_ref', '');
             $faceSyncOn = filter_var(studio_config('face_sync_enabled', true), FILTER_VALIDATE_BOOL);
+            $faceDesc = '';
             if ($faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/')) {
                 $hash = md5($faceRef);
                 $faceDesc = ((string) setting('studio_face_desc_hash', '') === $hash)
@@ -73,13 +74,30 @@ class RenderImageJob implements ShouldQueue
                 $url = $this->applyBrandLogo($url);
             }
 
-            $generation->update(['status' => 'completed', 'media_url' => $url]);
+            $pr = (array) ($generation->promptsHistory?->json_response ?? []);
+            $generation->update([
+                'status' => 'completed',
+                'media_url' => $url,
+                'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
+                'meta' => [
+                    'type' => 'image',
+                    'provider' => $generation->provider,
+                    'model' => $generation->model,
+                    'resolution' => $generation->resolution,
+                    'ratio' => $generation->ratio,
+                    'creative_level' => $pr['creative_level'] ?? null,
+                    'adherence' => $pr['adherence'] ?? null,
+                    'negative_prompt' => $pr['negative_prompt'] ?? null,
+                    'face_sync' => ($faceDesc !== ''),
+                ],
+            ]);
             logger()->info('Image generation completed', [
                 'generation_id' => $generation->id, 'provider' => $generation->provider,
                 'model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
+                'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
         } catch (\Throwable $e) {
-            $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
+            $generation->update(['status' => 'failed', 'error' => $e->getMessage(), 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000)]);
             $this->refund($generation);
             logger()->warning('Image generation failed', [
                 'generation_id' => $generation->id, 'total_s' => round(microtime(true) - $t0, 2),
