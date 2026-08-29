@@ -41,7 +41,7 @@ class StyleSuggestService
 
     protected function suggestViaQwenVision(string $imagePath, string $key): array
     {
-        $model = (string) studio_config('vision_model', 'qwen-vl-max');
+        $model = (string) studio_config('qwen_vision_model', 'qwen3.8-flash');
         [$b64, $mime] = $this->downscaleBase64($imagePath);
         $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
         $prompt = 'Analyze this fashion model photo and its garment. Return ONLY valid JSON with keys: '

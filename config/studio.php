@@ -27,10 +27,12 @@ return [
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image-3.0-pro'),
     'qwen_edit_model' => env('STUDIO_QWEN_EDIT_MODEL', 'qwen-image-edit'),
+    'brand_name' => env('STUDIO_BRAND_NAME', ''),
     'gemini_image_model' => env('STUDIO_GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
     'vision_provider' => env('STUDIO_VISION_PROVIDER', 'gemini'), // gemini | qwen
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-2.5-flash'),
+    'qwen_vision_model' => env('STUDIO_QWEN_VISION_MODEL', 'qwen3.8-flash'),
     'image_resolution' => env('STUDIO_IMAGE_RESOLUTION', '2K'), // 1K | 2K
     'video_resolution' => env('STUDIO_VIDEO_RESOLUTION', '720'), // 480 | 720 | 1080
     'image_ratio' => env('STUDIO_IMAGE_RATIO', '1:1'), // 1:1 | 4:3 | 3:4 | 16:9 | 9:16 | 4:5 | 21:9 | 19:6

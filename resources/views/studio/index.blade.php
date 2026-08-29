@@ -326,8 +326,11 @@ document.addEventListener('alpine:init', () => {
         _timers: {},
 
         init() {
-            const f = this.generations.find(g => g.status === 'completed');
+            const q = new URLSearchParams(location.search).get('gen');
+            const target = q ? this.generations.find(g => g.id === Number(q)) : null;
+            const f = target || this.generations.find(g => g.status === 'completed');
             if (f) { this.previewId = f.id; this.loadPalette(f.id); }
+            if (target && target.status === 'completed') this.selectImage(target);
             this.generations.forEach(g => { if (this.isActive(g.status)) this.poll(g.id); });
         },
         get preview() { return this.generations.find(g => g.id === this.previewId) || null; },

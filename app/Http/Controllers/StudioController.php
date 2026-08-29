@@ -125,6 +125,7 @@ class StudioController extends Controller
         if ($generation->media_url) {
             $data['base_image'] = $generation->media_url;
         }
+        $data['edit'] = true;
 
         $cost = (int) studio_config('image_credits', 1);
 
@@ -233,7 +234,12 @@ class StudioController extends Controller
 
         $user->decrement('credits_balance', $cost);
 
-        [$provider, $model] = $this->defaultProviderModel($type);
+        if (! empty($data['edit'])) {
+            $provider = 'qwen';
+            $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+        } else {
+            [$provider, $model] = $this->defaultProviderModel($type);
+        }
 
         $generation = $user->generations()->create([
             'project_id' => $data['project_id'] ?? null,
