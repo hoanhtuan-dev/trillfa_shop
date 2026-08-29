@@ -622,6 +622,12 @@ class ImageAIService
                         .'Dùng key Pay-As-You-Go cho Inpaint (Quản lý API → “Qwen Edit”), hoặc chọn model edit có trên gói.';
                     break;
                 }
+                if ($resp->status() === 403) {
+                    $this->dashscopeError = 'Model “'.$model.'” chưa được mua/kích hoạt trên tài khoản (403 AccessDenied.Unpurchased). '
+                        .'Bật/mua model Qwen-Image-Edit (vd qwen-image-edit, qwen-image-edit-plus) trong QwenCloud Model Center, '
+                        .'hoặc dùng Gemini. Sau khi bật, chọn lại “Qwen Edit” trong Cài đặt.';
+                    break;
+                }
                 if ($resp->status() === 401) {
                     continue; // invalid key -> try the next one
                 }

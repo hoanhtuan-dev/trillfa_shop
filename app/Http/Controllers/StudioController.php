@@ -403,7 +403,8 @@ class StudioController extends Controller
                 'gemini' => $this->testGemini($key),
                 'replicate' => $this->testReplicate($key),
                 'fal' => ['ok' => true, 'message' => 'Fal.ai: khoá đã lưu (không có endpoint ping miễn phí).'],
-                'wan', 'qwen', 'qwen_edit', 'dashscope' => $this->testDashscope($key),
+                'wan', 'qwen', 'dashscope' => $this->testDashscope($key),
+                'qwen_edit' => $this->testQwenEdit($key),
                 default => ['ok' => false, 'message' => 'Không hỗ trợ test '.$service.'.'],
             };
         } catch (\Throwable $e) {
@@ -429,6 +430,47 @@ class StudioController extends Controller
         return $resp->successful()
             ? ['ok' => true, 'message' => 'Replicate: kết nối OK.']
             : ['ok' => false, 'message' => 'Replicate: HTTP '.$resp->status().' — key không hợp lệ'];
+    }
+
+    /**
+     * Lightweight eligibility probe for the dedicated Qwen image-edit model (auth/eligibility only).
+     */
+    protected function testQwenEdit(string $key): array
+    {
+        $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+        $base = dashscope_base_url($key).'/api/v1';
+        $onePx = 'data:image/png;base64,'.base64_encode(base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='));
+
+        try {
+            $resp = Http::withToken($key)->timeout(25)
+                ->post($base.'/services/aigc/multimodal-generation/generation', [
+                    'model' => $model,
+                    'input' => ['messages' => [['role' => 'user', 'content' => [
+                        ['image' => $onePx],
+                        ['text' => 'no change'],
+                    ]]]],
+                    'parameters' => ['watermark' => false],
+                ]);
+
+            if ($resp->successful()) {
+                return ['ok' => true, 'message' => 'Qwen Edit “'.$model.'” khả dụng (kết nối OK).'];
+            }
+
+            if ($resp->status() === 403) {
+                return ['ok' => false, 'message' => 'Model edit “'.$model.'” CHƯA được mua/kích hoạt (403 AccessDenied.Unpurchased). '
+                    .'Bật/mua model Qwen-Image-Edit trong QwenCloud Model Center, hoặc dùng Gemini.'];
+            }
+            if ($resp->status() === 404) {
+                return ['ok' => false, 'message' => 'Model edit “'.$model.'” không tồn tại trên host này. Chọn model edit đúng gói/QwenCloud.'];
+            }
+            if ($resp->status() === 401) {
+                return ['ok' => false, 'message' => 'Khoá không hợp lệ (401 InvalidApiKey). Dùng key Pay-As-You-Go (sk-…/sk-ws-…).'];
+            }
+
+            return ['ok' => false, 'message' => 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180)];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'message' => 'Đã gửi yêu cầu nhưng chưa có phản hồi ('.$e->getMessage().'). Model có thể đang xử lý — thử lại sau.'];
+        }
     }
 
     protected function testDashscope(string $key): array
