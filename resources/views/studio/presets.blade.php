@@ -3,8 +3,8 @@
 @section('title', 'Prompt Templates · Trillfa Studio')
 
 @php
-    $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy'];
-    $catColors = ['fabric'=>'bg-cream-100 text-ink-700','silhouette'=>'bg-cream-100 text-ink-700','style'=>'bg-brand-50 text-brand-800','background'=>'bg-cream-100 text-ink-700','pose'=>'bg-cream-100 text-ink-700','camera'=>'bg-brand-50 text-brand-800'];
+    $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy','lens'=>'Ống kính','video_scene'=>'Kịch bản quay'];
+    $catColors = ['fabric'=>'bg-cream-100 text-ink-700','silhouette'=>'bg-cream-100 text-ink-700','style'=>'bg-brand-50 text-brand-800','background'=>'bg-cream-100 text-ink-700','pose'=>'bg-cream-100 text-ink-700','camera'=>'bg-brand-50 text-brand-800','lens'=>'bg-cream-100 text-ink-700','video_scene'=>'bg-brand-50 text-brand-800'];
 @endphp
 
 @section('content')
@@ -45,6 +45,10 @@
             <label class="label">Value (prompt tiếng Anh)</label>
             <textarea name="prompt_injection" rows="2" class="input !text-xs" placeholder="VD: old money aesthetic, timeless elegance, tailored linen and cashmere, neutral tones…"></textarea>
         </div>
+        <div class="mt-3">
+            <label class="label">Chú giải (tiếng Việt — hiển thị khi hover / xem thông tin template)</label>
+            <textarea name="note" rows="1" class="input !text-xs" placeholder="VD: Chụp Lookbook thương mại, hiển thị tỷ lệ trang phục trung thực."></textarea>
+        </div>
         @if($errors->any())<div class="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </form>
 
@@ -70,6 +74,7 @@
                                     <input type="number" name="sort_order" value="{{ $p->sort_order }}" min="0" title="Thứ tự" class="w-20 input !py-1.5 text-sm">
                                 </div>
                                 <textarea name="prompt_injection" rows="2" class="input !text-xs" placeholder="Giá trị prompt…">{{ $p->prompt_injection }}</textarea>
+                                <textarea name="note" rows="1" class="input !text-xs" placeholder="Chú giải tiếng Việt…">{{ $p->note }}</textarea>
                                 <div class="flex items-center justify-end gap-2">
                                     <span class="text-[10px] text-ink-500">#{{ $p->id }}</span>
                                     <button type="submit" class="btn-outline btn-sm">Lưu</button>

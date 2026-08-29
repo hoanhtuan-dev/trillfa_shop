@@ -755,7 +755,7 @@ class StudioController extends Controller
     public function presets()
     {
         $presets = Preset::orderBy('sort_order')->get()->groupBy('category');
-        $categories = ['fabric', 'silhouette', 'style', 'background', 'pose', 'camera'];
+        $categories = ['fabric', 'silhouette', 'style', 'background', 'pose', 'camera', 'lens', 'video_scene'];
 
         return view('studio.presets', compact('presets', 'categories'));
     }
@@ -766,6 +766,7 @@ class StudioController extends Controller
             'category' => ['required', 'string', 'max:40'],
             'ui_label' => ['required', 'string', 'max:120'],
             'prompt_injection' => ['required', 'string', 'max:1000'],
+            'note' => ['nullable', 'string', 'max:600'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
@@ -779,6 +780,7 @@ class StudioController extends Controller
         $data = $request->validate([
             'ui_label' => ['required', 'string', 'max:120'],
             'prompt_injection' => ['required', 'string', 'max:1000'],
+            'note' => ['nullable', 'string', 'max:600'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 

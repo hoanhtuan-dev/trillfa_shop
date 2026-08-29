@@ -108,7 +108,7 @@
                     <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
                 </div>
                 <div class="space-y-4">
-                    <template x-for="group in presets" :key="group.category">
+                    <template x-for="group in presetGroups" :key="group.category">
                         <div>
                             <label class="label" x-text="catLabels[group.category] || group.category"></label>
                             <div class="flex flex-wrap gap-1.5">
@@ -453,6 +453,7 @@ document.addEventListener('alpine:init', () => {
         lbMovePan(e) { if (!this._lbDrag) return; this.lbPan.x = this._lbDrag.px + (e.clientX - this._lbDrag.x); this.lbPan.y = this._lbDrag.py + (e.clientY - this._lbDrag.y); },
         lbEndPan() { this._lbDrag = null; },
         get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
+        get presetGroups() { return this.presets.filter(g => g.category !== 'video_scene'); },
         async loadPalette(id) {
             if (!id) { this.palette = []; return; }
             try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }

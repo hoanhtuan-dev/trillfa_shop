@@ -51,6 +51,13 @@ class ImageAIService
             if ($edited) {
                 return $edited;
             }
+            // Inpaint must NOT silently fall through to text2image — that produces a brand-new image
+            // instead of editing the source. Surface the real error so the user can fix the edit model.
+            logger()->warning('Inpaint failed: edit model returned no result (no text2image fallback)', [
+                'model' => studio_config('qwen_edit_model', 'qwen-image-edit'),
+                'err' => $this->dashscopeError,
+            ]);
+            throw new \RuntimeException('Không thể chỉnh sửa ảnh (model edit không trả kết quả). Kiểm tra model “Qwen Edit” trong Cài đặt và khoá “Qwen Edit” trong Quản lý API.');
         }
 
         if ($provider === 'gemini') {
