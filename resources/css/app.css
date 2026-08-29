@@ -132,13 +132,13 @@
     .prose-content a { @apply text-brand-700 underline underline-offset-2; }
     .prose-content img { @apply my-6 w-full rounded-2xl; }
     .studio-nav {
-        @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-700 transition-colors hover:bg-cream-100 hover:text-ink-900;
+        @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-cream-200 transition-colors hover:bg-ink-700 hover:text-white;
     }
     .studio-nav.is-active {
-        @apply bg-brand-50 font-semibold text-brand-800 hover:bg-brand-50;
+        @apply bg-brand-600 font-semibold text-white hover:bg-brand-600;
     }
     .studio-nav-head {
-        @apply mt-4 px-3 text-[11px] font-semibold uppercase tracking-wide text-ink-500;
+        @apply mt-4 px-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300;
     }
 }
 

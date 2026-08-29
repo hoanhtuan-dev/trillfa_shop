@@ -30,15 +30,15 @@
         $routeName = request()->route()?->getName();
     @endphp
 </head>
-<body class="min-h-screen bg-cream-100 text-ink-900 antialiased">
+<body class="min-h-screen bg-ink-900 text-cream-100 antialiased">
     <div class="flex min-h-screen" x-data="{ sidebarCollapsed: false }">
         <!-- ===== Left sidebar ===== -->
-        <aside class="hidden w-60 shrink-0 flex-col border-r border-cream-200 bg-white" :class="sidebarCollapsed ? 'lg:hidden' : 'lg:flex'">
+        <aside class="hidden w-60 shrink-0 flex-col border-r border-ink-700 bg-ink-900" :class="sidebarCollapsed ? 'lg:hidden' : 'lg:flex'">
             <a href="{{ route('studio.index') }}" class="flex items-center gap-2 border-b border-cream-200 px-4 py-4">
                 <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
                 </span>
-                <span class="font-display text-lg font-bold tracking-tight">Trillfa<span class="text-brand-600"> Studio</span></span>
+                <span class="font-display text-lg font-bold tracking-tight text-cream-50">Trillfa<span class="text-brand-400"> Studio</span></span>
             </a>
 
             <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-3 text-sm">
@@ -66,12 +66,12 @@
                 <a href="{{ route('admin.dashboard') }}" class="studio-nav">Quản trị shop</a>
             </nav>
 
-            <div class="border-t border-cream-200 px-4 py-3">
+            <div class="border-t border-ink-700 px-4 py-3">
                 <div class="flex items-center justify-between text-xs">
-                    <span class="text-ink-500">Tín dụng</span>
-                    <span class="font-semibold text-ink-900">{{ $credits }}</span>
+                    <span class="text-cream-300">Tín dụng</span>
+                    <span class="font-semibold text-cream-50">{{ $credits }}</span>
                 </div>
-                <div class="mt-1 flex items-center gap-1 text-[11px] text-ink-500">
+                <div class="mt-1 flex items-center gap-1 text-[11px] text-cream-300">
                     <span class="inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
                     {{ $connected ? 'Kết nối AI' : 'Chế độ Stub' }}
                 </div>
@@ -80,10 +80,10 @@
 
         <!-- ===== Main region ===== -->
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-cream-200 bg-white/90 px-4 backdrop-blur">
+            <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-ink-700 bg-ink-900/95 px-4 backdrop-blur">
                 <div class="flex items-center gap-2 text-sm">
                     <button @click="sidebarCollapsed = !sidebarCollapsed" class="btn-outline btn-sm" :title="sidebarCollapsed ? 'Hiện thanh bên' : 'Ẩn thanh bên'"><span x-text="sidebarCollapsed ? '»' : '«'"></span></button>
-                    <span class="font-display text-sm font-semibold text-ink-900">@yield('title', 'Trillfa Studio')</span>
+                    <span class="font-display text-sm font-semibold text-cream-50">@yield('title', 'Trillfa Studio')</span>
                     <span class="hidden badge bg-cream-200 text-ink-500 sm:inline-flex">{{ $connected ? 'AI Connected' : 'Stub' }}</span>
                 </div>
                 <div class="flex items-center gap-3">
@@ -100,12 +100,12 @@
             </main>
 
             <!-- ===== Status bar ===== -->
-            <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-cream-200 bg-white px-4 py-2 text-[11px] text-ink-500">
-                <span>User: <b class="text-ink-900">{{ $u?->name }}</b></span>
-                <span>Credits: <b class="text-ink-900">{{ $credits }}</b></span>
-                <span>Used: <b class="text-ink-900">{{ $creditsUsed }}</b></span>
-                <span>Job Queue: <b class="text-ink-900">{{ $pendingCount }}</b> pending</span>
-                <span>Sync Status: <b class="{{ $connected ? 'text-emerald-600' : 'text-amber-600' }}">{{ $connected ? 'Connected' : 'Stub' }}</b></span>
+            <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-700 bg-ink-900 px-4 py-2 text-[11px] text-cream-300">
+                <span>User: <b class="text-cream-50">{{ $u?->name }}</b></span>
+                <span>Credits: <b class="text-cream-50">{{ $credits }}</b></span>
+                <span>Used: <b class="text-cream-50">{{ $creditsUsed }}</b></span>
+                <span>Job Queue: <b class="text-cream-50">{{ $pendingCount }}</b> pending</span>
+                <span>Sync Status: <b class="{{ $connected ? 'text-emerald-400' : 'text-amber-400' }}">{{ $connected ? 'Connected' : 'Stub' }}</b></span>
                 <span class="ml-auto"><a href="{{ route('studio.settings') }}" class="link">Trợ giúp</a></span>
             </footer>
         </div>

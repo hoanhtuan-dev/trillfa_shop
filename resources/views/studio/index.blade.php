@@ -173,7 +173,7 @@
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url">
-                            <img :src="preview.media_url" class="max-h-full max-w-full object-contain" onerror="this.src='/images/placeholder.svg'">
+                            <img :src="preview.media_url" class="max-h-full max-w-full cursor-zoom-in object-contain" onerror="this.src='/images/placeholder.svg'" @click="lightbox = true">
                         </template>
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'video' && preview.media_url">
                             <video :src="preview.media_url" class="max-h-full max-w-full object-contain" controls loop muted playsinline></video>
@@ -306,6 +306,15 @@
             </div>
         </div>
     </template>
+
+    <!-- Fullscreen lightbox -->
+    <template x-if="lightbox && preview && preview.media_url">
+        <div class="fixed inset-0 z-[80] flex items-center justify-center bg-ink-900/90 p-4" @click.self="lightbox = false">
+            <button @click="lightbox = false" class="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-ink-900/80 text-cream-200 hover:text-white">×</button>
+            <img :src="preview.media_url" class="max-h-[92vh] max-w-[94vw] rounded-xl object-contain" onerror="this.src='/images/placeholder.svg'" @wheel.prevent="onWheel($event)">
+            <div class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-ink-900/80 px-3 py-1 text-xs text-cream-200">Lăn chuột: Thu phóng · Zoom <b x-text="zoom.toFixed(2)"></b>x</div>
+        </div>
+    </template>
 </div>
 @push('scripts')
 <script>
@@ -322,7 +331,7 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
-        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null,
+        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false,
         _timers: {},
 
         init() {
