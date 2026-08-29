@@ -9,7 +9,7 @@ class Preset extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['category', 'ui_label', 'prompt_injection', 'sort_order'];
+    protected $fillable = ['category', 'ui_label', 'prompt_injection', 'note', 'sort_order'];
 
     public function scopeCategory($query, string $category)
     {

@@ -3,7 +3,7 @@
 @section('title', 'Trillfa Studio')
 
 @php
-    $presetJs = $presets->map(fn($group, $cat) => ['category' => $cat, 'items' => $group->map(fn($p) => ['id' => $p->id, 'key' => $p->ui_label, 'label' => $p->ui_label, 'value' => $p->prompt_injection])->values()])->values();
+    $presetJs = $presets->map(fn($group, $cat) => ['category' => $cat, 'items' => $group->map(fn($p) => ['id' => $p->id, 'key' => $p->ui_label, 'label' => $p->ui_label, 'value' => $p->prompt_injection, 'note' => $p->note])->values()])->values();
     $gensJs = $latest->map(fn($g) => [
         'id' => $g->id, 'type' => $g->type, 'status' => $g->status,
         'model' => $g->model, 'provider' => $g->provider,
@@ -22,7 +22,7 @@
         'gemini' => (bool) (studio_api_key('gemini')),
         default => (bool) (studio_api_key('fal') ?: studio_api_key('replicate')),
     };
-    $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy'];
+    $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy','lens'=>'Ống kính','video_scene'=>'Kịch bản quay'];
     $imageResolution = studio_config('image_resolution', '2K');
     $videoResolution = studio_config('video_resolution', '720');
     $imageRatio = studio_config('image_ratio', '1:1');
@@ -114,7 +114,7 @@
                             <div class="flex flex-wrap gap-1.5">
                                 <template x-for="item in group.items" :key="item.id">
                                     <button type="button" @click="togglePreset(item.id)"
-                                        :title="item.key + ': ' + item.value"
+                                        :title="item.key + ': ' + item.value + (item.note ? ' · ' + item.note : '')"
                                         class="rounded-full border px-3 py-1.5 text-xs transition-colors"
                                         :class="presetIds.includes(item.id) ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800' : 'border-cream-300 text-ink-700 hover:border-brand-400 hover:text-brand-700'">
                                         <span x-text="item.key || item.label"></span>
@@ -242,10 +242,10 @@
                     </div>
                     <!-- camera dropdown -->
                     <div>
-                        <label class="label">Camera (video)</label>
-                        <select x-model="videoCamera" class="input !py-2">
-                            <option value="">— Chọn góc máy —</option>
-                            <template x-for="cam in cameraOptions" :key="cam"><option :value="cam" x-text="cam"></option></template>
+                        <label class="label">Kịch bản quay</label>
+                        <select x-model="videoScene" class="input !py-2">
+                            <option value="">— Chọn kịch bản quay —</option>
+                            <template x-for="scene in videoScenes" :key="scene.id"><option :value="scene.value" :title="scene.note" x-text="scene.label + (scene.note ? ' · ' + scene.note : '')"></option></template>
                         </select>
                     </div>
                     <div class="mt-3 grid grid-cols-2 gap-2">
@@ -388,7 +388,7 @@ document.addEventListener('alpine:init', () => {
         loading: false, generating: false, videoBusy: false, refining: false,
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
         generations: gens, creditsLeft: Number(credits),
-        currentProjectId: currentProject, selectedImageId: null, videoSourceId: null, videoCamera: '',
+        currentProjectId: currentProject, selectedImageId: null, videoSourceId: null, videoScene: '',
         newProjectName: '', showNewProject: false, refinePrompt: '',
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
@@ -452,7 +452,7 @@ document.addEventListener('alpine:init', () => {
         lbStartPan(e) { this._lbDrag = { x: e.clientX, y: e.clientY, px: this.lbPan.x, py: this.lbPan.y }; },
         lbMovePan(e) { if (!this._lbDrag) return; this.lbPan.x = this._lbDrag.px + (e.clientX - this._lbDrag.x); this.lbPan.y = this._lbDrag.py + (e.clientY - this._lbDrag.y); },
         lbEndPan() { this._lbDrag = null; },
-        get cameraOptions() { const g = this.presets.find(x => x.category === 'camera'); return g ? g.items.map(i => i.label) : []; },
+        get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
         async loadPalette(id) {
             if (!id) { this.palette = []; return; }
             try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
@@ -574,7 +574,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.videoSourceId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoCamera || 'slow tracking shot'; const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || this.output.image_prompt_en || 'một video catwalk thời trang', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
+            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || this.output.image_prompt_en || 'một video catwalk thời trang', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },

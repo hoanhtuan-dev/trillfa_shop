@@ -108,7 +108,9 @@ class CreativeDirectionService
         $rawImage = (string) ($raw['image_prompt_en'] ?? '');
         $rawVideo = (string) ($raw['video_prompt_en'] ?? '');
         $imagePrompt = $this->clean($rawImage !== '' ? $rawImage : $this->buildImagePrompt($concept, $tokens));
-        $videoPrompt = $this->clean($rawVideo !== '' ? $rawVideo : $this->buildVideoPrompt($concept, $tokens, (string) ($tokens['camera'] ?? '')));
+        // Video camera action is chosen at render time via the "Kịch bản quay" preset (video_scene),
+        // NOT from the image camera angle (category.camera) — the two are decoupled.
+        $videoPrompt = $this->clean($rawVideo !== '' ? $rawVideo : $this->buildVideoPrompt($concept, $tokens));
 
         // Guarantee both prompts carry the same garment identity (no divergence).
         $imagePrompt = $this->ensureSignature($imagePrompt, $sig, $tokens, suppress: true);

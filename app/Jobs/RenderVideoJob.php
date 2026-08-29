@@ -42,7 +42,12 @@ class RenderVideoJob implements ShouldQueue
             // Camera + coherent video prompt come from the same Creative Direction so the
             // video matches the rendered image (consolidated image -> video workflow).
             $pr = $generation->promptsHistory?->json_response ?? [];
-            $camera = (string) (data_get($pr, 'category.camera') ?: data_get($pr, 'camera', 'slow tracking'));
+            // Camera action comes from the selected "Kịch bản quay" (stored in meta.camera); fall back to
+            // a neutral tracking shot. Image camera angles (category.camera) must NOT leak into video.
+            $camera = (string) ($generation->meta['camera'] ?? '');
+            if ($camera === '') {
+                $camera = (string) (data_get($pr, 'camera', '') ?: 'slow tracking');
+            }
             $prompt = (string) $generation->prompt;
             if (trim($prompt) === '') {
                 $prompt = (string) data_get($pr, 'video_prompt_en', 'một video catwalk thời trang');

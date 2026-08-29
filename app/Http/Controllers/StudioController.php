@@ -104,7 +104,7 @@ class StudioController extends Controller
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:4000'],
             'base_image' => ['nullable', 'string', 'max:2048'],
-            'camera' => ['nullable', 'string', 'max:255'],
+            'camera' => ['nullable', 'string', 'max:1000'], // Kịch bản quay (video_scene) injection có thể dài
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
             'duration' => ['nullable', 'string', 'in:5,8,10,15,20'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
@@ -305,6 +305,7 @@ class StudioController extends Controller
             'base_image' => $data['base_image'] ?? $source?->media_url,
             'mask_image' => $data['mask_image'] ?? null,
             'credits_cost' => $cost,
+            'meta' => ($type === 'video' && ! empty($data['camera'])) ? ['camera' => $data['camera']] : null,
         ]);
 
         // The job is processed lazily when the client polls this generation (show()), or via the

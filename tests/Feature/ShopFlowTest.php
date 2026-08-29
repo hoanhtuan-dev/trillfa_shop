@@ -1036,6 +1036,24 @@ class ShopFlowTest extends TestCase
     }
 
 
+    public function test_studio_presets_camera_lens_video_scene(): void
+    {
+        $camera = \App\Models\Preset::category('camera')->get();
+        $this->assertGreaterThanOrEqual(8, $camera->count(), 'Phải có ít nhất 8 góc máy ảnh.');
+        $this->assertNotEmpty($camera->first()->note, 'Góc máy phải có chú giải (note).');
+        $this->assertStringContainsString('eye', strtolower($camera->first()->prompt_injection));
+
+        $lens = \App\Models\Preset::category('lens')->get();
+        $this->assertGreaterThanOrEqual(7, $lens->count(), 'Phải có ít nhất 7 tiêu cự ống kính.');
+        $this->assertNotEmpty($lens->first()->note);
+
+        $video = \App\Models\Preset::category('video_scene')->get();
+        $this->assertGreaterThanOrEqual(8, $video->count(), 'Phải có ít nhất 8 kịch bản quay.');
+        $this->assertNotEmpty($video->first()->note);
+        $this->assertStringContainsString('runway', strtolower($video->first()->prompt_injection));
+    }
+
+
     public function test_studio_api_qwen_edit_key(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
