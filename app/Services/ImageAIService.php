@@ -411,6 +411,95 @@ class ImageAIService
         }
     }
 
+    /**
+     * Describe the reference face's features using the configured vision provider, so the
+     * generated image can reproduce that face via the prompt (no edit model required).
+     */
+    public function describeFace(string $faceRef): ?string
+    {
+        $rel = ltrim((string) parse_url($faceRef, PHP_URL_PATH), '/');
+        $path = storage_path('app/public/'.str_replace('storage/', '', $rel));
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $model = (string) studio_config('vision_model', 'gemini-2.5-flash');
+        [$b64, $mime] = $this->downscaleImageBase64($path);
+        $text = 'Describe this person\'s face in detail for an AI fashion image so it can be reproduced: '
+            .'give ethnicity hint, hair (colour, length, style, texture), face shape, eyebrows, eyes, nose, lips, '
+            .'skin tone, makeup, and any distinguishing features. Return a short paragraph (max 80 words), plain text, '
+            .'no intro.';
+
+        if ((string) studio_config('vision_provider', 'gemini') === 'qwen') {
+            $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+            if ($key) {
+                try {
+                    $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
+                    $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
+                        'model' => (string) studio_config('qwen_vision_model', 'qwen3.8-flash'),
+                        'messages' => [['role' => 'user', 'content' => [
+                            ['type' => 'text', 'text' => $text],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                        ]]],
+                    ]);
+                    $desc = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                    if ($resp->successful() && $desc) {
+                        return $desc;
+                    }
+                } catch (\Throwable $e) {
+                    logger()->error('Qwen describeFace failed: '.$e->getMessage());
+                }
+            }
+        }
+
+        $key = studio_api_key('gemini');
+        if ($key) {
+            try {
+                $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
+                    ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
+                        'contents' => [['parts' => [
+                            ['inlineData' => ['mimeType' => $mime, 'data' => $b64]],
+                            ['text' => $text],
+                        ]]],
+                    ]);
+                $desc = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
+                if ($resp->successful() && $desc) {
+                    return $desc;
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Gemini describeFace failed: '.$e->getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    protected function downscaleImageBase64(string $path): array
+    {
+        $img = @imagecreatefromstring((string) file_get_contents($path));
+        if (! $img) {
+            return ['', 'image/jpeg'];
+        }
+        $w = imagesx($img);
+        $h = imagesy($img);
+        $max = 768;
+        if ($w > $max || $h > $max) {
+            $scale = min($max / $w, $max / $h);
+            $nw = max(1, (int) ($w * $scale));
+            $nh = max(1, (int) ($h * $scale));
+            $tmp = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($tmp, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($img);
+            $img = $tmp;
+        }
+        ob_start();
+        imagejpeg($img, null, 85);
+        $data = ob_get_clean();
+        imagedestroy($img);
+
+        return [base64_encode((string) $data), 'image/jpeg'];
+    }
+
     protected function storeRemoteImage(string $url): ?string
     {
         $contents = @file_get_contents($url);

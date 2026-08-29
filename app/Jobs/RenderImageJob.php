@@ -35,8 +35,20 @@ class RenderImageJob implements ShouldQueue
                 return;
             }
 
+            // Face sync (no edit model): describe the reference face via the vision provider, then
+            // inject that description into the prompt so the model reproduces the face.
+            $prompt = (string) $generation->prompt;
+            $faceRef = (string) setting('studio_face_ref', '');
+            if ($faceRef && str_starts_with($faceRef, '/storage/')) {
+                $faceDesc = $images->describeFace($faceRef);
+                if ($faceDesc) {
+                    $prompt = 'The model has this face: '.$faceDesc.'. '.$prompt;
+                    $generation->update(['prompt' => $prompt]);
+                }
+            }
+
             $url = $images->generate(
-                (string) $generation->prompt,
+                $prompt,
                 $generation->base_image,
                 $generation->mask_image,
                 $generation->resolution,
@@ -46,17 +58,6 @@ class RenderImageJob implements ShouldQueue
             // Brand logo stamping is disabled for now (opt-in via studio.brand_logo_enabled).
             if (studio_config('brand_logo_enabled', false)) {
                 $url = $this->applyBrandLogo($url);
-            }
-
-            // Best-effort face consistency: apply the reference face to the generated image.
-            if (! $generation->base_image || ! $generation->mask_image) {
-                $faceRef = (string) setting('studio_face_ref', '');
-                if ($faceRef && str_starts_with($faceRef, '/storage/')) {
-                    $faced = $images->applyFace($url, $faceRef);
-                    if ($faced) {
-                        $url = $faced;
-                    }
-                }
             }
 
             $generation->update(['status' => 'completed', 'media_url' => $url]);
