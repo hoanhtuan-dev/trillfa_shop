@@ -37,7 +37,7 @@ class VideoAIService
             $abs = url($imageUrl);
             // Some i2v models (e.g. happyhorse-1.1-i2v) require input.media; others use img_url.
             $input['img_url'] = $abs;
-            $input['media'] = [$abs];
+            $input['media'] = [['url' => $abs]];
         }
 
         $submit = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)

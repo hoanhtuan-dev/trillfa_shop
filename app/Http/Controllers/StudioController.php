@@ -251,16 +251,9 @@ class StudioController extends Controller
             'credits_cost' => $cost,
         ]);
 
-        // Run the job inline so the create request returns a completed result (reliable). The
-        // front-end shows an optimistic "Đang tạo" placeholder while the model runs. Extend the
-        // PHP execution time so a provider that takes up to ~120s can finish.
-        set_time_limit(600);
-        if ($type === 'video') {
-            RenderVideoJob::dispatchSync($generation->id);
-        } else {
-            RenderImageJob::dispatchSync($generation->id);
-        }
-
+        // The job is processed lazily when the client polls this generation (show()), or via the
+        // "Xử lý ngay" button / studio:process. The create request returns fast (pending) so the
+        // Canvas shows "Đang tạo" immediately.
         $fresh = $generation->fresh();
 
         return response()->json([

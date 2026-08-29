@@ -52,7 +52,10 @@ class StyleSuggestService
             throw new \RuntimeException('Vision ('.$resp->status().'): '.$resp->body());
         }
 
-        $json = json_decode(trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text')), true);
+        $text = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
+        $start = strpos($text, '{');
+        $end = strrpos($text, '}');
+        $json = ($start !== false && $end !== false) ? json_decode(substr($text, $start, $end - $start + 1), true) : null;
         if (! is_array($json)) {
             throw new \RuntimeException('Không phân tích được JSON từ vision.');
         }
@@ -94,6 +97,32 @@ class StyleSuggestService
         }
 
         return array_values(array_unique($ids));
+    }
+
+    protected function downscaleBase64(string $path): array
+    {
+        $img = @imagecreatefromstring((string) file_get_contents($path));
+        if (! $img) {
+            return ['', 'image/jpeg'];
+        }
+        $w = imagesx($img);
+        $h = imagesy($img);
+        $max = 1024;
+        if ($w > $max || $h > $max) {
+            $scale = min($max / $w, $max / $h);
+            $nw = max(1, (int) ($w * $scale));
+            $nh = max(1, (int) ($h * $scale));
+            $tmp = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($tmp, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($img);
+            $img = $tmp;
+        }
+        ob_start();
+        imagejpeg($img, null, 85);
+        $data = ob_get_clean();
+        imagedestroy($img);
+
+        return [base64_encode((string) $data), 'image/jpeg'];
     }
 
     protected function suggestViaColor(string $imagePath): array
