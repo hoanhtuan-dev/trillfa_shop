@@ -125,12 +125,19 @@ class StudioController extends Controller
 
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:4000'],
+            'preserve_background' => ['nullable', 'boolean'],
+            'preserve_face' => ['nullable', 'boolean'],
         ]);
 
+        $preserveBg = ! empty($data['preserve_background']);
+        $preserveFace = ! empty($data['preserve_face']);
+
         $data['prompt'] = 'Using the provided image as the exact base, edit it surgically. Change ONLY: '.$request->input('prompt')
-            .'. Preserve everything else exactly as in the original image — the model\'s face and identity, pose, body proportions, '
-            .'garment structure and fit, fabric, all colours except the edited element, lighting, shadows, camera angle, '
-            .'composition, and background. Do not restyle, do not add new elements, do not change the setting.';
+            .'. Preserve everything else exactly as in the original image — '
+            .($preserveFace ? 'the model\'s face and identity, skin tone and hair, ' : '')
+            .'pose, body proportions, garment structure and fit, fabric, all colours except the edited element, lighting, shadows, camera angle, composition'
+            .($preserveBg ? ', and background' : '')
+            .'. Do not restyle, do not add new elements, do not change the setting.';
 
         if ($generation->media_url) {
             $data['base_image'] = $generation->media_url;

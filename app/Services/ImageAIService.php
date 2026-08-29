@@ -562,43 +562,61 @@ class ImageAIService
     protected function editImage(string $prompt, string $imageUrl): ?string
     {
         $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
-        // Model edit chuyên dụng dùng KHOA RIÊNG (qwen_edit_key) — mỗi gói có bộ model edit khác nhau.
-        $key = studio_api_key('qwen_edit') ?: studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if (! $key) {
+        $source = $this->imageDataUri($imageUrl);
+        if (! $source) {
+            logger()->warning('Edit: cannot read source image', ['url' => $imageUrl]);
             return null;
         }
-        $base = dashscope_base_url($key).'/api/v1';
 
-        try {
-            $source = $this->imageDataUri($imageUrl);
-            if (! $source) {
-                logger()->warning('Edit: cannot read source image', ['url' => $imageUrl]);
-                return null;
+        // Sep 2025: the dedicated edit key can be invalid (401 InvalidApiKey) while the main Qwen key still
+        // works for image gen. Try the dedicated edit key first, then fall back to the proven qwen/dashscope key.
+        $keys = array_values(array_unique(array_filter([
+            studio_api_key('qwen_edit'),
+            studio_api_key('qwen') ?: studio_api_key('dashscope'),
+        ])));
+
+        $last = null;
+        foreach ($keys as $key) {
+            $base = dashscope_base_url($key).'/api/v1';
+            logger()->info('Edit attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base]);
+            try {
+                $resp = Http::withToken($key)->timeout(240)
+                    ->post($base.'/services/aigc/multimodal-generation/generation', [
+                        'model' => $model,
+                        'input' => ['messages' => [['role' => 'user', 'content' => [
+                            ['image' => $source],
+                            ['text' => $prompt],
+                        ]]]],
+                        'parameters' => ['watermark' => false],
+                    ]);
+
+                if ($resp->successful()) {
+                    $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
+                        ->pluck('image')->first();
+                    if ($editUrl) {
+                        logger()->info('Edit succeeded', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                        return $this->storeRemoteImage($editUrl);
+                    }
+                    $last = 'model returned no image in content';
+                    continue;
+                }
+
+                $body = Str::limit((string) $resp->body(), 240);
+                logger()->warning('Edit model failed', ['model' => $model, 'status' => $resp->status(), 'body' => $body, 'key_prefix' => substr($key, 0, 8)]);
+                $last = 'HTTP '.$resp->status().': '.$body;
+                if ($resp->status() === 401) {
+                    continue; // invalid key -> try the next one
+                }
+                break; // 429/404/… are host/model-level -> don't hammer other keys
+            } catch (\Throwable $e) {
+                $last = $e->getMessage();
+                logger()->warning('Edit model threw', ['model' => $model, 'error' => $last, 'key_prefix' => substr($key, 0, 8)]);
             }
-
-            $resp = Http::withToken($key)->timeout(180)
-                ->post($base.'/services/aigc/multimodal-generation/generation', [
-                    'model' => $model,
-                    'input' => ['messages' => [['role' => 'user', 'content' => [
-                        ['image' => $source],
-                        ['text' => $prompt],
-                    ]]]],
-                    'parameters' => ['watermark' => false],
-                ]);
-
-            if (! $resp->successful()) {
-                logger()->warning('Edit model failed', ['model' => $model, 'status' => $resp->status(), 'body' => Str::limit((string) $resp->body(), 240)]);
-                return null;
-            }
-
-            $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
-                ->pluck('image')->first();
-
-            return $editUrl ? $this->storeRemoteImage($editUrl) : null;
-        } catch (\Throwable $e) {
-            logger()->warning('Edit model threw', ['model' => $model, 'error' => $e->getMessage()]);
-            return null;
         }
+
+        logger()->warning('Edit model ultimately failed', ['model' => $model, 'err' => $last]);
+
+        return null;
     }
 
     protected function storeRemoteImage(string $url): ?string

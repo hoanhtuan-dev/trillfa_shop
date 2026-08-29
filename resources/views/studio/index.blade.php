@@ -152,6 +152,10 @@
                     </div>
                 </template>
                 <textarea x-model="refinePrompt" rows="2" class="input" placeholder="VD: add puffy sleeve (sẽ chỉnh trên ảnh nguồn trên)"></textarea>
+                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-700">
+                    <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveFace" class="h-4 w-4 accent-brand-600"> Giữ nguyên khuôn mặt & dáng</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveBg" class="h-4 w-4 accent-brand-600"> Giữ nguyên nền</label>
+                </div>
                 <button @click="refine()" :disabled="refining || !refinePrompt" class="btn-outline mt-3 w-full"><span x-show="!refining">Cập nhật Ảnh</span><span x-show="refining">Đang gửi…</span></button>
             </div>
         </div>
@@ -389,7 +393,7 @@ document.addEventListener('alpine:init', () => {
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
         generations: gens, creditsLeft: Number(credits),
         currentProjectId: currentProject, selectedImageId: null, videoSourceId: null, videoScene: '',
-        newProjectName: '', showNewProject: false, refinePrompt: '',
+        newProjectName: '', showNewProject: false, refinePrompt: '', preserveBg: true, preserveFace: true,
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
@@ -583,7 +587,7 @@ document.addEventListener('alpine:init', () => {
         async refine() {
             if (!this.selectedImageId || !this.refinePrompt.trim() || this.refining) return;
             this.refining = true;
-            try { const data = await this.api('/studio/generations/' + this.selectedImageId + '/inpaint', { prompt: this.refinePrompt }); this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.refinePrompt = ''; this.maybePoll(data.generation_id, data.status); }
+            try { const data = await this.api('/studio/generations/' + this.selectedImageId + '/inpaint', { prompt: this.refinePrompt, preserve_background: this.preserveBg, preserve_face: this.preserveFace }); this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.refinePrompt = ''; this.maybePoll(data.generation_id, data.status); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.refining = false; }
         },
