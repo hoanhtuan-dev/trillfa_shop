@@ -44,6 +44,15 @@ class ImageAIService
         $dashscopeKey = studio_api_key('dashscope');
         $triedReal = false;
 
+        // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
+        // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
+        if ($baseImage && ($this->providerKey() || $dashscopeKey)) {
+            $edited = $this->editImage($prompt, $baseImage);
+            if ($edited) {
+                return $edited;
+            }
+        }
+
         if ($provider === 'gemini') {
             $key = $this->providerKey();
             if ($key) {
@@ -104,6 +113,14 @@ class ImageAIService
                 return $url;
             }
             $last = $this->dashscopeError;
+            // A quota (429) or "model not exist" / invalid endpoint (404) is host/account-level:
+            // trying more models here just wastes time and surfaces the same class of failure.
+            $lower = strtolower((string) $this->dashscopeError);
+            if (str_contains($lower, 'allocationquota') || str_contains($lower, 'throttling')
+                || str_contains($lower, 'model not exist') || str_contains($lower, 'invalidparameter')
+                || str_contains($lower, 'model_not_supported') || str_contains($lower, 'url error')) {
+                break;
+            }
         }
 
         $this->dashscopeError = $last ?: 'Nhà cung cấp AI không trả về ảnh.';
@@ -114,8 +131,17 @@ class ImageAIService
     protected function providerErrorMessage(): string
     {
         $msg = $this->dashscopeError ?: 'Không thể gọi nhà cung cấp AI. Kiểm tra key / model / độ phân giải trong Cài đặt.';
+        $lower = strtolower((string) $msg);
 
-        if (str_contains($msg, 'Unpurchased') || str_contains($msg, 'eligible')) {
+        if (str_contains($lower, 'allocationquota') || str_contains($lower, 'throttling') || str_contains($msg, '(429)')) {
+            $msg = 'Hạn mức tài khoản QwenCloud đã hết (Throttling.AllocationQuota). '
+                .'Vào https://home.qwencloud.com → kiểm tra / gia hạn hạn mức — quota sẽ reset theo chu kỳ (resets theo thông báo).';
+        } elseif (str_contains($lower, 'model not exist') || str_contains($lower, 'invalidparameter')
+            || str_contains($lower, 'model_not_supported')) {
+            $msg = 'Model ảnh không tồn tại trên host QwenCloud hiện tại. Token/Coding Plan có bộ model tạo ảnh riêng '
+                .'(thường là wan2.7-image / happyhorse-1.1-t2v); Pay-As-You-Go dùng qwen-image-3.0-pro/qwen-image. '
+                .'Đổi lại “Ảnh Qwen” / base URL trong Cài đặt cho đúng loại key.';
+        } elseif (str_contains($lower, 'unpurchased') || str_contains($lower, 'eligible')) {
             $msg = 'Khóa QwenCloud hợp lệ, nhưng model ảnh chưa được kích hoạt/mua trên tài khoản (AccessDenied.Unpurchased). '
                 .'Vào https://home.qwencloud.com → Model Center → bật / mua một model Qwen-Image (Qwen-Image, Qwen-Image-Max, Qwen-Image-Plus, Qwen-Image-3.0). '
                 .'Tài khoản này hiện chỉ có model giọng nói (ASR/TTS). Sau khi bật, chọn lại “Ảnh Qwen” trong Cài đặt.';
@@ -496,6 +522,45 @@ class ImageAIService
         imagedestroy($img);
 
         return [base64_encode((string) $data), 'image/jpeg'];
+    }
+
+    /**
+     * Inpaint using the Qwen image-edit model with the source image as input.
+     * Returns null on failure so the caller falls back to normal generation.
+     */
+    protected function editImage(string $prompt, string $imageUrl): ?string
+    {
+        $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        if (! $key) {
+            return null;
+        }
+        $base = dashscope_base_url($key).'/api/v1';
+
+        try {
+            $resp = Http::withToken($key)->timeout(180)
+                ->post($base.'/services/aigc/multimodal-generation/generation', [
+                    'model' => $model,
+                    'input' => ['messages' => [['role' => 'user', 'content' => [
+                        ['image' => url($imageUrl)],
+                        ['text' => $prompt],
+                    ]]]],
+                    'parameters' => ['watermark' => false],
+                ]);
+
+            if (! $resp->successful()) {
+                logger()->warning('Edit model failed', ['model' => $model, 'status' => $resp->status(), 'body' => Str::limit((string) $resp->body(), 240)]);
+                return null;
+            }
+
+            $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
+                ->pluck('image')->first();
+
+            return $editUrl ? $this->storeRemoteImage($editUrl) : null;
+        } catch (\Throwable $e) {
+            logger()->warning('Edit model threw', ['model' => $model, 'error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     protected function storeRemoteImage(string $url): ?string

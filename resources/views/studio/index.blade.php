@@ -89,11 +89,12 @@
                 <!-- Reference source -->
                 <div class="mt-4 rounded-xl border border-cream-200 bg-cream-50 p-3">
                     <p class="mb-2 text-xs font-semibold text-ink-700">Gợi ý từ ảnh tham khảo</p>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh</button>
+                        <button type="button" @click="openOutputsRef()" class="btn-outline btn-sm whitespace-nowrap" title="Dùng một ảnh kết quả (Output) hoặc trong Thư viện làm nguồn tham khảo.">Từ kết quả</button>
                         <button type="button" @click="openRefPicker()" class="btn-outline btn-sm whitespace-nowrap">Từ sản phẩm</button>
-                        <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm col-span-2 whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
                     </div>
+                    <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
                     <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
                     <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-white object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
                     <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-50 p-3 text-xs text-brand-800"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
@@ -332,6 +333,31 @@
         </div>
     </template>
 
+    <!-- Outputs / Library reference picker ("Gợi ý từ ảnh tham khảo" -> use a generated result) -->
+    <template x-if="outputsRefOpen">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-ink-900/60" @click="outputsRefOpen = false"></div>
+            <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3">
+                    <h3 class="font-display text-sm font-semibold text-ink-900">Chọn ảnh tham khảo (kết quả gần đây)</h3>
+                    <button @click="outputsRefOpen = false" class="grid h-8 w-8 place-items-center rounded-full bg-cream-100 text-ink-500 hover:text-ink-900">×</button>
+                </div>
+                <div class="max-h-[70vh] overflow-auto p-4">
+                    <div class="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                        <template x-for="g in generations.filter(x => x.type==='image' && x.status==='completed' && x.media_url)" :key="g.id">
+                            <button type="button" @click="useOutputRef(g)" class="overflow-hidden rounded-xl border border-cream-200 text-left hover:border-brand-500">
+                                <img :src="g.media_url" class="aspect-[3/4] w-full object-cover" onerror="this.src='/images/placeholder.svg'">
+                                <span class="block truncate px-2 py-1 text-[10px] text-ink-500" x-text="'#' + g.id + ' · ' + (g.provider||'') + ' · ' + (g.model||'')"></span>
+                            </button>
+                        </template>
+                    </div>
+                    <div class="mt-3 text-center text-xs text-ink-500" x-show="!generations.some(x => x.type==='image' && x.status==='completed' && x.media_url)">Chưa có ảnh kết quả nào. Tạo ảnh trước, hoặc mở Thư viện.</div>
+                    <div class="mt-2 text-center"><a href="{{ route('studio.library') }}" class="link text-xs">Mở Thư viện (tất cả kết quả)</a></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <!-- Fullscreen lightbox (self-contained zoom/pan; captures wheel & drag, blocks the layer below) -->
     <template x-if="lightbox && preview && preview.media_url">
         <div class="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden bg-ink-900/95 p-4"
@@ -364,7 +390,7 @@ document.addEventListener('alpine:init', () => {
         generations: gens, creditsLeft: Number(credits),
         currentProjectId: currentProject, selectedImageId: null, videoSourceId: null, videoCamera: '',
         newProjectName: '', showNewProject: false, refinePrompt: '',
-        refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false,
+        refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false,
@@ -490,6 +516,12 @@ document.addEventListener('alpine:init', () => {
         chooseProduct(item) {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refUrl = item.url; this.refImage = item.url; this.refFile = null; this.refOpen = false;
+        },
+        openOutputsRef() { this.outputsRefOpen = true; },
+        useOutputRef(g) {
+            if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
+            this.refUrl = g.media_url; this.refImage = g.media_url; this.refFile = null; this.outputsRefOpen = false;
+            Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm ảnh tham khảo.');
         },
         clearRef() {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
