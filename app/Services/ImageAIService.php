@@ -615,10 +615,17 @@ class ImageAIService
                 $body = Str::limit((string) $resp->body(), 240);
                 logger()->warning('Edit model failed', ['model' => $model, 'status' => $resp->status(), 'body' => $body, 'key_prefix' => substr($key, 0, 8)]);
                 $last = 'HTTP '.$resp->status().': '.$body;
+                if ($resp->status() === 404) {
+                    $this->dashscopeError = 'Model “'.$model.'” không tồn tại trên host '.$base.' (404). '
+                        .'Model Qwen-Edit thường CHỈ khả dụng trên host Pay-As-You-Go (key sk-…/sk-ws-…); host '
+                        .'Token/Coding Plan (key sk-sp-…) thường không có model chỉnh sửa ảnh (chỉ có model tạo ảnh/văn bản). '
+                        .'Dùng key Pay-As-You-Go cho Inpaint (Quản lý API → “Qwen Edit”), hoặc chọn model edit có trên gói.';
+                    break;
+                }
                 if ($resp->status() === 401) {
                     continue; // invalid key -> try the next one
                 }
-                break; // 429/404/… are host/model-level -> don't hammer other keys
+                break; // 429/… are host/model-level -> don't hammer other keys
             } catch (\Throwable $e) {
                 $last = $e->getMessage();
                 logger()->warning('Edit model threw', ['model' => $model, 'error' => $last, 'key_prefix' => substr($key, 0, 8)]);

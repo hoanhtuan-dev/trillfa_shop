@@ -67,8 +67,9 @@ class VideoAIService
 
         logger()->info('Video task submitted', ['task_id' => $taskId, 'model' => $model, 'size' => $size, 'duration' => (int) ($duration ?: 10), 'wait_s' => round(microtime(true) - $t0, 2)]);
 
-        $deadline = microtime(true) + 420; // 7 min cap: legit videos (~90-150s) finish; stuck tasks fail fast
+        $deadline = microtime(true) + 300; // 5 min cap: legit videos (~90-150s) finish; stuck tasks fail fast
         $lastStatus = '';
+        $lastWarn = 0;
 
         while (microtime(true) < $deadline) {
             sleep(5);
@@ -83,6 +84,9 @@ class VideoAIService
             if ($status !== $lastStatus && $status !== '') {
                 logger()->info('Video task status', ['task_id' => $taskId, 'status' => $status, 'elapsed_s' => round(microtime(true) - $t0, 2)]);
                 $lastStatus = $status;
+            } elseif ($status === 'RUNNING' && microtime(true) - $lastWarn > 60) {
+                logger()->warning('Video task still queued/running in provider', ['task_id' => $taskId, 'elapsed_s' => round(microtime(true) - $t0, 2)]);
+                $lastWarn = microtime(true);
             }
 
             if ($status === 'SUCCEEDED') {
