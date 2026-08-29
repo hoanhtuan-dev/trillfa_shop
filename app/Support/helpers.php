@@ -233,6 +233,55 @@ if (! function_exists('dashscope_base_url')) {
     }
 }
 
+if (! function_exists('is_qwen_quota_error')) {
+    /**
+     * Whether a DashScope/QwenCloud message/body indicates quota exhaustion (Throttling.AllocationQuota).
+     */
+    function is_qwen_quota_error(?string $message): bool
+    {
+        if (! $message) {
+            return false;
+        }
+        $lower = strtolower($message);
+
+        return str_contains($lower, 'allocationquota') || str_contains($lower, 'throttling') || str_contains($message, '429');
+    }
+}
+
+if (! function_exists('studio_qwen_credentials')) {
+    /**
+     * Ordered Qwen/DashScope API keys to try for a task, with automatic failover:
+     *   - image / video / prompt / vision: Token Plan (sk-sp-…) first, then Pay-As-You-Go (sk-…/sk-ws-…)
+     *   - edit (Inpaint): Pay-As-You-Go first (edit models usually live on the pay-go host), then Token Plan.
+     * Keys are gathered from every Qwen/DashScope slot and ordered by their prefix.
+     */
+    function studio_qwen_credentials(string $task = 'image'): array
+    {
+        $keys = array_values(array_unique(array_filter([
+            studio_api_key('qwen'),
+            studio_api_key('dashscope'),
+            studio_api_key('qwen_edit'),
+            studio_api_key('wan'),
+        ])));
+
+        $plan = [];
+        $paygo = [];
+        foreach ($keys as $k) {
+            if (str_starts_with($k, 'sk-sp-')) {
+                $plan[] = $k;
+            } else {
+                $paygo[] = $k;
+            }
+        }
+
+        if ($task === 'edit') {
+            return array_merge($paygo, $plan);
+        }
+
+        return array_merge($plan, $paygo);
+    }
+}
+
 if (! function_exists('capture_provider_quota_reset')) {
     /**
      * Extract the provider's "quota will reset at <time> UTC" from a quota error and store it

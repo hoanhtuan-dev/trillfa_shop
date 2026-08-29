@@ -1074,6 +1074,32 @@ class ShopFlowTest extends TestCase
     }
 
 
+    public function test_studio_qwen_credentials_rotation(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Token Plan key (sk-sp-…) in the 'qwen' slot; Pay-As-You-Go key (sk-ws-…) in the 'qwen_edit' slot.
+        set_setting('api_qwen_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-sp-plan-123456'));
+        set_setting('api_qwen_edit_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-ws-paygo-123456'));
+
+        // Generation prioritises Token Plan first, then Pay-As-You-Go.
+        $gen = studio_qwen_credentials('image');
+        $this->assertSame('sk-sp-plan-123456', $gen[0]);
+        $this->assertSame('sk-ws-paygo-123456', $gen[1]);
+
+        // Edit (Inpaint) prioritises Pay-As-You-Go first, then Token Plan.
+        $edit = studio_qwen_credentials('edit');
+        $this->assertSame('sk-ws-paygo-123456', $edit[0]);
+        $this->assertSame('sk-sp-plan-123456', $edit[1]);
+
+        // No keys -> empty list resolution.
+        set_setting('api_qwen_key', '');
+        set_setting('api_qwen_edit_key', '');
+        $this->assertSame([], studio_qwen_credentials('image'));
+    }
+
+
     public function test_studio_usage_stats(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();

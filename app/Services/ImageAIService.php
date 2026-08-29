@@ -77,7 +77,7 @@ class ImageAIService
                     ? array_values(array_unique([(string) studio_config('wan_model', 'wan2.7-image-pro'), 'wan2.7-image-pro', 'wan2.1-image-pro']))
                     : array_values(array_unique([(string) studio_config('qwen_model', 'qwen-image-3.0-pro'), 'qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image']));
 
-                $url = $this->tryModels($prompt, $models, $key, $resolution, $ratio, $faceRef);
+                $url = $this->tryModels($prompt, $models, studio_qwen_credentials('image'), $resolution, $ratio, $faceRef);
                 if ($url) {
                     return $url;
                 }
@@ -87,7 +87,7 @@ class ImageAIService
             // Flux/default without a Fal/Replicate key: use the Qwen image model so a valid
             // QwenCloud / DashScope key produces a real AI image.
             $models = ['qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image'];
-            $url = $this->tryModels($prompt, $models, $dashscopeKey, $resolution, $ratio);
+            $url = $this->tryModels($prompt, $models, studio_qwen_credentials('image'), $resolution, $ratio);
             if ($url) {
                 return $url;
             }
@@ -105,30 +105,43 @@ class ImageAIService
      * Try each model in order until one returns an image (handles model eligibility
      * differences between accounts). The last error is kept for the user.
      */
-    protected function tryModels(string $prompt, array $models, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
+    protected function tryModels(string $prompt, array $models, array $keys, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
     {
         $last = null;
 
-        foreach ($models as $model) {
-            $t = microtime(true);
-            $url = $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef);
-            logger()->info('Image model attempt', [
-                'model' => $model, 'ok' => (bool) $url, 's' => round(microtime(true) - $t, 2),
-                'key_prefix' => substr($key, 0, 8),
-                'err' => $url ? null : $this->dashscopeError,
-            ]);
-            if ($url) {
-                return $url;
+        foreach ($keys as $key) {
+            $keyQuota = false;
+            foreach ($models as $model) {
+                $t = microtime(true);
+                $url = $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef);
+                logger()->info('Image model attempt', [
+                    'model' => $model, 'ok' => (bool) $url, 's' => round(microtime(true) - $t, 2),
+                    'key_prefix' => substr($key, 0, 8),
+                    'err' => $url ? null : $this->dashscopeError,
+                ]);
+                if ($url) {
+                    return $url;
+                }
+                $last = $this->dashscopeError;
+
+                // Quota exhausted on this key -> fail over to the next credential (Pay-As-You-Go).
+                if (is_qwen_quota_error($this->dashscopeError)) {
+                    $keyQuota = true;
+                    break;
+                }
+
+                // Host/model-level failure (404/401/not exist/url error) — don't rotate keys on those.
+                $lower = strtolower((string) $this->dashscopeError);
+                if (str_contains($lower, 'model not exist') || str_contains($lower, 'invalidparameter')
+                    || str_contains($lower, 'model_not_supported') || str_contains($lower, 'url error')
+                    || str_contains($lower, 'invalidapikey')) {
+                    break 2;
+                }
             }
-            $last = $this->dashscopeError;
-            // A quota (429) or "model not exist" / invalid endpoint (404) is host/account-level:
-            // trying more models here just wastes time and surfaces the same class of failure.
-            $lower = strtolower((string) $this->dashscopeError);
-            if (str_contains($lower, 'allocationquota') || str_contains($lower, 'throttling')
-                || str_contains($lower, 'model not exist') || str_contains($lower, 'invalidparameter')
-                || str_contains($lower, 'model_not_supported') || str_contains($lower, 'url error')) {
-                break;
+            if ($keyQuota) {
+                continue; // try the next key (Token Plan -> Pay-As-You-Go)
             }
+            break;
         }
 
         $this->dashscopeError = $last ?: 'Nhà cung cấp AI không trả về ảnh.';
@@ -580,12 +593,9 @@ class ImageAIService
             return null;
         }
 
-        // Sep 2025: the dedicated edit key can be invalid (401 InvalidApiKey) while the main Qwen key still
-        // works for image gen. Try the dedicated edit key first, then fall back to the proven qwen/dashscope key.
-        $keys = array_values(array_unique(array_filter([
-            studio_api_key('qwen_edit'),
-            studio_api_key('qwen') ?: studio_api_key('dashscope'),
-        ])));
+        // Edit (Inpaint) prioritises the Pay-As-You-Go credential (edit models usually live on the pay-go
+        // host), then falls back to Token Plan — via studio_qwen_credentials('edit').
+        $keys = studio_qwen_credentials('edit');
 
         $last = null;
         foreach ($keys as $key) {

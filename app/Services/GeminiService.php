@@ -28,7 +28,7 @@ class GeminiService
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
 
         if ($provider === 'qwen' && $qwenKey) {
-            return $this->callQwen($idea, $injections, $creativeLevel, $qwenKey);
+            return $this->callQwen($idea, $injections, $creativeLevel);
         }
 
         $key = studio_api_key('gemini');
@@ -53,9 +53,8 @@ class GeminiService
             .'mood, color_palette (array), style_notes.';
     }
 
-    protected function callQwen(string $idea, array $injections, int $creativeLevel, string $key): array
+    protected function callQwen(string $idea, array $injections, int $creativeLevel): array
     {
-        $base = dashscope_base_url($key).'/compatible-mode/v1';
         $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
         $system = $this->systemPrompt($creativeLevel);
         $prompt = 'Idea: '.$idea."
@@ -63,27 +62,43 @@ Creative level: {$creativeLevel}/10
 Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
 
         $raw = null;
+        $last = null;
+        foreach (studio_qwen_credentials('prompt') as $key) {
+            $base = dashscope_base_url($key).'/compatible-mode/v1';
+            try {
+                $resp = Http::withToken($key)->timeout(90)
+                    ->post($base.'/chat/completions', [
+                        'model' => $model,
+                        'messages' => [
+                            ['role' => 'system', 'content' => $system],
+                            ['role' => 'user', 'content' => $prompt],
+                        ],
+                        'response_format' => ['type' => 'json_object'],
+                    ]);
 
-        try {
-            $resp = Http::withToken($key)->timeout(90)
-                ->post($base.'/chat/completions', [
-                    'model' => $model,
-                    'messages' => [
-                        ['role' => 'system', 'content' => $system],
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                    'response_format' => ['type' => 'json_object'],
-                ]);
-
-            if ($resp->successful()) {
-                $text = (string) data_get($resp->json(), 'choices.0.message.content');
-                $json = json_decode(trim($text), true);
-                if (is_array($json)) {
-                    $raw = $json;
+                if ($resp->successful()) {
+                    $text = (string) data_get($resp->json(), 'choices.0.message.content');
+                    $json = json_decode(trim($text), true);
+                    if (is_array($json)) {
+                        $raw = $json;
+                        break;
+                    }
+                    $last = 'Bad JSON from Qwen.';
+                } elseif (is_qwen_quota_error((string) $resp->body())) {
+                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
+                    continue; // Token Plan quota exhausted -> try Pay-As-You-Go next
+                } else {
+                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
+                    break; // non-quota -> don't rotate
                 }
+            } catch (\Throwable $e) {
+                $last = $e->getMessage();
+                logger()->error('Qwen prompt failed: '.$e->getMessage());
+                break;
             }
-        } catch (\Throwable $e) {
-            logger()->error('Qwen prompt failed: '.$e->getMessage());
+        }
+        if ($raw === null && $last) {
+            logger()->warning('Qwen prompt failed all keys', ['last' => $last]);
         }
 
         return $this->normalize($raw, $idea, $injections, $creativeLevel, 'qwen');

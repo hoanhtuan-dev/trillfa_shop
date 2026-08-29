@@ -19,7 +19,7 @@ class StyleSuggestService
             $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
             if ($qwenKey) {
                 try {
-                    return $this->suggestViaQwenVision($imagePath, $creativeLevel, $qwenKey);
+                    return $this->suggestViaQwenVision($imagePath, $creativeLevel);
                 } catch (\Throwable $e) {
                     logger()->error('Qwen vision suggest failed: '.$e->getMessage());
                 }
@@ -39,38 +39,51 @@ class StyleSuggestService
         return $this->suggestViaColor($imagePath, $creativeLevel);
     }
 
-    protected function suggestViaQwenVision(string $imagePath, int $creativeLevel, string $key): array
+    protected function suggestViaQwenVision(string $imagePath, int $creativeLevel): array
     {
         $model = (string) studio_config('qwen_vision_model', 'qwen3.8-flash');
         [$b64, $mime] = $this->downscaleBase64($imagePath);
-        $base = dashscope_base_url($key).'/compatible-mode/v1';
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
             .'Return ONLY valid JSON with keys: "styles", "background", "pose", "fabric", "silhouette", "camera", '
             .'"image_prompt_en" (a detailed ready-to-use English image prompt), "video_prompt_en" (a matching '
             .'English video-catwalk prompt for the SAME garment), "keywords" (array).';
 
-        $resp = Http::withToken($key)->timeout(90)
-            ->post($base.'/chat/completions', [
-                'model' => $model,
-                'messages' => [['role' => 'user', 'content' => [
-                    ['type' => 'text', 'text' => $prompt],
-                    ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                ]]],
-                'response_format' => ['type' => 'json_object'],
-            ]);
+        $last = null;
+        foreach (studio_qwen_credentials('vision') as $key) {
+            $base = dashscope_base_url($key).'/compatible-mode/v1';
+            try {
+                $resp = Http::withToken($key)->timeout(90)
+                    ->post($base.'/chat/completions', [
+                        'model' => $model,
+                        'messages' => [['role' => 'user', 'content' => [
+                            ['type' => 'text', 'text' => $prompt],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                        ]]],
+                        'response_format' => ['type' => 'json_object'],
+                    ]);
 
-        if (! $resp->successful()) {
-            throw new \RuntimeException('Qwen vision ('.$resp->status().'): '.$resp->body());
+                if ($resp->successful()) {
+                    $text = (string) data_get($resp->json(), 'choices.0.message.content');
+                    $json = json_decode(trim($text), true);
+                    if (is_array($json)) {
+                        return $this->finalize($json, $creativeLevel);
+                    }
+                    $last = 'Không phân tích được JSON từ Qwen vision.';
+                } elseif (is_qwen_quota_error((string) $resp->body())) {
+                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
+                    continue; // Token Plan quota -> try Pay-As-You-Go next
+                } else {
+                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
+                    break;
+                }
+            } catch (\Throwable $e) {
+                $last = $e->getMessage();
+                break;
+            }
         }
 
-        $text = (string) data_get($resp->json(), 'choices.0.message.content');
-        $json = json_decode(trim($text), true);
-        if (! is_array($json)) {
-            throw new \RuntimeException('Không phân tích được JSON từ Qwen vision.');
-        }
-
-        return $this->finalize($json, $creativeLevel);
+        throw new \RuntimeException('Qwen vision: '.($last ?: 'không xác định'));
     }
 
     protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key): array

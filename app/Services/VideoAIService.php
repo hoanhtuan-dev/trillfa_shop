@@ -16,10 +16,24 @@ class VideoAIService
 {
     public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null, ?string $duration = null): string
     {
-        $key = studio_api_key('wan') ?: studio_api_key('dashscope');
-
-        if ($key) {
-            return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, $key);
+        // Failover: try Token Plan first, then Pay-As-You-Go on a quota error (studio_qwen_credentials('video')).
+        $keys = studio_qwen_credentials('video');
+        if ($keys) {
+            $last = null;
+            foreach ($keys as $key) {
+                try {
+                    return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, $key);
+                } catch (\Throwable $e) {
+                    $last = $e->getMessage();
+                    capture_provider_quota_reset($last);
+                    if (! is_qwen_quota_error($last)) {
+                        throw $e; // non-quota error -> don't rotate keys
+                    }
+                }
+            }
+            if ($last) {
+                throw new \RuntimeException($last);
+            }
         }
 
         // No key configured -> stub (bundled demo video).
