@@ -50,7 +50,7 @@ class RenderVideoJob implements ShouldQueue
             }
             $prompt = (string) $generation->prompt;
             if (trim($prompt) === '') {
-                $prompt = (string) data_get($pr, 'video_prompt_en', 'một video catwalk thời trang');
+                $prompt = (string) data_get($pr, 'video_prompt_en', 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video');
             }
 
             $url = $videos->render(
