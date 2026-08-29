@@ -25,6 +25,7 @@
     $videoResolution = studio_config('video_resolution', '720');
     $imageRatio = studio_config('image_ratio', '1:1');
     $videoDuration = studio_config('video_duration', '10');
+    $creativeLevel = max(1, min(10, (int) studio_config('creative_level', 6)));
 @endphp
 
 @section('content')
@@ -38,7 +39,8 @@
     {{ Js::from($imageResolution) }},
     {{ Js::from($videoResolution) }},
   {{ Js::from($imageRatio) }},
-  {{ Js::from($videoDuration) }}
+  {{ Js::from($videoDuration) }},
+  {{ Js::from($creativeLevel) }}
 )">
     <!-- Toolbar -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -55,6 +57,13 @@
             <button @click="newProjectName='', showNewProject=!showNewProject" class="btn-outline btn-sm">+ Dự án</button>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-xs">
+            <div class="flex items-center gap-2 rounded-full border border-cream-200 bg-cream-50 px-3 py-1.5" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng/preset; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
+                <span class="font-medium text-ink-700">Sáng tạo</span>
+                <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-24 cursor-pointer accent-brand-600">
+                <span class="font-semibold text-ink-900" x-text="creativeLevel"></span>
+                <span class="text-ink-500">/10</span>
+                <span class="hidden text-ink-500 sm:inline" x-text="'· Tuân thủ ' + (11 - creativeLevel)"></span>
+            </div>
             <span class="badge {{ $aiStub ? 'bg-amber-100 text-amber-700' : 'bg-brand-600 text-white' }}">Prompt: {{ $aiStub ? 'Mô phỏng' : 'Gemini' }}</span>
             <span class="badge bg-cream-200 text-ink-700">Ảnh: {{ $imgProvider }}{{ $imgKeySet ? '' : ' (stub)' }}</span>
             <span class="badge {{ studio_config('processing') === 'queue' ? 'bg-amber-100 text-amber-700' : 'bg-cream-200 text-ink-700' }}">{{ studio_config('processing') === 'queue' ? 'Queue: cần worker' : 'Đồng bộ' }}</span>
@@ -320,9 +329,10 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels, imageRes, videoRes, imageRatio, videoDuration) => ({
+    Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels, imageRes, videoRes, imageRatio, videoDuration, creativeLevel) => ({
         presets, projects, catLabels,
         imageRes: imageRes || '2K', videoRes: videoRes || '720', imageRatio: imageRatio || '1:1', videoDuration: videoDuration || '10',
+        creativeLevel: Number(creativeLevel) || 6,
         idea: '', presetIds: [],
         loading: false, generating: false, videoBusy: false, refining: false,
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
@@ -471,7 +481,7 @@ document.addEventListener('alpine:init', () => {
         async ideate() {
             if (!this.idea.trim() || this.loading) return;
             this.loading = true;
-            try { const data = await this.api('/studio/ideate', { idea: this.idea, preset_ids: this.presetIds }); this.output.image_prompt_en = data.image_prompt_en; this.output.video_prompt_en = data.video_prompt_en; this.output.history_id = data.history_id; }
+            try { const data = await this.api('/studio/ideate', { idea: this.idea, preset_ids: this.presetIds, creative_level: this.creativeLevel }); this.output.image_prompt_en = data.image_prompt_en; this.output.video_prompt_en = data.video_prompt_en; this.output.history_id = data.history_id; if (data.creative_level) this.creativeLevel = Number(data.creative_level); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.loading = false; }
         },
@@ -527,13 +537,15 @@ document.addEventListener('alpine:init', () => {
             try {
                 let data;
                 if (this.refFile) {
-                    const form = new FormData(); form.append('image', this.refFile);
+                    const form = new FormData(); form.append('image', this.refFile); form.append('creative_level', this.creativeLevel);
                     data = await this.upload('/studio/suggest', form);
                 } else {
-                    data = await this.api('/studio/suggest', { reference_url: this.refUrl });
+                    data = await this.api('/studio/suggest', { reference_url: this.refUrl, creative_level: this.creativeLevel });
                 }
                 this.suggestResult = data;
                 if (data.image_prompt_en) this.output.image_prompt_en = data.image_prompt_en;
+                if (data.video_prompt_en) this.output.video_prompt_en = data.video_prompt_en;
+                if (data.creative_level) this.creativeLevel = Number(data.creative_level);
                 Alpine.store('toast').show(data.preset_ids && data.preset_ids.length ? 'Đã gợi ý prompt từ ảnh (AI).' : 'Đã gợi ý prompt từ ảnh.');
             } catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.suggesting = false; }

@@ -38,11 +38,19 @@ class RenderVideoJob implements ShouldQueue
             // Simulate the async nature of a real video provider for the demo.
             sleep(2);
 
-            $camera = data_get($generation->promptsHistory?->json_response ?? [], 'camera', 'slow tracking');
+            // Camera + coherent video prompt come from the same Creative Direction so the
+            // video matches the rendered image (consolidated image -> video workflow).
+            $pr = $generation->promptsHistory?->json_response ?? [];
+            $camera = (string) (data_get($pr, 'category.camera') ?: data_get($pr, 'camera', 'slow tracking'));
+            $prompt = (string) $generation->prompt;
+            if (trim($prompt) === '') {
+                $prompt = (string) data_get($pr, 'video_prompt_en', 'một video catwalk thời trang');
+            }
+
             $url = $videos->render(
-                (string) $generation->prompt,
+                $prompt,
                 (string) $generation->base_image,
-                (string) $camera,
+                $camera,
                 $generation->resolution,
                 $generation->duration,
             );

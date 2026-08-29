@@ -38,6 +38,7 @@ return [
     'video_resolution' => env('STUDIO_VIDEO_RESOLUTION', '720'), // 480 | 720 | 1080
     'image_ratio' => env('STUDIO_IMAGE_RATIO', '1:1'), // 1:1 | 4:3 | 3:4 | 16:9 | 9:16 | 4:5 | 21:9 | 19:6
     'video_duration' => env('STUDIO_VIDEO_DURATION', '10'), // 5 | 8 | 10 | 15 | 20 (giây)
+    'creative_level' => (int) env('STUDIO_CREATIVE_LEVEL', 6), // 1 (bám sát brief) .. 10 (sáng tạo tự do)
 
     /*
     |--------------------------------------------------------------------------

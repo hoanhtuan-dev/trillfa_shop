@@ -13,13 +13,13 @@ use Illuminate\Support\Facades\Http;
  */
 class StyleSuggestService
 {
-    public function suggest(string $imagePath): array
+    public function suggest(string $imagePath, int $creativeLevel = 6): array
     {
         if ((string) studio_config('vision_provider', 'gemini') === 'qwen') {
             $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
             if ($qwenKey) {
                 try {
-                    return $this->suggestViaQwenVision($imagePath, $qwenKey);
+                    return $this->suggestViaQwenVision($imagePath, $creativeLevel, $qwenKey);
                 } catch (\Throwable $e) {
                     logger()->error('Qwen vision suggest failed: '.$e->getMessage());
                 }
@@ -30,23 +30,25 @@ class StyleSuggestService
 
         if ($key) {
             try {
-                return $this->suggestViaVision($imagePath, $key);
+                return $this->suggestViaVision($imagePath, $creativeLevel, $key);
             } catch (\Throwable $e) {
                 logger()->error('Vision suggest failed: '.$e->getMessage());
             }
         }
 
-        return $this->suggestViaColor($imagePath);
+        return $this->suggestViaColor($imagePath, $creativeLevel);
     }
 
-    protected function suggestViaQwenVision(string $imagePath, string $key): array
+    protected function suggestViaQwenVision(string $imagePath, int $creativeLevel, string $key): array
     {
         $model = (string) studio_config('qwen_vision_model', 'qwen3.8-flash');
         [$b64, $mime] = $this->downscaleBase64($imagePath);
         $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
-        $prompt = 'Analyze this fashion model photo and its garment. Return ONLY valid JSON with keys: '
-            .'"styles", "background", "pose", "fabric", "silhouette", "camera", '
-            .'"image_prompt_en" (a detailed ready-to-use English image prompt).';
+        $direction = app(CreativeDirectionService::class);
+        $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
+            .'Return ONLY valid JSON with keys: "styles", "background", "pose", "fabric", "silhouette", "camera", '
+            .'"image_prompt_en" (a detailed ready-to-use English image prompt), "video_prompt_en" (a matching '
+            .'English video-catwalk prompt for the SAME garment), "keywords" (array).';
 
         $resp = Http::withToken($key)->timeout(90)
             ->post($base.'/chat/completions', [
@@ -68,25 +70,21 @@ class StyleSuggestService
             throw new \RuntimeException('Không phân tích được JSON từ Qwen vision.');
         }
 
-        return [
-            'preset_ids' => $this->matchPresets($json),
-            'styles' => array_values(array_filter((array) ($json['styles'] ?? []))),
-            'background' => (string) ($json['background'] ?? ''),
-            'pose' => (string) ($json['pose'] ?? ''),
-            'image_prompt_en' => (string) ($json['image_prompt_en'] ?? 'High-fashion editorial photo, premium, 4k'),
-        ];
+        return $this->finalize($json, $creativeLevel);
     }
 
-    protected function suggestViaVision(string $imagePath, string $key): array
+    protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key): array
     {
         $model = (string) studio_config('vision_model', 'gemini-1.5-flash');
         $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
         $b64 = base64_encode((string) file_get_contents($imagePath));
 
-        $prompt = 'Analyze this fashion model photo and its garment. Return ONLY valid JSON with keys: '
-            .'"styles" (1-3 style labels), "background" (one label), "pose" (one label), '
+        $direction = app(CreativeDirectionService::class);
+        $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
+            .'Return ONLY valid JSON with keys: "styles" (1-3 style labels), "background" (one label), "pose" (one label), '
             .'"fabric" (one label), "silhouette" (one label), "camera" (one label), '
-            .'"image_prompt_en" (a detailed, ready-to-use English image-generation prompt describing the outfit, fabric, colors, fit and setting).';
+            .'"image_prompt_en" (a detailed, ready-to-use English image-generation prompt describing the outfit, fabric, colors, fit and setting), '
+            .'"video_prompt_en" (a matching English video-catwalk prompt for the SAME garment), "keywords" (array).';
 
         $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
             ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
@@ -109,12 +107,59 @@ class StyleSuggestService
             throw new \RuntimeException('Không phân tích được JSON từ vision.');
         }
 
+        return $this->finalize($json, $creativeLevel);
+    }
+
+    /**
+     * Canonicalise a vision suggestion into the unified Creative Direction schema,
+     * guaranteeing image & video prompts describe the SAME garment.
+     */
+    protected function finalize(array $json, int $creativeLevel): array
+    {
+        $styles = array_values(array_filter((array) ($json['styles'] ?? [])));
+        $background = (string) ($json['background'] ?? '');
+        $pose = (string) ($json['pose'] ?? '');
+        $fabric = (string) ($json['fabric'] ?? '');
+        $silhouette = (string) ($json['silhouette'] ?? '');
+        $camera = (string) ($json['camera'] ?? '');
+
+        $injections = array_filter([
+            'fabric' => $fabric,
+            'silhouette' => $silhouette,
+            'style' => implode(', ', $styles),
+            'background' => $background,
+            'pose' => $pose,
+            'camera' => $camera,
+        ]);
+
+        $raw = [
+            'image_prompt_en' => (string) ($json['image_prompt_en'] ?? ''),
+            'video_prompt_en' => (string) ($json['video_prompt_en'] ?? ''),
+            'keywords' => $json['keywords'] ?? [],
+            'category' => $injections,
+            'mood' => $json['mood'] ?? ($styles[0] ?? 'luxury'),
+            'color_palette' => $json['color_palette'] ?? ['ivory', 'black', 'gold'],
+            'style_notes' => $json['style_notes'] ?? 'High-fashion editorial, minimal, luxury fabric feel.',
+        ];
+
+        $dir = app(CreativeDirectionService::class);
+        $c = $dir->normalize($raw, '', $injections, $creativeLevel);
+
         return [
             'preset_ids' => $this->matchPresets($json),
-            'styles' => array_values(array_filter((array) ($json['styles'] ?? []))),
-            'background' => (string) ($json['background'] ?? ''),
-            'pose' => (string) ($json['pose'] ?? ''),
-            'image_prompt_en' => (string) ($json['image_prompt_en'] ?? 'High-fashion editorial photo, premium, ultra detailed, 4k'),
+            'styles' => $styles,
+            'background' => $background,
+            'pose' => $pose,
+            'fabric' => $fabric,
+            'silhouette' => $silhouette,
+            'camera' => $camera,
+            'image_prompt_en' => $c['image_prompt_en'],
+            'video_prompt_en' => $c['video_prompt_en'],
+            'creative_level' => $c['creative_level'],
+            'adherence' => $c['adherence'],
+            'negative_prompt' => $c['negative_prompt'],
+            'keywords' => $c['keywords'],
+            'category' => $c['category'],
         ];
     }
 
@@ -174,7 +219,7 @@ class StyleSuggestService
         return [base64_encode((string) $data), 'image/jpeg'];
     }
 
-    protected function suggestViaColor(string $imagePath): array
+    protected function suggestViaColor(string $imagePath, int $creativeLevel = 6): array
     {
         $styles = Preset::category('style')->get();
         $backgrounds = Preset::category('background')->get();
@@ -194,13 +239,12 @@ class StyleSuggestService
             .($pose && $pose->prompt_injection ? ', '.$pose->prompt_injection : '')
             .', ultra detailed, 4k';
 
-        return [
-            'preset_ids' => $presetIds,
+        return $this->finalize([
+            'image_prompt_en' => $prompt,
             'styles' => $style ? [$style->ui_label] : [],
             'background' => $bg?->ui_label,
             'pose' => $pose?->ui_label,
-            'image_prompt_en' => $prompt,
-        ];
+        ], $creativeLevel);
     }
 
     /**

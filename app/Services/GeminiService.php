@@ -5,40 +5,64 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 
 /**
- * "Giám đốc sáng tạo" — turns a Vietnamese idea + fashion presets into
- * professional English prompts (image + video) as structured JSON.
+ * "Giám đốc sáng tạo" — turns a Vietnamese idea + fashion presets into a canonical
+ * Creative Direction: professional English prompts (image + video) that describe the
+ * SAME garment, plus a controllable creativity vs. adherence level.
  *
- * If GEMINI_API_KEY is configured the real Gemini API is used; otherwise a
- * deterministic stub is returned so the whole flow works without credentials.
+ * Every path (Gemini, Qwen, or deterministic stub) is run through
+ * CreativeDirectionService so the schema is unified and the image/video prompts stay
+ * in sync regardless of provider or whether a real key is configured.
  */
 class GeminiService
 {
-    public function generateCreativeDirector(string $idea, array $injections = []): array
+    protected CreativeDirectionService $direction;
+
+    public function __construct(?CreativeDirectionService $direction = null)
+    {
+        $this->direction = $direction ?: app(CreativeDirectionService::class);
+    }
+
+    public function generateCreativeDirector(string $idea, array $injections = [], int $creativeLevel = 6): array
     {
         $provider = (string) studio_config('prompt_provider', 'gemini');
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
 
         if ($provider === 'qwen' && $qwenKey) {
-            return $this->callQwen($idea, $injections, $qwenKey);
+            return $this->callQwen($idea, $injections, $creativeLevel, $qwenKey);
         }
 
         $key = studio_api_key('gemini');
 
         if ($key) {
-            return $this->callGemini($idea, $injections, $key);
+            return $this->callGemini($idea, $injections, $creativeLevel, $key);
         }
 
-        return $this->stub($idea, $injections);
+        return $this->stub($idea, $injections, $creativeLevel);
     }
 
-    protected function callQwen(string $idea, array $injections, string $key): array
+    protected function systemPrompt(int $creativeLevel): string
+    {
+        $directive = app(CreativeDirectionService::class)->creativityDirective($creativeLevel);
+
+        return 'You are a fashion creative director. Given a Vietnamese idea and optional preset tags, '
+            .'write BOTH an image-generation prompt and a matching video-catwalk prompt for the SAME garment. '
+            .'Keep the garment identity (fabric, silhouette, style, colours) identical across the two prompts so the '
+            .'video matches the rendered image. '.$directive.' '
+            .'Return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, concept_en (short English garment '
+            .'concept), category (object with fabric/silhouette/style/background/pose/camera), keywords (array), '
+            .'mood, color_palette (array), style_notes.';
+    }
+
+    protected function callQwen(string $idea, array $injections, int $creativeLevel, string $key): array
     {
         $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
         $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
-        $system = 'You are a fashion creative director. Given a Vietnamese idea and optional preset tags, '
-            .'return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, keywords (array), mood, '
-            .'color_palette (array), style_notes.';
-        $prompt = 'Idea: '.$idea.'\nTags: '.json_encode($injections, JSON_UNESCAPED_UNICODE);
+        $system = $this->systemPrompt($creativeLevel);
+        $prompt = 'Idea: '.$idea."
+Creative level: {$creativeLevel}/10
+Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
+
+        $raw = null;
 
         try {
             $resp = Http::withToken($key)->timeout(90)
@@ -55,70 +79,33 @@ class GeminiService
                 $text = (string) data_get($resp->json(), 'choices.0.message.content');
                 $json = json_decode(trim($text), true);
                 if (is_array($json)) {
-                    return array_merge($json, ['idea' => $idea, 'provider' => 'qwen']);
+                    $raw = $json;
                 }
             }
         } catch (\Throwable $e) {
             logger()->error('Qwen prompt failed: '.$e->getMessage());
         }
 
-        return $this->stub($idea, $injections);
+        return $this->normalize($raw, $idea, $injections, $creativeLevel, 'qwen');
     }
 
-    protected function stub(string $idea, array $injections): array
+    protected function callGemini(string $idea, array $injections, int $creativeLevel, string $key): array
     {
-        $fabric = $injections['fabric'] ?? '';
-        $silhouette = $injections['silhouette'] ?? '';
-        $style = $injections['style'] ?? '';
-        $background = $injections['background'] ?? '';
-        $pose = $injections['pose'] ?? '';
-        $camera = $injections['camera'] ?? '';
+        $system = $this->systemPrompt($creativeLevel);
+        $prompt = "Idea: {$idea}
+Creative level: {$creativeLevel}/10
+Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
 
-        $subject = trim($idea ?: 'a high-end fashion outfit', ' .,');
-
-        $imagePrompt = $this->clean('High-fashion editorial photo of '.$subject
-            .($fabric ? ', crafted from '.$fabric : '')
-            .($silhouette ? ', '.$silhouette.' silhouette' : '')
-            .($style ? ', '.$style.' aesthetic' : '')
-            .($background ? ', '.$background.' background' : '')
-            .($pose ? ', '.$pose.' pose' : '')
-            .', clean studio background, soft diffused lighting, premium Vogue editorial, ultra detailed, 4k');
-
-        $videoPrompt = $this->clean('Cinematic fashion show. A model walks the runway wearing '.$subject
-            .($fabric ? ', made of '.$fabric : '')
-            .($silhouette ? ', '.$silhouette.' cut' : '')
-            .($style ? ', '.$style.' style' : '')
-            .($background ? ', '.$background.' backdrop' : '')
-            .($pose ? ', '.$pose.' pose' : '')
-            .($camera ? ', camera: '.$camera : ', slow tracking shot')
-            .', dramatic runway lighting, slow motion, 4k');
-
-        return [
-            'idea' => $idea,
-            'image_prompt_en' => $imagePrompt,
-            'video_prompt_en' => $videoPrompt,
-            'keywords' => array_values(array_filter([$fabric, $silhouette, $style, $camera])),
-            'mood' => $style ? $style : 'luxury',
-            'color_palette' => ['ivory', 'black', 'gold'],
-            'style_notes' => 'High-fashion editorial, minimal, luxury fabric feel.',
-            'provider' => 'stub',
-        ];
-    }
-
-    protected function callGemini(string $idea, array $injections, string $key): array
-    {
-        $system = 'You are a fashion creative director. Given a Vietnamese idea and optional preset tags, '.
-            'return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, keywords (array), mood, '.
-            'color_palette (array), style_notes.';
-
-        $prompt = "Idea: {$idea}\nTags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
+        $raw = null;
 
         try {
             $model = studio_config('prompt_model', 'gemini-1.5-flash');
 
             $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(60)
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
-                    'contents' => [['parts' => [['text' => $system."\n\n".$prompt]]]],
+                    'contents' => [['parts' => [['text' => $system."
+
+".$prompt]]]],
                     'generationConfig' => ['responseMimeType' => 'application/json'],
                 ]);
 
@@ -126,18 +113,42 @@ class GeminiService
                 $text = (string) data_get($resp->json(), 'candidates.0.content.parts.0.text');
                 $json = json_decode(trim($text), true);
                 if (is_array($json)) {
-                    return array_merge($json, ['idea' => $idea, 'provider' => 'gemini']);
+                    $raw = $json;
                 }
             }
         } catch (\Throwable $e) {
             logger()->error('GeminiService failed: '.$e->getMessage());
         }
 
-        return $this->stub($idea, $injections);
+        return $this->normalize($raw, $idea, $injections, $creativeLevel, 'gemini');
+    }
+
+    protected function stub(string $idea, array $injections, int $creativeLevel): array
+    {
+        return $this->normalize([
+            'concept_en' => $this->clean(trim($idea ?: 'a high-end fashion outfit', ' .,')),
+            'keywords' => array_values(array_filter([
+                $injections['fabric'] ?? null,
+                $injections['silhouette'] ?? null,
+                $injections['style'] ?? null,
+                $injections['camera'] ?? null,
+            ])),
+            'mood' => ($injections['style'] ?? null) ?: 'luxury',
+            'color_palette' => ['ivory', 'black', 'gold'],
+            'style_notes' => 'High-fashion editorial, minimal, luxury fabric feel.',
+        ], $idea, $injections, $creativeLevel, 'stub');
+    }
+
+    protected function normalize(?array $raw, string $idea, array $injections, int $creativeLevel, string $provider): array
+    {
+        $result = $this->direction->normalize($raw ?? [], $idea, $injections, $creativeLevel);
+        $result['provider'] = $provider;
+
+        return $result;
     }
 
     protected function clean(string $value): string
     {
-        return preg_replace('/\s+/', ' ', trim($value));
+        return preg_replace('/\s+/', ' ', trim($value)) ?? '';
     }
 }

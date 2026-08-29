@@ -54,10 +54,12 @@ class StudioController extends Controller
             'idea' => ['required', 'string', 'max:1000'],
             'preset_ids' => ['nullable', 'array'],
             'preset_ids.*' => ['integer', 'exists:presets,id'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
         ]);
 
+        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
         $injections = $this->resolveInjectedPresets($data['preset_ids'] ?? []);
-        $result = app(GeminiService::class)->generateCreativeDirector($data['idea'], $injections);
+        $result = app(GeminiService::class)->generateCreativeDirector($data['idea'], $injections, $creativeLevel);
 
         $history = auth()->user()->prompts()->create([
             'idea' => $data['idea'],
@@ -71,6 +73,8 @@ class StudioController extends Controller
             'image_prompt_en' => $result['image_prompt_en'],
             'video_prompt_en' => $result['video_prompt_en'],
             'keywords' => $result['keywords'] ?? [],
+            'creative_level' => $result['creative_level'] ?? $creativeLevel,
+            'adherence' => $result['adherence'] ?? null,
         ]);
     }
 
@@ -315,6 +319,7 @@ class StudioController extends Controller
         $data = $request->validate([
             'image' => ['nullable', 'image', 'max:8192'],
             'reference_url' => ['nullable', 'string', 'max:2048'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
         ]);
 
         $imagePath = null;
@@ -330,7 +335,8 @@ class StudioController extends Controller
             return response()->json(['message' => 'Không đọc được ảnh nguồn. Vui lòng tải ảnh hoặc chọn ảnh sản phẩm.'], 422);
         }
 
-        $result = app(StyleSuggestService::class)->suggest($imagePath);
+        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
+        $result = app(StyleSuggestService::class)->suggest($imagePath, $creativeLevel);
 
         return response()->json($result);
     }
