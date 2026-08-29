@@ -57,6 +57,7 @@ class VideoAIService
             ]);
 
         if (! $submit->successful()) {
+            capture_provider_quota_reset((string) $submit->body());
             throw new \RuntimeException('DashScope video ('.$submit->status().'): '.Str::limit((string) $submit->body(), 240));
         }
 
@@ -77,6 +78,7 @@ class VideoAIService
             $q = Http::withToken($key)->timeout(30)->get($base.'/tasks/'.$taskId);
 
             if (! $q->successful()) {
+                capture_provider_quota_reset((string) $q->body());
                 throw new \RuntimeException('DashScope ('.$q->status().'): '.Str::limit((string) $q->body(), 240));
             }
 

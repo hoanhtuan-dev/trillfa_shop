@@ -233,6 +233,41 @@ if (! function_exists('dashscope_base_url')) {
     }
 }
 
+if (! function_exists('capture_provider_quota_reset')) {
+    /**
+     * Extract the provider's "quota will reset at <time> UTC" from a quota error and store it
+     * so the UI can show when the limit resets.
+     */
+    function capture_provider_quota_reset(?string $message): void
+    {
+        if (! $message) {
+            return;
+        }
+        if (preg_match('/reset(?:s| will reset)? at ([0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} UTC)/i', $message, $m)) {
+            set_setting('studio_provider_quota_resets_at', $m[1]);
+        }
+    }
+}
+
+if (! function_exists('studio_usage')) {
+    /**
+     * Real token/credit usage summary (from the DB) + the provider's last-known quota reset time.
+     */
+    function studio_usage($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $q = $user ? $user->generations()->where('status', 'completed') : null;
+
+        return [
+            'balance' => $user ? (int) $user->credits_balance : 0,
+            'used_total' => $q ? (int) $q->sum('credits_cost') : 0,
+            'used_today' => $q ? (int) $q->whereDate('created_at', today())->sum('credits_cost') : 0,
+            'limit' => (int) studio_config('quota_limit', 0),
+            'quota_resets_at' => (string) setting('studio_provider_quota_resets_at', ''),
+        ];
+    }
+}
+
 if (! function_exists('category_children_nodes')) {
     function category_children_nodes(\App\Models\Category $category): \Illuminate\Support\Collection
     {

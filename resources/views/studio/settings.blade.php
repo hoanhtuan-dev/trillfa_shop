@@ -5,6 +5,21 @@
     <h1 class="font-display text-2xl font-semibold text-ink-900">Cài đặt Studio</h1>
     <p class="mt-1 text-sm text-ink-500">Tinh chỉnh tín dụng và giới hạn cho công cụ AI nội bộ.</p>
 
+    {{-- usage card inserted above the form --}}
+    <div class="card mt-6 p-5">
+        <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Sử dụng &amp; Hạn mức</h2>
+        <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Tín dụng (còn)</p><p class="mt-1 text-lg font-bold text-ink-900">{{ number_format($usage['balance']) }}</p></div>
+            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Đã dùng (tổng)</p><p class="mt-1 text-lg font-bold text-ink-900">{{ number_format($usage['used_total']) }}</p></div>
+            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Hôm nay</p><p class="mt-1 text-lg font-bold text-ink-900">{{ number_format($usage['used_today']) }}</p></div>
+            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Hạn mức (quota)</p><p class="mt-1 text-lg font-bold text-ink-900">{{ $usage['limit'] > 0 ? number_format($usage['limit']) : 'Không giới hạn' }}</p></div>
+        </div>
+        @if($usage['quota_resets_at'])
+            <p class="mt-3 text-xs text-amber-700">⚠️ Hạn mức nhà cung cấp vừa hết — reset lúc <b>{{ $usage['quota_resets_at'] }} UTC</b>. Kiểm tra/gia hạn hạn mức tài khoản, hoặc dùng key khác.</p>
+        @endif
+        <p class="mt-2 text-xs text-ink-500">Quota là tín dụng token/credit đã xài với nhà cung cấp (QwenCloud/DashScope). Giới hạn hiển thị nếu bạn đặt <code class="rounded bg-white px-1">STUDIO_QUOTA_LIMIT</code>.</p>
+    </div>
+
     <form method="POST" action="{{ route('studio.settings.update') }}" enctype="multipart/form-data" class="card mt-6 space-y-5 p-6">
         @csrf
         <div>

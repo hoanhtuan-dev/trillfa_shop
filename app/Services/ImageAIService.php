@@ -271,6 +271,7 @@ class ImageAIService
             $this->dashscopeError = 'Nhà cung cấp AI không trả về ảnh. Kiểm tra model / độ phân giải.';
         } catch (\Throwable $e) {
             $this->dashscopeError = $e->getMessage();
+            capture_provider_quota_reset($e->getMessage());
             logger()->error('DashScope '.$model.' failed: '.$e->getMessage());
         }
 

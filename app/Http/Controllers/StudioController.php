@@ -680,6 +680,7 @@ class StudioController extends Controller
             'face_ref' => setting('studio_face_ref', ''),
             'pending_count' => auth()->user()->generations()->whereIn('status', ['pending', 'processing'])->count(),
             'queue_driver' => config('queue.default'),
+            'usage' => studio_usage(auth()->user()),
         ]);
     }
 

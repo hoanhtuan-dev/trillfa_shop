@@ -28,6 +28,8 @@
     $imageRatio = studio_config('image_ratio', '1:1');
     $videoDuration = studio_config('video_duration', '10');
     $creativeLevel = max(1, min(10, (int) studio_config('creative_level', 6)));
+    $creditsUsedToday = (int) auth()->user()->generations()->where('status', 'completed')->whereDate('created_at', today())->sum('credits_cost');
+    $quotaResetsAt = (string) setting('studio_provider_quota_resets_at', '');
 @endphp
 
 @section('content')
@@ -71,6 +73,8 @@
             <span class="badge {{ studio_config('processing') === 'queue' ? 'bg-amber-100 text-amber-700' : 'bg-cream-200 text-ink-700' }}">{{ studio_config('processing') === 'queue' ? 'Queue: cần worker' : 'Đồng bộ' }}</span>
             <span class="text-ink-500">Tín dụng: <b class="font-semibold text-ink-900" x-text="creditsLeft"></b></span>
             <span class="text-ink-500">Đã dùng: <b class="font-semibold text-ink-900">{{ $creditsUsed }}</b></span>
+            <span class="text-ink-500">Hôm nay: <b class="font-semibold text-ink-900">{{ $creditsUsedToday }}</b></span>
+            @if($quotaResetsAt)<span class="badge bg-amber-100 text-amber-700" title="Hạn mức nhà cung cấp vừa hết — reset lúc {{ $quotaResetsAt }} UTC">⚠️ Hạn mức</span>@endif
             <button @click="processNow()" class="btn-outline btn-sm whitespace-nowrap" title="Xử lý các công việc đang chờ trong hàng đợi">Xử lý ngay</button>
         </div>
     </div>

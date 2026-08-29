@@ -1074,6 +1074,25 @@ class ShopFlowTest extends TestCase
     }
 
 
+    public function test_studio_usage_stats(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $admin->generations()->create(['type' => 'image', 'status' => 'completed', 'credits_cost' => 3]);
+        $admin->generations()->create(['type' => 'video', 'status' => 'completed', 'credits_cost' => 10]);
+
+        $u = studio_usage($admin);
+        $this->assertSame(13, $u['used_total']);
+        $this->assertSame(13, $u['used_today']); // created now -> today
+        $this->assertSame($admin->fresh()->credits_balance, $u['balance']);
+
+        // Provider quota reset time is surfaced.
+        set_setting('studio_provider_quota_resets_at', '09-04 20:57:00 UTC');
+        $this->assertSame('09-04 20:57:00 UTC', studio_usage($admin)['quota_resets_at']);
+    }
+
+
     public function test_studio_dashscope_base_url_routing(): void
     {
         // Pay-As-You-Go (sk-…) -> dashscope-intl host.
