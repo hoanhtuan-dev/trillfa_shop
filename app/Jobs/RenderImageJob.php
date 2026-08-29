@@ -43,7 +43,9 @@ class RenderImageJob implements ShouldQueue
             $faceRef = (string) setting('studio_face_ref', '');
             $faceSyncOn = filter_var(studio_config('face_sync_enabled', true), FILTER_VALIDATE_BOOL);
             $faceDesc = '';
-            if ($faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/')) {
+            // Chỉ nhúng mô tả khuôn mặt cho lần TẠO MỚI (không có ảnh nguồn). Với Inpaint (có base_image),
+            // ảnh nguồn đã chứa khuôn mặt → mô tả lại làm model vẽ lại toàn bộ, gây trôi/không bảo toàn.
+            if ($faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/') && ! $generation->base_image) {
                 $hash = md5($faceRef);
                 $faceDesc = ((string) setting('studio_face_desc_hash', '') === $hash)
                     ? (string) setting('studio_face_desc', '')
