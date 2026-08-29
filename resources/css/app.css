@@ -132,7 +132,7 @@
     .prose-content a { @apply text-brand-700 underline underline-offset-2; }
     .prose-content img { @apply my-6 w-full rounded-2xl; }
     .studio-nav {
-        @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-cream-200 transition-colors hover:bg-ink-700 hover:text-white;
+        @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-white;
     }
     .studio-nav.is-active {
         @apply bg-brand-600 font-semibold text-white hover:bg-brand-600;
@@ -141,6 +141,23 @@
         @apply mt-4 px-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300;
     }
 }
+
+
+/* --- Elegant scrollbars (thin, subtle, animated) --- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: rgba(107, 99, 88, 0.32);
+    border-radius: 999px;
+    transition: background .2s ease;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(107, 99, 88, 0.55); }
+::-webkit-scrollbar-thumb:active { background: rgba(51, 103, 77, 0.7); }
+/* Dark surfaces get a lighter thumb */
+.bg-ink-900::-webkit-scrollbar-thumb,
+aside::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); }
+aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
+* { scrollbar-width: thin; scrollbar-color: rgba(107, 99, 88, 0.35) transparent; }
 
 @utility btn {
     @apply inline-flex items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;

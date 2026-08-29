@@ -88,14 +88,14 @@
                 </div>
                 <div class="flex items-center gap-3">
                     <span class="badge bg-brand-50 text-brand-800">Tín dụng: <span class="font-bold">{{ $credits }}</span></span>
-                    <span class="hidden text-xs text-ink-500 md:inline">{{ $u?->name }}</span>
+                    <span class="hidden text-xs text-cream-300 md:inline">{{ $u?->name }}</span>
                     <form method="POST" action="{{ route('logout') }}">@csrf
                         <button type="submit" class="btn-outline btn-sm">Đăng xuất</button>
                     </form>
                 </div>
             </header>
 
-            <main class="flex-1 p-4 sm:p-6">
+            <main class="flex-1 overflow-y-auto bg-cream-50 p-4 sm:p-6">
                 @yield('content')
             </main>
 
