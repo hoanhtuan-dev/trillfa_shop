@@ -55,7 +55,7 @@ class GeminiService
 
     protected function callQwen(string $idea, array $injections, int $creativeLevel, string $key): array
     {
-        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
+        $base = dashscope_base_url($key).'/compatible-mode/v1';
         $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
         $system = $this->systemPrompt($creativeLevel);
         $prompt = 'Idea: '.$idea."

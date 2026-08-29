@@ -54,5 +54,7 @@ return [
     'veo_key' => env('GOOGLE_VEO_KEY', ''),
     'qwen_key' => env('QWEN_API_KEY', ''),
     'dashscope_key' => env('DASHSCOPE_API_KEY', ''),
-    'dashscope_base' => env('DASHSCOPE_BASE', 'https://dashscope-intl.aliyuncs.com'), // intl = quốc tế; dashscope.aliyuncs.com = Trung Quốc
+    'dashscope_base' => env('DASHSCOPE_BASE', 'https://dashscope-intl.aliyuncs.com'), // Pay-As-You-Go (sk-…): intl = quốc tế
+    'dashscope_token_plan_base' => env('DASHSCOPE_TOKEN_PLAN_BASE', 'https://token-plan.ap-southeast-1.maas.aliyuncs.com'), // Token/Coding Plan (sk-sp-…): riêng, không dùng chung
+    'face_sync_enabled' => (bool) env('STUDIO_FACE_SYNC', true), // mô tả khuôn mặt (vision) rồi nhúng vào prompt
 ];

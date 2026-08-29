@@ -41,7 +41,8 @@ class RenderImageJob implements ShouldQueue
             // static, so the description is cached — a ~90s vision call should NOT run on every image.
             $prompt = (string) $generation->prompt;
             $faceRef = (string) setting('studio_face_ref', '');
-            if ($faceRef && str_starts_with($faceRef, '/storage/')) {
+            $faceSyncOn = filter_var(studio_config('face_sync_enabled', true), FILTER_VALIDATE_BOOL);
+            if ($faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/')) {
                 $hash = md5($faceRef);
                 $faceDesc = ((string) setting('studio_face_desc_hash', '') === $hash)
                     ? (string) setting('studio_face_desc', '')

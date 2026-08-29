@@ -994,6 +994,8 @@ class ShopFlowTest extends TestCase
         $this->assertSame('gemini-2.5-flash', setting('studio_prompt_model'));
         $this->assertSame('qwen-image-plus', setting('studio_qwen_model'));
         $this->assertSame('https://dashscope-intl.aliyuncs.com', setting('studio_dashscope_base'));
+        $this->assertSame('https://token-plan.ap-southeast-1.maas.aliyuncs.com', setting('studio_dashscope_token_plan_base'));
+        $this->assertSame('1', setting('studio_face_sync_enabled'));
         $this->assertSame('queue', setting('studio_processing'));
         $this->assertSame('1K', setting('studio_image_resolution'));
         $this->assertSame('1080', setting('studio_video_resolution'));
@@ -1025,6 +1027,18 @@ class ShopFlowTest extends TestCase
         $this->assertNotEmpty($data['video_prompt_en']);
         $this->assertSame(6, (int) $data['creative_level']);
         $this->assertSame(5, (int) $data['adherence']);
+    }
+
+
+    public function test_studio_dashscope_base_url_routing(): void
+    {
+        // Pay-As-You-Go (sk-…) -> dashscope-intl host.
+        $this->assertSame('https://dashscope-intl.aliyuncs.com', dashscope_base_url('sk-abcdef123456'));
+        // Token / Coding Plan (sk-sp-…) -> token-plan host (separate, never mixed).
+        $this->assertSame('https://token-plan.ap-southeast-1.maas.aliyuncs.com', dashscope_base_url('sk-sp-abcdef123456'));
+        // A custom pay-as-you-go base is honoured.
+        set_setting('studio_dashscope_base', 'https://dashscope.aliyuncs.com');
+        $this->assertSame('https://dashscope.aliyuncs.com', dashscope_base_url('sk-abc'));
     }
 
 

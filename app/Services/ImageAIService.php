@@ -271,14 +271,7 @@ class ImageAIService
      */
     protected function dashscopeBase(string $key): string
     {
-        $configured = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
-        $classic = ['https://dashscope-intl.aliyuncs.com', 'https://dashscope.aliyuncs.com'];
-
-        if (str_starts_with($key, 'sk-sp-') && in_array($configured, $classic, true)) {
-            return 'https://token-plan.ap-southeast-1.maas.aliyuncs.com';
-        }
-
-        return $configured;
+        return dashscope_base_url($key);
     }
 
     protected function callDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
@@ -388,7 +381,7 @@ class ImageAIService
         if (! $key) {
             return null;
         }
-        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/api/v1';
+        $base = dashscope_base_url($key).'/api/v1';
 
         try {
             $resp = Http::withToken($key)->timeout(180)
@@ -439,7 +432,7 @@ class ImageAIService
             $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
             if ($key) {
                 try {
-                    $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
+                    $base = dashscope_base_url($key).'/compatible-mode/v1';
                     $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
                         'model' => (string) studio_config('qwen_vision_model', 'qwen3.8-flash'),
                         'messages' => [['role' => 'user', 'content' => [

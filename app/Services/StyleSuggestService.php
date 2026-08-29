@@ -43,7 +43,7 @@ class StyleSuggestService
     {
         $model = (string) studio_config('qwen_vision_model', 'qwen3.8-flash');
         [$b64, $mime] = $this->downscaleBase64($imagePath);
-        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
+        $base = dashscope_base_url($key).'/compatible-mode/v1';
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
             .'Return ONLY valid JSON with keys: "styles", "background", "pose", "fabric", "silhouette", "camera", '

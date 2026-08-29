@@ -77,15 +77,17 @@
         </div>
         <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
             <h3 class="mb-3 font-display text-sm font-semibold text-ink-900">Model AI theo tác vụ</h3>
-            <div>
-                <label class="label">DashScope base URL</label>
-                <input type="url" name="dashscope_base" value="{{ old('dashscope_base', $dashscope_base) }}" class="input !py-2" placeholder="https://dashscope-intl.aliyuncs.com">
-                <p class="mt-1 text-xs text-ink-500">Chỉ nhập <strong>host</strong> (không thêm <code class="rounded bg-white px-1">/apps/...</code>); đây là API endpoint nên mở trực tiếp trên trình duyệt sẽ <strong>404 (bình thường)</strong>. Base URL <strong>phụ thuộc loại key QwenCloud</strong>:
-                    <span class="mt-1 block">• Key <code class="rounded bg-white px-1">sk-xxxxx</code> (pay-as-you-go) → <code class="rounded bg-white px-1">https://dashscope-intl.aliyuncs.com</code></span>
-                    <span class="block">• Key <code class="rounded bg-white px-1">sk-sp-…</code> (Token Plan, dùng Credits) → <code class="rounded bg-white px-1">https://token-plan.ap-southeast-1.maas.aliyuncs.com</code></span>
-                    <span class="block">• Key <code class="rounded bg-white px-1">sk-sp-…</code> (Coding Plan) → <code class="rounded bg-white px-1">https://coding-intl.dashscope.aliyuncs.com</code></span>
-                    Nếu để mặc định và dùng key <code class="rounded bg-white px-1">sk-sp-</code>, hệ thống tự chuyển sang Token Plan. Kiểm tra bằng nút <strong>Test</strong> trong Quản lý API.</p>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="label">Pay-As-You-Go base URL <span class="text-ink-500">(key <code class="rounded bg-white px-1">sk-…</code>)</span></label>
+                    <input type="url" name="dashscope_base" value="{{ old('dashscope_base', $dashscope_base) }}" class="input !py-2" placeholder="https://dashscope-intl.aliyuncs.com">
+                </div>
+                <div>
+                    <label class="label">Token / Coding Plan base URL <span class="text-ink-500">(key <code class="rounded bg-white px-1">sk-sp-…</code>)</span></label>
+                    <input type="url" name="dashscope_token_plan_base" value="{{ old('dashscope_token_plan_base', $dashscope_token_plan_base) }}" class="input !py-2" placeholder="https://token-plan.ap-southeast-1.maas.aliyuncs.com">
+                </div>
             </div>
+            <p class="mt-2 text-xs text-ink-500">Ứng dụng tự chọn base URL theo loại key: <code class="rounded bg-white px-1">sk-…</code> → Pay-As-You-Go, <code class="rounded bg-white px-1">sk-sp-…</code> → Token/Coding Plan. <strong>Hai loại key dùng host và chiến lược riêng, không dùng chung.</strong> Chỉ nhập <strong>host</strong> (không thêm <code class="rounded bg-white px-1">/apps/...</code>); mở trên trình duyệt sẽ <strong>404 (bình thường)</strong>. Kiểm tra bằng nút <strong>Test</strong> trong Quản lý API.</p>
             <div>
                 <label class="label">Chế độ xử lý</label>
                 <select name="processing" class="input !py-2">
@@ -147,6 +149,10 @@
                     @if($face_ref)<img src="{{ $face_ref }}" class="mt-2 h-16 w-16 rounded-full bg-white object-cover" alt="Mặt mẫu">@endif
                 </div>
             </div>
+            <label class="mb-0 mt-3 flex items-center gap-2 text-xs text-ink-700">
+                <input type="checkbox" name="face_sync_enabled" value="1" @checked(old('face_sync_enabled', $face_sync_enabled)) class="h-4 w-4 accent-brand-600">
+                <span>Bật <strong>đồng bộ khuôn mặt</strong> — AI mô tả khuôn mặt mẫu rồi nhúng vào prompt tạo ảnh để giữ nhất quán nhân vật (mô tả chạy 1 lần, kết quả được cache).</span>
+            </label>
             <p class="mt-2 text-xs text-ink-500">Logo được dán vào góc ảnh khi tạo ảnh nền shop; khuôn mặt mẫu dùng làm tham chiếu cho nhất quán nhân vật (nếu model ảnh hỗ trợ).</p>
         </div>
         <div class="flex items-center gap-3">

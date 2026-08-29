@@ -422,10 +422,11 @@ class StudioController extends Controller
         // Wan (image & video) + Qwen run on a DashScope-compatible endpoint. Try every
         // candidate host (classic region + QwenCloud Token/Coding Plan) because a
         // QwenCloud key is bound to a specific base URL by key type.
-        $configured = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
+        $configured = dashscope_base_url($key);
         $candidates = array_unique([
             $configured,
-            str_contains($configured, 'intl') ? 'https://dashscope.aliyuncs.com' : 'https://dashscope-intl.aliyuncs.com',
+            'https://dashscope.aliyuncs.com',
+            'https://dashscope-intl.aliyuncs.com',
             'https://token-plan.ap-southeast-1.maas.aliyuncs.com',
             'https://coding-intl.dashscope.aliyuncs.com',
         ]);
@@ -612,6 +613,8 @@ class StudioController extends Controller
             'video_model' => setting('studio_video_model', config('studio.video_model')),
             'vision_model' => setting('studio_vision_model', config('studio.vision_model')),
             'dashscope_base' => setting('studio_dashscope_base', config('studio.dashscope_base')),
+            'dashscope_token_plan_base' => setting('studio_dashscope_token_plan_base', config('studio.dashscope_token_plan_base')),
+            'face_sync_enabled' => setting('studio_face_sync_enabled', config('studio.face_sync_enabled')),
             'processing' => setting('studio_processing', config('studio.processing')),
             'image_resolution' => setting('studio_image_resolution', config('studio.image_resolution')),
             'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
@@ -642,6 +645,8 @@ class StudioController extends Controller
             'video_model' => ['required', 'string', 'max:255'],
             'vision_model' => ['required', 'string', 'max:255'],
             'dashscope_base' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
+            'dashscope_token_plan_base' => ['nullable', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
+            'face_sync_enabled' => ['nullable', 'boolean'],
             'processing' => ['required', 'string', 'in:sync,queue'],
             'image_resolution' => ['required', 'string', 'in:1K,2K'],
             'video_resolution' => ['required', 'string', 'in:480,720,1080'],
@@ -664,6 +669,8 @@ class StudioController extends Controller
         set_setting('studio_video_model', $data['video_model']);
         set_setting('studio_vision_model', $data['vision_model']);
         set_setting('studio_dashscope_base', $data['dashscope_base']);
+        set_setting('studio_dashscope_token_plan_base', $data['dashscope_token_plan_base'] ?? config('studio.dashscope_token_plan_base'));
+        set_setting('studio_face_sync_enabled', isset($data['face_sync_enabled']) ? ($data['face_sync_enabled'] ? '1' : '0') : '1');
         set_setting('studio_processing', $data['processing']);
         set_setting('studio_image_resolution', $data['image_resolution']);
         set_setting('studio_video_resolution', $data['video_resolution']);

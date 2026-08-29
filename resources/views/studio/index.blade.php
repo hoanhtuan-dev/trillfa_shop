@@ -212,16 +212,20 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 border-t border-cream-200 px-4 py-3 text-xs" x-show="preview">
                     <span class="truncate text-ink-500" x-text="preview ? (preview.created_at || '') + ' · ' + preview.credits_cost + ' token' : ''"></span>
                     <span class="flex flex-wrap items-center gap-2">
-                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'">Sửa · Video</button>
+                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Chỉnh sửa (Inpaint) ở bảng bên trái.">✏️ Sửa ảnh <span x-show="selectedImageId === preview.id" class="ml-0.5 text-[10px]">✓</span></button>
+                        <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Render Video catwalk ở bảng bên dưới.">🎬 Tạo video <span x-show="videoSourceId === preview.id" class="ml-0.5 text-[10px] text-brand-700">✓</span></button>
                         <a :href="preview ? '/studio/generations/' + preview.id + '/download' : '#'" class="btn-outline btn-sm" x-show="preview && preview.media_url">Tải xuống</a>
                         <button @click="cancelGeneration(preview)" :disabled="!preview || !isActive(preview.status)" class="btn-outline btn-sm text-red-600" x-show="preview && isActive(preview.status)">Dừng</button>
                         <button @click="removeGeneration(preview)" class="btn-outline btn-sm text-red-600">Xóa</button>
                     </span>
                 </div>
-                <div class="px-4 py-2 text-[10px] text-brand-700" x-show="preview && selectedImageId === preview.id">✓ Đã chọn làm nguồn cho Chỉnh sửa / Video</div>
+                <div class="flex flex-wrap gap-x-4 px-4 py-2 text-[10px] text-brand-700">
+                    <span x-show="preview && selectedImageId === preview.id">✓ Đã chọn làm nguồn Chỉnh sửa (Inpaint)</span>
+                    <span x-show="preview && videoSourceId === preview.id">✓ Đã chọn làm nguồn Video</span>
+                </div>
 
                 <!-- ===== Video Rendering Timeline ===== -->
-                <div class="border-t border-cream-200 px-4 py-3" x-show="output.video_prompt_en || selectedImageId">
+                <div class="border-t border-cream-200 px-4 py-3" x-show="output.video_prompt_en || videoSourceId">
                     <div class="mb-2 flex items-center justify-between">
                         <h3 class="font-display text-sm font-semibold text-ink-900">Video Rendering Timeline</h3>
                         <span class="text-[10px] text-ink-500">Camera keyframes</span>
@@ -241,9 +245,9 @@
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select>
                         <select x-model="videoRes" class="input !py-2"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select>
-                        <button @click="renderVideo()" :disabled="videoBusy || !selectedImageId" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!videoBusy">Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
+                        <button @click="renderVideo()" :disabled="videoBusy || !videoSourceId" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!videoBusy">Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
                     </div>
-                    <p class="mt-2 text-[10px] text-ink-500" x-text="selectedImageId ? 'Nguồn ảnh #' + selectedImageId : 'Chọn ảnh nguồn trước khi Render.'"></p>
+                    <p class="mt-2 text-[10px] text-ink-500" x-text="videoSourceId ? 'Nguồn ảnh #' + videoSourceId : 'Chọn ảnh nguồn trước khi Render (bấm nút “Tạo video”).'"></p>
                 </div>
             </div>
         </div>
@@ -347,7 +351,7 @@ document.addEventListener('alpine:init', () => {
         loading: false, generating: false, videoBusy: false, refining: false,
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
         generations: gens, creditsLeft: Number(credits),
-        currentProjectId: currentProject, selectedImageId: null, videoCamera: '',
+        currentProjectId: currentProject, selectedImageId: null, videoSourceId: null, videoCamera: '',
         newProjectName: '', showNewProject: false, refinePrompt: '',
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
@@ -389,8 +393,8 @@ document.addEventListener('alpine:init', () => {
             if (!g) { this.previewId = null; this.selectedImageId = null; this.palette = []; return; }
             this.previewId = g.id;
             this.loadPalette(g.id);
-            if (g.type === 'image' && g.status === 'completed') { this.selectedImageId = g.id; Alpine.store('toast').show('Đã mở ảnh #' + g.id); }
-            else this.selectedImageId = null;
+            if (g.type === 'image' && g.status === 'completed') { this.selectedImageId = g.id; this.videoSourceId = g.id; Alpine.store('toast').show('Đã mở ảnh #' + g.id); }
+            else { this.selectedImageId = null; this.videoSourceId = null; }
         },
         get preview() { return this.generations.find(g => g.id === this.previewId) || null; },
         setPreview(g) { if (g) { this.previewId = g.id; this.loadPalette(g.id); } },
@@ -525,9 +529,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         async renderVideo() {
-            if (!this.selectedImageId || this.videoBusy) return;
+            if (!this.videoSourceId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.selectedImageId); const camera = this.videoCamera || 'slow tracking shot'; const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || this.output.image_prompt_en || 'một video catwalk thời trang', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
+            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoCamera || 'slow tracking shot'; const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || this.output.image_prompt_en || 'một video catwalk thời trang', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
@@ -547,7 +551,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async removeGeneration(g) {
-            try { await this.del('/studio/generations/' + g.id); this.generations = this.generations.filter(x => x.id !== g.id); if (this.selectedImageId === g.id) this.selectedImageId = null; if (this.previewId === g.id) this.previewId = null; if (this._timers[g.id]) { clearTimeout(this._timers[g.id]); delete this._timers[g.id]; } Alpine.store('toast').show('Đã xóa nhiệm vụ #' + g.id); }
+            try { await this.del('/studio/generations/' + g.id); this.generations = this.generations.filter(x => x.id !== g.id); if (this.selectedImageId === g.id) this.selectedImageId = null; if (this.videoSourceId === g.id) this.videoSourceId = null; if (this.previewId === g.id) this.previewId = null; if (this._timers[g.id]) { clearTimeout(this._timers[g.id]); delete this._timers[g.id]; } Alpine.store('toast').show('Đã xóa nhiệm vụ #' + g.id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
         },
 
@@ -573,7 +577,8 @@ document.addEventListener('alpine:init', () => {
 
         addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else this.generations.unshift(gen); this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
         async syncLatest() { try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); if (d && d.items) this.generations = d.items; } catch (e) {} },
-        selectImage(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.selectedImageId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn.'); },
+        selectImage(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.selectedImageId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Chỉnh sửa.'); },
+        selectVideo(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.videoSourceId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Video.'); },
 
         statusLabel(s) { return { pending:'Đang chờ', processing:'Đang tạo', completed:'Hoàn tất', failed:'Lỗi', cancelled:'Đã hủy' }[s] || s; },
         isActive(s) { return s === 'pending' || s === 'processing'; },

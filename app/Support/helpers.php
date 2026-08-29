@@ -208,6 +208,22 @@ if (! function_exists('studio_api_key')) {
     }
 }
 
+if (! function_exists('dashscope_base_url')) {
+    /**
+     * QwenCloud / DashScope hosts are separate per key type and must NOT be mixed.
+     *  - sk-sp-…  (Token / Coding Plan) -> token-plan host
+     *  - sk-…     (Pay-As-You-Go)        -> dashscope-intl host
+     */
+    function dashscope_base_url(string $key): string
+    {
+        if (str_starts_with($key, 'sk-sp-')) {
+            return rtrim((string) studio_config('dashscope_token_plan_base', 'https://token-plan.ap-southeast-1.maas.aliyuncs.com'), '/');
+        }
+
+        return rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
+    }
+}
+
 if (! function_exists('category_children_nodes')) {
     function category_children_nodes(\App\Models\Category $category): \Illuminate\Support\Collection
     {

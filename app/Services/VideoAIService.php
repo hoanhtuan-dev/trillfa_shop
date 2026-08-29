@@ -28,7 +28,7 @@ class VideoAIService
 
     protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key): string
     {
-        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/api/v1';
+        $base = dashscope_base_url($key).'/api/v1';
         $model = (string) studio_config('video_model', 'wan2.5-t2v');
         $size = $this->videoSize($resolution);
 
