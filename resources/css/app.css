@@ -28,6 +28,7 @@
     --color-ink-900: #1b1a17;
     --color-ink-700: #3a382f;
     --color-ink-500: #6e6a5d;
+    --color-ink-800: #34322b;
 
     --color-clay-500: #b06a3b;
     --color-clay-600: #96522a;
@@ -96,7 +97,7 @@
     }
 
     .card {
-        @apply rounded-3xl border border-cream-200 bg-white;
+        @apply rounded-3xl border border-cream-200 bg-cream-100 shadow-sm shadow-ink-900/5;
     }
 
     .card-hover {
@@ -155,7 +156,8 @@
 ::-webkit-scrollbar-thumb:active { background: rgba(51, 103, 77, 0.7); }
 /* Dark surfaces get a lighter thumb */
 .bg-ink-900::-webkit-scrollbar-thumb,
-aside::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); }
+.bg-ink-800::-webkit-scrollbar-thumb,
+aside::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
 aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 * { scrollbar-width: thin; scrollbar-color: rgba(107, 99, 88, 0.35) transparent; }
 

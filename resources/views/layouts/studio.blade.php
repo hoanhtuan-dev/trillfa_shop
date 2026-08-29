@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#0f1f18">
+    <meta name="theme-color" content="#34322b">
     <meta name="color-scheme" content="light">
     <title>@yield('title', 'Trillfa Studio') · Trillfa Fa</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -30,11 +30,11 @@
         $routeName = request()->route()?->getName();
     @endphp
 </head>
-<body class="min-h-screen bg-ink-900 text-cream-100 antialiased">
+<body class="min-h-screen bg-ink-800 text-cream-100 antialiased">
     <div class="flex min-h-screen" x-data="{ sidebarCollapsed: false }">
         <!-- ===== Left sidebar ===== -->
-        <aside class="hidden w-60 shrink-0 flex-col border-r border-ink-700 bg-ink-900" :class="sidebarCollapsed ? 'lg:hidden' : 'lg:flex'">
-            <a href="{{ route('studio.index') }}" class="flex items-center gap-2 border-b border-cream-200 px-4 py-4">
+        <aside class="hidden w-60 shrink-0 flex-col border-r border-ink-700 bg-ink-800" :class="sidebarCollapsed ? 'lg:hidden' : 'lg:flex'">
+            <a href="{{ route('studio.index') }}" class="flex items-center gap-2 border-b border-ink-700 px-4 py-4">
                 <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
                 </span>
@@ -80,9 +80,9 @@
 
         <!-- ===== Main region ===== -->
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-ink-700 bg-ink-900/95 px-4 backdrop-blur">
+            <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-ink-700 bg-ink-800/95 px-4 backdrop-blur">
                 <div class="flex items-center gap-2 text-sm">
-                    <button @click="sidebarCollapsed = !sidebarCollapsed" class="btn-outline btn-sm" :title="sidebarCollapsed ? 'Hiện thanh bên' : 'Ẩn thanh bên'"><span x-text="sidebarCollapsed ? '»' : '«'"></span></button>
+                    <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 transition-colors hover:bg-ink-700 hover:text-white" :title="sidebarCollapsed ? 'Hiện thanh bên' : 'Ẩn thanh bên'"><span x-text="sidebarCollapsed ? '»' : '«'"></span></button>
                     <span class="font-display text-sm font-semibold text-cream-50">@yield('title', 'Trillfa Studio')</span>
                     <span class="hidden badge bg-cream-200 text-ink-500 sm:inline-flex">{{ $connected ? 'AI Connected' : 'Stub' }}</span>
                 </div>
@@ -90,7 +90,7 @@
                     <span class="badge bg-brand-50 text-brand-800">Tín dụng: <span class="font-bold">{{ $credits }}</span></span>
                     <span class="hidden text-xs text-cream-300 md:inline">{{ $u?->name }}</span>
                     <form method="POST" action="{{ route('logout') }}">@csrf
-                        <button type="submit" class="btn-outline btn-sm">Đăng xuất</button>
+                        <button type="submit" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 transition-colors hover:bg-ink-700 hover:text-white">Đăng xuất</button>
                     </form>
                 </div>
             </header>
@@ -100,7 +100,7 @@
             </main>
 
             <!-- ===== Status bar ===== -->
-            <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-700 bg-ink-900 px-4 py-2 text-[11px] text-cream-300">
+            <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-700 bg-ink-800 px-4 py-2 text-[11px] text-cream-300">
                 <span>User: <b class="text-cream-50">{{ $u?->name }}</b></span>
                 <span>Credits: <b class="text-cream-50">{{ $credits }}</b></span>
                 <span>Used: <b class="text-cream-50">{{ $creditsUsed }}</b></span>

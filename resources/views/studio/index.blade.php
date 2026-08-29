@@ -187,10 +187,11 @@
                         </template>
                         <template x-if="!preview">
                             <div class="text-center">
-                                <div class="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-brand-50 text-brand-700">
+                                <div x-show="opening" class="mx-auto mb-3 h-16 w-16 animate-spin rounded-full border-4 border-brand-600 border-t-transparent"></div>
+                                <div x-show="!opening" class="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-brand-50 text-brand-700">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.25-5.25 4.5 4.5L15.75 9.75l3.75 3.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 </div>
-                                <p class="text-sm text-ink-500">Chọn một mục ở bảng Outputs để xem chi tiết.</p>
+                                <p class="text-sm text-ink-500" x-text="opening ? 'Đang mở mục bạn chọn…' : 'Chọn một mục ở bảng Outputs để xem chi tiết.'"></p>
                             </div>
                         </template>
                     </div>
@@ -331,16 +332,44 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
-        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false,
+        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false,
         _timers: {},
 
-        init() {
+        async init() {
             const q = new URLSearchParams(location.search).get('gen');
-            const target = q ? this.generations.find(g => g.id === Number(q)) : null;
-            const f = target || this.generations.find(g => g.status === 'completed');
-            if (f) { this.previewId = f.id; this.loadPalette(f.id); }
-            if (target && target.status === 'completed') this.selectImage(target);
+            let target = null;
+            if (q) {
+                target = this.generations.find(g => g.id === Number(q));
+                if (target) {
+                    this.openGem(target);
+                } else {
+                    // Item may be older than the first 12 loaded; fetch the exact one.
+                    this.opening = true;
+                    try {
+                        const res = await fetch('/studio/generations/' + Number(q), { headers: { Accept: 'application/json' } });
+                        if (res.ok) {
+                            const g = await res.json();
+                            target = { id: g.id, type: g.type, status: g.status, model: g.model, provider: g.provider, media_url: g.media_url, error: g.error, credits_cost: g.credits_cost, created_at: '' };
+                            if (!this.generations.some(x => x.id === Number(g.id))) this.generations.unshift(target);
+                            this.openGem(target);
+                        } else {
+                            this.openGem(this.generations.find(g => g.status === 'completed') || null);
+                        }
+                    } catch (e) {
+                        this.openGem(this.generations.find(g => g.status === 'completed') || null);
+                    } finally { this.opening = false; }
+                }
+            } else {
+                this.openGem(this.generations.find(g => g.status === 'completed') || null);
+            }
             this.generations.forEach(g => { if (this.isActive(g.status)) this.poll(g.id); });
+        },
+        openGem(g) {
+            if (!g) { this.previewId = null; this.selectedImageId = null; this.palette = []; return; }
+            this.previewId = g.id;
+            this.loadPalette(g.id);
+            if (g.type === 'image' && g.status === 'completed') { this.selectedImageId = g.id; Alpine.store('toast').show('Đã mở ảnh #' + g.id); }
+            else this.selectedImageId = null;
         },
         get preview() { return this.generations.find(g => g.id === this.previewId) || null; },
         setPreview(g) { if (g) { this.previewId = g.id; this.loadPalette(g.id); } },
