@@ -142,17 +142,35 @@ class StudioController extends Controller
     }
 
     /**
+     * Mark a generation failed and refund its credits (used for stuck / aborted jobs).
+     */
+    protected function failStuck(Generation $generation, string $message): void
+    {
+        $generation->update(['status' => 'failed', 'error' => $message]);
+        if ($generation->credits_cost > 0) {
+            $generation->user?->increment('credits_balance', $generation->credits_cost);
+        }
+    }
+
+    /**
      * Polling endpoint for a single generation.
      */
     public function show(Generation $generation)
     {
         abort_unless($generation->user_id === auth()->id(), 403);
 
-        // Lazy worker: if this generation is still pending (not picked up by a worker), process it
-        // inline now so the polling request returns the completed result. This lets the create request
-        // return fast (Canvas shows "Đang tạo" instantly) and slow providers finish without SSH/cron.
-        if ($generation->status === 'pending') {
+        // A generation left 'processing' by a killed web request (client disconnect) is healed here
+        // so polling resolves instead of spinning "Đang tạo" forever.
+        $stuckWindow = $generation->type === 'video' ? 12 : 6; // minutes; job timeout is 10m (video) / 5m (image)
+        if ($generation->status === 'processing'
+            && $generation->updated_at->lt(now()->subMinutes($stuckWindow))) {
+            $this->failStuck($generation, 'Hết thời gian xử lý (có thể request đã bị ngắt). Bấm “Xử lý ngay” hoặc thử lại.');
+        } elseif ($generation->status === 'pending') {
+            // Lazy worker: if this generation is still pending (not picked up by a worker), process it
+            // inline now so the polling request returns the completed result. Keep running even if the
+            // polling client disconnects (ignore_user_abort) so a slow provider isn't killed mid-run.
             set_time_limit(600);
+            ignore_user_abort(true);
             $generation->update(['status' => 'processing']);
             try {
                 if ($generation->type === 'video') {
@@ -162,6 +180,7 @@ class StudioController extends Controller
                 }
             } catch (\Throwable $e) {
                 logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
+                $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
             }
         }
 

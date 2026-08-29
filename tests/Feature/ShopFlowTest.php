@@ -1028,6 +1028,27 @@ class ShopFlowTest extends TestCase
     }
 
 
+    public function test_studio_show_heals_stuck_processing_generation(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // A generation left 'processing' by a killed request (old updated_at) should be
+        // healed by the poll (show) endpoint instead of spinning "Đang tạo" forever.
+        $gen = $admin->generations()->create([
+            'type' => 'image', 'status' => 'processing', 'prompt' => 'x', 'credits_cost' => 1,
+        ]);
+        // Force a stale updated_at (not mass-assignable) so show() sees it as stuck.
+        \Illuminate\Support\Facades\DB::table('generations')->where('id', $gen->id)
+            ->update(['updated_at' => now()->subMinutes(20)]);
+
+        $this->getJson('/studio/generations/'.$gen->id)->assertOk();
+        $this->assertSame('failed', $gen->fresh()->status);
+        $this->assertStringContainsString('Hết thời gian xử lý', $gen->fresh()->error);
+        $this->assertSame(1001, $admin->fresh()->credits_balance); // 1000 + 1 refund
+    }
+
+
     public function test_studio_cancel_and_delete_generation(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();

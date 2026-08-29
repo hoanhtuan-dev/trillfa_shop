@@ -527,7 +527,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async removeGeneration(g) {
-            try { await this.del('/studio/generations/' + g.id); this.generations = this.generations.filter(x => x.id !== g.id); if (this.selectedImageId === g.id) this.selectedImageId = null; if (this.previewId === g.id) this.previewId = null; if (this._timers[g.id]) { clearInterval(this._timers[g.id]); delete this._timers[g.id]; } Alpine.store('toast').show('Đã xóa nhiệm vụ #' + g.id); }
+            try { await this.del('/studio/generations/' + g.id); this.generations = this.generations.filter(x => x.id !== g.id); if (this.selectedImageId === g.id) this.selectedImageId = null; if (this.previewId === g.id) this.previewId = null; if (this._timers[g.id]) { clearTimeout(this._timers[g.id]); delete this._timers[g.id]; } Alpine.store('toast').show('Đã xóa nhiệm vụ #' + g.id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
         },
 
@@ -568,16 +568,32 @@ document.addEventListener('alpine:init', () => {
 
         poll(id) {
             if (this._timers[id]) return;
-            this._timers[id] = setInterval(async () => {
+            const started = Date.now();
+            const maxWait = (this.generations.find(g => g.id === Number(id)) || {}).type === 'video' ? 300000 : 150000;
+            const tick = async () => {
                 try {
                     const res = await fetch('/studio/generations/' + id, { headers: { Accept: 'application/json' } });
-                    if (!res.ok) { clearInterval(this._timers[id]); delete this._timers[id]; return; }
+                    if (!res.ok) { clearTimeout(this._timers[id]); delete this._timers[id]; return; }
                     const g = await res.json();
                     const item = this.generations.find(x => x.id === Number(g.id));
                     if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; }
-                    if (['completed','failed','cancelled'].includes(g.status)) { clearInterval(this._timers[id]); delete this._timers[id]; }
-                } catch (e) { clearInterval(this._timers[id]); delete this._timers[id]; }
-            }, 2000);
+                    if (['completed','failed','cancelled'].includes(g.status)) { clearTimeout(this._timers[id]); delete this._timers[id]; return; }
+                } catch (e) { clearTimeout(this._timers[id]); delete this._timers[id]; return; }
+                // Watchdog: a generation that never resolves (e.g. a killed request) stops spinning
+                // and surfaces an actionable error + auto-retry instead of "Đang tạo" forever.
+                if (Date.now() - started > maxWait) {
+                    clearTimeout(this._timers[id]); delete this._timers[id];
+                    const item = this.generations.find(x => x.id === Number(id));
+                    if (item && this.isActive(item.status)) {
+                        item.status = 'failed';
+                        item.error = 'Quá lâu chưa xong (có thể đã bị ngắt). Bấm “Xử lý ngay” hoặc tải lại trang để thử.';
+                        Alpine.store('toast').show('Nhiệm vụ #' + id + ' có vẻ bị treo — bấm “Xử lý ngay”.', 'error');
+                    }
+                    return;
+                }
+                this._timers[id] = setTimeout(tick, 2000);
+            };
+            this._timers[id] = setTimeout(tick, 2000);
         },
     }));
 });
