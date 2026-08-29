@@ -57,9 +57,9 @@ class VideoAIService
         $input = ['prompt' => $prompt];
         if ($imageUrl && str_starts_with($imageUrl, '/')) {
             $abs = url($imageUrl);
-            // i2v models require input.media items with a 'type'; some also accept img_url.
+            // i2v models require input.media items whose 'type' is the starting frame role ('first_frame').
             $input['img_url'] = $abs;
-            $input['media'] = [['type' => 'image', 'url' => $abs]];
+            $input['media'] = [['type' => 'first_frame', 'url' => $abs]];
         }
 
         $t0 = microtime(true);
