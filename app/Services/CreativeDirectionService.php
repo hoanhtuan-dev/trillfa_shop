@@ -172,8 +172,11 @@ class CreativeDirectionService
         if (! empty($tokens['pose'])) {
             $parts[] = ', '.$this->lowerise((string) $tokens['pose']).' pose';
         }
-        $camera = trim($camera) !== '' ? trim($camera) : 'slow tracking shot';
-        $parts[] = ', camera: '.$camera;
+        // Camera action is chosen at render time via the "Kịch bản quay" preset; do NOT hardcode a
+        // camera here (avoids duplicating/conflicting with the script added by VideoAIService).
+        if (trim($camera) !== '') {
+            $parts[] = ', camera: '.trim($camera);
+        }
         $parts[] = ', dramatic runway lighting, slow motion, 4k';
 
         return $this->clean(implode('', $parts).'. '.$direction);

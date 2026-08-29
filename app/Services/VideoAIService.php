@@ -32,7 +32,15 @@ class VideoAIService
         $model = (string) studio_config('video_model', 'wan2.5-t2v');
         $size = $this->videoSize($resolution);
 
-        $input = ['prompt' => trim(trim($prompt).' '.$cameraPreset)];
+        $prompt = trim($prompt);
+        $cameraPreset = trim($cameraPreset);
+        // Avoid duplication: only append the "Kịch bản quay" camera action if the prompt doesn't already
+        // specify a camera / camera-movement keyword.
+        if ($cameraPreset !== '' && ! $this->promptHasCamera($prompt)) {
+            $prompt = trim($prompt.' '.$cameraPreset);
+        }
+
+        $input = ['prompt' => $prompt];
         if ($imageUrl && str_starts_with($imageUrl, '/')) {
             $abs = url($imageUrl);
             // Some i2v models (e.g. happyhorse-1.1-i2v) require input.media; others use img_url.
@@ -59,7 +67,7 @@ class VideoAIService
 
         logger()->info('Video task submitted', ['task_id' => $taskId, 'model' => $model, 'size' => $size, 'duration' => (int) ($duration ?: 10), 'wait_s' => round(microtime(true) - $t0, 2)]);
 
-        $deadline = microtime(true) + 1200; // allow generous time; job timeout is now 1200s
+        $deadline = microtime(true) + 420; // 7 min cap: legit videos (~90-150s) finish; stuck tasks fail fast
         $lastStatus = '';
 
         while (microtime(true) < $deadline) {
@@ -103,6 +111,18 @@ class VideoAIService
         }
 
         throw new \RuntimeException('Hết thời gian chờ tạo video (task '.$taskId.', '.(int) round(microtime(true) - $t0).'s).');
+    }
+
+    protected function promptHasCamera(string $prompt): bool
+    {
+        $lower = strtolower($prompt);
+        foreach (['camera', 'shot', 'orbit', 'tracking', 'panning', 'pan ', 'zoom', 'dolly', 'pov', 'crane', 'slow motion', 'slow-motion', 'close-up', 'close up'] as $kw) {
+            if (str_contains($lower, $kw)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function videoSize(?string $resolution): string

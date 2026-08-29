@@ -1083,6 +1083,14 @@ class ShopFlowTest extends TestCase
         // A custom pay-as-you-go base is honoured.
         set_setting('studio_dashscope_base', 'https://dashscope.aliyuncs.com');
         $this->assertSame('https://dashscope.aliyuncs.com', dashscope_base_url('sk-abc'));
+
+        // A pay-go key (sk-ws-…) must NEVER be routed to a Token/Coding Plan host, even if the admin
+        // left dashscope_base pointing at the plan host (this was the 401 InvalidApiKey root cause).
+        set_setting('studio_dashscope_base', 'https://token-plan.ap-southeast-1.maas.aliyuncs.com');
+        $this->assertSame('https://dashscope-intl.aliyuncs.com', dashscope_base_url('sk-ws-abcdef'));
+        $this->assertSame('https://dashscope-intl.aliyuncs.com', dashscope_base_url('sk-abcdef'));
+        // Token-plan host is still used for sk-sp- keys.
+        $this->assertSame('https://token-plan.ap-southeast-1.maas.aliyuncs.com', dashscope_base_url('sk-sp-abcdef'));
     }
 
 

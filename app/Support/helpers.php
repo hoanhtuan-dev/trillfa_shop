@@ -221,7 +221,15 @@ if (! function_exists('dashscope_base_url')) {
             return rtrim((string) studio_config('dashscope_token_plan_base', 'https://token-plan.ap-southeast-1.maas.aliyuncs.com'), '/');
         }
 
-        return rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
+        $payGo = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/');
+
+        // A Pay-As-You-Go key (sk-… / sk-ws-…) must NEVER be sent to a Token/Coding Plan host.
+        // If the admin left dashscope_base pointing at a plan host, correct it to the pay-go host.
+        if (str_contains($payGo, 'token-plan.') || str_contains($payGo, 'coding-')) {
+            $payGo = 'https://dashscope-intl.aliyuncs.com';
+        }
+
+        return $payGo;
     }
 }
 

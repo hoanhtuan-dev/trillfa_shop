@@ -16,7 +16,7 @@ class RenderVideoJob implements ShouldQueue
     /**
      * Allow generous time for video render (1-3 min on real providers).
      */
-    public int $timeout = 1200; // 20 min — video provider can be slow
+    public int $timeout = 900; // 15 min — must exceed the 420s provider poll deadline
 
     public function __construct(public int $generationId) {}
 

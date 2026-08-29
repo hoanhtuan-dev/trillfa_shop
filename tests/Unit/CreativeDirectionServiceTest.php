@@ -76,7 +76,10 @@ class CreativeDirectionServiceTest extends TestCase
         $c = $this->dir->normalize([], 'a velvet evening gown', [], 6);
 
         $this->assertStringContainsString('velvet evening gown', strtolower($c['image_prompt_en']));
-        $this->assertStringContainsString('slow tracking shot', strtolower($c['video_prompt_en']));
+        // The base video prompt must NOT hardcode a camera — the camera action comes from the
+        // "Kịch bản quay" preset at render time, so it is added by VideoAIService (dedup-aware).
+        $this->assertStringNotContainsString('slow tracking shot', strtolower($c['video_prompt_en']));
+        $this->assertStringContainsString('cinematic fashion show', strtolower($c['video_prompt_en']));
         $this->assertStringContainsString('creativity', strtolower($c['image_prompt_en']));
     }
 }
