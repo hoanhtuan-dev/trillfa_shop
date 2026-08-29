@@ -203,7 +203,7 @@
                     <span class="truncate text-ink-500" x-text="preview ? (preview.created_at || '') + ' · ' + preview.credits_cost + ' token' : ''"></span>
                     <span class="flex flex-wrap items-center gap-2">
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'">Sửa · Video</button>
-                        <a :href="'/studio/generations/' + preview.id + '/download'" class="btn-outline btn-sm" x-show="preview && preview.media_url">Tải xuống</a>
+                        <a :href="preview ? '/studio/generations/' + preview.id + '/download' : '#'" class="btn-outline btn-sm" x-show="preview && preview.media_url">Tải xuống</a>
                         <button @click="cancelGeneration(preview)" :disabled="!preview || !isActive(preview.status)" class="btn-outline btn-sm text-red-600" x-show="preview && isActive(preview.status)">Dừng</button>
                         <button @click="removeGeneration(preview)" class="btn-outline btn-sm text-red-600">Xóa</button>
                     </span>
@@ -456,7 +456,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.selectedImageId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.selectedImageId); const camera = this.videoCamera || 'slow tracking shot'; const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || '', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
+            try { const src = this.generations.find(g => g.id === this.selectedImageId); const camera = this.videoCamera || 'slow tracking shot'; const data = await this.api('/studio/video', { prompt: this.output.video_prompt_en || this.output.image_prompt_en || 'một video catwalk thời trang', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
@@ -476,7 +476,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         async removeGeneration(g) {
-            try { await this.del('/studio/generations/' + g.id); this.generations = this.generations.filter(x => x.id !== g.id); if (this.selectedImageId === g.id) this.selectedImageId = null; if (this.previewId === g.id) this.previewId = null; Alpine.store('toast').show('Đã xóa nhiệm vụ #' + g.id); }
+            try { await this.del('/studio/generations/' + g.id); this.generations = this.generations.filter(x => x.id !== g.id); if (this.selectedImageId === g.id) this.selectedImageId = null; if (this.previewId === g.id) this.previewId = null; if (this._timers[g.id]) { clearInterval(this._timers[g.id]); delete this._timers[g.id]; } Alpine.store('toast').show('Đã xóa nhiệm vụ #' + g.id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
         },
 
@@ -518,11 +518,12 @@ document.addEventListener('alpine:init', () => {
             this._timers[id] = setInterval(async () => {
                 try {
                     const res = await fetch('/studio/generations/' + id, { headers: { Accept: 'application/json' } });
+                    if (!res.ok) { clearInterval(this._timers[id]); delete this._timers[id]; return; }
                     const g = await res.json();
                     const item = this.generations.find(x => x.id === Number(g.id));
                     if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; }
                     if (['completed','failed','cancelled'].includes(g.status)) { clearInterval(this._timers[id]); delete this._timers[id]; }
-                } catch (e) {}
+                } catch (e) { clearInterval(this._timers[id]); delete this._timers[id]; }
             }, 2000);
         },
     }));
