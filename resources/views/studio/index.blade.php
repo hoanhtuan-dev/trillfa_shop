@@ -248,8 +248,8 @@
                     <h2 class="font-display text-sm font-semibold text-ink-900">Outputs</h2>
                     <a href="{{ route('studio.library') }}" class="link text-xs">Thư viện</a>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <template x-for="g in generations.slice(0, 6)" :key="g.id">
+                <div class="grid max-h-[64vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
+                    <template x-for="g in generations" :key="g.id">
                         <button type="button" @click="setPreview(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'">
                             <div class="relative">
                                 <template x-if="g.status === 'completed' && g.media_url"><img :src="g.media_url" class="aspect-[3/4] w-full object-cover" onerror="this.src='/images/placeholder.svg'"></template>
