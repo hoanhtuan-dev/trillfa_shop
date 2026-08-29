@@ -95,10 +95,18 @@
                 <p class="mt-1 text-xs text-ink-500">Queue: chạy <code class="rounded bg-white px-1">php artisan queue:work</code> hoặc cron <code class="rounded bg-white px-1">php artisan studio:process</code> mỗi phút. Nếu đã cấu hình key AI thật (QwenCloud/Wan), hệ thống tự chuyển sang Queue để tránh quá hạn PHP; nếu chưa có key (chế độ mô phỏng) vẫn chạy tức thì.</p>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
-                <div><label class="label">Prompt (Gemini)</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-1.5-flash"></div>
+                <div>
+                    <label class="label">Prompt — nhà cung cấp</label>
+                    <select name="prompt_provider" class="input !py-2">
+                        <option value="gemini" @selected(old('prompt_provider', $prompt_provider) === 'gemini')>Gemini</option>
+                        <option value="qwen" @selected(old('prompt_provider', $prompt_provider) === 'qwen')>Qwen (qwen3.8-flash)</option>
+                    </select>
+                </div>
+                <div><label class="label">Prompt model</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-1.5-flash / qwen3.8-flash"></div>
                 <div><label class="label">Ảnh Flux</label><input type="text" name="image_model" value="{{ old('image_model', $image_model) }}" class="input !py-2" placeholder="flux-1.1-schnell"></div>
                 <div><label class="label">Ảnh Wan</label><input type="text" name="wan_model" value="{{ old('wan_model', $wan_model) }}" class="input !py-2" placeholder="wan2.7-image-pro"></div>
                 <div><label class="label">Ảnh Qwen</label><input type="text" name="qwen_model" value="{{ old('qwen_model', $qwen_model) }}" class="input !py-2" placeholder="qwen-image-3.0-pro"></div>
+                <div><label class="label">Qwen Edit (chỉnh sửa ảnh)</label><input type="text" name="qwen_edit_model" value="{{ old('qwen_edit_model', $qwen_edit_model) }}" class="input !py-2" placeholder="qwen-image-edit"></div>
                 <div><label class="label">Ảnh Gemini</label><input type="text" name="gemini_image_model" value="{{ old('gemini_image_model', $gemini_image_model) }}" class="input !py-2" placeholder="gemini-2.5-flash-image"><p class="mt-1 text-xs text-ink-500">Model hợp lệ: <code class="rounded bg-white px-1">gemini-2.5-flash-image</code> · <code class="rounded bg-white px-1">gemini-2.0-flash-preview-image-generation</code> · <code class="rounded bg-white px-1">imagen-4.0-generate-001</code>. Key dùng <code class="rounded bg-white px-1">x-goog-api-key</code> (lấy tại <code class="rounded bg-white px-1">aistudio.google.com/apikey</code>).</p></div>
                 <div>
                     <label class="label">Video (Wan / Veo)</label>
@@ -107,7 +115,14 @@
                         <option value="wan2.5-t2v"><option value="wan2.2-i2v"><option value="happyhorse-1.1-i2v"><option value="wan2.1-i2v-turbo"><option value="veo-3.1">
                     </datalist>
                 </div>
-                <div><label class="label">Vision (gợi ý từ ảnh)</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-2.5-flash"></div>
+                <div>
+                    <label class="label">Vision — nhà cung cấp</label>
+                    <select name="vision_provider" class="input !py-2">
+                        <option value="gemini" @selected(old('vision_provider', $vision_provider) === 'gemini')>Gemini</option>
+                        <option value="qwen" @selected(old('vision_provider', $vision_provider) === 'qwen')>Qwen (VL)</option>
+                    </select>
+                </div>
+                <div><label class="label">Vision model</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-2.5-flash / qwen-vl-max"></div>
             </div>
         </div>
         <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">

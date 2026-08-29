@@ -21,12 +21,15 @@ return [
     | You can override each on the Studio Settings page; the values below are
     | the defaults and are also read from env.
     */
+    'prompt_provider' => env('STUDIO_PROMPT_PROVIDER', 'gemini'), // gemini | qwen
     'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-1.5-flash'),
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image-3.0-pro'),
+    'qwen_edit_model' => env('STUDIO_QWEN_EDIT_MODEL', 'qwen-image-edit'),
     'gemini_image_model' => env('STUDIO_GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
+    'vision_provider' => env('STUDIO_VISION_PROVIDER', 'gemini'), // gemini | qwen
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-2.5-flash'),
     'image_resolution' => env('STUDIO_IMAGE_RESOLUTION', '2K'), // 1K | 2K
     'video_resolution' => env('STUDIO_VIDEO_RESOLUTION', '720'), // 480 | 720 | 1080

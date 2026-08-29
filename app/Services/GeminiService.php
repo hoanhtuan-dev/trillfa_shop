@@ -15,10 +15,51 @@ class GeminiService
 {
     public function generateCreativeDirector(string $idea, array $injections = []): array
     {
+        $provider = (string) studio_config('prompt_provider', 'gemini');
+        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
+
+        if ($provider === 'qwen' && $qwenKey) {
+            return $this->callQwen($idea, $injections, $qwenKey);
+        }
+
         $key = studio_api_key('gemini');
 
         if ($key) {
             return $this->callGemini($idea, $injections, $key);
+        }
+
+        return $this->stub($idea, $injections);
+    }
+
+    protected function callQwen(string $idea, array $injections, string $key): array
+    {
+        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
+        $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
+        $system = 'You are a fashion creative director. Given a Vietnamese idea and optional preset tags, '
+            .'return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, keywords (array), mood, '
+            .'color_palette (array), style_notes.';
+        $prompt = 'Idea: '.$idea.'\nTags: '.json_encode($injections, JSON_UNESCAPED_UNICODE);
+
+        try {
+            $resp = Http::withToken($key)->timeout(90)
+                ->post($base.'/chat/completions', [
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $system],
+                        ['role' => 'user', 'content' => $prompt],
+                    ],
+                    'response_format' => ['type' => 'json_object'],
+                ]);
+
+            if ($resp->successful()) {
+                $text = (string) data_get($resp->json(), 'choices.0.message.content');
+                $json = json_decode(trim($text), true);
+                if (is_array($json)) {
+                    return array_merge($json, ['idea' => $idea, 'provider' => 'qwen']);
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Qwen prompt failed: '.$e->getMessage());
         }
 
         return $this->stub($idea, $injections);

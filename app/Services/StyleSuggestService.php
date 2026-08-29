@@ -15,6 +15,17 @@ class StyleSuggestService
 {
     public function suggest(string $imagePath): array
     {
+        if ((string) studio_config('vision_provider', 'gemini') === 'qwen') {
+            $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
+            if ($qwenKey) {
+                try {
+                    return $this->suggestViaQwenVision($imagePath, $qwenKey);
+                } catch (\Throwable $e) {
+                    logger()->error('Qwen vision suggest failed: '.$e->getMessage());
+                }
+            }
+        }
+
         $key = studio_api_key('gemini');
 
         if ($key) {
@@ -26,6 +37,44 @@ class StyleSuggestService
         }
 
         return $this->suggestViaColor($imagePath);
+    }
+
+    protected function suggestViaQwenVision(string $imagePath, string $key): array
+    {
+        $model = (string) studio_config('vision_model', 'qwen-vl-max');
+        [$b64, $mime] = $this->downscaleBase64($imagePath);
+        $base = rtrim((string) studio_config('dashscope_base', 'https://dashscope-intl.aliyuncs.com'), '/').'/compatible-mode/v1';
+        $prompt = 'Analyze this fashion model photo and its garment. Return ONLY valid JSON with keys: '
+            .'"styles", "background", "pose", "fabric", "silhouette", "camera", '
+            .'"image_prompt_en" (a detailed ready-to-use English image prompt).';
+
+        $resp = Http::withToken($key)->timeout(90)
+            ->post($base.'/chat/completions', [
+                'model' => $model,
+                'messages' => [['role' => 'user', 'content' => [
+                    ['type' => 'text', 'text' => $prompt],
+                    ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                ]]],
+                'response_format' => ['type' => 'json_object'],
+            ]);
+
+        if (! $resp->successful()) {
+            throw new \RuntimeException('Qwen vision ('.$resp->status().'): '.$resp->body());
+        }
+
+        $text = (string) data_get($resp->json(), 'choices.0.message.content');
+        $json = json_decode(trim($text), true);
+        if (! is_array($json)) {
+            throw new \RuntimeException('Không phân tích được JSON từ Qwen vision.');
+        }
+
+        return [
+            'preset_ids' => $this->matchPresets($json),
+            'styles' => array_values(array_filter((array) ($json['styles'] ?? []))),
+            'background' => (string) ($json['background'] ?? ''),
+            'pose' => (string) ($json['pose'] ?? ''),
+            'image_prompt_en' => (string) ($json['image_prompt_en'] ?? 'High-fashion editorial photo, premium, 4k'),
+        ];
     }
 
     protected function suggestViaVision(string $imagePath, string $key): array

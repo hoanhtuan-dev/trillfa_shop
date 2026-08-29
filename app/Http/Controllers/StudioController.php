@@ -548,10 +548,13 @@ class StudioController extends Controller
             'video_credits' => setting('studio_video_credits', config('studio.video_credits')),
             'max_generations' => setting('studio_max_generations', 50),
             'image_provider' => setting('studio_image_provider', config('studio.image_provider')),
+            'prompt_provider' => setting('studio_prompt_provider', config('studio.prompt_provider')),
+            'vision_provider' => setting('studio_vision_provider', config('studio.vision_provider')),
             'prompt_model' => setting('studio_prompt_model', config('studio.prompt_model')),
             'image_model' => setting('studio_image_model', config('studio.image_model')),
             'wan_model' => setting('studio_wan_model', config('studio.wan_model')),
             'qwen_model' => setting('studio_qwen_model', config('studio.qwen_model')),
+            'qwen_edit_model' => setting('studio_qwen_edit_model', config('studio.qwen_edit_model')),
             'gemini_image_model' => setting('studio_gemini_image_model', config('studio.gemini_image_model')),
             'video_model' => setting('studio_video_model', config('studio.video_model')),
             'vision_model' => setting('studio_vision_model', config('studio.vision_model')),
@@ -575,10 +578,13 @@ class StudioController extends Controller
             'video_credits' => ['required', 'integer', 'min:0', 'max:1000'],
             'max_generations' => ['nullable', 'integer', 'min:1', 'max:500'],
             'image_provider' => ['required', 'string', 'in:flux,wan,qwen,gemini'],
+            'prompt_provider' => ['required', 'string', 'in:gemini,qwen'],
+            'vision_provider' => ['required', 'string', 'in:gemini,qwen'],
             'prompt_model' => ['required', 'string', 'max:255'],
             'image_model' => ['nullable', 'string', 'max:255'],
             'wan_model' => ['required', 'string', 'max:255'],
             'qwen_model' => ['required', 'string', 'max:255'],
+            'qwen_edit_model' => ['nullable', 'string', 'max:255'],
             'gemini_image_model' => ['nullable', 'string', 'max:255'],
             'video_model' => ['required', 'string', 'max:255'],
             'vision_model' => ['required', 'string', 'max:255'],
@@ -594,10 +600,13 @@ class StudioController extends Controller
         set_setting('studio_video_credits', (string) $data['video_credits']);
         set_setting('studio_max_generations', (string) ($data['max_generations'] ?? 50));
         set_setting('studio_image_provider', $data['image_provider']);
+        set_setting('studio_prompt_provider', $data['prompt_provider']);
+        set_setting('studio_vision_provider', $data['vision_provider']);
         set_setting('studio_prompt_model', $data['prompt_model']);
         set_setting('studio_image_model', $data['image_model'] ?? '');
         set_setting('studio_wan_model', $data['wan_model']);
         set_setting('studio_qwen_model', $data['qwen_model']);
+        set_setting('studio_qwen_edit_model', $data['qwen_edit_model'] ?? '');
         set_setting('studio_gemini_image_model', $data['gemini_image_model'] ?? '');
         set_setting('studio_video_model', $data['video_model']);
         set_setting('studio_vision_model', $data['vision_model']);

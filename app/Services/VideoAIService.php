@@ -44,7 +44,7 @@ class VideoAIService
             ->post($base.'/services/aigc/video-generation/video-synthesis', [
                 'model' => $model,
                 'input' => $input,
-                'parameters' => ['size' => $size, 'duration' => (int) ($duration ?: 10)],
+                'parameters' => ['size' => $size, 'duration' => (int) ($duration ?: 10), 'watermark' => false, 'prompt_extend' => true],
             ]);
 
         if (! $submit->successful()) {
