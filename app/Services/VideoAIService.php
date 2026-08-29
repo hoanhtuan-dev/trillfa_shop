@@ -59,7 +59,7 @@ class VideoAIService
 
         logger()->info('Video task submitted', ['task_id' => $taskId, 'model' => $model, 'size' => $size, 'duration' => (int) ($duration ?: 10), 'wait_s' => round(microtime(true) - $t0, 2)]);
 
-        $deadline = microtime(true) + 600; // allow generous time; job timeout is 600s
+        $deadline = microtime(true) + 1200; // allow generous time; job timeout is now 1200s
         $lastStatus = '';
 
         while (microtime(true) < $deadline) {

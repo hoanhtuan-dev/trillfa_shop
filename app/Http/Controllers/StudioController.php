@@ -169,10 +169,10 @@ class StudioController extends Controller
 
         // A generation left 'processing' by a killed web request (client disconnect) is healed here
         // so polling resolves instead of spinning "Đang tạo" forever.
-        $stuckWindow = $generation->type === 'video' ? 12 : 6; // minutes; job timeout is 10m (video) / 5m (image)
+        $stuckWindow = $generation->type === 'video' ? 25 : 6; // minutes; job timeout is 20m (video) / 5m (image)
         if ($generation->status === 'processing'
             && $generation->updated_at->lt(now()->subMinutes($stuckWindow))) {
-            $this->failStuck($generation, 'Hết thời gian xử lý (có thể request đã bị ngắt). Bấm “Xử lý ngay” hoặc thử lại.');
+            $this->failStuck($generation, 'Hết thời gian xử lý (có thể request đã bị ngắt). Đã hoàn tiền vào tài khoản. Vui lòng thử lại bằng cách tạo mới, hoặc bấm “Xử lý ngay” ở thanh công cụ nếu còn nhiệm vụ chờ.');
         } elseif ($generation->status === 'pending') {
             // Lazy worker: if this generation is still pending (not picked up by a worker), process it
             // inline now so the polling request returns the completed result. Keep running even if the

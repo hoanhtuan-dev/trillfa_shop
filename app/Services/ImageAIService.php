@@ -57,7 +57,7 @@ class ImageAIService
                 'model' => studio_config('qwen_edit_model', 'qwen-image-edit'),
                 'err' => $this->dashscopeError,
             ]);
-            throw new \RuntimeException('Không thể chỉnh sửa ảnh (model edit không trả kết quả). Kiểm tra model “Qwen Edit” trong Cài đặt và khoá “Qwen Edit” trong Quản lý API.');
+            throw new \RuntimeException($this->dashscopeError ?: 'Không thể chỉnh sửa ảnh (model edit không trả kết quả). Kiểm tra model “Qwen Edit” trong Cài đặt và khoá “Qwen Edit” trong Quản lý API.');
         }
 
         if ($provider === 'gemini') {
@@ -567,6 +567,12 @@ class ImageAIService
     protected function editImage(string $prompt, string $imageUrl): ?string
     {
         $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+        if (! str_contains(strtolower($model), 'edit')) {
+            $this->dashscopeError = 'Model “'.$model.'” có vẻ KHÔNG phải model chỉnh sửa ảnh (tên không chứa “edit”). '
+                .'Chọn model Qwen Edit chuyên dụng (vd: qwen-image-edit, qwen-image-edit-plus…) trong Cài đặt — không dùng chung model tạo ảnh (qwen-image-3.0-pro) cho Inpaint.';
+            logger()->warning('Edit model không phải model edit', ['model' => $model]);
+            return null;
+        }
         $source = $this->imageDataUri($imageUrl);
         if (! $source) {
             logger()->warning('Edit: cannot read source image', ['url' => $imageUrl]);
