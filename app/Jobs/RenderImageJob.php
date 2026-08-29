@@ -81,10 +81,12 @@ class RenderImageJob implements ShouldQueue
         $iw = imagesx($img);
         $lh = imagesy($logo);
         $lw = imagesx($logo);
-        $targetW = max(40, (int) round($iw * 0.18));
+        $targetW = max(36, (int) round($iw * 0.13));
         $targetH = max(1, (int) round($lh * ($targetW / $lw)));
-        $pad = max(12, (int) round($iw * 0.03));
-        imagecopyresampled($img, $logo, $iw - $targetW - $pad, imagesy($img) - $targetH - $pad, 0, 0, $targetW, $targetH, $lw, $lh);
+        $pad = max(14, (int) round($iw * 0.04));
+        // Top-centre (background wall behind the model) reads as a natural backdrop sign.
+        $dx = (int) (($iw - $targetW) / 2);
+        imagecopyresampled($img, $logo, $dx, $pad, 0, 0, $targetW, $targetH, $lw, $lh);
 
         if (str_ends_with($relImg, '.png')) {
             imagepng($img, $imgPath);

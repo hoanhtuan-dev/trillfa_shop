@@ -289,7 +289,7 @@ class ImageAIService
             ->timeout(180)
             ->post($base.'/services/aigc/multimodal-generation/generation', [
                 'model' => $model,
-                'input' => ['messages' => [['role' => 'user', 'content' => $this->dashscopeContent($prompt, $faceRef)]]],
+                'input' => ['messages' => [['role' => 'user', 'content' => [['text' => $prompt]]]]],
                 'parameters' => [
                     'negative_prompt' => '',
                     'prompt_extend' => true,
