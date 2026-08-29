@@ -114,6 +114,7 @@ class ImageAIService
             $url = $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef);
             logger()->info('Image model attempt', [
                 'model' => $model, 'ok' => (bool) $url, 's' => round(microtime(true) - $t, 2),
+                'key_prefix' => substr($key, 0, 8),
                 'err' => $url ? null : $this->dashscopeError,
             ]);
             if ($url) {
@@ -148,6 +149,10 @@ class ImageAIService
             $msg = 'Model ảnh không tồn tại trên host QwenCloud hiện tại. Token/Coding Plan có bộ model tạo ảnh riêng '
                 .'(thường là wan2.7-image / happyhorse-1.1-t2v); Pay-As-You-Go dùng qwen-image-3.0-pro/qwen-image. '
                 .'Đổi lại “Ảnh Qwen” / base URL trong Cài đặt cho đúng loại key.';
+        } elseif (str_contains($lower, 'invalidapikey') || str_contains($msg, '(401)')) {
+            $msg = 'Khoá API không hợp lệ (InvalidApiKey / 401). Với tạo ảnh & chỉnh sửa ảnh, hãy dùng key '
+                .'Pay-As-You-Go (bắt đầu bằng sk-… hoặc sk-ws-…), KHÔNG dùng key Token/Coding Plan (sk-sp-…) vì gói plan '
+                .'chỉ hỗ trợ model text/code. Tạo key mới tại Model Studio → API-KEY rồi nhập vào Quản lý API.';
         } elseif (str_contains($lower, 'unpurchased') || str_contains($lower, 'eligible')) {
             $msg = 'Khóa QwenCloud hợp lệ, nhưng model ảnh chưa được kích hoạt/mua trên tài khoản (AccessDenied.Unpurchased). '
                 .'Vào https://home.qwencloud.com → Model Center → bật / mua một model Qwen-Image (Qwen-Image, Qwen-Image-Max, Qwen-Image-Plus, Qwen-Image-3.0). '

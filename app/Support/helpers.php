@@ -212,8 +212,8 @@ if (! function_exists('studio_api_key')) {
 if (! function_exists('dashscope_base_url')) {
     /**
      * QwenCloud / DashScope hosts are separate per key type and must NOT be mixed.
-     *  - sk-sp-…  (Token / Coding Plan) -> token-plan host
-     *  - sk-…     (Pay-As-You-Go)        -> dashscope-intl host
+     *  - sk-sp-…  (Token / Coding Plan) -> token-plan host (text/code models only)
+     *  - sk-ws-… / sk-… (Pay-As-You-Go) -> dashscope-intl host (image/video generation)
      */
     function dashscope_base_url(string $key): string
     {
