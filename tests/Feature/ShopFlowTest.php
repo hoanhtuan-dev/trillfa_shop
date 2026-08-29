@@ -1051,6 +1051,11 @@ class ShopFlowTest extends TestCase
         $this->assertGreaterThanOrEqual(8, $video->count(), 'Phải có ít nhất 8 kịch bản quay.');
         $this->assertNotEmpty($video->first()->note);
         $this->assertStringContainsString('runway', strtolower($video->first()->prompt_injection));
+
+        $pose = \App\Models\Preset::category('pose')->get();
+        $this->assertGreaterThanOrEqual(12, $pose->count(), 'Phải có ít nhất 12 dáng đứng.');
+        $this->assertNotEmpty($pose->first()->note);
+        $this->assertStringContainsString('pose', strtolower($pose->first()->prompt_injection));
     }
 
 

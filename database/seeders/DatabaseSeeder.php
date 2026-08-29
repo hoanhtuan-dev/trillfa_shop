@@ -511,14 +511,14 @@ class DatabaseSeeder extends Seeder
         $file = database_path('data/fashion_presets.json');
         if (file_exists($file)) {
             $extra = json_decode(file_get_contents($file), true) ?: [];
-            foreach (['styles' => 'style', 'backgrounds' => 'background', 'poses' => 'pose'] as $key => $cat) {
+            foreach (['styles' => 'style', 'backgrounds' => 'background'] as $key => $cat) {
                 foreach ($extra[$key] ?? [] as $item) {
                     $rows[] = [$cat, $item['label'], $item['prompt'], ''];
                 }
             }
         }
 
-        Preset::whereIn('category', ['camera', 'lens', 'video_scene'])->delete();
+        Preset::whereIn('category', ['camera', 'lens', 'video_scene', 'pose'])->delete();
 
         $sort = 0;
         $all = collect($rows)->map(fn ($row) => [$row[0], $row[1], $row[2], $row[3] ?? '']);
