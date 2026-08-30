@@ -520,6 +520,19 @@ class StudioController extends Controller
         $category = (string) studio_config('tryon_category', 'dress');
         $res = $svc->submit($modelUrl, $garmentUrl, $category);
         if (! empty($res['error'])) {
+            // Try-on không khả dụng (vùng/intl hoặc free-trial hết) -> fallback qwen-image-edit
+            // đổi người mẫu/dáng, giữ nguyên 100% trang phục.
+            logger()->warning('Try-on khả dụng, fallback qwen-edit: '.($res['error'] ?? ''));
+            $fallback = $svc->fallbackEdit($data['image'], $model['desc'] ?? ($model['ethnicity'] ?? 'a model'), $pose['skeleton'] ?? ($pose['name'] ?? 'standing'));
+            if ($fallback) {
+                $gen = auth()->user()->generations()->create([
+                    'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
+                    'prompt' => 'Thay đổi người mẫu (qwen-edit) · '.($model['name'] ?? 'model'),
+                    'model' => 'qwen-image-edit', 'provider' => 'qwen', 'credits_cost' => 1,
+                    'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => 'qwen-image-edit', 'fallback' => true],
+                ]);
+                return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'task_id' => null]);
+            }
             return response()->json(['message' => $res['error']], 422);
         }
 
@@ -528,7 +541,7 @@ class StudioController extends Controller
             'type' => 'image',
             'status' => 'pending',
             'prompt' => 'Thay đổi người mẫu (virtual try-on) · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
-            'model' => (string) studio_config('tryon_model', 'wanx-virtual-try-on'),
+            'model' => (string) studio_config('tryon_model', 'wanx-virtualmodel'),
             'provider' => 'tryon',
             'base_image' => $data['image'],
             'job_id' => $res['task_id'],

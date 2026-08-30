@@ -1008,7 +1008,14 @@ document.addEventListener('alpine:init', () => {
             try {
                 const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: this.swapModelId, pose_id: this.swapPoseId }) });
                 const d = await res.json().catch(() => ({}));
-                if (!res.ok || !d.task_id) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
+                if (!res.ok) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
+                if (d.media_url) { // fallback qwen-edit (try-on unavailable) -> hoàn tất ngay
+                    this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.provider || 'qwen', provider: d.provider || 'qwen', media_url: d.media_url, credits_cost: 1, created_at: 'Đã đổi người mẫu' });
+                    this.previewId = d.generation_id;
+                    Alpine.store('toast').show('Đã đổi người mẫu (chế độ dự phòng).');
+                    return;
+                }
+                if (!d.task_id) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
                 this.addGen({ id: d.generation_id, type: 'image', status: 'pending', model: 'tryon', provider: 'tryon', media_url: null, credits_cost: 1, created_at: 'Đang thử đồ' });
                 this.previewId = d.generation_id;
                 this.pollSwap(d.task_id, d.generation_id);

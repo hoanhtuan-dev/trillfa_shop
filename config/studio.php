@@ -24,7 +24,7 @@ return [
     'prompt_provider' => env('STUDIO_PROMPT_PROVIDER', 'gemini'), // gemini | qwen
     'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-1.5-flash'),
     'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-3.6-flash-image'),
-    'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtual-try-on'), // Virtual Try-On (Thay đổi người mẫu)
+    'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtualmodel'), // Virtual Try-On (Thay đổi người mẫu) — Beijing-only, free-trial
     'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),

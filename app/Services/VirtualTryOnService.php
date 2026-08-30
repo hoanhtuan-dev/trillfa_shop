@@ -63,22 +63,43 @@ class VirtualTryOnService
     {
         $key = $this->key();
         if (! $key) { return ['error' => 'Chưa có key DashScope (Pay-As-You-Go) để gọi virtual try-on.']; }
-        $model = (string) studio_config('tryon_model', 'wanx-virtual-try-on');
-        $resp = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)
-            ->post(dashscope_base_url($key).'/api/v1/services/aigc/virtual-try-on/generation', [
-                'model' => $model,
-                'input' => [
-                    'model_image_url' => $modelImageUrl,
-                    'garment_image_url' => $garmentImageUrl,
-                ],
-                'parameters' => ['category' => $category],
-            ]);
-        if (! $resp->successful()) {
-            logger()->warning('Try-on submit: HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 220));
-            return ['error' => 'Gửi try-on lỗi (HTTP '.$resp->status().'). '.substr((string) $resp->body(), 0, 160)];
+        $models = array_values(array_unique(array_filter([
+            (string) studio_config('tryon_model', 'wanx-virtualmodel'),
+            'wanx-virtualmodel', 'virtualmodel-v2', 'wanx-virtual-try-on',
+        ])));
+        foreach ($models as $model) {
+            $resp = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)
+                ->post(dashscope_base_url($key).'/api/v1/services/aigc/virtual-try-on/generation', [
+                    'model' => $model,
+                    'input' => [
+                        'model_image_url' => $modelImageUrl,
+                        'garment_image_url' => $garmentImageUrl,
+                    ],
+                    'parameters' => ['category' => $category],
+                ]);
+            if ($resp->successful()) {
+                $taskId = data_get($resp->json(), 'output.task_id');
+                if ($taskId) { return ['task_id' => $taskId]; }
+            }
+            $body = (string) $resp->body();
+            logger()->warning('Try-on submit ('.$model.'): HTTP '.$resp->status().' '.substr($body, 0, 200));
+            // Model not exist / not supported -> try the next try-on model; other errors -> give up.
+            if (! (str_contains(strtolower($body), 'model not exist') || $resp->status() === 400 || $resp->status() === 404)) {
+                break;
+            }
         }
-        $taskId = data_get($resp->json(), 'output.task_id');
-        return $taskId ? ['task_id' => $taskId] : ['error' => 'Không nhận được task_id try-on.'];
+        return ['error' => 'Không model try-on nào khả dụng trên tài khoản ('.($models[0] ?? '?').'). '.substr($body ?? '', 0, 160)];
+    }
+
+    // Fallback khi try-on không khả dụng (region/intl hoặc free-trial hết): dùng qwen-image-edit để
+    // đổi người mẫu/dáng trên ảnh thiết kế, GIỮ NGUYÊN 100% trang phục.
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose): ?string
+    {
+        $svc = app(ImageAIService::class);
+        return $svc->generate(
+            'Keep the exact garment, outfit and all its details 100% unchanged. Change the person to a '.$modelDesc.' and set the pose to '.$pose.'. Photorealistic, full body, high fashion.',
+            $designImage
+        );
     }
 
     public function status(string $taskId): array
