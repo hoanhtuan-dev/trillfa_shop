@@ -167,8 +167,17 @@
                             <p class="text-xs font-semibold text-cream-200">👤 Khuôn mặt (đồng bộ nhân vật)</p>
                             <button type="button" @click="clearFace()" class="text-[10px] text-cream-300/60 hover:text-red-300">Bỏ</button>
                         </div>
-                        <span class="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $faceSync['enabled'] && $faceSync['has_ref'] ? 'bg-emerald-500/20 text-emerald-300' : ($faceSync['has_ref'] ? 'bg-amber-500/20 text-amber-300' : 'bg-ink-700 text-cream-300/60') }}">{{ $faceSync['enabled'] && $faceSync['has_ref'] ? '✅ Đồng bộ đang bật' : ($faceSync['has_ref'] ? '⚠️ Đã đặt mặt — cần bật đồng bộ trong Cài đặt' : 'Chưa đặt khuôn mặt mẫu') }}</span>
-                        <p class="mt-0.5 text-[10px] text-cream-200/50">Chọn ảnh khuôn mặt để AI giữ nhất quán nhân vật khi tạo ảnh/video. Nếu tắt “đồng bộ khuôn mặt” trong Cài đặt, ảnh này sẽ không được áp dụng.</p>
+                        @php($fs = $faceSync)
+                        @if(! $fs['has_ref'])
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-300/60">Chưa đặt ảnh mặt</span>
+                        @elseif(! $fs['enabled'])
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">⚠️ Đã đặt mặt — cần bật “đồng bộ khuôn mặt” trong Cài đặt</span>
+                        @elseif($fs['edit_sync'])
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">✅ Mô tả (ảnh mới) + đổi mặt chính xác (model chỉnh sửa)</span>
+                        @else
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">✅ Mô tả khi tạo ảnh mới · đổi mặt chính xác (tuỳ chọn)</span>
+                        @endif
+                        <p class="mt-0.5 text-[10px] text-cream-200/50">Ảnh mặt này dùng để <b>mô tả khuôn mặt</b> (nhúng vào prompt khi tạo ảnh mới — miễn phí, không thêm lệnh gọi) và <b>đổi mặt chính xác 1:1</b> chỉ khi bật “Đồng bộ khuôn mặt (model chỉnh sửa)” trong Cài đặt (thêm 1 lần gọi, ~40s).</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2">
                             <button type="button" @click="$refs.faceInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh mặt</button>
                             <template x-if="faceImage"><img :src="faceImage" class="h-12 w-12 rounded-full bg-ink-900 object-cover" alt="Khuôn mặt"></template>
