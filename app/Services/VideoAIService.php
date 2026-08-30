@@ -72,7 +72,14 @@ class VideoAIService
 
         if (! $submit->successful()) {
             capture_provider_quota_reset((string) $submit->body());
-            throw new \RuntimeException('DashScope video ('.$submit->status().'): '.Str::limit((string) $submit->body(), 240));
+            $body = (string) $submit->body();
+            $lower = strtolower($body);
+            if (str_contains($lower, 'model not exist') || str_contains($lower, 'invalidparameter') || str_contains($lower, 'model_not_supported')) {
+                throw new \RuntimeException('Model video không tồn tại trên nhà cung cấp. Model_id không hợp lệ cho provider đã chọn — '
+                    .'VD model video HỢP LỆ cho DashScope/Wan: wan2.5-t2v, wan2.2-i2v, wan2.5-i2v, wan2.1-i2v-turbo, happyhorse-1.1-i2v. '
+                    .'Kiểm tra lại model_id trong Model Registry (không dùng tên model của provider khác như Kling nếu chỉ có key DashScope). '.Str::limit($body, 160));
+            }
+            throw new \RuntimeException('DashScope video ('.$submit->status().'): '.Str::limit($body, 240));
         }
 
         $taskId = data_get($submit->json(), 'output.task_id');

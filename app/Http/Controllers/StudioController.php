@@ -345,6 +345,39 @@ class StudioController extends Controller
         return response()->json(['groups' => $out]);
     }
 
+    /**
+     * JSON: report how a registered model resolves — provider, model_id, api_key_ref,
+     * whether a key exists, the base URL, and a hint if the model_id looks invalid.
+     */
+    public function testModel(\App\Models\StudioModel $model)
+    {
+        $key = studio_api_keys_for($model->provider, $model->model_id, $model->group)->first();
+        $keyVal = $key ? studio_api_key_value($key) : null;
+        $knownVideo = ['wan2.5-t2v', 'wan2.2-i2v', 'wan2.5-i2v', 'wan2.1-i2v-turbo', 'happyhorse-1.1-i2v', 'wanx2.1-t2v-turbo', 'wanx2.1-i2v-turbo'];
+
+        $note = '';
+        if ($model->group === 'video' && ! in_array($model->model_id, $knownVideo)) {
+            $note = '⚠️ Model_id này KHÔNG nằm trong nhóm model video phổ biến của DashScope/Wan — dễ gặp lỗi "Model not exist". ';
+        }
+        if (! $keyVal) {
+            $note .= 'Chưa có KEY cho provider "'.$model->provider.'" — thêm key trong API Keys Registry (hoặc env).';
+        } elseif ($key && $key->scopes && ! in_array('*', $key->scopes) && ! in_array($model->model_id, $key->scopes)) {
+            $note .= 'Key hiện có scope hạn chế ('.implode(', ', $key->scopes).') — key này có thể KHÔNG phục vụ model "'.$model->model_id.'".';
+        }
+
+        return response()->json([
+            'provider' => $model->provider,
+            'model_id' => $model->model_id,
+            'model_name' => $model->name,
+            'group' => $model->group,
+            'api_key_ref' => $model->api_key_ref,
+            'key_exists' => (bool) $keyVal,
+            'key_prefix' => $keyVal ? substr($keyVal, 0, 8).'…' : null,
+            'base_url' => $keyVal ? dashscope_base_url($keyVal) : '',
+            'note' => $note ?: 'OK — provider + key + model_id đã cấu hình hợp lý.',
+        ]);
+    }
+
     protected function queueGeneration(string $type, array $data, int $cost, ?Generation $source = null)
     {
         $user = auth()->user();

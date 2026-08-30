@@ -207,6 +207,7 @@
                             <span class="text-ink-500">{{ $provider }} · {{ $modelId }}</span>
                             <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $priority }}</span>
                             <span class="rounded-full px-2 py-0.5 text-[10px] {{ $enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $enabled ? 'Bật' : 'Tắt' }}</span>
+                            @if($id)<button type="button" class="btn-outline btn-sm" onclick="studioTestModel(this, {{ $id }})" :title="'Kiểm tra model này'">🔍 Kiểm tra</button><span class="test-result block w-full text-[10px]"></span>@endif
                             @if($id)
                                 <form method="POST" action="{{ route('studio.models.update', $m) }}" class="ml-auto flex flex-wrap items-center gap-1.5">
                                     @csrf @method('PUT')
@@ -325,4 +326,22 @@
         </form>
     </div>
 </div>
+@push('scripts')
+<script>
+function studioTestModel(btn, id) {
+    const row = btn.closest('div'); const el = row ? row.querySelector('.test-result') : null;
+    if (el) { el.textContent = 'Đang kiểm tra…'; el.className = 'block w-full text-[10px] text-ink-500'; }
+    fetch('/studio/models/' + id + '/test', { headers: { Accept: 'application/json' } })
+      .then(r => r.json()).then(d => {
+          if (el) {
+              const ok = d.key_exists;
+              el.className = 'block w-full text-[10px] ' + (ok ? 'text-emerald-400' : 'text-red-400');
+              el.textContent = 'Provider: ' + d.provider + ' · Model: ' + d.model_id + (ok ? ' · Key: ' + d.key_prefix : ' · CHƯA CÓ KEY') + (d.base_url ? ' · ' + d.base_url : '');
+              el.title = d.note || '';
+          }
+          if (d.note && d.note.indexOf('OK') !== 0) { alert(d.note); }
+      }).catch(e => { if (el) { el.textContent = 'Lỗi kiểm tra: ' + e.message; el.className = 'block w-full text-[10px] text-red-400'; } });
+}
+</script>
+@endpush
 @endsection

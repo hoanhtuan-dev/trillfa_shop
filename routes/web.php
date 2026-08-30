@@ -112,6 +112,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::get('/models', [StudioController::class, 'models'])->name('models');
     Route::post('/models', [StudioController::class, 'storeModel'])->name('models.store');
     Route::put('/models/{model}', [StudioController::class, 'updateModel'])->name('models.update');
+    Route::get('/models/{model}/test', [StudioController::class, 'testModel'])->name('models.test');
     Route::delete('/models/{model}', [StudioController::class, 'deleteModel'])->name('models.delete');
     Route::post('/keys', [StudioController::class, 'storeApiKey'])->name('keys.store');
     Route::put('/keys/{key}', [StudioController::class, 'updateApiKey'])->name('keys.update');
