@@ -335,6 +335,7 @@ class StudioController extends Controller
             'media_url' => $fresh->media_url,
             'error' => $fresh->error,
             'credits_left' => $user->fresh()->credits_balance,
+            'prompts_history_id' => $fresh->prompts_history_id,
         ]);
     }
 
@@ -913,6 +914,7 @@ class StudioController extends Controller
                 'model' => $g->model, 'provider' => $g->provider,
                 'media_url' => $g->media_url, 'error' => $g->error,
                 'credits_cost' => $g->credits_cost, 'project_id' => $g->project_id,
+                'prompts_history_id' => $g->prompts_history_id,
                 'created_at' => $g->created_at?->format('d/m H:i'),
                 'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
                 'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta, 'prompt' => $g->prompt,

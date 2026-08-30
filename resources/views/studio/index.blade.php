@@ -8,7 +8,7 @@
         'id' => $g->id, 'type' => $g->type, 'status' => $g->status,
         'model' => $g->model, 'provider' => $g->provider,
         'media_url' => $g->media_url, 'error' => $g->error, 'credits_cost' => $g->credits_cost,
-        'project_id' => $g->project_id, 'created_at' => $g->created_at?->format('d/m H:i'),
+        'project_id' => $g->project_id, 'prompts_history_id' => $g->prompts_history_id, 'created_at' => $g->created_at?->format('d/m H:i'),
         'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
         'elapsed_ms' => $g->elapsed_ms, 'meta' => $g->meta, 'prompt' => $g->prompt,
     ])->values();
@@ -46,7 +46,7 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <div class="grid gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
+    <div class="grid gap-4 pb-6 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
@@ -58,8 +58,8 @@
                 <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
 
                 <!-- Reference source -->
-                <div class="mt-4 rounded-xl border border-cream-200 bg-cream-50 p-3">
-                    <p class="mb-2 text-xs font-semibold text-ink-700">Gợi ý từ ảnh tham khảo</p>
+                <div class="mt-4 rounded-xl border border-ink-700 bg-ink-800 p-3">
+                    <p class="mb-2 text-xs font-semibold text-cream-200">Gợi ý từ ảnh tham khảo</p>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh</button>
                         <button type="button" @click="openOutputsRef()" class="btn-outline btn-sm whitespace-nowrap" title="Dùng một ảnh kết quả (Output) hoặc trong Thư viện làm nguồn tham khảo.">Từ kết quả</button>
@@ -67,8 +67,8 @@
                     </div>
                     <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
                     <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
-                    <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-white object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
-                    <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-50 p-3 text-xs text-brand-800"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
+                    <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
+                    <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
                 </div>
             </div>
 
@@ -190,9 +190,9 @@
         <!-- ===== CENTER: Canvas preview ===== -->
         <!-- =============================================================== -->
         <div class="min-w-0 lg:order-1" x-show="!isMobile || step===2">
-            <div class="card flex flex-col overflow-hidden p-0 lg:sticky lg:top-16 lg:h-[calc(100dvh-9rem)]">
+            <div class="card flex flex-col overflow-hidden p-0 lg:sticky lg:top-16">
                 <!-- Media area -->
-                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
+                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-[calc(100dvh-17rem)]" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
                     <!-- Step indicator (Progressive Disclosure) — floated over the canvas -->
                     <div class="pointer-events-auto absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-ink-900/80 p-1 text-[11px] font-semibold shadow-lg backdrop-blur" @pointerdown.stop @click.stop>
                         <button @click="step=1" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===1?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/25':'bg-white/10'">1</span> Concept</button>
@@ -236,9 +236,9 @@
                         </template>
                     </div>
                     <!-- Variations swiper (Step 2) — floated over the canvas bottom -->
-                    <div class="pointer-events-auto absolute inset-x-0 bottom-3 z-20 flex justify-center px-3" x-show="generations.length" @pointerdown.stop @click.stop>
+                    <div class="pointer-events-auto absolute inset-x-0 bottom-3 z-20 flex justify-center px-3" x-show="previewVariants.length" @pointerdown.stop @click.stop>
                         <div class="scrollbar-hide flex max-w-full items-center gap-2 overflow-x-auto rounded-2xl bg-ink-900/70 px-2 py-2 shadow-lg backdrop-blur">
-                            <template x-for="g in generations" :key="g.id">
+                            <template x-for="g in previewVariants" :key="g.id">
                                 <button type="button" @click="setPreview(g)" class="relative w-14 shrink-0 overflow-hidden rounded-xl border" :class="previewId===g.id ? 'border-brand-400 ring-2 ring-brand-400/40' : 'border-white/10'">
                                     <template x-if="g.status==='completed' && g.media_url"><img :src="g.media_url" class="aspect-[3/4] w-full object-cover" onerror="this.src='/images/placeholder.svg'"></template>
                                     <template x-if="g.status!=='completed'"><div class="grid aspect-[3/4] w-full place-items-center bg-white/10"><span x-show="isActive(g.status)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></span></div></template>
@@ -261,7 +261,7 @@
                         <button @click="removeGeneration(preview)" class="btn-outline btn-sm text-red-600">Xóa</button>
                     </span>
                 </div>
-                <div class="flex flex-wrap gap-x-4 px-4 py-2 text-[10px] text-brand-700">
+                <div class="flex flex-wrap gap-x-4 px-4 py-2 text-xs text-brand-300">
                     <span x-show="preview && selectedImageId === preview.id">✓ Đã chọn làm nguồn Chỉnh sửa (Inpaint)</span>
                     <span x-show="preview && videoSourceId === preview.id">✓ Đã chọn làm nguồn Video</span>
                 </div>
@@ -272,14 +272,6 @@
         <!-- ===== RIGHT: Generation Parameters ===== -->
         <!-- =============================================================== -->
         <div class="space-y-4 lg:order-3" x-show="!isMobile || step===3">
-            <!-- Generation Parameters -->
-            <div class="card p-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="font-display text-sm font-semibold text-ink-900">⚙️ Params</h2>
-                    <span class="badge text-xs" :class="preview && preview.status==='completed' ? 'bg-emerald-500 text-white' : 'bg-cream-200 text-ink-700'" x-text="preview && preview.status==='completed' ? 'Sẵn sàng' : 'Chờ kết quả'"></span>
-                </div>
-            </div>
-
             <!-- Outputs grid -->
             <div class="card p-4">
                 <div class="mb-3 flex items-center justify-between">
@@ -357,16 +349,6 @@
             </div>
         </div>
     </template>
-
-    <!-- FAB: contextual primary action (Step 1 Generate · Step 2 to video · Step 3 Action) -->
-    <div class="fixed inset-x-0 bottom-0 z-40 p-3 sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-auto sm:p-0">
-        <button @click="fabAction()" :disabled="fabDisabled" class="btn-brand w-full shadow-xl shadow-ink-900/25 sm:w-auto sm:px-6">
-            <span x-show="step===1">✨ Tạo thiết kế</span>
-            <span x-show="step===2">🎬 Render Video</span>
-            <span x-show="step===3"><span x-show="!videoBusy">🔥 Action! (Render)</span><span x-show="videoBusy">Đang gửi…</span></span>
-        </button>
-        <p class="mt-1 text-center text-[10px] text-ink-500 sm:text-right" x-text="stepLabel"></p>
-    </div>
 
     <!-- Fullscreen lightbox (self-contained zoom/pan; captures wheel & drag, blocks the layer below) -->
     <template x-if="lightbox && preview && preview.media_url">
@@ -482,6 +464,12 @@ document.addEventListener('alpine:init', () => {
             else { this.selectedImageId = null; this.videoSourceId = null; }
         },
         get preview() { return this.generations.find(g => g.id === this.previewId) || null; },
+        // Results of the SAME image-generation run (variants share prompts_history_id).
+        get previewVariants() {
+            const p = this.preview; if (!p) return [];
+            if (p.prompts_history_id) { const list = this.generations.filter(g => g.prompts_history_id === p.prompts_history_id); if (list.length) return list; }
+            return this.generations.filter(g => g.id === p.id);
+        },
         setPreview(g) { if (g) { this.previewId = g.id; this.loadPalette(g.id); } },
         zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25).toFixed(2)); },
         zoomOut() { this.zoom = Math.max(0.6, +(this.zoom - 0.25).toFixed(2)); },
