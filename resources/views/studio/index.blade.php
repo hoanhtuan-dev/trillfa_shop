@@ -172,6 +172,43 @@
                 </div>
             </div>
 
+            <!-- Thay Đổi Người Mẫu (Click-to-Swap) -->
+            <div x-show="swapOpen" x-cloak @click="swapOpen=false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
+                    <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
+                        <div>
+                            <h3 class="font-display text-base font-semibold text-cream-50">🔄 Thay Đổi Người Mẫu</h3>
+                            <p class="text-[11px] text-cream-300/60">Chọn khuôn mặt + dáng → hệ thống tự ghép trang phục (virtual try-on).</p>
+                        </div>
+                        <button @click="swapOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
+                    </div>
+                    <div class="max-h-[72vh] overflow-y-auto p-5">
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70">👤 Bộ sưu tập Người mẫu</p>
+                        <div class="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                            <template x-for="m in swapModels" :key="m.id">
+                                <button @click="swapModelId = m.id" class="flex flex-col items-center gap-1 rounded-xl border p-2 transition-all" :class="swapModelId === m.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
+                                    <span class="grid h-12 w-12 place-items-center rounded-full text-[10px] font-bold text-white" :style="{ background: m.color }" x-text="m.tone.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()"></span>
+                                    <span class="text-[10px] text-cream-200" x-text="m.name"></span>
+                                </button>
+                            </template>
+                        </div>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🧍 Bộ sưu tập Tư thế</p>
+                        <div class="grid grid-cols-5 gap-2">
+                            <template x-for="p in swapPoses" :key="p.id">
+                                <button @click="swapPoseId = p.id" class="flex flex-col items-center gap-1 rounded-xl border p-2 transition-all" :class="swapPoseId === p.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
+                                    <svg viewBox="0 0 24 24" class="h-10 w-10 text-cream-300"><path :d="p.sk" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span class="text-[10px] text-cream-200" x-text="p.name"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-2 border-t border-ink-700 px-5 py-3">
+                        <button @click="swapOpen=false" class="btn-outline btn-sm">Huỷ</button>
+                        <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm"><span x-show="!swapLoading">Áp Dụng</span><span x-show="swapLoading">Đang ghép…</span></button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Chỉnh sửa prompt tiếng Việt -->
             <div x-show="translateViOpen" x-cloak @click="translateViOpen=false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
                 <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
@@ -354,6 +391,7 @@
                     <div class="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint).">✏️ Sửa ảnh</button>
                         <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="step>=2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Render Video.">🎬 Tạo video</button>
+                        <button @click="openSwap()" class="btn-outline btn-sm whitespace-nowrap text-brand-200" x-show="preview && preview.type==='image' && preview.status==='completed'" title="Thay đổi người mẫu — thử trang phục lên khuôn mặt + dáng bạn chọn.">🔄 Thay Đổi Người Mẫu</button>
                     </div>
 
                     <!-- Canvas zoom toolbar (vertical, right edge) -->
@@ -563,6 +601,21 @@ document.addEventListener('alpine:init', () => {
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
+        swapOpen: false, swapModelId: '', swapPoseId: '', swapLoading: false,
+        swapModels: [
+            { id: 'asian_f', name: 'Nữ Á Đông', tone: 'East Asian female', color: '#e8b98b' },
+            { id: 'euro_f', name: 'Nữ Châu Âu', tone: 'European female', color: '#f0c9a6' },
+            { id: 'asian_m', name: 'Nam Á Đông', tone: 'East Asian male', color: '#d9a06b' },
+            { id: 'euro_m', name: 'Nam Châu Âu', tone: 'European male', color: '#eec39b' },
+            { id: 'african_f', name: 'Nữ Phi', tone: 'Black female', color: '#8a5a3b' },
+        ],
+        swapPoses: [
+            { id: 'stand', name: 'Đứng thẳng', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-4 12h2l2-5 2 5h2z' },
+            { id: 'hip', name: 'Tay chống hông', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 10l-3 10h2l1-4 1 4h2zM9 13l3-1 3 1' },
+            { id: 'walk', name: 'Đang bước', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-2 11h2l1-4 2 4h2l-3-8zM12 13l-3-2' },
+            { id: 'twist', name: 'Xoay lưng', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-3 11h2l1-6 2 6h2l-3-8z' },
+            { id: 'squat', name: 'Ngồi xổm', sk: 'M12 5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 10l-4 8h2l2-4 2 4h2z' },
+        ],
         pickTarget: 'ref',
         editSource: null, editSourceTmp: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
@@ -932,6 +985,23 @@ document.addEventListener('alpine:init', () => {
                 if (items.length) { this.previewId = items[0].generation_id; Alpine.store('toast').show('Đang phẫu thuật ảnh… #' + items[0].generation_id); }
             } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
             finally { this.editSurging = false; }
+        },
+        // ===== Thay Đổi Người Mẫu (Click-to-Swap) =====
+        openSwap() {
+            const img = this.preview && this.preview.media_url;
+            if (!img) { Alpine.store('toast').show('Chọn một ảnh 2D (kết quả) trước.', 'error'); return; }
+            this.swapDesign = img; this.swapModelId = 'asian_f'; this.swapPoseId = 'stand'; this.swapOpen = true;
+        },
+        async runSwap() {
+            if (!this.swapDesign || this.swapLoading) return;
+            this.swapLoading = true;
+            try {
+                const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: this.swapModelId, pose_id: this.swapPoseId }) });
+                const d = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
+                if (d.media_url) { this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.provider, provider: d.provider, media_url: d.media_url, credits_cost: 1, created_at: 'Đã đổi người mẫu' }); this.swapOpen = false; Alpine.store('toast').show('Đã tạo người mẫu mới.'); }
+            } catch (e) { Alpine.store('toast').show(e.message, 'error'); }
+            finally { this.swapLoading = false; }
         },
         // Mở popup sửa prompt tiếng Việt: dịch prompt EN hiện tại sang VI.
         async openTranslateVi() {

@@ -489,6 +489,37 @@ class StudioController extends Controller
     /**
      * Translate a prompt between Vietnamese and English (used by the "Chỉnh sửa prompt tiếng Việt" popup).
      */
+    /**
+     * "Thay Đổi Người Mẫu" (Click-to-Swap) — virtual try-on with a chosen model + pose.
+     */
+    public function swapModel(Request $request)
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],   // design image URL (generation media_url or /storage)
+            'model_id' => ['required', 'string', 'max:40'],
+            'pose_id' => ['required', 'string', 'max:40'],
+        ]);
+
+        $res = app(\App\Services\VirtualTryOnService::class)->swap($data['image'], $data['model_id'], $data['pose_id']);
+        if (! ($res['url'] ?? null)) {
+            return response()->json(['message' => $res['error'] ?? 'Không thể thay đổi người mẫu.'], 422);
+        }
+
+        // Record a completed Generation so the result appears in Outputs.
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image',
+            'status' => 'completed',
+            'media_url' => $res['url'],
+            'prompt' => 'Thay đổi người mẫu (virtual try-on)',
+            'model' => $res['provider'] ?? 'tryon',
+            'provider' => $res['provider'] ?? 'tryon',
+            'credits_cost' => 1,
+            'meta' => ['type' => 'image', 'provider' => $res['provider'] ?? 'tryon', 'model' => $res['provider'] ?? 'tryon', 'tryon' => true],
+        ]);
+
+        return response()->json(['generation_id' => $gen->id, 'media_url' => $res['url'], 'provider' => $res['provider'] ?? 'tryon']);
+    }
+
     public function translate(Request $request)
     {
         $data = $request->validate([
