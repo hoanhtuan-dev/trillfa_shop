@@ -71,6 +71,17 @@ class RenderImageJob implements ShouldQueue
                 $generation->ratio,
             );
 
+            // Face sync via the image-edit model (opt-in): after generating a NEW image,
+            // swap the person's face to the reference face for identity-consistent looks.
+            // Falls back to the original image if the edit fails (keeps the result usable).
+            $faceEditSync = filter_var(studio_config('face_edit_sync', false), FILTER_VALIDATE_BOOL);
+            if ($faceEditSync && $faceRef && str_starts_with($faceRef, '/storage/') && ! $generation->base_image) {
+                $edited = $images->applyFace($url, $faceRef);
+                if ($edited && $edited !== $url) {
+                    $url = $edited;
+                }
+            }
+
             // Brand logo stamping is disabled for now (opt-in via studio.brand_logo_enabled).
             if (studio_config('brand_logo_enabled', false)) {
                 $url = $this->applyBrandLogo($url);
