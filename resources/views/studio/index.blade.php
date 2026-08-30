@@ -182,7 +182,7 @@
                         </div>
                         <button @click="swapOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
                     </div>
-                    <div class="max-h-[72vh] overflow-y-auto p-5">
+                    <div class="max-h-[58vh] min-h-[38vh] overflow-y-auto p-5">
                         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70">👤 Bộ sưu tập Người mẫu</p>
                         <div class="mb-5 grid grid-cols-3 gap-3 sm:grid-cols-6">
                             <template x-for="m in swapModels" :key="m.id">
@@ -205,8 +205,10 @@
                                 </button>
                             </template>
                         </div>
-                        <p class="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🏙 Hậu cảnh</p>
-                        <div class="mb-3 flex flex-wrap gap-1.5">
+                    </div>
+                    <div class="shrink-0 border-t border-ink-700 bg-ink-900/30 px-5 py-3">
+                        <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🏙 Hậu cảnh</p>
+                        <div class="flex flex-wrap gap-1.5">
                             <template x-for="bg in swapBackgrounds" :key="bg.v">
                                 <button @click="swapBackground = bg.v" class="rounded-full border px-2 py-1 text-[11px] transition-colors" :class="swapBackground === bg.v ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 bg-ink-700/40 text-cream-200 hover:bg-ink-700'" x-text="bg.l"></button>
                             </template>
@@ -996,6 +998,14 @@ document.addEventListener('alpine:init', () => {
             finally { this.editSurging = false; }
         },
         // ===== Thay Đổi Người Mẫu (Click-to-Swap) =====
+        openLookbook(item) {
+            if (!item || !item.id) return;
+            this.cleanCanvas(true); this.canvasImg = '';
+            if (!this.generations.some(x => x.id === item.id)) {
+                this.generations.unshift({ id: item.id, type: 'image', status: 'completed', model: 'swap', provider: 'swap', media_url: item.url, credits_cost: 1, created_at: 'Phiên bản' });
+            }
+            this.previewId = item.id;
+        },
         clearSwap() { this.swapModelIds = []; this.swapPoseIds = []; this.swapDesign = ''; this.lookbook = []; this.lookbookOpen = false; Alpine.store('toast').show('Đã xoá lựa chọn khuôn mặt & dáng.', 'info'); },
         toggleSwapModel(id) { const i = this.swapModelIds.indexOf(id); if (i >= 0) this.swapModelIds.splice(i, 1); else this.swapModelIds.push(id); },
         toggleSwapPose(id) { const i = this.swapPoseIds.indexOf(id); if (i >= 0) this.swapPoseIds.splice(i, 1); else this.swapPoseIds.push(id); },
