@@ -909,18 +909,18 @@ document.addEventListener('alpine:init', () => {
                 const up = await this.upload('/studio/upload-ref', fd);
                 this.editSource = { url: up.url, label: 'Ảnh tải lên' };
                 this.editSourceTmp = URL.createObjectURL(f);
-                this.canvasImg = this.editSourceTmp; this.selectedImageId = null;
+                this.cleanCanvas(true); this.canvasImg = this.editSourceTmp; this.selectedImageId = null;
                 Alpine.store('toast').show('Đã chọn ảnh tải lên để chỉnh sửa.');
             } catch (err) { Alpine.store('toast').show(err.message, 'error'); }
         },
         chooseEditProduct(item) {
             this.editSource = { url: item.url, label: item.name || 'Từ sản phẩm' };
-            this.editSourceTmp = item.url; this.canvasImg = item.url; this.selectedImageId = null; this.refOpen = false;
+            this.editSourceTmp = item.url; this.cleanCanvas(true); this.canvasImg = item.url; this.selectedImageId = null; this.refOpen = false;
             Alpine.store('toast').show('Đã chọn ảnh sản phẩm để chỉnh sửa.');
         },
         useEditOutput(g) {
             this.editSource = { url: g.media_url, label: 'Kết quả #' + g.id, generationId: g.id };
-            this.editSourceTmp = g.media_url; this.canvasImg = g.media_url; this.selectedImageId = g.id; this.outputsRefOpen = false;
+            this.editSourceTmp = g.media_url; this.cleanCanvas(true); this.canvasImg = g.media_url; this.selectedImageId = g.id; this.outputsRefOpen = false;
         },
         clearEditSource() {
             this.editSource = null; this.editSourceTmp = ''; this.canvasImg = '';
@@ -978,14 +978,14 @@ document.addEventListener('alpine:init', () => {
                 const d = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
                 if (d.media_url) { // fallback qwen-edit (try-on unavailable) -> hoàn tất ngay
-                    this.canvasImg = '';
+                    this.cleanCanvas(true); this.canvasImg = '';
                     this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.provider || 'qwen', provider: d.provider || 'qwen', media_url: d.media_url, credits_cost: 1, created_at: 'Đã đổi người mẫu' });
                     this.previewId = d.generation_id;
                     Alpine.store('toast').show('Đã đổi người mẫu (chế độ dự phòng).');
                     return;
                 }
                 if (!d.task_id) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
-                this.canvasImg = '';
+                this.cleanCanvas(true); this.canvasImg = '';
                 this.addGen({ id: d.generation_id, type: 'image', status: 'pending', model: 'tryon', provider: 'tryon', media_url: null, credits_cost: 1, created_at: 'Đang thử đồ' });
                 this.previewId = d.generation_id;
                 this.pollSwap(d.task_id, d.generation_id);
@@ -1033,10 +1033,10 @@ document.addEventListener('alpine:init', () => {
             Alpine.store('toast').show('Đã cập nhật prompt.');
             this.translateViOpen = false;
         },
-        cleanCanvas() {
+        cleanCanvas(silent = false) {
             this.previewId = null; this.selectedImageId = null; this.videoSourceId = null; this.viewGen = null;
             this.palette = []; this.pan = { x: 0, y: 0 }; this.zoom = 1;
-            Alpine.store('toast').show('Đã dọn canvas — bỏ ảnh/video đang xem & các nguồn đang dùng.', 'info');
+            if (! silent) { Alpine.store('toast').show('Đã dọn canvas — bỏ ảnh/video đang xem & các nguồn đang dùng.', 'info'); }
         },
 
         async processNow() {
