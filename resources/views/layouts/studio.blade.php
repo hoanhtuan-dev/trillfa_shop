@@ -65,13 +65,8 @@
                     <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 hover:text-white" :title="'Ẩn thanh bên'">«</button>
                 </div>
                 <div class="mb-2 flex items-center gap-1 text-[11px] text-cream-300"><span class="inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>{{ $connected ? 'Kết nối AI' : 'Chế độ Stub' }}</div>
-                <div class="space-y-1 text-xs">
-                    <div class="flex items-center justify-between"><span class="text-cream-300">Tín dụng</span><span class="font-semibold text-cream-50">{{ $credits }}</span></div>
-                    <div class="flex items-center justify-between"><span class="text-cream-300">Đã dùng</span><span class="text-cream-200">{{ $creditsUsed }}</span></div>
-                    <div class="flex items-center justify-between"><span class="text-cream-300">Queue</span><span class="text-cream-200">{{ $pendingCount }} pending</span></div>
-                    <div class="flex items-center justify-between"><span class="text-cream-300">User</span><span class="text-cream-200">{{ $u?->name }}</span></div>
-                </div>
-                <div class="mt-3 flex items-center gap-2">
+                <div class="mb-2 flex items-center justify-between text-xs"><span class="text-cream-300">Tín dụng</span><span class="font-semibold text-cream-50">{{ $credits }}</span></div>
+                <div class="flex items-center gap-2">
                     <a href="{{ route('studio.settings') }}" class="link text-xs">Trợ giúp</a>
                     <form method="POST" action="{{ route('logout') }}" class="ml-auto">@csrf
                         <button type="submit" class="rounded-full border border-ink-700 px-3 py-1 text-xs font-semibold text-cream-100 hover:bg-ink-700 hover:text-white">Đăng xuất</button>

@@ -46,11 +46,11 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <div class="grid gap-4 pb-6 lg:h-full lg:grid-cols-[minmax(0,1fr)_400px_150px]">
+    <div class="grid gap-4 lg:h-full lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-2 lg:h-full lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
+        <div class="space-y-4 lg:order-2 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
             <!-- Idea -->
             <div class="card p-5" x-show="step===1" x-transition.opacity>
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
@@ -198,7 +198,7 @@
         <!-- ===== CENTER: Canvas preview ===== -->
         <!-- =============================================================== -->
         <div class="min-w-0 lg:order-1" x-show="!isMobile || step===2">
-            <div class="card flex flex-col overflow-hidden p-0 lg:h-full">
+            <div class="card flex flex-col overflow-hidden p-0 lg:h-full lg:min-h-0">
                 <!-- Media area -->
                 <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
                     <!-- Step indicator (Progressive Disclosure) — floated over the canvas -->
@@ -279,14 +279,14 @@
         <!-- =============================================================== -->
         <!-- ===== RIGHT: Generation Parameters ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-3 lg:h-full lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===3">
+        <div class="space-y-4 lg:order-3 lg:h-full lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden lg:pr-1" x-show="!isMobile || step===3">
             <!-- Outputs grid -->
-            <div class="card p-4">
-                <div class="mb-3 flex items-center justify-between">
+            <div class="card flex flex-1 flex-col overflow-hidden p-4 lg:min-h-0">
+                <div class="mb-3 flex shrink-0 items-center justify-between">
                     <h2 class="font-display text-sm font-semibold text-ink-900">Outputs</h2>
                     <a href="{{ route('studio.library') }}" class="link text-xs">Thư viện</a>
                 </div>
-                <div class="grid max-h-[64vh] grid-cols-1 gap-2 overflow-y-auto pr-1">
+                <div class="grid flex-1 grid-cols-1 gap-2 overflow-y-auto pr-1 lg:min-h-0">
                     <template x-for="g in generations" :key="g.id">
                         <button type="button" @click="openGenView(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
                             <div class="relative">
