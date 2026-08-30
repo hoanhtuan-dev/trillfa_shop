@@ -196,7 +196,8 @@
                         <div class="grid grid-cols-5 gap-2">
                             <template x-for="p in swapPoses" :key="p.id">
                                 <button @click="swapPoseId = p.id" class="flex flex-col items-center gap-1 rounded-xl border p-2 transition-all" :class="swapPoseId === p.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
-                                    <svg viewBox="0 0 24 24" class="h-10 w-10 text-cream-300"><path :d="p.sk" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <img :src="p.img" class="h-14 w-full max-w-[3.5rem] rounded-lg bg-ink-900 object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'" alt="Dáng">
+                                    <svg viewBox="0 0 24 24" class="hidden h-10 w-10 text-cream-300"><path :d="p.sk" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     <span class="text-[10px] text-cream-200" x-text="p.name"></span>
                                 </button>
                             </template>
@@ -610,11 +611,11 @@ document.addEventListener('alpine:init', () => {
             { id: 'african_f', name: 'Nữ Phi', tone: 'Black female', color: '#8a5a3b' },
         ],
         swapPoses: [
-            { id: 'stand', name: 'Đứng thẳng', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-4 12h2l2-5 2 5h2z' },
-            { id: 'hip', name: 'Tay chống hông', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 10l-3 10h2l1-4 1 4h2zM9 13l3-1 3 1' },
-            { id: 'walk', name: 'Đang bước', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-2 11h2l1-4 2 4h2l-3-8zM12 13l-3-2' },
-            { id: 'twist', name: 'Xoay lưng', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-3 11h2l1-6 2 6h2l-3-8z' },
-            { id: 'squat', name: 'Ngồi xổm', sk: 'M12 5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 10l-4 8h2l2-4 2 4h2z' },
+            { id: 'stand', name: 'Đứng thẳng', img: '/samples/pose-stand.jpg', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-4 12h2l2-5 2 5h2z' },
+            { id: 'hip', name: 'Tay chống hông', img: '/samples/pose-hip.jpg', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 10l-3 10h2l1-4 1 4h2zM9 13l3-1 3 1' },
+            { id: 'walk', name: 'Đang bước', img: '/samples/pose-walk.jpg', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-2 11h2l1-4 2 4h2l-3-8zM12 13l-3-2' },
+            { id: 'twist', name: 'Xoay lưng', img: '/samples/pose-twist.jpg', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-3 11h2l1-6 2 6h2l-3-8z' },
+            { id: 'squat', name: 'Ngồi xổm', img: '/samples/pose-squat.jpg', sk: 'M12 5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 10l-4 8h2l2-4 2 4h2z' },
         ],
         pickTarget: 'ref',
         editSource: null, editSourceTmp: '', editFace: '', editFaceRef: '',

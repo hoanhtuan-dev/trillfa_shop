@@ -510,11 +510,12 @@ class StudioController extends Controller
         // garment_image_url: the design image (person in the outfit) — for best results use a clean
         // flat-lay / background-removed garment, but the design image is a working default.
         $garmentUrl = url($data['image']);
-        $modelImage = $model['image'] ?? null;
-        if (! $modelImage) {
-            return response()->json(['message' => 'Người mẫu này chưa có ảnh (model_image_url). Thêm ảnh trong catalog.'], 422);
+        // VTON bắt buộc POSE dạng ẢNH -> model_image_url = ảnh ma-nơ-canh đang ở dáng đã chọn (pose.image).
+        $poseImage = $pose['image'] ?? null;
+        if (! $poseImage) {
+            return response()->json(['message' => 'Pose "'.($pose['name'] ?? '?').'" chưa có ảnh (model_image_url). Thêm ảnh dáng trong catalog.'], 422);
         }
-        $modelUrl = url($modelImage);
+        $modelUrl = url($poseImage);
 
         $category = (string) studio_config('tryon_category', 'dress');
         $res = $svc->submit($modelUrl, $garmentUrl, $category);

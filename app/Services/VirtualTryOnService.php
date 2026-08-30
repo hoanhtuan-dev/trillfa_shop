@@ -28,12 +28,14 @@ class VirtualTryOnService
 
     public function poseCatalog(): array
     {
+        // Each pose carries its OWN IMAGE (a model/mannequin in that pose) — required because the
+        // VTON API reads the body geometry from model_image_url (pose cannot be a text prompt).
         return [
-            ['id' => 'stand', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body'],
-            ['id' => 'hip', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, confident contrapposto'],
-            ['id' => 'walk', 'name' => 'Đang bước', 'skeleton' => 'walking mid-stride catwalk, dynamic'],
-            ['id' => 'twist', 'name' => 'Xoay lưng', 'skeleton' => 'turned away, looking back over the shoulder'],
-            ['id' => 'squat', 'name' => 'Ngồi xổm', 'skeleton' => 'stylish squat pose, knees apart'],
+            ['id' => 'stand', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body', 'image' => '/samples/pose-stand.jpg'],
+            ['id' => 'hip', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, confident contrapposto', 'image' => '/samples/pose-hip.jpg'],
+            ['id' => 'walk', 'name' => 'Đang bước', 'skeleton' => 'walking mid-stride catwalk, dynamic', 'image' => '/samples/pose-walk.jpg'],
+            ['id' => 'twist', 'name' => 'Xoay lưng', 'skeleton' => 'turned away, looking back over the shoulder', 'image' => '/samples/pose-twist.jpg'],
+            ['id' => 'squat', 'name' => 'Ngồi xổm', 'skeleton' => 'stylish squat pose, knees apart', 'image' => '/samples/pose-squat.jpg'],
         ];
     }
 
