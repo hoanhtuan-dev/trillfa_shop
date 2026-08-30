@@ -50,9 +50,9 @@
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="scrollbar-hide space-y-4 lg:order-2 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
+        <div x-ref="leftPanel" class="scrollbar-hide space-y-4 lg:order-2 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
             <!-- Idea -->
-            <div class="card p-5" x-show="step===1" x-transition.opacity>
+            <div class="card p-5" x-show="step===1">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
                 <textarea x-model="idea" rows="3" class="input" placeholder="VD: A flowing silk evening gown with sequin…" @keydown.enter.prevent="ideate()"></textarea>
                 <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
@@ -73,7 +73,7 @@
             </div>
 
             <!-- Presets -->
-            <div class="card p-5" x-show="step===1" x-transition.opacity>
+            <div class="card p-5" x-show="step===1">
                 <div class="mb-3 flex items-center justify-between">
                     <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(chọn từng nhóm)</span></h2>
                     <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
@@ -94,7 +94,7 @@
             </div>
 
             <!-- Prompt + generate -->
-            <div class="card p-5" x-show="step===1" x-transition.opacity>
+            <div class="card p-5" x-show="step===1">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tạo ảnh <span class="text-xs font-normal text-ink-500">(nhập trực tiếp hoặc bấm “Tạo Prompt”)</span></h2>
                 <div class="mb-3 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng/preset; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
                     <span class="font-medium text-cream-200">Sáng tạo</span>
@@ -118,7 +118,7 @@
             </div>
 
             <!-- Bước 2 · Inpaint -->
-            <div class="card p-5" x-show="step===2" x-transition.opacity>
+            <div class="card p-5" x-show="step===2">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">✏️ Prompt Inpainting</h2>
                 <p class="mb-3 text-xs text-ink-500">Chọn ảnh nguồn (nút “Sửa ảnh” dưới canvas), nhập mô tả chỉnh sửa rồi cập nhật.</p>
                 <template x-if="selectedImageId">
@@ -140,7 +140,7 @@
             </div>
 
             <!-- Color Palette (Bước 2) -->
-            <div class="card p-5" x-show="step===2" x-transition.opacity>
+            <div class="card p-5" x-show="step===2">
                 <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🎨 Color Palette</h2>
                 <div class="flex items-center gap-1.5" x-show="palette.length">
                     <template x-for="c in palette" :key="c"><button type="button" class="h-7 w-7 rounded-full border border-ink-700" :style="{ background: c }" :title="c" @click="Alpine.store('toast').show('Màu ' + c, 'info')"></button></template>
@@ -149,7 +149,7 @@
             </div>
 
             <!-- Texture (Bước 2) -->
-            <div class="card p-5" x-data="{ texture: 5 }" x-show="step===2" x-transition.opacity>
+            <div class="card p-5" x-data="{ texture: 5 }" x-show="step===2">
                 <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🧵 Texture</h2>
                 <input type="range" min="0" max="10" x-model="texture" class="w-full accent-brand-500">
                 <div class="mt-2 flex items-center justify-between text-xs">
@@ -161,7 +161,7 @@
             </div>
 
             <!-- Bước 3 · Ghế Đạo Diễn -->
-            <div class="card p-5" x-show="step===3" x-transition.opacity>
+            <div class="card p-5" x-show="step===3">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
                 <div class="mb-3">
                     <label class="label">Model video</label>
@@ -203,11 +203,17 @@
                 <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
                     <!-- Step indicator (Progressive Disclosure) — floated over the canvas -->
                     <div class="pointer-events-auto absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-ink-900/80 p-1 text-[11px] font-semibold shadow-lg backdrop-blur" @pointerdown.stop @click.stop>
-                        <button @click="step=1" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===1?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/25':'bg-white/10'">1</span> Concept</button>
+                        <button @click="goStep(1)" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===1?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/25':'bg-white/10'">1</span> Concept</button>
                         <span class="text-cream-300/60">›</span>
-                        <button @click="step=2" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===2?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/25':'bg-white/10'">2</span> Fitting Room</button>
+                        <button @click="goStep(2)" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===2?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/25':'bg-white/10'">2</span> Fitting Room</button>
                         <span class="text-cream-300/60">›</span>
-                        <button @click="step=3" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===3?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/25':'bg-white/10'">3</span> Director</button>
+                        <button @click="goStep(3)" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===3?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/25':'bg-white/10'">3</span> Director</button>
+                    </div>
+
+                    <!-- Canvas contextual actions (per-step) -->
+                    <div class="absolute left-3 top-3 z-20 flex gap-1.5" @pointerdown.stop @click.stop>
+                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint).">✏️ Sửa ảnh</button>
+                        <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="step>=2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Render Video.">🎬 Tạo video</button>
                     </div>
 
                     <!-- Canvas zoom toolbar (vertical, right edge) -->
@@ -256,23 +262,6 @@
                     </div>
                 </div>
 
-                <!-- Action bar -->
-                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-cream-200 px-4 py-3 text-xs" x-show="preview">
-                    <span class="flex min-w-0 items-center gap-2 text-ink-500">
-                        <span class="truncate text-xs text-cream-300" x-text="preview ? genInfoLine(preview) + ' · ' + preview.credits_cost + ' token' : ''"></span>
-                    </span>
-                    <span class="flex flex-wrap items-center gap-2">
-                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Chỉnh sửa (Inpaint) ở bảng AI Design Inputs.">✏️ Sửa ảnh <span x-show="preview && selectedImageId === preview.id" class="ml-0.5 text-[10px]">✓</span></button>
-                        <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Render Video catwalk ở bảng Generation Parameters.">🎬 Tạo video <span x-show="preview && videoSourceId === preview.id" class="ml-0.5 text-[10px] text-brand-700">✓</span></button>
-                        <a :href="preview ? '/studio/generations/' + preview.id + '/download' : '#'" class="btn-outline btn-sm" x-show="preview && preview.media_url">Tải xuống</a>
-                        <button @click="cancelGeneration(preview)" :disabled="!preview || !isActive(preview.status)" class="btn-outline btn-sm text-red-600" x-show="preview && isActive(preview.status)">Dừng</button>
-                        <button @click="removeGeneration(preview)" class="btn-outline btn-sm text-red-600">Xóa</button>
-                    </span>
-                </div>
-                <div class="flex flex-wrap gap-x-4 px-4 py-2 text-xs text-brand-300">
-                    <span x-show="preview && selectedImageId === preview.id">✓ Đã chọn làm nguồn Chỉnh sửa (Inpaint)</span>
-                    <span x-show="preview && videoSourceId === preview.id">✓ Đã chọn làm nguồn Video</span>
-                </div>
             </div>
         </div>
 
@@ -283,9 +272,9 @@
             <!-- Thư viện card (top) -->
             <div class="card flex shrink-0 items-center justify-between gap-2 p-2.5">
                 <a href="{{ route('studio.library') }}" class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600/20 text-brand-300 transition-colors hover:bg-brand-600 hover:text-white" title="Mở thư viện">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12a9 9 0 1118 0v.75m-18 0H5a1.5 1.5 0 011.5 1.5v3.75A1.5 1.5 0 015 19.5H2.25m18 0H19a1.5 1.5 0 01-1.5-1.5v-3.75A1.5 1.5 0 0119 12.75h2.25m-3 3H19a.75.75 0 00.75-.75v-3a.75.75 0 00-.75-.75h-1.5a.75.75 0 00-.75.75v3a.75.75 0 00.75.75Z"/></svg>
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.25-5.25 4.5 4.5 3.75-3.75 3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-6.75-3a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
                 </a>
-                <a href="{{ route('studio.library') }}" class="link text-xs">Xem tất cả trong thư viện</a>
+                <a href="{{ route('studio.library') }}" class="link text-xs">Thư viện Ảnh</a>
             </div>
             <!-- Outputs grid -->
             <div class="card flex min-h-0 flex-1 flex-col overflow-hidden p-4">
@@ -488,6 +477,7 @@ document.addEventListener('alpine:init', () => {
             return this.generations.filter(g => g.id === p.id);
         },
         setPreview(g) { if (g) { this.previewId = g.id; this.loadPalette(g.id); } },
+        goStep(n) { this.step = n; this.$nextTick(() => { const el = this.$refs.leftPanel; if (el) el.scrollTop = 0; }); },
         _zoomAt(cx, cy, factor) {
             const old = this.zoom;
             const nz = Math.min(4, Math.max(0.6, +(old * factor).toFixed(2)));
