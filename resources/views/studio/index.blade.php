@@ -46,40 +46,11 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <!-- Toolbar -->
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-            <label class="label mb-0">Dự án:</label>
-            <div class="w-56"><select x-model="currentProjectId" class="input !py-2">
-                <option value="">— Dự án mới (không lưu) —</option>
-                <template x-for="p in projects" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
-            </select></div>
-            <template x-if="showNewProject"><span class="flex items-center gap-2">
-                <div class="w-48"><input type="text" x-model="newProjectName" @keydown.enter.prevent="createProject()" placeholder="Tên dự án…" class="input !py-2"></div>
-                <button @click="createProject()" class="btn-outline btn-sm">Tạo</button>
-            </span></template>
-            <button @click="newProjectName='', showNewProject=!showNewProject" class="btn-outline btn-sm">+ Dự án</button>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 text-xs">
-            <div class="flex items-center gap-2 rounded-full border border-cream-200 bg-cream-50 px-3 py-1.5" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng/preset; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
-                <span class="font-medium text-ink-700">Sáng tạo</span>
-                <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-24 cursor-pointer accent-brand-600">
-                <span class="font-semibold text-ink-900" x-text="creativeLevel"></span>
-                <span class="text-ink-500">/10</span>
-            </div>
-            <span class="badge {{ $aiStub ? 'bg-amber-100 text-amber-700' : 'bg-brand-600 text-white' }}">Prompt: {{ $aiStub ? 'Mô phỏng' : 'Gemini' }}</span>
-            <span class="badge bg-cream-200 text-ink-700">Ảnh: {{ $imgProvider }}{{ $imgKeySet ? '' : ' (stub)' }}</span>
-            <span class="text-ink-500">Tín dụng: <b class="font-semibold text-ink-900" x-text="creditsLeft"></b></span>
-            @if($quotaResetsAt)<span class="badge bg-amber-100 text-amber-700" title="Hạn mức nhà cung cấp vừa hết — reset lúc {{ $quotaResetsAt }} UTC">⚠️ Hạn mức</span>@endif
-            <button @click="processNow()" class="btn-outline btn-sm whitespace-nowrap" title="Xử lý các công việc đang chờ trong hàng đợi">Xử lý ngay</button>
-        </div>
-    </div>
-
     <div class="grid gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_300px_240px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-2 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1">
+        <div class="space-y-4 lg:order-2 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
             <!-- Idea -->
             <div class="card p-5" x-show="step===1" x-transition.opacity>
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
@@ -102,7 +73,7 @@
             </div>
 
             <!-- Presets -->
-            <div class="card p-5">
+            <div class="card p-5" x-show="step===1" x-transition.opacity>
                 <div class="mb-3 flex items-center justify-between">
                     <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(chọn từng nhóm)</span></h2>
                     <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
@@ -124,11 +95,13 @@
 
             <!-- Prompt + generate -->
             <div class="card p-5" x-show="step===1" x-transition.opacity>
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tiếng Anh <span class="text-xs font-normal text-ink-500">(nhập trực tiếp hoặc bấm “Tạo Prompt”)</span></h2>
-                <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
-                <div class="mt-2"><label class="label">Video prompt</label><textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs" placeholder="(để trống để ghép tự động từ ý tưởng + preset + kịch bản quay)"></textarea>
-                    <button type="button" @click="suggestVideoPrompt()" class="btn-outline btn-sm mt-1 w-full" title="Ghép prompt video từ ý tưởng + preset + kịch bản quay (không dùng AI)">✨ Gợi ý prompt video</button>
+                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tạo ảnh <span class="text-xs font-normal text-ink-500">(nhập trực tiếp hoặc bấm “Tạo Prompt”)</span></h2>
+                <div class="mb-3 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng/preset; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
+                    <span class="font-medium text-cream-200">Sáng tạo</span>
+                    <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-24 cursor-pointer accent-brand-500">
+                    <span class="font-semibold text-cream-50" x-text="creativeLevel"></span><span class="text-cream-300/70">/10</span>
                 </div>
+                <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select>
                     <select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
@@ -136,9 +109,10 @@
                 </div>
             </div>
 
-            <!-- Refine -->
-            <div class="card p-5" x-show="selectedImageId" x-transition.opacity>
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Chỉnh sửa ảnh (Inpaint)</h2>
+            <!-- Bước 2 · Inpaint -->
+            <div class="card p-5" x-show="step===2" x-transition.opacity>
+                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">✏️ Prompt Inpainting</h2>
+                <p class="mb-3 text-xs text-ink-500">Chọn ảnh nguồn (nút “Sửa ảnh” dưới canvas), nhập mô tả chỉnh sửa rồi cập nhật.</p>
                 <template x-if="selectedImageId">
                     <div class="mb-3 flex items-center gap-2 rounded-xl border border-cream-200 bg-cream-50 p-2">
                         <img :src="(generations.find(g => g.id === selectedImageId) || {}).media_url" class="h-14 w-14 rounded-lg bg-white object-cover" onerror="this.src='/images/placeholder.svg'">
@@ -156,6 +130,39 @@
                 </div>
                 <button @click="refine()" :disabled="refining || !refinePrompt" class="btn-outline mt-3 w-full"><span x-show="!refining">Cập nhật Ảnh</span><span x-show="refining">Đang gửi…</span></button>
             </div>
+
+            <!-- Bước 3 · Ghế Đạo Diễn -->
+            <div class="card p-5" x-show="step===3" x-transition.opacity>
+                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
+                <div class="mb-3">
+                    <label class="label">Model video</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="m in videoModels" :key="m.model">
+                            <button type="button" @click="videoModel = videoModel===m.model ? '' : m.model" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="videoModel===m.model ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400 hover:text-brand-200'"><span x-text="m.label"></span></button>
+                        </template>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="label">Kịch bản quay</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="scene in videoScenes" :key="scene.id">
+                            <button type="button" @click="videoScene = videoScene===scene.value ? '' : scene.value" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="videoScene===scene.value ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400 hover:text-brand-200'" :title="scene.note"><span x-text="scene.label.split(' (')[0]"></span></button>
+                        </template>
+                    </div>
+                    <p class="mt-1 text-[10px] text-brand-300" x-show="videoScene" x-text="'Kịch bản sẽ được áp dụng: ' + videoSceneLabel"></p>
+                </div>
+                <div class="mb-3 grid grid-cols-2 gap-2">
+                    <div><label class="label">Thời lượng</label><select x-model="videoDuration" class="input !py-2"><option>5</option><option>8</option><option>10</option><option>15</option><option>20</option></select></div>
+                    <div><label class="label">Độ phân giải</label><select x-model="videoRes" class="input !py-2"><option>480</option><option>720</option><option>1080</option></select></div>
+                </div>
+                <div class="mb-3">
+                    <label class="label">Prompt video</label>
+                    <textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs" placeholder="(để trống để ghép tự động từ ý tưởng + preset + kịch bản quay)"></textarea>
+                    <button type="button" @click="suggestVideoPrompt()" class="btn-outline btn-sm mt-1 w-full" title="Ghép prompt video từ ý tưởng + preset + kịch bản quay (không dùng AI)">✨ Gợi ý prompt video</button>
+                </div>
+                <button @click="renderVideo()" :disabled="videoBusy || !videoSourceId" class="btn-brand w-full whitespace-nowrap"><span x-show="!videoBusy">🎬 Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
+                <p class="mt-2 text-[10px] text-ink-500" x-text="videoSourceId ? 'Nguồn ảnh #' + videoSourceId : 'Chọn ảnh nguồn (Bước 2) để Render.'"></p>
+            </div>
         </div>
 
         <!-- =============================================================== -->
@@ -163,21 +170,6 @@
         <!-- =============================================================== -->
         <div class="min-w-0 lg:order-1" x-show="!isMobile || step===2">
             <div class="card overflow-hidden p-0 lg:sticky lg:top-20">
-                <!-- Canvas toolbar -->
-                <div class="flex items-center justify-between gap-2 border-b border-cream-200 px-4 py-2.5 text-xs text-ink-500">
-                    <span class="flex items-center gap-2">
-                        <span class="font-display font-semibold text-ink-900">Canvas</span>
-                        <span>zoom <b class="text-ink-900" x-text="zoom.toFixed(2)"></b></span>
-                    </span>
-                    <span class="flex items-center gap-1">
-                        <button @click="zoomOut()" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">−</button>
-                        <button @click="resetZoom()" class="rounded-lg border border-cream-200 px-2 hover:bg-cream-100" title="Vừa khung">Vừa</button>
-                        <button @click="zoomIn()" class="grid h-7 w-7 place-items-center rounded-lg border border-cream-200 hover:bg-cream-100">+</button>
-                        <span class="mx-1 h-4 w-px bg-cream-200"></span>
-                        <span class="hidden text-[10px] text-ink-500 sm:inline">Kéo để di chuyển</span>
-                    </span>
-                </div>
-
                 <!-- Media area -->
                 <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
                     <!-- Step indicator (Progressive Disclosure) — floated over the canvas -->
@@ -187,6 +179,15 @@
                         <button @click="step=2" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===2?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/25':'bg-white/10'">2</span> Fitting Room</button>
                         <span class="text-cream-300/60">›</span>
                         <button @click="step=3" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===3?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/25':'bg-white/10'">3</span> Director</button>
+                    </div>
+
+                    <!-- Canvas zoom toolbar (vertical, right edge) -->
+                    <div class="pointer-events-auto absolute right-2 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-1 rounded-2xl bg-ink-900/80 p-1.5 shadow-lg backdrop-blur" @pointerdown.stop @click.stop>
+                        <button @click="zoomIn()" class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700" title="Phóng to">+</button>
+                        <span class="text-[10px] font-semibold text-cream-300" x-text="zoom.toFixed(1)"></span>
+                        <button @click="zoomOut()" class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700" title="Thu nhỏ">−</button>
+                        <span class="h-px w-5 bg-white/10"></span>
+                        <button @click="resetZoom()" class="grid h-7 w-7 place-items-center rounded-lg text-[10px] text-cream-200 hover:bg-ink-700" title="Vừa khung">⤢</button>
                     </div>
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
@@ -209,13 +210,10 @@
                                 <div x-show="!opening" class="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-brand-50 text-brand-700">
                                     <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.25-5.25 4.5 4.5L15.75 9.75l3.75 3.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 </div>
-                                <p class="text-sm text-ink-500" x-text="opening ? 'Đang mở mục bạn chọn…' : 'Chọn một mục ở bảng Outputs để xem chi tiết.'"></p>
+                                <p class="text-sm text-cream-300" x-text="opening ? 'Đang mở mục bạn chọn…' : 'Tạo thiết kế ở Bước 1 để bắt đầu — kết quả sẽ hiện ở đây.'"></p>
                             </div>
                         </template>
                     </div>
-                    <span class="absolute left-3 top-3 badge" :class="badgeClass(preview && preview.status)" x-show="preview" x-text="preview ? statusLabel(preview.status) : ''"></span>
-                    <span class="absolute right-3 top-3 badge bg-ink-900/70 text-white" x-show="preview && preview.type === 'video'">Video</span>
-
                     <!-- Variations swiper (Step 2) — floated over the canvas bottom -->
                     <div class="pointer-events-auto absolute inset-x-0 bottom-3 z-20 flex justify-center px-3" x-show="generations.length" @pointerdown.stop @click.stop>
                         <div class="scrollbar-hide flex max-w-full items-center gap-2 overflow-x-auto rounded-2xl bg-ink-900/70 px-2 py-2 shadow-lg backdrop-blur">
@@ -223,8 +221,6 @@
                                 <button type="button" @click="setPreview(g)" class="relative w-14 shrink-0 overflow-hidden rounded-xl border" :class="previewId===g.id ? 'border-brand-400 ring-2 ring-brand-400/40' : 'border-white/10'">
                                     <template x-if="g.status==='completed' && g.media_url"><img :src="g.media_url" class="aspect-[3/4] w-full object-cover" onerror="this.src='/images/placeholder.svg'"></template>
                                     <template x-if="g.status!=='completed'"><div class="grid aspect-[3/4] w-full place-items-center bg-white/10"><span x-show="isActive(g.status)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></span></div></template>
-                                    <span class="absolute left-0.5 top-0.5 badge text-[8px]" :class="badgeClass(g.status)" x-text="statusLabel(g.status)"></span>
-                                    <span class="absolute right-0.5 top-0.5 badge text-[8px]" :class="g.type==='video' ? 'bg-ink-900/80 text-white' : 'bg-white/20 text-white'" x-text="g.type==='video' ? 'V' : 'ẢNH'"></span>
                                 </button>
                             </template>
                         </div>
@@ -234,8 +230,7 @@
                 <!-- Action bar -->
                 <div class="flex flex-wrap items-center justify-between gap-2 border-t border-cream-200 px-4 py-3 text-xs" x-show="preview">
                     <span class="flex min-w-0 items-center gap-2 text-ink-500">
-                        <span class="badge text-[10px] font-bold" :class="preview && preview.type === 'video' ? 'bg-ink-900 text-white' : 'bg-cream-200 text-ink-700'" x-text="preview && preview.type === 'video' ? '▶ VIDEO' : (preview ? 'ẢNH' : '')"></span>
-                        <span class="truncate text-[11px]" x-text="preview ? genInfoLine(preview) + ' · ' + preview.credits_cost + ' token' : ''"></span>
+                        <span class="truncate text-xs text-cream-300" x-text="preview ? genInfoLine(preview) + ' · ' + preview.credits_cost + ' token' : ''"></span>
                     </span>
                     <span class="flex flex-wrap items-center gap-2">
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Chỉnh sửa (Inpaint) ở bảng AI Design Inputs.">✏️ Sửa ảnh <span x-show="selectedImageId === preview.id" class="ml-0.5 text-[10px]">✓</span></button>
@@ -299,7 +294,7 @@
                 </div>
                 <div class="grid max-h-[64vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
                     <template x-for="g in generations" :key="g.id">
-                        <button type="button" @click="setPreview(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
+                        <button type="button" @click="openGenView(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
                             <div class="relative">
                                 <template x-if="g.status === 'completed' && g.media_url">
                                     <div class="relative aspect-[3/4] w-full bg-cream-100">
@@ -308,41 +303,11 @@
                                     </div>
                                 </template>
                                 <template x-if="g.status !== 'completed'"><div class="grid aspect-[3/4] w-full place-items-center bg-cream-100"><span x-show="isActive(g.status)" class="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></span></div></template>
-                                <span class="absolute left-1 top-1 badge text-[9px]" :class="badgeClass(g.status)" x-text="statusLabel(g.status)"></span>
-                                <span class="absolute right-1 top-1 badge text-[9px] font-bold" :class="g.type === 'video' ? 'bg-ink-900/85 text-white' : 'bg-cream-200 text-ink-700'" x-text="g.type === 'video' ? (g.duration ? 'VIDEO ' + g.duration + 's' : 'VIDEO') : 'ẢNH'"></span>
                             </div>
                         </button>
                     </template>
                 </div>
                 <div class="mt-3 text-center text-xs text-ink-500" x-show="!generations.length">Chưa có kết quả.</div>
-            </div>
-
-            <!-- Bước 3 · Ghế Đạo Diễn -->
-            <div class="card p-4" x-show="step===3">
-                <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🎬 Ghế Đạo Diễn</h2>
-                <div class="mb-3">
-                    <label class="label">Model video</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        <template x-for="m in videoModels" :key="m.model">
-                            <button type="button" @click="videoModel = videoModel===m.model ? '' : m.model" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="videoModel===m.model ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800' : 'border-cream-300 text-ink-700 hover:border-brand-400 hover:text-brand-700'"><span x-text="m.label"></span></button>
-                        </template>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="label">Kịch bản quay</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        <template x-for="scene in videoScenes" :key="scene.id">
-                            <button type="button" @click="videoScene = videoScene===scene.value ? '' : scene.value" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="videoScene===scene.value ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800' : 'border-cream-300 text-ink-700 hover:border-brand-400 hover:text-brand-700'" :title="scene.note"><span x-text="scene.label.split(' (')[0]"></span></button>
-                        </template>
-                    </div>
-                    <p class="mt-1 text-[10px] text-brand-700" x-show="videoScene" x-text="'Kịch bản sẽ được áp dụng: ' + videoSceneLabel"></p>
-                </div>
-                <div class="mb-3 grid grid-cols-2 gap-2">
-                    <div><label class="label">Thời lượng</label><select x-model="videoDuration" class="input !py-2"><option>5</option><option>8</option><option>10</option><option>15</option><option>20</option></select></div>
-                    <div><label class="label">Độ phân giải</label><select x-model="videoRes" class="input !py-2"><option>480</option><option>720</option><option>1080</option></select></div>
-                </div>
-                <button @click="renderVideo()" :disabled="videoBusy || !videoSourceId" class="btn-brand w-full whitespace-nowrap"><span x-show="!videoBusy">🔥 Action! (Render Video)</span><span x-show="videoBusy">Đang gửi…</span></button>
-                <p class="mt-2 text-[10px] text-ink-500" x-text="videoSourceId ? 'Nguồn ảnh #' + videoSourceId : 'Chọn ảnh nguồn (Bước 2) để Render.'"></p>
             </div>
 
             <!-- Texture (Bước 2) -->
@@ -443,6 +408,31 @@
             <div class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-ink-900/80 px-3 py-1 text-xs text-cream-200">Lăn chuột / +− : Thu phóng · Kéo: di chuyển · Zoom <b x-text="lbZoom.toFixed(2)"></b>x</div>
         </div>
     </template>
+
+    <!-- Output viewer popup -->
+    <template x-if="viewGen">
+        <div class="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8" @click.self="closeGenView()">
+            <div class="absolute inset-0 bg-ink-900/90" @click="closeGenView()"></div>
+            <div class="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-ink-900 shadow-2xl">
+                <button @click="closeGenView()" class="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-ink-800 text-cream-200 hover:text-white">×</button>
+                <div class="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-ink-900 p-3">
+                    <template x-if="viewGen && viewGen.type==='video' && viewGen.media_url">
+                        <video :src="viewGen.media_url" class="max-h-[78vh] w-full rounded-2xl object-contain" controls autoplay loop muted playsinline></video>
+                    </template>
+                    <template x-if="viewGen && viewGen.type!=='video' && viewGen.media_url">
+                        <img :src="viewGen.media_url" class="max-h-[78vh] max-w-full rounded-2xl object-contain" onerror="this.src='/images/placeholder.svg'">
+                    </template>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-ink-700 px-4 py-3">
+                    <span class="truncate text-xs text-cream-300" x-text="viewGen ? genInfoLine(viewGen) : ''"></span>
+                    <span class="flex items-center gap-2">
+                        <button @click="openInStudio(viewGen)" class="btn-brand btn-sm whitespace-nowrap" title="Mở trong Studio (canvas)">🖼 Mở trong Studio</button>
+                        <a :href="viewGen ? '/studio/generations/' + viewGen.id + '/download' : '#'" class="btn-outline btn-sm" x-show="viewGen && viewGen.media_url">Tải xuống</a>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
 @push('scripts')
 <script>
@@ -466,6 +456,7 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
+        viewGen: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false, step: 1,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
@@ -530,6 +521,9 @@ document.addEventListener('alpine:init', () => {
                 this._touchDist = d;
             } else { this._touchDist = null; }
         },
+        openGenView(g) { this.viewGen = g; },
+        openInStudio(g) { if (g) { this.setPreview(g); } this.viewGen = null; },
+        closeGenView() { this.viewGen = null; },
         openLightbox() { this.lbZoom = 1; this.lbPan = { x: 0, y: 0 }; this.lightbox = true; document.body.style.overflow = 'hidden'; },
         closeLightbox() { this.lightbox = false; document.body.style.overflow = ''; },
         lbZoomIn() { this.lbZoom = Math.min(8, +(this.lbZoom + 0.5).toFixed(2)); },
