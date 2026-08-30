@@ -77,6 +77,7 @@
                         <button type="button" @click="openRefPicker()" class="btn-outline btn-sm whitespace-nowrap">Từ sản phẩm</button>
                     </div>
                     <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
+                    <button type="button" @click="createFromRef()" :disabled="refBusy || (!refFile && !refUrl && !refImage)" class="btn-outline btn-sm mt-1.5 w-full whitespace-nowrap text-brand-200" title="Tạo ảnh MỚI từ ảnh tham khảo — giữ đặc điểm trang phục, đổi tư thế/hậu cảnh theo Presets bạn chọn"><span x-show="!refBusy">🖼 Tạo mới từ ảnh tham khảo</span><span x-show="refBusy">Đang tạo…</span></button>
                     <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
                     <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
                     <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
@@ -439,6 +440,7 @@ document.addEventListener('alpine:init', () => {
         newProjectName: '', showNewProject: false, refinePrompt: '', preserveBg: true, preserveFace: true,
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
+        refBusy: false,
         previewId: null,
         viewGen: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false, step: 1,
@@ -797,6 +799,37 @@ document.addEventListener('alpine:init', () => {
                 Alpine.store('toast').show(data.preset_ids && data.preset_ids.length ? 'Đã gợi ý prompt từ ảnh (AI).' : 'Đã gợi ý prompt từ ảnh.');
             } catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.suggesting = false; }
+        },
+
+        // Tạo ảnh MỚI từ ảnh tham khảo: giữ đặc điểm trang phục (mô tả qua vision) + áp tư thế/hậu cảnh/
+        // góc máy/phong cách bạn chọn ở Presets (đổi biến thể nhưng giữ "bản sắc" trang phục).
+        async createFromRef() {
+            if ((!this.refFile && !this.refUrl && !this.refImage) || this.refBusy) return;
+            this.refBusy = true;
+            try {
+                if (!this.suggestResult || !this.suggestResult.category || !this.suggestResult.category.fabric) {
+                    try { await this.suggestStyle(); } catch (e) {}
+                }
+                const cat = (this.suggestResult && this.suggestResult.category) || {};
+                const parts = [];
+                if (cat.fabric) parts.push('crafted from ' + cat.fabric);
+                if (cat.silhouette) parts.push(cat.silhouette + ' silhouette');
+                if (cat.style) parts.push(cat.style + ' aesthetic');
+                const garment = parts.join(', ');
+                const variation = ['pose', 'background', 'camera', 'style']
+                    .map((c) => this.selectedPresetText(c)).filter(Boolean).join(', ');
+                let prompt = garment
+                    ? 'High-fashion editorial photo of a model wearing ' + garment
+                    : (this.output.image_prompt_en || '');
+                if (variation) prompt = (prompt ? prompt + ', ' : 'High-fashion editorial photo, ') + variation;
+                if (!prompt) throw 'Không đọc được đặc điểm trang phục từ ảnh tham khảo. Hãy bấm “Gợi ý phong cách & prompt” trước.';
+                prompt += ', premium Vogue editorial, ultra detailed, 4k';
+                this.output.image_prompt_en = prompt;
+                if (this.step !== 1) this.step = 1;
+                await this.generateImage();
+                Alpine.store('toast').show('Đã tạo mới từ ảnh tham khảo — giữ trang phục, dùng tư thế/hậu cảnh bạn chọn.');
+            } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
+            finally { this.refBusy = false; }
         },
 
         addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else { gen._t0 = Date.now(); this.generations.unshift(gen); } this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
