@@ -68,78 +68,18 @@
                 <textarea x-model="idea" rows="3" class="input" placeholder="VD: A flowing silk evening gown with sequin…" @keydown.enter.prevent="ideate()"></textarea>
                 <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
 
-                <!-- Reference source -->
-                <div class="mt-4 rounded-xl border border-ink-700 bg-ink-800 p-3">
-                    <p class="mb-2 text-xs font-semibold text-cream-200">Gợi ý từ ảnh tham khảo</p>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh</button>
-                        <button type="button" @click="openOutputsRef()" class="btn-outline btn-sm whitespace-nowrap" title="Dùng một ảnh kết quả (Output) hoặc trong Thư viện làm nguồn tham khảo.">Từ kết quả</button>
-                        <button type="button" @click="openRefPicker()" class="btn-outline btn-sm whitespace-nowrap">Từ sản phẩm</button>
-                    </div>
-                    <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
-                    <button type="button" @click="createFromRef()" :disabled="refBusy || (!refFile && !refUrl && !refImage)" class="btn-outline btn-sm mt-1.5 w-full whitespace-nowrap text-brand-200" title="Tạo ảnh MỚI từ ảnh tham khảo — giữ đặc điểm trang phục, đổi tư thế/hậu cảnh theo Presets bạn chọn"><span x-show="!refBusy">🖼 Tạo mới từ ảnh tham khảo</span><span x-show="refBusy">Đang tạo…</span></button>
-                    <div class="mt-3 rounded-xl bg-ink-800/60 p-3" x-show="refImage">
-                        <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-200/70">⚡ Đổi nhanh — giữ nguyên trang phục</p>
-                        <div class="space-y-1.5 text-[10px]">
-                            <div class="flex flex-wrap items-center gap-1">
-                                <span class="w-12 shrink-0 text-cream-200/50">Nền</span>
-                                <template x-for="bg in quickRefs.backgrounds" :key="bg.v">
-                                    <button @click="quickEdit('Keep the exact garment, outfit, person and camera exactly unchanged. Change only the background to ' + bg.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="bg.l"></button>
-                                </template>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-1">
-                                <span class="w-12 shrink-0 text-cream-200/50">Tư thế</span>
-                                <template x-for="p in quickRefs.poses" :key="p.v">
-                                    <button @click="quickEdit('Keep the exact identical garment and person. Change only the pose to ' + p.v + ', the garment stays identical.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="p.l"></button>
-                                </template>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-1">
-                                <span class="w-12 shrink-0 text-cream-200/50">Góc</span>
-                                <template x-for="a in quickRefs.angles" :key="a.v">
-                                    <button @click="quickEdit('Keep the exact garment and person. Change only the camera to ' + a.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="a.l"></button>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                    <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
-                    <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
-                    <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
-                </div>
-            </div>
-
-            <!-- Lựa chọn nhanh + Presets (popup) -->
-            <div class="card p-5" x-show="step===1">
-                <div class="flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">Lựa chọn nhanh</h2>
+                <!-- Presets (unified, multi-select) -->
+                <div class="mt-2 flex flex-wrap items-center gap-2">
                     <button @click="presetOpen = true" class="btn-outline btn-sm whitespace-nowrap">🎛 Presets <span x-show="presetIds.length" x-text="'(' + presetIds.length + ')'"></span></button>
-                </div>
-                <p class="mt-1 text-xs text-ink-500">Chọn nhanh nền/tư thế/góc để gộp vào prompt (không tự tạo ảnh). Presets chuyên sâu mở bằng nút “🎛 Presets”.</p>
-                <div class="mt-3 space-y-2 text-[11px]">
-                    <div class="flex flex-wrap items-center gap-1">
-                        <span class="w-10 shrink-0 text-ink-500">Nền</span>
-                        <template x-for="bg in quickRefs.backgrounds" :key="bg.v">
-                            <button @click="toggleQuick('background', bg.v)" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" :class="quickOptions.background === bg.v ? 'bg-brand-600 text-white' : ''" x-text="bg.l"></button>
-                        </template>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-1">
-                        <span class="w-10 shrink-0 text-ink-500">Tư thế</span>
-                        <template x-for="p in quickRefs.poses" :key="p.v">
-                            <button @click="toggleQuick('pose', p.v)" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" :class="quickOptions.pose === p.v ? 'bg-brand-600 text-white' : ''" x-text="p.l"></button>
-                        </template>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-1">
-                        <span class="w-10 shrink-0 text-ink-500">Góc</span>
-                        <template x-for="a in quickRefs.angles" :key="a.v">
-                            <button @click="toggleQuick('angle', a.v)" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" :class="quickOptions.angle === a.v ? 'bg-brand-600 text-white' : ''" x-text="a.l"></button>
-                        </template>
-                    </div>
+                    <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
+                    <span class="text-[10px] text-cream-200/60" x-show="presetIds.length" x-text="selectedPresetSummary()"></span>
                 </div>
 
                 <!-- Presets modal -->
                 <div x-show="presetOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
                     <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-ink-700 bg-ink-800 p-5 shadow-2xl" @click.stop>
                         <div class="mb-3 flex items-center justify-between">
-                            <h3 class="font-display text-base font-semibold text-cream-50">🎛 Presets chuyên sâu <span class="text-xs font-normal text-cream-300/60">(chọn nhiều — chỉ áp dụng preset đã chọn)</span></h3>
+                            <h3 class="font-display text-base font-semibold text-cream-50">🎛 Presets <span class="text-xs font-normal text-cream-300/60">(chọn nhiều — chỉ áp dụng preset đã chọn)</span></h3>
                             <button @click="presetOpen=false" class="btn-outline btn-sm">✕</button>
                         </div>
                         <div class="space-y-4">
@@ -163,7 +103,37 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Reference source -->
+                <div class="mt-4 rounded-xl border border-ink-700 bg-ink-800 p-3">
+                    <p class="mb-2 text-xs font-semibold text-cream-200">Gợi ý từ ảnh tham khảo</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh</button>
+                        <button type="button" @click="openOutputsRef()" class="btn-outline btn-sm whitespace-nowrap" title="Dùng một ảnh kết quả (Output) hoặc trong Thư viện làm nguồn tham khảo.">Từ kết quả</button>
+                        <button type="button" @click="openRefPicker()" class="btn-outline btn-sm whitespace-nowrap">Từ sản phẩm</button>
+                    </div>
+                    <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
+                    <button type="button" @click="createFromRef()" :disabled="refBusy || (!refFile && !refUrl && !refImage)" class="btn-outline btn-sm mt-1.5 w-full whitespace-nowrap text-brand-200" title="Tạo ảnh MỚI từ ảnh tham khảo — giữ đặc điểm trang phục, đổi tư thế/hậu cảnh theo Presets bạn chọn"><span x-show="!refBusy">🖼 Tạo mới từ ảnh tham khảo</span><span x-show="refBusy">Đang tạo…</span></button>
+                    <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
+                    <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
+                    <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
+
+                    <!-- Face reference (đồng bộ nhân vật) -->
+                    <div class="mt-3 rounded-xl border border-ink-700 bg-ink-800/70 p-3">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-semibold text-cream-200">👤 Khuôn mặt (đồng bộ nhân vật)</p>
+                            <button type="button" @click="clearFace()" class="text-[10px] text-cream-300/60 hover:text-red-300">Bỏ</button>
+                        </div>
+                        <p class="mt-0.5 text-[10px] text-cream-200/50">Chọn ảnh khuôn mặt để AI giữ nhất quán nhân vật khi tạo ảnh/video. Nếu tắt “đồng bộ khuôn mặt” trong Cài đặt, ảnh này sẽ không được áp dụng.</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <button type="button" @click="$refs.faceInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh mặt</button>
+                            <template x-if="faceImage"><img :src="faceImage" class="h-12 w-12 rounded-full bg-ink-900 object-cover" alt="Khuôn mặt"></template>
+                        </div>
+                        <input x-ref="faceInput" type="file" accept="image/*" @change="onFaceChange" class="hidden">
+                    </div>
+                </div>
             </div>
+
 
             <!-- Prompt + generate -->
             <div class="card p-5" x-show="step===1">
@@ -490,7 +460,7 @@ document.addEventListener('alpine:init', () => {
             { label: 'Wan 2.1 · i2v turbo', model: 'wan2.1-i2v-turbo' },
         ],
         newProjectName: '', showNewProject: false, refinePrompt: '', preserveBg: true, preserveFace: true,
-        refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
+        refFile: null, refImage: null, refUrl: null, faceImage: '', suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
         presetOpen: false,
@@ -721,6 +691,14 @@ document.addEventListener('alpine:init', () => {
                 .filter((it) => this.presetIds.includes(it.id))
                 .map((it) => it.key || it.label).join(', ');
         },
+        selectedPresetSummary() {
+            const parts = [];
+            this.presetGroups.forEach((g) => {
+                const t = this.selectedPresetText(g.category);
+                if (t) parts.push((this.catLabels[g.category] || g.category) + ': ' + t);
+            });
+            return parts.join(' · ');
+        },
         // Assemble the video prompt from the Step-1 pieces (idea + garment presets) + motion. No AI inference:
         // the user decides when to press "Gợi ý prompt video". The Kịch bản quay is the camera control and is
         // shown separately (appended at render).
@@ -773,6 +751,24 @@ document.addEventListener('alpine:init', () => {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refImage = null; this.refFile = null; this.refUrl = null;
             this.resetForRef();
+        },
+        async onFaceChange(e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            this.refBusy = true;
+            try {
+                if (this.faceImage && String(this.faceImage).startsWith('blob:')) URL.revokeObjectURL(this.faceImage);
+                const fd = new FormData(); fd.append('image', f);
+                const up = await this.upload('/studio/face', fd);
+                this.faceImage = up.url || URL.createObjectURL(f);
+                Alpine.store('toast').show('Đã lưu khuôn mặt mẫu — AI sẽ giữ nhất quán nhân vật.');
+            } catch (err) { Alpine.store('toast').show(err.message || 'Không lưu được ảnh mặt.', 'error'); }
+            finally { this.refBusy = false; }
+        },
+        clearFace() {
+            if (this.faceImage && String(this.faceImage).startsWith('blob:')) URL.revokeObjectURL(this.faceImage);
+            this.faceImage = '';
+            Alpine.store('toast').show('Đã bỏ khuôn mặt mẫu (khuôn mặt trong Cài đặt vẫn giữ nếu có).', 'info');
         },
         cleanCanvas() {
             this.previewId = null; this.selectedImageId = null; this.videoSourceId = null; this.viewGen = null;

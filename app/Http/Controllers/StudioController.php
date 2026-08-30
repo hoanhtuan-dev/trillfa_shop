@@ -486,6 +486,21 @@ class StudioController extends Controller
         return response()->json(['url' => '/storage/'.$path]);
     }
 
+    /**
+     * Upload a face reference for character consistency (syncs the person in generated images/videos).
+     */
+    public function storeFace(Request $request)
+    {
+        $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
+        $path = '/storage/'.$request->file('image')->store('studio/ref', 'public');
+        set_setting('studio_face_ref', $path);
+        // New face -> invalidate the cached describeFace result so it is re-described once.
+        set_setting('studio_face_desc', '');
+        set_setting('studio_face_desc_hash', '');
+
+        return response()->json(['url' => $path]);
+    }
+
     protected function resolveReferencePath(string $url): ?string
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
