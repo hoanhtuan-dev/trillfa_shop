@@ -231,6 +231,27 @@
             </div>
 
             <!-- Bước 2 · Inpaint -->
+            <!-- Fitting Room: Thay Đổi Người Mẫu (Click-to-Swap) -->
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500);">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
+                    <button @click="openSwap()" class="btn-brand btn-sm whitespace-nowrap">Chọn Người Mẫu & Tư thế</button>
+                </div>
+                <p class="mt-1 text-xs text-ink-500">Tạo nhiều phiên bản cho cùng thiết kế: giữ <b>nguyên 100% trang phục</b>, chỉ thay khuôn mặt + dáng. Bạn chỉ bấm chọn ảnh — hệ thống tự ghép.</p>
+                <div class="mt-3 flex items-center gap-3" x-show="swapModelId">
+                    <div class="flex items-center gap-2">
+                        <img :src="(swapModels.find(m=>m.id===swapModelId)||{}).img || '/images/placeholder.svg'" class="h-12 w-12 rounded-xl bg-ink-900 object-cover" alt="Khuôn mặt">
+                        <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapModels.find(m=>m.id===swapModelId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Khuôn mặt</p></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <img :src="(swapPoses.find(p=>p.id===swapPoseId)||{}).img || '/images/placeholder.svg'" class="h-12 w-12 rounded-xl bg-ink-900 object-cover" alt="Tư thế">
+                        <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapPoses.find(p=>p.id===swapPoseId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Tư thế</p></div>
+                    </div>
+                    <button @click="runSwap()" :disabled="swapLoading" class="btn-outline btn-sm ml-auto whitespace-nowrap"><span x-show="!swapLoading">Áp Dụng</span><span x-show="swapLoading">Đang ghép…</span></button>
+                </div>
+                <p class="mt-2 text-[10px] text-ink-500" x-show="!swapModelId">Bấm "Chọn Người Mẫu & Tư thế" để mở thư viện <b>6 khuôn mặt + 12 dáng</b> rồi chọn.</p>
+            </div>
+
             <!-- Fitting Room: Ảnh để chỉnh sửa -->
             <div class="card p-5" x-show="step===2">
                 <h2 class="mb-2 font-display text-base font-semibold text-ink-900">🖼 Ảnh để chỉnh sửa</h2>
@@ -1000,7 +1021,7 @@ document.addEventListener('alpine:init', () => {
         openSwap() {
             const img = this.preview && this.preview.media_url;
             if (!img) { Alpine.store('toast').show('Chọn một ảnh 2D (kết quả) trước.', 'error'); return; }
-            this.swapDesign = img; this.swapModelId = 'asian_f'; this.swapPoseId = 'stand'; this.swapOpen = true;
+            this.swapDesign = img; this.swapModelId = 'model01'; this.swapPoseId = 'pose01'; this.swapOpen = true;
         },
         async runSwap() {
             if (!this.swapDesign || this.swapLoading) return;
