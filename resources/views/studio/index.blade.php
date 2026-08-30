@@ -255,6 +255,20 @@
                     <span x-show="preview && videoSourceId === preview.id">✓ Đã chọn làm nguồn Video</span>
                 </div>
 
+                <!-- Variations swiper (Step 2) -->
+                <div class="border-t border-cream-200 px-2 py-2" x-show="generations.length">
+                    <div class="scrollbar-hide flex gap-2 overflow-x-auto px-1 pb-1">
+                        <template x-for="g in generations" :key="g.id">
+                            <button type="button" @click="setPreview(g)" class="relative w-16 shrink-0 overflow-hidden rounded-lg border text-left" :class="previewId===g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'">
+                                <template x-if="g.status==='completed' && g.media_url"><img :src="g.media_url" class="aspect-[3/4] w-full object-cover" onerror="this.src='/images/placeholder.svg'"></template>
+                                <template x-if="g.status!=='completed'"><div class="grid aspect-[3/4] w-full place-items-center bg-cream-100"><span x-show="isActive(g.status)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></span></div></template>
+                                <span class="absolute left-0.5 top-0.5 badge text-[8px]" :class="badgeClass(g.status)" x-text="statusLabel(g.status)"></span>
+                                <span class="absolute right-0.5 top-0.5 badge text-[8px]" :class="g.type==='video' ? 'bg-ink-900/80 text-white' : 'bg-cream-200 text-ink-700'" x-text="g.type==='video' ? 'V' : 'ẢNH'"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- ===== Video Rendering Timeline ===== -->
                 <div class="border-t border-cream-200 px-4 py-3" x-show="false">
                     <div class="mb-2 flex items-center justify-between">

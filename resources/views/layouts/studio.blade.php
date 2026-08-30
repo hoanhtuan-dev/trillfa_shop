@@ -31,7 +31,7 @@
     @endphp
 </head>
 <body class="min-h-screen bg-ink-800 text-cream-100 antialiased">
-    <div class="flex min-h-screen" x-data="{ sidebarCollapsed: false }">
+    <div class="flex min-h-screen" x-data="{ sidebarCollapsed: false, navOpen: { ai: true, pm: true, catwalk: true, asset: true, sys: true } }">
         <!-- ===== Left sidebar ===== -->
         <aside class="hidden shrink-0 flex-col border-r border-ink-700 bg-ink-800 transition-[width] duration-300" :class="sidebarCollapsed ? 'lg:flex lg:w-16' : 'lg:flex lg:w-60'">
             <a href="{{ route('studio.index') }}" class="flex items-center gap-2 border-b border-ink-700 px-3 py-4">
