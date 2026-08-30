@@ -222,8 +222,11 @@
                 <!-- Media area -->
                 <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
 
-                    <!-- Clean canvas -->
-                    <button x-show="preview || selectedImageId || videoSourceId" @click="cleanCanvas()" class="absolute left-3 top-3 z-20 rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-cream-200 shadow backdrop-blur transition-colors hover:bg-red-600 hover:text-white" title="Dọn canvas — xoá ảnh/video đang xem và các nguồn (Chỉnh sửa, Video) đang dùng" @pointerdown.stop @click.stop>🗑 Dọn canvas</button>
+                    <!-- Clean canvas + cancel -->
+                    <div class="absolute left-3 top-3 z-20 flex gap-1.5" @pointerdown.stop @click.stop>
+                        <button x-show="preview || selectedImageId || videoSourceId" @click="cleanCanvas()" class="rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-cream-200 shadow backdrop-blur transition-colors hover:bg-red-600 hover:text-white" title="Dọn canvas — xoá ảnh/video đang xem và các nguồn (Chỉnh sửa, Video) đang dùng">🗑 Dọn canvas</button>
+                        <button x-show="preview && isActive(preview.status)" @click="cancelGeneration(preview)" class="rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-red-300 shadow backdrop-blur transition-colors hover:bg-red-600 hover:text-white" title="Dừng tác vụ này và hoàn tiền vào tài khoản">⏹ Dừng · Hoàn tiền</button>
+                    </div>
 
                     <!-- Canvas contextual actions (per-step) -->
                     <div class="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
@@ -808,7 +811,13 @@ document.addEventListener('alpine:init', () => {
             if (g.status === 'failed') return 'Lỗi: ' + (g.error || 'không xác định');
             if (g.status === 'cancelled') return 'Đã hủy';
             const el = (g._t0 && this.isActive(g.status)) ? ' (' + this.fmtElapsed(this.now - g._t0) + ')' : '';
-            return (g.type === 'video' ? 'Đang render video…' : 'Đang tạo ảnh…') + el;
+            if (g.type !== 'video') return 'Đang tạo ảnh…' + el;
+            const ph = (g.meta && g.meta.video_phase) || '';
+            if (ph === 'pending') return 'Đang gửi tác vụ…' + el;
+            if (ph === 'running') return 'Trong hàng đợi nhà cung cấp…' + el;
+            if (ph === 'succeeded') return 'Hoàn tất';
+            if (ph === 'failed') return 'Lỗi tạo video';
+            return 'Đang tạo video…' + el;
         },
         haptic(ms = 15) { if (navigator.vibrate) navigator.vibrate(ms); },
         fmtElapsed(ms) {

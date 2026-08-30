@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
  */
 class VideoAIService
 {
-    public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null, ?string $duration = null): string
+    public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null, ?string $duration = null, ?int $generationId = null): string
     {
         // Failover: try Token Plan first, then Pay-As-You-Go on a quota error (studio_qwen_credentials('video')).
         $keys = studio_qwen_credentials('video');
@@ -22,7 +22,7 @@ class VideoAIService
             $last = null;
             foreach ($keys as $key) {
                 try {
-                    return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, $key);
+                    return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, $key, $generationId);
                 } catch (\Throwable $e) {
                     $last = $e->getMessage();
                     capture_provider_quota_reset($last);
@@ -40,7 +40,7 @@ class VideoAIService
         return '/samples/studio-catwalk.mp4';
     }
 
-    protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key): string
+    protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key, ?int $generationId = null): string
     {
         $base = dashscope_base_url($key).'/api/v1';
         $model = (string) studio_config('video_model', 'wan2.5-t2v');
@@ -82,9 +82,15 @@ class VideoAIService
 
         logger()->info('Video task submitted', ['task_id' => $taskId, 'model' => $model, 'size' => $size, 'duration' => (int) ($duration ?: 10), 'wait_s' => round(microtime(true) - $t0, 2)]);
 
-        $deadline = microtime(true) + 300; // 5 min cap: legit videos (~90-150s) finish; stuck tasks fail fast
+        $deadline = microtime(true) + 480; // 8 min cap: legit videos (~90-180s) finish; slow providers get room
         $lastStatus = '';
         $lastWarn = 0;
+        $setPhase = function (string $phase) use ($generationId) {
+            if (! $generationId) { return; }
+            $g = \App\Models\Generation::find($generationId);
+            if ($g) { $m = (array) ($g->meta ?? []); $m['video_phase'] = $phase; $g->update(['meta' => $m]); }
+        };
+        $setPhase('submitted');
 
         while (microtime(true) < $deadline) {
             sleep(5);
@@ -98,6 +104,7 @@ class VideoAIService
 
             $status = (string) data_get($q->json(), 'output.task_status');
             if ($status !== $lastStatus && $status !== '') {
+                $setPhase(strtolower((string) $status));
                 logger()->info('Video task status', ['task_id' => $taskId, 'status' => $status, 'elapsed_s' => round(microtime(true) - $t0, 2)]);
                 $lastStatus = $status;
             } elseif ($status === 'RUNNING' && microtime(true) - $lastWarn > 60) {
