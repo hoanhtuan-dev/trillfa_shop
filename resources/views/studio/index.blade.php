@@ -50,7 +50,7 @@
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-2 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
+        <div class="scrollbar-hide space-y-4 lg:order-2 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
             <!-- Idea -->
             <div class="card p-5" x-show="step===1" x-transition.opacity>
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
@@ -281,9 +281,11 @@
         <!-- =============================================================== -->
         <div class="space-y-4 lg:order-3 lg:h-full lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden lg:pr-1" x-show="!isMobile || step===3">
             <!-- Thư viện card (top) -->
-            <div class="card flex shrink-0 items-center justify-between gap-2 p-4">
-                <h2 class="font-display text-sm font-semibold text-ink-900">🗂 Thư viện</h2>
-                <a href="{{ route('studio.library') }}" class="btn-outline btn-sm whitespace-nowrap">Mở library</a>
+            <div class="card flex shrink-0 items-center justify-between gap-2 p-2.5">
+                <a href="{{ route('studio.library') }}" class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600/20 text-brand-300 transition-colors hover:bg-brand-600 hover:text-white" title="Mở thư viện">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12a9 9 0 1118 0v.75m-18 0H5a1.5 1.5 0 011.5 1.5v3.75A1.5 1.5 0 015 19.5H2.25m18 0H19a1.5 1.5 0 01-1.5-1.5v-3.75A1.5 1.5 0 0119 12.75h2.25m-3 3H19a.75.75 0 00.75-.75v-3a.75.75 0 00-.75-.75h-1.5a.75.75 0 00-.75.75v3a.75.75 0 00.75.75Z"/></svg>
+                </a>
+                <a href="{{ route('studio.library') }}" class="link text-xs">Xem tất cả trong thư viện</a>
             </div>
             <!-- Outputs grid -->
             <div class="card flex min-h-0 flex-1 flex-col overflow-hidden p-4">
@@ -291,7 +293,7 @@
                     <h2 class="font-display text-sm font-semibold text-ink-900">Outputs</h2>
                     <span class="text-xs text-ink-500" x-text="'(' + generations.length + ')'"></span>
                 </div>
-                <div class="min-h-0 flex-1 overflow-y-auto pr-1">
+                <div class="scrollbar-hide min-h-0 flex-1 overflow-y-auto pr-1">
                     <div class="flex flex-col gap-2">
                         <template x-for="g in generations" :key="g.id">
                             <button type="button" @click="openGenView(g)" class="w-full overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
