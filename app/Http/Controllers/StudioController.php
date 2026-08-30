@@ -490,6 +490,35 @@ class StudioController extends Controller
      * Translate a prompt between Vietnamese and English (used by the "Chỉnh sửa prompt tiếng Việt" popup).
      */
     /**
+     * Custom Model/Pose library assets (uploaded by the user).
+     */
+    public function assetIndex(): \Illuminate\Http\JsonResponse
+    {
+        $assets = \App\Models\StudioAsset::orderBy('type')->orderBy('sort')->get(['id', 'type', 'name', 'path']);
+        return response()->json(['items' => $assets]);
+    }
+
+    public function assetStore(Request $request)
+    {
+        $data = $request->validate([
+            'type' => ['required', 'in:model,pose'],
+            'name' => ['required', 'string', 'max:80'],
+            'image' => ['required', 'image', 'max:8192'],
+        ]);
+        $path = '/storage/'.$request->file('image')->store('studio/assets', 'public');
+        $asset = \App\Models\StudioAsset::create([
+            'type' => $data['type'], 'name' => $data['name'], 'path' => $path, 'sort' => 0,
+        ]);
+        return response()->json(['id' => $asset->id, 'type' => $asset->type, 'name' => $asset->name, 'path' => $asset->path]);
+    }
+
+    public function assetDestroy(\App\Models\StudioAsset $asset)
+    {
+        $asset->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * "Thay Đổi Người Mẫu" (Click-to-Swap) — virtual try-on with a chosen model + pose.
      */
     public function swapModel(Request $request)

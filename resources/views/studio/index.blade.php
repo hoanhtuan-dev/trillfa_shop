@@ -186,25 +186,31 @@
                         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70">👤 Bộ sưu tập Người mẫu</p>
                         <div class="mb-5 grid grid-cols-3 gap-3 sm:grid-cols-6">
                             <template x-for="m in swapModels" :key="m.id">
-                                <button @click="swapModelId = m.id" class="group flex flex-col items-center gap-1.5 rounded-2xl border p-3 transition-all" :class="swapModelId === m.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
-                                    <img :src="m.img" class="h-20 w-20 rounded-2xl bg-ink-900 object-cover ring-2 transition-transform group-hover:scale-105" :class="swapModelId === m.id ? 'ring-brand-500' : 'ring-transparent'" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" alt="Khuôn mặt">
+                                <button @click="toggleSwapModel(m.id)" class="group relative flex flex-col items-center gap-1.5 rounded-2xl border p-3 transition-all" :class="swapModelIds.includes(m.id) ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
+                                    <img :src="m.img" class="h-20 w-20 rounded-2xl bg-ink-900 object-cover ring-2 transition-transform group-hover:scale-105" :class="swapModelIds.includes(m.id) ? 'ring-brand-500' : 'ring-transparent'" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" alt="Khuôn mặt">
                                     <span class="hidden h-20 w-20 place-items-center rounded-2xl bg-ink-700 text-xs font-bold text-cream-200" x-text="m.name"></span>
                                     <span class="text-[10px] text-cream-200" x-text="m.name"></span>
+                                    <button @click="removeSwapAsset(m)" class="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600 text-[10px] text-white" x-show="m.assetId" title="Xoá khỏi thư viện">×</button>
                                 </button>
                             </template>
                         </div>
                         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🧍 Bộ sưu tập Tư thế</p>
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             <template x-for="p in swapPoses" :key="p.id">
-                                <button @click="swapPoseId = p.id" class="group flex flex-col items-center gap-1.5 rounded-2xl border p-2 transition-all" :class="swapPoseId === p.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
+                                <button @click="toggleSwapPose(p.id)" class="group relative flex flex-col items-center gap-1.5 rounded-2xl border p-2 transition-all" :class="swapPoseIds.includes(p.id) ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
                                     <img :src="p.img" class="aspect-[3/4] w-full rounded-xl bg-ink-900 object-cover object-top transition-transform group-hover:scale-[1.02]" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'" alt="Dáng">
                                     <svg viewBox="0 0 24 24" class="hidden h-10 w-10 text-cream-300"><path :d="p.sk" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     <span class="text-[10px] text-cream-200" x-text="p.name"></span>
+                                    <button @click="removeSwapAsset(p)" class="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600 text-[10px] text-white" x-show="p.assetId" title="Xoá khỏi thư viện">×</button>
                                 </button>
                             </template>
                         </div>
                     </div>
-                    <div class="flex items-center justify-end gap-2 border-t border-ink-700 px-5 py-3">
+                    <div class="flex items-center gap-2 border-t border-ink-700 px-5 py-3">
+                        <button class="btn-outline btn-sm mr-auto" @click="$refs.swapModelInput.click()">➕ Thêm khuôn mặt</button>
+                        <button class="btn-outline btn-sm" @click="$refs.swapPoseInput.click()">➕ Thêm dáng</button>
+                        <input x-ref="swapModelInput" type="file" accept="image/*" @change="addSwapAsset('model', $event)" class="hidden">
+                        <input x-ref="swapPoseInput" type="file" accept="image/*" @change="addSwapAsset('pose', $event)" class="hidden">
                         <button @click="swapOpen=false" class="btn-outline btn-sm">Huỷ</button>
                         <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm"><span x-show="!swapLoading">Áp Dụng</span><span x-show="swapLoading">Đang ghép…</span></button>
                     </div>
@@ -237,18 +243,27 @@
                     <h2 class="font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
                     <button @click="openSwap()" class="btn-brand btn-sm whitespace-nowrap">Chọn</button>
                 </div>
-                <template x-if="swapModelId">
-                    <div class="mt-3 flex items-center gap-3">
-                        <div class="relative flex items-center gap-2">
-                            <img :src="(swapModels.find(m=>m.id===swapModelId)||{}).img || '/images/placeholder.svg'" class="h-16 w-16 rounded-2xl bg-ink-900 object-cover" alt="Khuôn mặt">
-                            <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapModels.find(m=>m.id===swapModelId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Khuôn mặt</p></div>
+                <template x-if="swapModelIds.length">
+                    <div class="mt-3">
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2">
+                                <img :src="(swapModels.find(m=>m.id===swapModelIds[0])||{}).img || '/images/placeholder.svg'" class="h-14 w-14 rounded-2xl bg-ink-900 object-cover" alt="Khuôn mặt">
+                                <div class="text-xs"><p class="font-semibold text-cream-200" x-text="swapModelIds.length + ' khuôn mặt'"></p></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <img :src="(swapPoses.find(p=>p.id===swapPoseIds[0])||{}).img || '/images/placeholder.svg'" class="h-14 w-14 rounded-2xl bg-ink-900 object-cover" alt="Tư thế">
+                                <div class="text-xs"><p class="font-semibold text-cream-200" x-text="swapPoseIds.length + ' dáng'"></p></div>
+                            </div>
+                            <button @click="clearSwap()" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-300 hover:bg-red-600 hover:text-white" title="Xoá lựa chọn khuôn mặt & dáng">✕</button>
+                            <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm ml-auto whitespace-nowrap"><span x-show="!swapLoading">Áp Dụng · ' + (swapModelIds.length * swapPoseIds.length) + ' phiên bản</span><span x-show="swapLoading">Đang ghép…</span></button>
                         </div>
-                        <div class="relative flex items-center gap-2">
-                            <img :src="(swapPoses.find(p=>p.id===swapPoseId)||{}).img || '/images/placeholder.svg'" class="h-16 w-16 rounded-2xl bg-ink-900 object-cover" alt="Tư thế">
-                            <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapPoses.find(p=>p.id===swapPoseId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Tư thế</p></div>
+                        <div class="mt-3 grid grid-cols-3 gap-2" x-show="lookbook.length">
+                            <template x-for="item in lookbook" :key="item.id">
+                                <button @click="previewId = item.id" class="group relative overflow-hidden rounded-xl border border-ink-700 bg-ink-900" :class="previewId === item.id ? 'outline outline-2 outline-brand-500' : 'hover:border-brand-500/40'">
+                                    <img :src="item.url || '/images/placeholder.svg'" class="aspect-[3/4] w-full object-cover object-top" loading="lazy" alt="Phiên bản">
+                                </button>
+                            </template>
                         </div>
-                        <button @click="clearSwap()" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-300 hover:bg-red-600 hover:text-white" title="Xoá lựa chọn khuôn mặt & dáng">✕</button>
-                        <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm ml-auto whitespace-nowrap"><span x-show="!swapLoading">Áp Dụng</span><span x-show="swapLoading">Đang ghép…</span></button>
                     </div>
                 </template>
                 <p class="mt-2 text-[10px] text-ink-500" x-show="!swapModelId">Bấm "Chọn" để chọn khuôn mặt + dáng (giữ nguyên 100% trang phục).</p>
@@ -569,7 +584,7 @@ document.addEventListener('alpine:init', () => {
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
-        swapOpen: false, swapModelId: '', swapPoseId: '', swapLoading: false,
+        swapOpen: false, swapModelIds: [], swapPoseIds: [], swapLoading: false, lookbook: [], lookbookOpen: false,
         swapModels: [
             { id: 'model01', name: 'Mẫu 1', img: '/samples/model-01.png' },
             { id: 'model02', name: 'Mẫu 2', img: '/samples/model-02.png' },
@@ -661,6 +676,9 @@ document.addEventListener('alpine:init', () => {
                 if (!v) return;
                 _trDeb = setTimeout(() => { this.silentTranslate(v); }, 600);
             });
+
+            // Load custom model/pose library assets (Thư viện upload riêng).
+            this.loadSwapAssets();
         },
         async silentTranslate(en) {
             const v = String(en || '').trim();
@@ -964,32 +982,70 @@ document.addEventListener('alpine:init', () => {
             finally { this.editSurging = false; }
         },
         // ===== Thay Đổi Người Mẫu (Click-to-Swap) =====
-        clearSwap() { this.swapModelId = ''; this.swapPoseId = ''; this.swapDesign = ''; Alpine.store('toast').show('Đã xoá lựa chọn khuôn mặt & dáng.', 'info'); },
+        clearSwap() { this.swapModelIds = []; this.swapPoseIds = []; this.swapDesign = ''; this.lookbook = []; this.lookbookOpen = false; Alpine.store('toast').show('Đã xoá lựa chọn khuôn mặt & dáng.', 'info'); },
+        toggleSwapModel(id) { const i = this.swapModelIds.indexOf(id); if (i >= 0) this.swapModelIds.splice(i, 1); else this.swapModelIds.push(id); },
+        toggleSwapPose(id) { const i = this.swapPoseIds.indexOf(id); if (i >= 0) this.swapPoseIds.splice(i, 1); else this.swapPoseIds.push(id); },
+        async loadSwapAssets() {
+            try {
+                const res = await fetch('/studio/assets', { headers: { Accept: 'application/json' } });
+                const d = await res.json().catch(() => ({}));
+                (d.items || []).forEach((a) => {
+                    if (a.type === 'model') this.swapModels.push({ id: 'asset-' + a.id, name: a.name, img: a.path, assetId: a.id });
+                    else this.swapPoses.push({ id: 'asset-' + a.id, name: a.name, img: a.path, sk: 'custom pose', assetId: a.id });
+                });
+            } catch (e) {}
+        },
+        async addSwapAsset(type, e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            const name = (type === 'model' ? 'Khuôn mặt ' : 'Dáng ') + 'mới';
+            try {
+                const fd = new FormData(); fd.append('type', type); fd.append('name', name); fd.append('image', f);
+                const up = await this.upload('/studio/assets', fd);
+                const item = { id: 'asset-' + up.id, name: up.name, img: up.path, assetId: up.id };
+                if (type === 'model') this.swapModels.push(item); else this.swapPoses.push({ ...item, sk: 'custom pose' });
+                Alpine.store('toast').show('Đã thêm ' + (type === 'model' ? 'khuôn mặt' : 'dáng') + ' mới.');
+            } catch (err) { Alpine.store('toast').show(err.message, 'error'); }
+            e.target.value = '';
+        },
+        async removeSwapAsset(item) {
+            if (!item || !item.assetId) return;
+            try { await fetch('/studio/assets/' + item.assetId, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' } }); } catch (e) {}
+            this.swapModels = this.swapModels.filter(x => x.id !== item.id);
+            this.swapPoses = this.swapPoses.filter(x => x.id !== item.id);
+            this.swapModelIds = this.swapModelIds.filter(x => x !== item.id);
+            this.swapPoseIds = this.swapPoseIds.filter(x => x !== item.id);
+            Alpine.store('toast').show('Đã xoá khỏi thư viện.', 'info');
+        },
         openSwap() {
             const img = this.canvasImg || (this.preview && this.preview.media_url);
             if (!img) { Alpine.store('toast').show('Chọn một ảnh 2D (kết quả) trước.', 'error'); return; }
-            this.swapDesign = img; this.swapModelId = 'model01'; this.swapPoseId = 'pose01'; this.swapOpen = true;
+            this.swapDesign = img; if (!this.swapModelIds.length) this.swapModelIds = ['model01']; if (!this.swapPoseIds.length) this.swapPoseIds = ['pose01']; this.swapOpen = true;
         },
         async runSwap() {
             if (!this.swapDesign || this.swapLoading) return;
+            if (!this.swapModelIds.length || !this.swapPoseIds.length) { Alpine.store('toast').show('Chọn ít nhất 1 khuôn mặt + 1 dáng.', 'error'); return; }
             this.swapLoading = true; this.swapOpen = false;
+            const jobs = [];
+            for (const m of this.swapModelIds) for (const p of this.swapPoseIds) jobs.push({ m, p });
             try {
-                const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: this.swapModelId, pose_id: this.swapPoseId }) });
-                const d = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
-                if (d.media_url) { // fallback qwen-edit (try-on unavailable) -> hoàn tất ngay
-                    this.cleanCanvas(true); this.canvasImg = '';
-                    this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.provider || 'qwen', provider: d.provider || 'qwen', media_url: d.media_url, credits_cost: 1, created_at: 'Đã đổi người mẫu' });
-                    this.previewId = d.generation_id;
-                    Alpine.store('toast').show('Đã đổi người mẫu (chế độ dự phòng).');
-                    return;
+                for (const job of jobs) {
+                    const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: job.m, pose_id: job.p }) });
+                    const d = await res.json().catch(() => ({}));
+                    if (!res.ok) { Alpine.store('toast').show(d.message || 'Thay đổi người mẫu thất bại.', 'error'); continue; }
+                    if (d.media_url) { // fallback qwen-edit -> hoàn tất ngay
+                        this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.provider || 'qwen', provider: d.provider || 'qwen', media_url: d.media_url, credits_cost: 1 });
+                        this.lookbook.push({ id: d.generation_id, modelId: job.m, poseId: job.p, url: d.media_url });
+                    } else if (d.task_id) {
+                        this.addGen({ id: d.generation_id, type: 'image', status: 'pending', model: 'tryon', provider: 'tryon', media_url: null, credits_cost: 1 });
+                        this.lookbook.push({ id: d.generation_id, modelId: job.m, poseId: job.p, url: null });
+                        this.pollSwap(d.task_id, d.generation_id);
+                    }
                 }
-                if (!d.task_id) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
-                this.cleanCanvas(true); this.canvasImg = '';
-                this.addGen({ id: d.generation_id, type: 'image', status: 'pending', model: 'tryon', provider: 'tryon', media_url: null, credits_cost: 1, created_at: 'Đang thử đồ' });
-                this.previewId = d.generation_id;
-                this.pollSwap(d.task_id, d.generation_id);
-                Alpine.store('toast').show('Đang thử đồ lên người mẫu…');
+                const last = this.lookbook[this.lookbook.length - 1];
+                if (last && last.id) { this.previewId = last.id; }
+                this.lookbookOpen = true;
+                Alpine.store('toast').show('Đã tạo ' + jobs.length + ' phiên bản người mẫu.');
             } catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.swapLoading = false; }
         },
@@ -1002,6 +1058,7 @@ document.addEventListener('alpine:init', () => {
                         clearInterval(t);
                         this.addGen({ id: genId, type: 'image', status: 'completed', model: 'tryon', provider: 'tryon', media_url: d.media_url, credits_cost: 1, created_at: 'Đã thử đồ' });
                         this.previewId = genId;
+                        const lb = this.lookbook.find(x => x.id === genId); if (lb) lb.url = d.media_url;
                         Alpine.store('toast').show('Đã thử đồ lên người mẫu.');
                     } else if (d.status === 'failed') {
                         clearInterval(t);

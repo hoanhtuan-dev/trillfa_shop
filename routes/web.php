@@ -120,6 +120,9 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/swap-model', [StudioController::class, 'swapModel'])->name('swapModel');
+    Route::get('/assets', [StudioController::class, 'assetIndex'])->name('assets');
+    Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
+    Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
     Route::get('/swap-status/{taskId}', [StudioController::class, 'swapStatus'])->name('swapStatus');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
