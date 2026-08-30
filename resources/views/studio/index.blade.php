@@ -88,7 +88,7 @@
         <button @click="step=3" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===3 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/20':'bg-cream-200'">3</span> Video</button>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)_280px]">
+    <div class="grid gap-4 pb-24 lg:grid-cols-[300px_minmax(0,1fr)_280px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
@@ -358,9 +358,9 @@
 
     <!-- Reference product picker modal -->
     <template x-if="refOpen">
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
             <div class="absolute inset-0 bg-ink-900/60" @click="closeRefPicker()"></div>
-            <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3">
                     <h3 class="font-display text-sm font-semibold text-ink-900">Chọn ảnh sản phẩm làm nguồn</h3>
                     <button @click="closeRefPicker()" class="grid h-8 w-8 place-items-center rounded-full bg-cream-100 text-ink-500 hover:text-ink-900">×</button>
@@ -383,9 +383,9 @@
 
     <!-- Outputs / Library reference picker ("Gợi ý từ ảnh tham khảo" -> use a generated result) -->
     <template x-if="outputsRefOpen">
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
             <div class="absolute inset-0 bg-ink-900/60" @click="outputsRefOpen = false"></div>
-            <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
                 <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3">
                     <h3 class="font-display text-sm font-semibold text-ink-900">Chọn ảnh tham khảo (kết quả gần đây)</h3>
                     <button @click="outputsRefOpen = false" class="grid h-8 w-8 place-items-center rounded-full bg-cream-100 text-ink-500 hover:text-ink-900">×</button>
@@ -405,6 +405,16 @@
             </div>
         </div>
     </template>
+
+    <!-- FAB: contextual primary action (Step 1 Generate · Step 2 to video · Step 3 Action) -->
+    <div class="fixed inset-x-0 bottom-0 z-40 p-3 sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-auto sm:p-0">
+        <button @click="fabAction()" :disabled="fabDisabled" class="btn-brand w-full shadow-xl shadow-ink-900/25 sm:w-auto sm:px-6">
+            <span x-show="step===1">✨ Tạo thiết kế</span>
+            <span x-show="step===2">🎬 Render Video</span>
+            <span x-show="step===3"><span x-show="!videoBusy">🔥 Action! (Render)</span><span x-show="videoBusy">Đang gửi…</span></span>
+        </button>
+        <p class="mt-1 text-center text-[10px] text-ink-500 sm:text-right" x-text="stepLabel"></p>
+    </div>
 
     <!-- Fullscreen lightbox (self-contained zoom/pan; captures wheel & drag, blocks the layer below) -->
     <template x-if="lightbox && preview && preview.media_url">
@@ -508,6 +518,19 @@ document.addEventListener('alpine:init', () => {
         lbStartPan(e) { this._lbDrag = { x: e.clientX, y: e.clientY, px: this.lbPan.x, py: this.lbPan.y }; },
         lbMovePan(e) { if (!this._lbDrag) return; this.lbPan.x = this._lbDrag.px + (e.clientX - this._lbDrag.x); this.lbPan.y = this._lbDrag.py + (e.clientY - this._lbDrag.y); },
         lbEndPan() { this._lbDrag = null; },
+        get stepLabel() { return ['', 'Bước 1 · Lên ý tưởng', 'Bước 2 · Duyệt bản thảo', 'Bước 3 · Ghế đạo diễn'][this.step] || ''; },
+        get fabDisabled() {
+            if (this.step === 3) return this.videoBusy || !this.videoSourceId;
+            if (this.step === 2) return false;
+            return this.generating || (!this.output.image_prompt_en && !this.idea.trim());
+        },
+        async fabAction() {
+            if (this.step === 3) return this.renderVideo();
+            if (this.step === 2) { this.step = 3; return; }
+            // Step 1: ensure a prompt then generate a 2D design.
+            if (!this.output.image_prompt_en && this.idea.trim()) await this.ideate();
+            this.generateImage();
+        },
         get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
         get videoSceneLabel() { const s = this.videoScenes.find(x => x.value === this.videoScene); return s ? (s.label + (s.note ? ' · ' + s.note : '')) : ''; },
         get presetGroups() { return this.presets.filter(g => g.category !== 'video_scene'); },
@@ -548,6 +571,7 @@ document.addEventListener('alpine:init', () => {
             const i = this.presetIds.indexOf(id);
             if (i >= 0) this.presetIds.splice(i, 1);
             else this.presetIds.push(id);
+            this.haptic(12);
         },
         selectedPresetText(cat) {
             const grp = this.presets.find((g) => g.category === cat);
@@ -645,7 +669,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.videoSourceId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, model: this.videoModel || null, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
+            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, model: this.videoModel || null, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') { Alpine.store('toast').show('Đã render xong video #' + data.generation_id); this.haptic(40); } }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
@@ -703,6 +727,7 @@ document.addEventListener('alpine:init', () => {
             const el = (g._t0 && this.isActive(g.status)) ? ' (' + this.fmtElapsed(this.now - g._t0) + ')' : '';
             return (g.type === 'video' ? 'Đang render video…' : 'Đang tạo ảnh…') + el;
         },
+        haptic(ms = 15) { if (navigator.vibrate) navigator.vibrate(ms); },
         fmtElapsed(ms) {
             ms = Number(ms) || 0;
             if (!ms) return '';
