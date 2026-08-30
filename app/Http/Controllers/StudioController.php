@@ -499,7 +499,8 @@ class StudioController extends Controller
         $target = $data['direction'] === 'vi' ? 'Vietnamese' : 'English';
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
         $geminiKey = studio_api_key('gemini');
-        $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
+        $qwenModel = (string) studio_config('prompt_model', 'qwen3.8-flash'); // Qwen chat (fallback)
+        $translateModel = (string) studio_config('translate_model', 'gemini-3.6-flash-image'); // Model dịch chuyên dụng
         $instruction = 'You are a professional fashion prompt translator. Translate the following image-generation prompt to '.$target.'. '
             .'Keep all technical descriptors (fabric, silhouette, camera, lighting) precise. Return ONLY the translated prompt, nothing else.';
 
@@ -508,7 +509,7 @@ class StudioController extends Controller
             try {
                 $resp = Http::withToken($qwenKey)->timeout(60)
                     ->post(dashscope_base_url($qwenKey).'/compatible-mode/v1/chat/completions', [
-                        'model' => $model, 'messages' => [
+                        'model' => $qwenModel, 'messages' => [
                             ['role' => 'system', 'content' => $instruction],
                             ['role' => 'user', 'content' => $text],
                         ],
@@ -525,7 +526,7 @@ class StudioController extends Controller
         if ($geminiKey) {
             try {
                 $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(60)
-                    ->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', [
+                    ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$translateModel.':generateContent', [
                         'contents' => [['parts' => [['text' => $instruction."\n\n".$text]]]],
                         'generationConfig' => ['responseMimeType' => 'text/plain'],
                     ]);
@@ -828,6 +829,7 @@ class StudioController extends Controller
             'prompt_provider' => setting('studio_prompt_provider', config('studio.prompt_provider')),
             'vision_provider' => setting('studio_vision_provider', config('studio.vision_provider')),
             'prompt_model' => setting('studio_prompt_model', config('studio.prompt_model')),
+            'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
             'image_model' => setting('studio_image_model', config('studio.image_model')),
             'wan_model' => setting('studio_wan_model', config('studio.wan_model')),
             'qwen_model' => setting('studio_qwen_model', config('studio.qwen_model')),
@@ -966,6 +968,7 @@ class StudioController extends Controller
             'prompt_provider' => ['required', 'string', 'in:gemini,qwen'],
             'vision_provider' => ['required', 'string', 'in:gemini,qwen'],
             'prompt_model' => ['required', 'string', 'max:255'],
+            'translate_model' => ['nullable', 'string', 'max:255'],
             'image_model' => ['nullable', 'string', 'max:255'],
             'wan_model' => ['required', 'string', 'max:255'],
             'qwen_model' => ['required', 'string', 'max:255'],
@@ -990,6 +993,7 @@ class StudioController extends Controller
         set_setting('studio_prompt_provider', $data['prompt_provider']);
         set_setting('studio_vision_provider', $data['vision_provider']);
         set_setting('studio_prompt_model', $data['prompt_model']);
+        if (isset($data['translate_model'])) set_setting('studio_translate_model', $data['translate_model']);
         set_setting('studio_image_model', $data['image_model'] ?? '');
         set_setting('studio_wan_model', $data['wan_model']);
         set_setting('studio_qwen_model', $data['qwen_model']);
