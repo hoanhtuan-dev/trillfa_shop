@@ -22,7 +22,7 @@
         'gemini' => (bool) (studio_api_key('gemini')),
         default => (bool) (studio_api_key('fal') ?: studio_api_key('replicate')),
     };
-    $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy','lens'=>'Ống kính','video_scene'=>'Kịch bản quay'];
+    $catLabels = ['fabric'=>'Chất liệu','color'=>'Màu sắc','silhouette'=>'Phom dáng','neckline'=>'Kiểu cổ','sleeve'=>'Dáng tay','fit'=>'Độ vừa','pattern'=>'Họa tiết','style'=>'Phong cách','detail'=>'Chi tiết','occasion'=>'Dịp sử dụng','season'=>'Mùa','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy','lens'=>'Ống kính','video_scene'=>'Kịch bản quay'];
     $imageResolution = studio_config('image_resolution', '2K');
     $videoResolution = studio_config('video_resolution', '720');
     $imageRatio = studio_config('image_ratio', '1:1');
