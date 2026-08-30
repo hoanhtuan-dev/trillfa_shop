@@ -71,6 +71,14 @@ class RenderImageJob implements ShouldQueue
                 $generation->ratio,
             );
 
+            // Face sync for a surgical edit (base_image set): swap the reference face onto the result when a
+            // face reference is configured and face sync is enabled (Fitting Room "Đồng bộ khuôn mặt").
+            if ($faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/') && $generation->base_image) {
+                logger()->info('Applying face sync (edit model)', ['generation_id' => $generation->id, 'face' => $faceRef]);
+                $edited = $images->applyFace($url, $faceRef);
+                if ($edited && $edited !== $url) { $url = $edited; }
+            }
+
             // Brand logo stamping is disabled for now (opt-in via studio.brand_logo_enabled).
             if (studio_config('brand_logo_enabled', false)) {
                 $url = $this->applyBrandLogo($url);

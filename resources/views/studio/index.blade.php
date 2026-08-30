@@ -192,25 +192,92 @@
             </div>
 
             <!-- Bước 2 · Inpaint -->
+            <!-- Fitting Room: Ảnh để chỉnh sửa -->
             <div class="card p-5" x-show="step===2">
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">✏️ Prompt Inpainting</h2>
-                <p class="mb-3 text-xs text-ink-500">Chọn ảnh nguồn (nút “Sửa ảnh” dưới canvas), nhập mô tả chỉnh sửa rồi cập nhật.</p>
-                <template x-if="selectedImageId">
-                    <div class="mb-3 flex items-center gap-2 rounded-xl border border-cream-200 bg-cream-50 p-2">
-                        <img :src="(generations.find(g => g.id === selectedImageId) || {}).media_url" class="h-14 w-14 rounded-lg bg-white object-cover" onerror="this.src='/images/placeholder.svg'">
+                <h2 class="mb-2 font-display text-base font-semibold text-ink-900">🖼 Ảnh để chỉnh sửa</h2>
+                <p class="mb-3 text-xs text-ink-500">Chọn ảnh từ 3 nguồn để phẫu thuật (chỉnh sửa theo prompt + preset).</p>
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn-outline btn-sm" @click="$refs.editImgInput.click()">Tải ảnh</button>
+                    <button class="btn-outline btn-sm" @click="pickTarget='edit'; openOutputsRef()">Từ kết quả</button>
+                    <button class="btn-outline btn-sm" @click="pickTarget='edit'; openRefPicker()">Từ sản phẩm</button>
+                </div>
+                <input x-ref="editImgInput" type="file" accept="image/*" @change="onEditImgChange" class="hidden">
+                <template x-if="editSource">
+                    <div class="mt-3 flex items-center gap-2 rounded-xl border border-ink-700 bg-ink-800 p-2">
+                        <img :src="editSourceTmp" class="h-16 w-16 rounded-lg bg-ink-900 object-cover" onerror="this.src='/images/placeholder.svg'">
                         <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold text-ink-900">Ảnh nguồn #<span x-text="selectedImageId"></span></p>
-                            <p class="truncate text-[10px] text-ink-500" x-text="((generations.find(g => g.id === selectedImageId) || {}).model || '') + ' · ' + ((generations.find(g => g.id === selectedImageId) || {}).provider || '')"></p>
+                            <p class="text-xs font-semibold text-cream-200" x-text="editSource.label"></p>
+                            <p class="truncate text-[10px] text-cream-200/50">Ảnh này sẽ được chỉnh sửa (phẫu thuật) theo prompt + preset bên dưới.</p>
                         </div>
-                        <button type="button" @click="selectedImageId = null" class="btn-outline btn-sm">Bỏ</button>
+                        <button class="btn-outline btn-sm" @click="clearEditSource()">Bỏ</button>
                     </div>
                 </template>
-                <textarea x-model="refinePrompt" rows="2" class="input" placeholder="VD: add puffy sleeve (sẽ chỉnh trên ảnh nguồn trên)"></textarea>
+            </div>
+
+            <!-- Fitting Room: Đồng bộ khuôn mặt -->
+            <div class="card p-5" x-show="step===2">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-ink-900">👤 Đồng bộ khuôn mặt</h2>
+                    <button class="text-[10px] text-cream-300/60 hover:text-red-300" @click="clearEditFace()" x-show="editFace">Bỏ</button>
+                </div>
+                <p class="mt-1 text-xs text-ink-500">Tải ảnh khuôn mặt mẫu → phẫu thuật sẽ đồng bộ nhân vật.</p>
+                <div class="mt-2 flex items-center gap-2">
+                    <button class="btn-outline btn-sm" @click="$refs.editFaceInput.click()">Tải ảnh mặt</button>
+                    <template x-if="editFace"><img :src="editFace" class="h-12 w-12 rounded-full bg-ink-900 object-cover" alt="Khuôn mặt"></template>
+                </div>
+                <input x-ref="editFaceInput" type="file" accept="image/*" @change="onEditFaceChange" class="hidden">
+            </div>
+
+            <!-- Fitting Room: Preset (Bối cảnh + Dáng) -->
+            <div class="card p-5" x-show="step===2">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-ink-900">🎛 Preset</h2>
+                    <button class="btn-brand btn-sm" @click="editPresetOpen = true">Chọn <span x-show="editPresetIds.length" x-text="'(' + editPresetIds.length + ')'"></span></button>
+                </div>
+                <p class="mt-1 text-xs text-ink-500">Chọn bối cảnh / dáng để đưa vào lệnh phẫu thuật.</p>
+                <div class="mt-2 space-y-1 text-[11px]">
+                    <p x-show="editPresetText('background')" class="text-brand-200">Nền: <span x-text="editPresetText('background')"></span></p>
+                    <p x-show="editPresetText('pose')" class="text-brand-200">Dáng: <span x-text="editPresetText('pose')"></span></p>
+                </div>
+                <div x-show="editPresetOpen" x-cloak @click="editPresetOpen=false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                    <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
+                        <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
+                            <h3 class="font-display text-base font-semibold text-cream-50">🎛 Preset (Bối cảnh · Dáng)</h3>
+                            <button class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" @click="editPresetOpen=false">✕</button>
+                        </div>
+                        <div class="max-h-[70vh] overflow-y-auto p-5">
+                            <template x-for="cat in ['background','pose']" :key="cat">
+                                <div class="mb-4">
+                                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70" x-text="catLabels[cat] || cat"></p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <template x-for="item in (presets.find(g => g.category === cat) || {items:[]}).items" :key="item.id">
+                                            <label class="flex cursor-pointer items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] transition-colors" :class="editPresetIds.includes(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 bg-ink-700/40 text-cream-200 hover:bg-ink-700'" :title="item.note">
+                                                <input type="checkbox" class="hidden" :checked="editPresetIds.includes(item.id)" @change="toggleEditPreset(item.id)">
+                                                <span x-text="item.key || item.label"></span>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 border-t border-ink-700 px-5 py-3">
+                            <button class="btn-outline btn-sm" @click="editPresetOpen=false">Huỷ</button>
+                            <button class="btn-brand btn-sm" @click="editPresetOpen=false">Áp dụng & Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fitting Room: Phẫu thuật Ảnh -->
+            <div class="card p-5" x-show="step===2">
+                <h2 class="mb-2 font-display text-base font-semibold text-ink-900">✏️ Phẫu thuật Ảnh</h2>
+                <p class="mb-3 text-xs text-ink-500">Nhập mô tả chỉnh sửa (hoặc bỏ trống để dùng prompt Bước 1) → áp bối cảnh/dáng preset + đồng bộ khuôn mặt.</p>
+                <textarea x-model="refinePrompt" rows="2" class="input" placeholder="VD: add puff sleeve, change background to a beach…"></textarea>
                 <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-700">
                     <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveFace" class="h-4 w-4 accent-brand-600"> Giữ nguyên khuôn mặt & dáng</label>
                     <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveBg" class="h-4 w-4 accent-brand-600"> Giữ nguyên nền</label>
                 </div>
-                <button @click="refine()" :disabled="refining || !refinePrompt" class="btn-brand mt-3 w-full"><span x-show="!refining">Theo dõi → Cập nhật Ảnh</span><span x-show="refining">Đang gửi…</span></button>
+                <button @click="surgery()" :disabled="editSurging || !(editSource && editSource.url)" class="btn-brand mt-3 w-full"><span x-show="!editSurging">🔧 Phẫu thuật Ảnh</span><span x-show="editSurging">Đang phẫu thuật…</span></button>
             </div>
 
             <!-- Color Palette (Bước 2) -->
@@ -496,6 +563,9 @@ document.addEventListener('alpine:init', () => {
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
+        pickTarget: 'ref',
+        editSource: null, editSourceTmp: '', editFace: '', editFaceRef: '',
+        editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: null,
 
         previewId: null,
@@ -783,12 +853,14 @@ document.addEventListener('alpine:init', () => {
         },
         closeRefPicker() { this.refOpen = false; },
         chooseProduct(item) {
+            if (this.pickTarget === 'edit') { this.chooseEditProduct(item); return; }
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refUrl = item.url; this.refImage = item.url; this.refFile = null; this.refOpen = false;
             this.resetForRef();
         },
         openOutputsRef() { this.outputsRefOpen = true; },
         useOutputRef(g) {
+            if (this.pickTarget === 'edit') { this.useEditOutput(g); return; }
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refUrl = g.media_url; this.refImage = g.media_url; this.refFile = null; this.outputsRefOpen = false;
             this.resetForRef();
@@ -798,6 +870,68 @@ document.addEventListener('alpine:init', () => {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refImage = null; this.refFile = null; this.refUrl = null;
             this.resetForRef();
+        },
+        // ===== Fitting Room: chọn ảnh để chỉnh sửa (3 nguồn) =====
+        async onEditImgChange(e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            try {
+                const fd = new FormData(); fd.append('image', f);
+                const up = await this.upload('/studio/upload-ref', fd);
+                this.editSource = { url: up.url, label: 'Ảnh tải lên' };
+                this.editSourceTmp = URL.createObjectURL(f);
+                Alpine.store('toast').show('Đã chọn ảnh tải lên để chỉnh sửa.');
+            } catch (err) { Alpine.store('toast').show(err.message, 'error'); }
+        },
+        chooseEditProduct(item) {
+            this.editSource = { url: item.url, label: item.name || 'Từ sản phẩm' };
+            this.editSourceTmp = item.url; this.refOpen = false;
+            Alpine.store('toast').show('Đã chọn ảnh sản phẩm để chỉnh sửa.');
+        },
+        useEditOutput(g) {
+            this.editSource = { url: g.media_url, label: 'Kết quả #' + g.id, generationId: g.id };
+            this.editSourceTmp = g.media_url; this.selectedImageId = g.id; this.outputsRefOpen = false;
+        },
+        clearEditSource() {
+            this.editSource = null; this.editSourceTmp = '';
+            if (this.selectedImageId) this.selectedImageId = null;
+        },
+        async onEditFaceChange(e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            try {
+                const fd = new FormData(); fd.append('image', f);
+                const up = await this.upload('/studio/face', fd);
+                this.editFace = up.url || URL.createObjectURL(f); this.editFaceRef = up.url || '';
+                Alpine.store('toast').show('Đã đặt khuôn mặt mẫu — phẫu thuật sẽ đồng bộ.');
+            } catch (err) { Alpine.store('toast').show(err.message, 'error'); }
+        },
+        clearEditFace() { this.editFace = ''; this.editFaceRef = ''; },
+        toggleEditPreset(id) { const i = this.editPresetIds.indexOf(id); if (i >= 0) this.editPresetIds.splice(i, 1); else this.editPresetIds.push(id); },
+        editPresetText(cat) {
+            const grp = this.presets.find((g) => g.category === cat);
+            if (!grp) return '';
+            return grp.items.filter((it) => this.editPresetIds.includes(it.id)).map((it) => it.key || it.label).join(', ');
+        },
+        // ===== Fitting Room: Phẫu thuật ảnh =====
+        async surgery() {
+            if (!this.editSource || !this.editSource.url || this.editSurging) { Alpine.store('toast').show('Chọn ảnh để chỉnh sửa trước.', 'error'); return; }
+            this.editSurging = true;
+            try {
+                const bg = this.editPresetText('background');
+                const pose = this.editPresetText('pose');
+                let prompt = (this.refinePrompt || this.output.image_prompt_en || '').trim();
+                if (!prompt) prompt = 'Keep the exact garment, outfit, person, face and camera as in the reference.';
+                const infl = [];
+                if (bg) infl.push('change the background to ' + bg);
+                if (pose) infl.push('change the pose to ' + pose);
+                if (infl.length) prompt = prompt.replace(/[. ]+$/, '') + '. ' + infl.join(', ') + '.';
+                const data = await this.api('/studio/generate', { prompt, base_image: this.editSource.url, edit: '1', history_id: this.output.history_id, project_id: this.currentProjectId || null });
+                const items = Array.isArray(data.items) ? data.items : [data];
+                items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' }));
+                if (items.length) { this.previewId = items[0].generation_id; Alpine.store('toast').show('Đang phẫu thuật ảnh… #' + items[0].generation_id); }
+            } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
+            finally { this.editSurging = false; }
         },
         // Mở popup sửa prompt tiếng Việt: dịch prompt EN hiện tại sang VI.
         async openTranslateVi() {

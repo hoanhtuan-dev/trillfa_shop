@@ -557,6 +557,21 @@ class StudioController extends Controller
         return response()->json(['text' => $text, 'provider' => 'none', 'model' => null]); // no key / failed -> keep as-is
     }
 
+    /**
+     * Upload a face reference (Fitting Room face-sync) — sets the global face so the edit/surgery applies it.
+     */
+    public function storeFace(Request $request)
+    {
+        $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
+        $path = '/storage/'.$request->file('image')->store('studio/ref', 'public');
+        set_setting('studio_face_ref', $path);
+        // Invalidate cached face description so it is re-described once.
+        set_setting('studio_face_desc', '');
+        set_setting('studio_face_desc_hash', '');
+
+        return response()->json(['url' => $path]);
+    }
+
     protected function resolveReferencePath(string $url): ?string
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
