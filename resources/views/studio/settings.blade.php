@@ -231,22 +231,11 @@
     </div>
 
     <div x-show="tab==='keys'">
-    {{-- ===== Provider connections ===== --}}
+    {{-- ===== API Keys Registry ===== --}}
     <div class="card mt-6 p-6">
-        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔌 Kết nối nhà cung cấp</h2>
-        <p class="mt-1 text-xs text-ink-500">Trạng thái key từng provider. Thêm/sửa key và scope trong <b>API Keys Registry</b> bên dưới.</p>
-        <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            @foreach($providers as $service=>$p)
-                <div class="flex items-center justify-between gap-2 rounded-xl border border-cream-200 p-2.5 text-xs">
-                    <span class="min-w-0">
-                        <span class="block font-semibold text-ink-900">{{ $p['label'] }}</span>
-                        <span class="block truncate text-[10px] text-ink-500">env: {{ $p['hint'] }}</span>
-                    </span>
-                    <span class="badge {{ $p['configured'] ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ $p['configured'] ? 'Có key' : 'Chưa có' }}</span>
-                </div>
-            @endforeach
-        </div>
-        <div class="mt-4 rounded-xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
+        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">nhiều key/provider · scope theo model/nhóm · ưu tiên · tránh trùng lặp</span></h2>
+        <p class="mt-1 text-xs text-ink-500">Mỗi provider có thể đăng ký <b>nhiều key</b> (vd Qwen: Token-Plan + Pay-As-You-Go). <b>Scope</b> giới hạn key chỉ dùng cho model/nhóm cụ thể (để trống = dùng chung, hoặc gõ model_id/nhóm cách dấu phẩy). Key dùng trước = ưu tiên cao nhất.</p>
+        <div class="mt-3 rounded-xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
             <p class="font-semibold">💡 Gợi ý lấy key</p>
             <ul class="mt-1 list-inside list-disc space-y-0.5">
                 <li>Gemini: <code class="rounded bg-ink-700 px-1 text-cream-100">aistudio.google.com</code> → API Keys.</li>
@@ -255,16 +244,14 @@
             </ul>
             <p class="mt-2">Khi có key, service tự chuyển từ <b>stub</b> sang gọi API thật. Key trong <b>API Keys Registry</b> ưu tiên hơn env trong <code class="rounded bg-ink-700 px-1 text-cream-100">.env</code>.</p>
         </div>
-    </div>
-
-    {{-- ===== API Keys Registry ===== --}}
-    <div class="card mt-6 p-6">
-        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">nhiều key/provider · scope theo model/nhóm · ưu tiên · tránh trùng lặp</span></h2>
-        <p class="mt-1 text-xs text-ink-500">Mỗi provider có thể đăng ký <b>nhiều key</b> (vd Qwen: Token-Plan + Pay-As-You-Go). <b>Scope</b> giới hạn key chỉ dùng cho model/nhóm cụ thể (để trống = dùng chung, hoặc gõ model_id/nhóm cách dấu phẩy). Key dùng trước = ưu tiên cao nhất.</p>
 
         @foreach($api_keys->groupBy('provider') as $provider=>$keys)
             <div class="mt-5">
-                <h3 class="text-sm font-semibold text-ink-900">{{ $provider }}</h3>
+                <h3 class="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                    <span>{{ ($providers[$provider]['label'] ?? $provider) }}</span>
+                    <span class="badge {{ count($keys) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ count($keys) ? 'Có key × '.count($keys) : 'Chưa có' }}</span>
+                    <button type="button" class="btn-outline btn-sm ml-auto" onclick="document.getElementById('apikey-provider').value='{{ $provider }}'; document.getElementById('apikey-provider').focus(); document.querySelector('#apikey-add').scrollIntoView({behavior:'smooth'})">➕ Thêm key</button>
+                </h3>
                 <div class="mt-2 space-y-2">
                     @foreach($keys as $k)
                         <div class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
@@ -293,11 +280,11 @@
         @endforeach
 
         {{-- Add API key --}}
-        <form method="POST" action="{{ route('studio.keys.store') }}" class="mt-6 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+        <form id="apikey-add" method="POST" action="{{ route('studio.keys.store') }}" class="mt-6 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
             @csrf
             <h3 class="text-sm font-semibold text-ink-900">➕ Thêm API key</h3>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div><label class="label">Provider</label><input name="provider" class="input !py-2" placeholder="qwen / wan / gemini / fal / ..." required></div>
+                <div><label class="label">Provider</label><input id="apikey-provider" name="provider" class="input !py-2" placeholder="qwen / wan / gemini / fal / ..." required></div>
                 <div><label class="label">Nhãn</label><input name="label" class="input !py-2" placeholder="VD: Qwen Token-Plan" required></div>
                 <div><label class="label">Key</label><input name="value" class="input !py-2" placeholder="sk-..." required></div>
                 <div><label class="label">Loại (kind)</label><input name="kind" class="input !py-2" placeholder="plan / paygo / ..."></div>
