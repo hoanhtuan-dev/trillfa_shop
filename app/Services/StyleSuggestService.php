@@ -41,7 +41,7 @@ class StyleSuggestService
 
     protected function suggestViaQwenVision(string $imagePath, int $creativeLevel): array
     {
-        $model = (string) studio_config('qwen_vision_model', 'qwen-vl-plus');
+        $model = studio_vision_model('qwen');
         [$b64, $mime] = $this->downscaleBase64($imagePath);
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
@@ -88,7 +88,7 @@ class StyleSuggestService
 
     protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key): array
     {
-        $model = (string) studio_config('vision_model', 'gemini-2.5-flash-image');
+        $model = studio_vision_model();
         $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
         $b64 = base64_encode((string) file_get_contents($imagePath));
 

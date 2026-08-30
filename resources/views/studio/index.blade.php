@@ -154,7 +154,7 @@
                         <button type="button" @click="openRefPicker()" class="btn-outline btn-sm whitespace-nowrap">Từ sản phẩm</button>
                     </div>
                     <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
-                    <button type="button" @click="createFromRef()" :disabled="refBusy || (!refFile && !refUrl && !refImage)" class="btn-outline btn-sm mt-1.5 w-full whitespace-nowrap text-brand-200" title="Tạo ảnh MỚI từ ảnh tham khảo — giữ đặc điểm trang phục, đổi tư thế/hậu cảnh theo Presets bạn chọn"><span x-show="!refBusy">🖼 Tạo mới từ ảnh tham khảo</span><span x-show="refBusy">Đang tạo…</span></button>
+                    <button type="button" @click="createFromRef()" :disabled="refBusy || (!refFile && !refUrl && !refImage)" class="btn-outline btn-sm mt-1.5 w-full whitespace-nowrap text-brand-200" title="Phẫu thuật ảnh tham khảo theo preset đã chọn — giữ nguyên trang phục/khuôn mặt, chỉ đổi tư thế/hậu cảnh/góc."><span x-show="!refBusy">🔧 Phẫu thuật ảnh tham khảo</span><span x-show="refBusy">Đang phẫu thuật…</span></button>
                     <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
                     <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
                     <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
@@ -165,6 +165,7 @@
                             <p class="text-xs font-semibold text-cream-200">👤 Khuôn mặt (đồng bộ nhân vật)</p>
                             <button type="button" @click="clearFace()" class="text-[10px] text-cream-300/60 hover:text-red-300">Bỏ</button>
                         </div>
+                        <span class="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $faceSync['enabled'] && $faceSync['has_ref'] ? 'bg-emerald-500/20 text-emerald-300' : ($faceSync['has_ref'] ? 'bg-amber-500/20 text-amber-300' : 'bg-ink-700 text-cream-300/60') }}">{{ $faceSync['enabled'] && $faceSync['has_ref'] ? '✅ Đồng bộ đang bật' : ($faceSync['has_ref'] ? '⚠️ Đã đặt mặt — cần bật đồng bộ trong Cài đặt' : 'Chưa đặt khuôn mặt mẫu') }}</span>
                         <p class="mt-0.5 text-[10px] text-cream-200/50">Chọn ảnh khuôn mặt để AI giữ nhất quán nhân vật khi tạo ảnh/video. Nếu tắt “đồng bộ khuôn mặt” trong Cài đặt, ảnh này sẽ không được áp dụng.</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2">
                             <button type="button" @click="$refs.faceInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh mặt</button>
@@ -944,13 +945,14 @@ document.addEventListener('alpine:init', () => {
             if ((!this.refFile && !this.refUrl && !this.refImage) || this.refBusy) return;
             this.refBusy = true;
             try {
-                // CO Giữ NGUYÊN ảnh tham khảo (chỉnh sửa trên pixel gốc) + áp các preset đã chọn
-                // (tư thế/hậu cảnh/góc/phong cách). KHÔNG tạo lại ảnh từ đầu => giữ đặc điểm gốc.
+                // PHẪU THUẬT ảnh tham khảo theo preset đã chọn: dùng model chỉnh sửa (qwen-edit) trên
+                // chính ảnh tham khảo làm BASE — GIỮ NGUYÊN trang phục/khuôn mặt/người, chỉ đổi theo preset
+                // (tư thế/hậu cảnh/góc/phong cách). Khuôn mặt (👤) sẽ được đồng bộ ở bước render nếu bật.
                 const variation = ['pose', 'background', 'camera', 'style']
                     .map((c) => this.selectedPresetText(c)).filter(Boolean).join(', ');
-                let instruction = 'Keep the exact garment, outfit, person, face, pose and camera exactly as in the reference image.';
+                let instruction = 'Keep the exact garment, outfit, person, face and camera as in the reference image.';
                 if (variation) instruction += ' Change only these: ' + variation + '.';
-                else instruction += ' Keep everything identical, only enhance the quality and detail.';
+                else instruction += ' Keep everything identical, only refine the details and quality.';
                 let refUrl = this.refUrl;
                 if (refUrl && String(refUrl).startsWith('blob:')) refUrl = null;
                 if (!refUrl && this.refFile) {
@@ -963,8 +965,8 @@ document.addEventListener('alpine:init', () => {
                 const items = Array.isArray(data.items) ? data.items : [data];
                 items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' }));
                 if (items.length) this.previewId = items[0].generation_id;
-                if (items.length) Alpine.store('toast').show('Đang tạo từ ảnh tham khảo (giữ nguyên trang phục)… #' + items[0].generation_id);
-                Alpine.store('toast').show('Đã tạo mới từ ảnh tham khảo — giữ trang phục, dùng tư thế/hậu cảnh bạn chọn.');
+                if (items.length) Alpine.store('toast').show('Đang phẫu thuật ảnh tham khảo (theo preset)… #' + items[0].generation_id);
+                Alpine.store('toast').show('Đã tạo mới từ ảnh tham khảo (không phẫu thuật) — giữ bản sắc, dùng tư thế/hậu cảnh bạn chọn.');
             } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
             finally { this.refBusy = false; }
         },

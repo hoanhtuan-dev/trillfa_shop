@@ -473,7 +473,7 @@ class ImageAIService
             return null;
         }
 
-        $model = (string) studio_config('vision_model', 'gemini-2.5-flash');
+        $model = studio_vision_model();
         [$b64, $mime] = $this->downscaleImageBase64($path);
         $text = 'Describe this person\'s face in detail for an AI fashion image so it can be reproduced: '
             .'give ethnicity hint, hair (colour, length, style, texture), face shape, eyebrows, eyes, nose, lips, '
@@ -486,7 +486,7 @@ class ImageAIService
                 try {
                     $base = dashscope_base_url($key).'/compatible-mode/v1';
                     $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
-                        'model' => (string) studio_config('qwen_vision_model', 'qwen3.8-flash'),
+                        'model' => studio_vision_model('qwen'),
                         'messages' => [['role' => 'user', 'content' => [
                             ['type' => 'text', 'text' => $text],
                             ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],

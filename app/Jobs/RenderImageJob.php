@@ -71,11 +71,11 @@ class RenderImageJob implements ShouldQueue
                 $generation->ratio,
             );
 
-            // Face sync via the image-edit model (opt-in): after generating a NEW image,
-            // swap the person's face to the reference face for identity-consistent looks.
+            // Face sync via the image-edit model (opt-in): after rendering (a NEW image OR a surgical edit
+            // of the reference), swap the person's face to the reference face for identity-consistent looks.
             // Falls back to the original image if the edit fails (keeps the result usable).
             $faceEditSync = filter_var(studio_config('face_edit_sync', false), FILTER_VALIDATE_BOOL);
-            if ($faceEditSync && $faceRef && str_starts_with($faceRef, '/storage/') && ! $generation->base_image) {
+            if ($faceEditSync && $faceRef && str_starts_with($faceRef, '/storage/')) {
                 $edited = $images->applyFace($url, $faceRef);
                 if ($edited && $edited !== $url) {
                     $url = $edited;

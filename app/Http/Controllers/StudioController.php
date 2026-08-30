@@ -26,7 +26,14 @@ class StudioController extends Controller
         $creditsUsed = (int) $user->generations()->where('status', 'completed')->sum('credits_cost');
         $pendingCount = (int) $user->generations()->whereIn('status', ['pending', 'processing'])->count();
 
-        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount'));
+        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount')
+            + [
+                'faceSync' => [   // trạng thái đồng bộ khuôn mặt cho ô 👤
+                    'enabled' => filter_var(setting('studio_face_sync_enabled', config('studio.face_sync_enabled', true)), FILTER_VALIDATE_BOOL),
+                    'edit_sync' => filter_var(setting('studio_face_edit_sync', config('studio.face_edit_sync', false)), FILTER_VALIDATE_BOOL),
+                    'has_ref' => (bool) setting('studio_face_ref', ''),
+                ],
+            ]);
     }
 
     public function storeProject(Request $request)

@@ -442,3 +442,29 @@ if (! function_exists('resolve_studio_model')) {
 }
 
 }
+
+
+/**
+ * Resolve a robust VISION model for describing a face / analyzing a reference image.
+ * Ignores clearly-wrong configs (e.g. qwen3.8-flash — a text-only model) so face sync
+ * and style-suggest don't fail with "Model not found / not supported" on the vision call.
+ */
+function studio_vision_model(?string $provider = null): string
+{
+    $provider = $provider ?: (string) studio_config('vision_provider', 'gemini');
+
+    if ($provider === 'qwen') {
+        $m = (string) studio_config('qwen_vision_model', 'qwen-vl-plus');
+        if (! preg_match('/vl|vision|minimax|wanx|owl/i', $m)) {
+            return 'qwen-vl-plus'; // text-only Qwen model -> use a vision-capable one
+        }
+        return $m ?: 'qwen-vl-plus';
+    }
+
+    $m = (string) studio_config('vision_model', 'gemini-2.5-flash');
+    if (str_contains(strtolower($m), 'qwen')) {
+        return 'gemini-2.5-flash'; // wrong provider configured -> use a Gemini vision model
+    }
+    return $m ?: 'gemini-2.5-flash';
+}
+
