@@ -76,30 +76,49 @@
                 </div>
 
                 <!-- Presets modal -->
-                <div x-show="presetOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                    <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-ink-700 bg-ink-800 p-5 shadow-2xl" @click.stop>
-                        <div class="mb-3 flex items-center justify-between">
-                            <h3 class="font-display text-base font-semibold text-cream-50">🎛 Presets <span class="text-xs font-normal text-cream-300/60">(chọn nhiều — chỉ áp dụng preset đã chọn)</span></h3>
-                            <button @click="presetOpen=false" class="btn-outline btn-sm">✕</button>
+                <div x-show="presetOpen" x-cloak @click="presetOpen=false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                    <div class="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
+                        <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
+                            <div>
+                                <h3 class="font-display text-base font-semibold text-cream-50">🎛 Presets</h3>
+                                <p class="text-[11px] text-cream-300/60">Chọn nhiều — chỉ áp dụng preset bạn đã chọn khi tạo.</p>
+                            </div>
+                            <button @click="presetOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
                         </div>
-                        <div class="space-y-4">
-                            <template x-for="group in presetGroups" :key="group.category">
-                                <div>
-                                    <p class="mb-1.5 text-xs font-semibold text-cream-200" x-text="catLabels[group.category] || group.category"></p>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <template x-for="item in group.items" :key="item.id">
-                                            <label class="flex cursor-pointer items-center gap-1.5 rounded-full border border-ink-700 bg-ink-700/40 px-2 py-1 text-[11px] text-cream-200 transition-colors hover:bg-ink-700" :class="presetIds.includes(item.id) ? 'border-brand-500 bg-brand-600 text-white' : ''" :title="item.note">
-                                                <input type="checkbox" class="hidden" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)">
-                                                <span x-text="item.key || item.label"></span>
-                                            </label>
-                                        </template>
-                                    </div>
+
+                        <!-- Siêu-nhóm -->
+                        <div class="flex gap-1.5 px-5 pt-3">
+                            <template x-for="sec in presetSections()" :key="sec.section">
+                                <button @click="presetSection = sec.section" class="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors" :class="presetSection === sec.section ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'"><span x-text="sec.section"></span><span class="ml-1 opacity-70" x-text="'·'+presetSectionCount(sec.section)"></span></button>
+                            </template>
+                        </div>
+
+                        <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                            <template x-for="sec in presetSections()" :key="sec.section">
+                                <div x-show="presetSection === sec.section">
+                                    <template x-for="group in sec.groups" :key="group.category">
+                                        <div class="mb-5">
+                                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70" x-text="catLabels[group.category] || group.category"></p>
+                                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                                <template x-for="item in group.items" :key="item.id">
+                                                    <label class="flex cursor-pointer items-start gap-2 rounded-xl border p-2.5 text-[11px] leading-tight transition-all" :class="presetIds.includes(item.id) ? 'border-brand-500 bg-brand-600/25 text-white' : 'border-ink-700 bg-ink-700/40 text-cream-200 hover:border-brand-500/50 hover:bg-ink-700'" :title="item.note">
+                                                        <input type="checkbox" class="mt-0.5 h-3.5 w-3.5 shrink-0 accent-brand-500" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)">
+                                                        <span x-text="item.key || item.label"></span>
+                                                    </label>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
-                        <div class="mt-4 flex items-center justify-between gap-2">
-                            <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
-                            <button @click="presetOpen=false" class="btn-brand btn-sm ml-auto">Áp dụng & Đóng</button>
+
+                        <div class="flex items-center justify-between gap-2 border-t border-ink-700 px-5 py-3">
+                            <span class="text-xs text-cream-300/60" x-show="presetIds.length" x-text="'Đã chọn ' + presetIds.length + ' preset'"></span>
+                            <div class="ml-auto flex items-center gap-2">
+                                <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
+                                <button @click="presetOpen=false" class="btn-brand btn-sm">Áp dụng & Đóng</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -463,7 +482,7 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, faceImage: '', suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
-        presetOpen: false,
+        presetOpen: false, presetSection: 'Trang phục',
         quickOptions: { background: '', pose: '', angle: '' },
         quickRefs: {
             backgrounds: [
@@ -630,6 +649,21 @@ document.addEventListener('alpine:init', () => {
         get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
         get videoSceneLabel() { const s = this.videoScenes.find(x => x.value === this.videoScene); return s ? (s.label + (s.note ? ' · ' + s.note : '')) : ''; },
         get presetGroups() { return this.presets.filter(g => g.category !== 'video_scene'); },
+        // Siêu-nhóm preset: chia nhóm theo mục đích dùng để người dùng chọn nhanh & dễ nhìn.
+        presetSections() {
+            const map = [
+                ['Trang phục', ['fabric', 'color', 'silhouette', 'neckline', 'sleeve', 'fit', 'pattern', 'detail']],
+                ['Phong cách', ['style', 'occasion', 'season']],
+                ['Bối cảnh & Dáng', ['background', 'pose', 'camera', 'lens']],
+            ];
+            const out = [];
+            for (const [section, cats] of map) {
+                const groups = this.presetGroups.filter((g) => cats.includes(g.category));
+                if (groups.length) out.push({ section, groups, count: groups.reduce((a, g) => a + g.items.length, 0) });
+            }
+            return out;
+        },
+        presetSectionCount(sec) { return this.presetSections().find((s) => s.section === sec)?.count || 0; },
         async loadPalette(id) {
             if (!id) { this.palette = []; return; }
             try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
@@ -877,26 +911,26 @@ document.addEventListener('alpine:init', () => {
             if ((!this.refFile && !this.refUrl && !this.refImage) || this.refBusy) return;
             this.refBusy = true;
             try {
-                if (!this.suggestResult || !this.suggestResult.category || !this.suggestResult.category.fabric) {
-                    try { await this.suggestStyle(); } catch (e) {}
-                }
-                const cat = (this.suggestResult && this.suggestResult.category) || {};
-                const parts = [];
-                if (cat.fabric) parts.push('crafted from ' + cat.fabric);
-                if (cat.silhouette) parts.push(cat.silhouette + ' silhouette');
-                if (cat.style) parts.push(cat.style + ' aesthetic');
-                const garment = parts.join(', ');
+                // CO Giữ NGUYÊN ảnh tham khảo (chỉnh sửa trên pixel gốc) + áp các preset đã chọn
+                // (tư thế/hậu cảnh/góc/phong cách). KHÔNG tạo lại ảnh từ đầu => giữ đặc điểm gốc.
                 const variation = ['pose', 'background', 'camera', 'style']
                     .map((c) => this.selectedPresetText(c)).filter(Boolean).join(', ');
-                let prompt = garment
-                    ? 'High-fashion editorial photo of a model wearing ' + garment
-                    : (this.output.image_prompt_en || '');
-                if (variation) prompt = (prompt ? prompt + ', ' : 'High-fashion editorial photo, ') + variation;
-                if (!prompt) throw 'Không đọc được đặc điểm trang phục từ ảnh tham khảo. Hãy bấm “Gợi ý phong cách & prompt” trước.';
-                prompt += ', premium Vogue editorial, ultra detailed, 4k';
-                this.output.image_prompt_en = prompt;
-                if (this.step !== 1) this.step = 1;
-                await this.generateImage();
+                let instruction = 'Keep the exact garment, outfit, person, face, pose and camera exactly as in the reference image.';
+                if (variation) instruction += ' Change only these: ' + variation + '.';
+                else instruction += ' Keep everything identical, only enhance the quality and detail.';
+                let refUrl = this.refUrl;
+                if (refUrl && String(refUrl).startsWith('blob:')) refUrl = null;
+                if (!refUrl && this.refFile) {
+                    const fd = new FormData(); fd.append('image', this.refFile);
+                    const up = await this.upload('/studio/upload-ref', fd);
+                    refUrl = up.url;
+                }
+                if (!refUrl) { Alpine.store('toast').show('Ảnh tham khảo cần là URL lưu trữ — chọn từ sản phẩm/kết quả hoặc tải ảnh mới.', 'error'); return; }
+                const data = await this.api('/studio/generate', { prompt: instruction, base_image: refUrl, edit: '1', history_id: this.output.history_id, project_id: this.currentProjectId || null });
+                const items = Array.isArray(data.items) ? data.items : [data];
+                items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' }));
+                if (items.length) this.previewId = items[0].generation_id;
+                if (items.length) Alpine.store('toast').show('Đang tạo từ ảnh tham khảo (giữ nguyên trang phục)… #' + items[0].generation_id);
                 Alpine.store('toast').show('Đã tạo mới từ ảnh tham khảo — giữ trang phục, dùng tư thế/hậu cảnh bạn chọn.');
             } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
             finally { this.refBusy = false; }

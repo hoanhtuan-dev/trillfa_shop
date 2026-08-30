@@ -41,7 +41,7 @@ class StyleSuggestService
 
     protected function suggestViaQwenVision(string $imagePath, int $creativeLevel): array
     {
-        $model = (string) studio_config('qwen_vision_model', 'qwen3.8-flash');
+        $model = (string) studio_config('qwen_vision_model', 'qwen-vl-plus');
         [$b64, $mime] = $this->downscaleBase64($imagePath);
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
@@ -88,7 +88,7 @@ class StyleSuggestService
 
     protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key): array
     {
-        $model = (string) studio_config('vision_model', 'gemini-1.5-flash');
+        $model = (string) studio_config('vision_model', 'gemini-2.5-flash-image');
         $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
         $b64 = base64_encode((string) file_get_contents($imagePath));
 
@@ -127,14 +127,22 @@ class StyleSuggestService
      * Canonicalise a vision suggestion into the unified Creative Direction schema,
      * guaranteeing image & video prompts describe the SAME garment.
      */
+    protected function str($v): string
+    {
+        if (is_array($v)) {
+            return trim(implode(', ', array_filter(array_map('strval', $v))));
+        }
+        return trim((string) $v);
+    }
+
     protected function finalize(array $json, int $creativeLevel): array
     {
         $styles = array_values(array_filter((array) ($json['styles'] ?? [])));
-        $background = (string) ($json['background'] ?? '');
-        $pose = (string) ($json['pose'] ?? '');
-        $fabric = (string) ($json['fabric'] ?? '');
-        $silhouette = (string) ($json['silhouette'] ?? '');
-        $camera = (string) ($json['camera'] ?? '');
+        $background = $this->str($json['background'] ?? '');
+        $pose = $this->str($json['pose'] ?? '');
+        $fabric = $this->str($json['fabric'] ?? '');
+        $silhouette = $this->str($json['silhouette'] ?? '');
+        $camera = $this->str($json['camera'] ?? '');
 
         $injections = array_filter([
             'fabric' => $fabric,
