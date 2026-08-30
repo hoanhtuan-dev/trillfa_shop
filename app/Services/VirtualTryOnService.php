@@ -17,12 +17,16 @@ class VirtualTryOnService
 
     public function modelCatalog(): array
     {
+        // 6 model faces (headshots) from the uploaded Face library. In VTON (Bước 2) the model_image_url
+        // is the POSE image (full-body mannequin), while these faces drive the Step-1 text prompt
+        // and identify the model to the user.
         return [
-            ['id' => 'asian_f', 'name' => 'Nữ Á Đông', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-asian-f.jpg', 'desc' => 'East Asian female, fair skin, long dark hair'],
-            ['id' => 'euro_f', 'name' => 'Nữ Châu Âu', 'ethnicity' => 'European female', 'image' => '/samples/model-euro-f.jpg', 'desc' => 'European female, light skin, blonde hair'],
-            ['id' => 'asian_m', 'name' => 'Nam Á Đông', 'ethnicity' => 'East Asian male', 'image' => '/samples/model-asian-m.jpg', 'desc' => 'East Asian male, tan skin, short black hair'],
-            ['id' => 'euro_m', 'name' => 'Nam Châu Âu', 'ethnicity' => 'European male', 'image' => '/samples/model-euro-m.jpg', 'desc' => 'European male, light skin, brown hair'],
-            ['id' => 'african_f', 'name' => 'Nữ Phi', 'ethnicity' => 'Black female', 'image' => '/samples/model-african-f.jpg', 'desc' => 'Black female, deep skin tone, curly hair'],
+            ['id' => 'model01', 'name' => 'Mẫu 1', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-01.png', 'desc' => 'East Asian female, shoulder-length reddish-brown hair, fair skin'],
+            ['id' => 'model02', 'name' => 'Mẫu 2', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-02.png', 'desc' => 'East Asian female, long black wavy hair, white shirt'],
+            ['id' => 'model03', 'name' => 'Mẫu 3', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-03.png', 'desc' => 'East Asian female, high bun updo, fair skin'],
+            ['id' => 'model04', 'name' => 'Mẫu 4', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-04.png', 'desc' => 'East Asian female, short bob black hair, smiling'],
+            ['id' => 'model05', 'name' => 'Mẫu 5', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-05.png', 'desc' => 'East Asian female, high ponytail, long black hair'],
+            ['id' => 'model06', 'name' => 'Mẫu 6', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-06.png', 'desc' => 'East Asian female, long wavy black hair, lace top'],
         ];
     }
 

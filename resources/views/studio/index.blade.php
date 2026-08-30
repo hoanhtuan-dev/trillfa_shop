@@ -187,7 +187,8 @@
                         <div class="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
                             <template x-for="m in swapModels" :key="m.id">
                                 <button @click="swapModelId = m.id" class="flex flex-col items-center gap-1 rounded-xl border p-2 transition-all" :class="swapModelId === m.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
-                                    <span class="grid h-12 w-12 place-items-center rounded-full text-[10px] font-bold text-white" :style="{ background: m.color }" x-text="m.tone.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()"></span>
+                                    <img :src="m.img" class="h-14 w-14 rounded-full bg-ink-900 object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" alt="Khuôn mặt">
+                                    <span class="hidden h-14 w-14 place-items-center rounded-full bg-ink-700 text-[10px] font-bold text-cream-200" x-text="m.name"></span>
                                     <span class="text-[10px] text-cream-200" x-text="m.name"></span>
                                 </button>
                             </template>
@@ -604,11 +605,12 @@ document.addEventListener('alpine:init', () => {
         presetOpen: false, presetSection: 'Trang phục',
         swapOpen: false, swapModelId: '', swapPoseId: '', swapLoading: false,
         swapModels: [
-            { id: 'asian_f', name: 'Nữ Á Đông', tone: 'East Asian female', color: '#e8b98b' },
-            { id: 'euro_f', name: 'Nữ Châu Âu', tone: 'European female', color: '#f0c9a6' },
-            { id: 'asian_m', name: 'Nam Á Đông', tone: 'East Asian male', color: '#d9a06b' },
-            { id: 'euro_m', name: 'Nam Châu Âu', tone: 'European male', color: '#eec39b' },
-            { id: 'african_f', name: 'Nữ Phi', tone: 'Black female', color: '#8a5a3b' },
+            { id: 'model01', name: 'Mẫu 1', img: '/samples/model-01.png' },
+            { id: 'model02', name: 'Mẫu 2', img: '/samples/model-02.png' },
+            { id: 'model03', name: 'Mẫu 3', img: '/samples/model-03.png' },
+            { id: 'model04', name: 'Mẫu 4', img: '/samples/model-04.png' },
+            { id: 'model05', name: 'Mẫu 5', img: '/samples/model-05.png' },
+            { id: 'model06', name: 'Mẫu 6', img: '/samples/model-06.png' },
         ],
         swapPoses: [
             { id: 'pose01', name: 'Đứng thẳng', img: '/samples/pose-01.png', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-4 12h2l2-5 2 5h2z' },
