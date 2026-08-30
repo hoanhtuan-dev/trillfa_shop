@@ -205,14 +205,14 @@
                                 </button>
                             </template>
                         </div>
-                    </div>
-                    <p class="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🏙 Hậu cảnh</p>
+                        <p class="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🏙 Hậu cảnh</p>
                         <div class="mb-3 flex flex-wrap gap-1.5">
                             <template x-for="bg in swapBackgrounds" :key="bg.v">
                                 <button @click="swapBackground = bg.v" class="rounded-full border px-2 py-1 text-[11px] transition-colors" :class="swapBackground === bg.v ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 bg-ink-700/40 text-cream-200 hover:bg-ink-700'" x-text="bg.l"></button>
                             </template>
                         </div>
-                        <div class="flex items-center gap-2 border-t border-ink-700 px-5 py-3">
+                    </div>
+                    <div class="flex items-center gap-2 border-t border-ink-700 px-5 py-3">
                         <button class="btn-outline btn-sm mr-auto" @click="$refs.swapModelInput.click()">➕ Thêm khuôn mặt</button>
                         <button class="btn-outline btn-sm" @click="$refs.swapPoseInput.click()">➕ Thêm dáng</button>
                         <input x-ref="swapModelInput" type="file" accept="image/*" @change="addSwapAsset('model', $event)" class="hidden">
