@@ -71,20 +71,6 @@ class RenderImageJob implements ShouldQueue
                 $generation->ratio,
             );
 
-            // Face swap (model chỉnh sửa) is OPT-IN — only runs when "Đồng bộ khuôn mặt (model chỉnh sửa)"
-            // is turned on in Settings, so the default surgical edit stays fast (~20s). When enabled it swaps
-            // the reference face onto the result (a second qwen-edit call, ~40s total). Falls back to the
-            // original image if it fails (keeps the result usable). Fresh generations keep the prompt-injection
-            // path above (describeFace) unless this opt-in is on too.
-            $faceSwap = filter_var(studio_config('face_edit_sync', false), FILTER_VALIDATE_BOOL);
-            if ($faceSwap && $faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/')) {
-                logger()->info('Applying face sync (edit model)', ['generation_id' => $generation->id, 'face' => $faceRef]);
-                $edited = $images->applyFace($url, $faceRef);
-                if ($edited && $edited !== $url) {
-                    $url = $edited;
-                }
-            }
-
             // Brand logo stamping is disabled for now (opt-in via studio.brand_logo_enabled).
             if (studio_config('brand_logo_enabled', false)) {
                 $url = $this->applyBrandLogo($url);

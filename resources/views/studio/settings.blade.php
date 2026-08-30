@@ -157,11 +157,7 @@
                 <input type="checkbox" name="face_sync_enabled" value="1" @checked(old('face_sync_enabled', $face_sync_enabled)) class="h-4 w-4 accent-brand-600">
                 <span>Bật <strong>đồng bộ khuôn mặt (mô tả)</strong> — AI mô tả khuôn mặt mẫu rồi nhúng vào prompt tạo ảnh để giữ nhất quán nhân vật (mô tả chạy 1 lần, kết quả được cache).</span>
             </label>
-            <label class="mb-0 mt-2 flex items-center gap-2 text-xs text-ink-700">
-                <input type="checkbox" name="face_edit_sync" value="1" @checked(old('face_edit_sync', $face_edit_sync)) class="h-4 w-4 accent-brand-600">
-                <span>Bật <strong>đồng bộ khuôn mặt (model chỉnh sửa)</strong> — sau khi tạo ảnh mới, dùng model <b>qwen-edit</b> thay khuôn mặt nhân vật bằng khuôn mặt mẫu cho khớp 1:1 (tốn thêm 1 lần gọi + 1 credit; nếu model edit lỗi sẽ giữ ảnh gốc).</span>
-            </label>
-            <p class="mt-2 text-xs text-ink-500">Logo được dán vào góc ảnh; khuôn mặt mẫu dùng làm tham chiếu nhất quán nhân vật. <b>Mô tả</b> phù hợp khi model chỉ sinh theo prompt; <b>model chỉnh sửa</b> cho khớp chính xác hơn nhưng cần key/model "qwen-image-edit" (QwenCloud).</p>
+            <p class="mt-2 text-xs text-ink-500">Logo được dán vào góc ảnh; khuôn mặt mẫu dùng làm tham chiếu nhất quán nhân vật (mô tả khuôn mặt vào prompt khi tạo ảnh mới).</p>
         </div>
         <div class="flex items-center gap-3">
             <button type="submit" class="btn-brand">Lưu cài đặt</button>

@@ -91,12 +91,18 @@
                     </div>
                     <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
                 </div>
+            </div>
 
-                <!-- Presets (unified, multi-select) -->
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <button @click="presetOpen = true" class="btn-outline btn-sm whitespace-nowrap">🎛 Presets <span x-show="presetIds.length" x-text="'(' + presetIds.length + ')'"></span></button>
-                    <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
-                    <span class="text-[10px] text-cream-200/60" x-show="presetIds.length" x-text="selectedPresetSummary()"></span>
+            <!-- ===== Presets (themed card) ===== -->
+            <div class="card mt-4 p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500);">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-brand-300">🎨 Presets <span class="text-xs font-normal text-cream-300/50">(tuỳ chọn)</span></h2>
+                    <button @click="presetOpen = true" class="btn-brand btn-sm whitespace-nowrap">🎛 Chọn preset <span x-show="presetIds.length" x-text="'(' + presetIds.length + ')'"></span></button>
+                </div>
+                <p class="mt-1 text-xs text-cream-200/60">Chọn chất liệu/phom/phong cách/hậu cảnh/góc… để AI tạo prompt chuẩn hơn — chỉ áp dụng preset bạn đã chọn.</p>
+                <div class="mt-2" x-show="presetIds.length">
+                    <span class="text-[11px] text-brand-200" x-text="selectedPresetSummary()"></span>
+                    <button @click="clearPresets()" class="ml-2 btn-outline btn-sm">Đặt lại</button>
                 </div>
 
                 <!-- Presets modal -->
@@ -146,9 +152,12 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
+            <!-- ===== Reference + Face ===== -->
+            <div class="card mt-4 p-5" x-show="step===1">
                 <!-- Reference source -->
-                <div class="mt-4 rounded-xl border border-ink-700 bg-ink-800 p-3">
+                <div class="rounded-xl border border-ink-700 bg-ink-800 p-3">
                     <p class="mb-2 text-xs font-semibold text-cream-200">Gợi ý từ ảnh tham khảo</p>
                     <div class="flex flex-wrap gap-2">
                         <button type="button" @click="$refs.refInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh</button>
@@ -156,7 +165,6 @@
                         <button type="button" @click="openRefPicker()" class="btn-outline btn-sm whitespace-nowrap">Từ sản phẩm</button>
                     </div>
                     <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
-                    <button type="button" @click="createFromRef()" :disabled="refBusy || (!refFile && !refUrl && !refImage)" class="btn-outline btn-sm mt-1.5 w-full whitespace-nowrap text-brand-200" title="Phẫu thuật ảnh tham khảo theo preset đã chọn — giữ nguyên trang phục/khuôn mặt, chỉ đổi tư thế/hậu cảnh/góc."><span x-show="!refBusy">🔧 Phẫu thuật ảnh tham khảo</span><span x-show="refBusy">Đang phẫu thuật…</span></button>
                     <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
                     <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
                     <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
@@ -172,12 +180,10 @@
                             <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-300/60">Chưa đặt ảnh mặt</span>
                         @elseif(! $fs['enabled'])
                             <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">⚠️ Đã đặt mặt — cần bật “đồng bộ khuôn mặt” trong Cài đặt</span>
-                        @elseif($fs['edit_sync'])
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">✅ Mô tả (ảnh mới) + đổi mặt chính xác (model chỉnh sửa)</span>
                         @else
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">✅ Mô tả khi tạo ảnh mới · đổi mặt chính xác (tuỳ chọn)</span>
+                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">✅ Đồng bộ khuôn mặt (mô tả vào prompt khi tạo ảnh mới)</span>
                         @endif
-                        <p class="mt-0.5 text-[10px] text-cream-200/50">Ảnh mặt này dùng để <b>mô tả khuôn mặt</b> (nhúng vào prompt khi tạo ảnh mới — miễn phí, không thêm lệnh gọi) và <b>đổi mặt chính xác 1:1</b> chỉ khi bật “Đồng bộ khuôn mặt (model chỉnh sửa)” trong Cài đặt (thêm 1 lần gọi, ~40s).</p>
+                        <p class="mt-0.5 text-[10px] text-cream-200/50">Ảnh mặt này dùng để AI mô tả khuôn mặt và nhúng vào prompt khi tạo ảnh/video mới, giữ nhân vật nhất quán — miễn phí, không thêm lệnh gọi.</p>
                         <div class="mt-2 flex flex-wrap items-center gap-2">
                             <button type="button" @click="$refs.faceInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh mặt</button>
                             <template x-if="faceImage"><img :src="faceImage" class="h-12 w-12 rounded-full bg-ink-900 object-cover" alt="Khuôn mặt"></template>
@@ -511,27 +517,7 @@ document.addEventListener('alpine:init', () => {
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
         translateViOpen: false, viPrompt: '', translating: false,
-        quickOptions: { background: '', pose: '', angle: '' },
-        quickRefs: {
-            backgrounds: [
-                { l: 'Studio trắng', v: 'a clean seamless white studio background' },
-                { l: 'Phố cổ', v: 'an old-town cobblestone street' },
-                { l: 'Thiên nhiên', v: 'a lush green nature landscape' },
-                { l: 'Bờ biển', v: 'a serene seaside beach at golden hour' },
-                { l: 'Đường đêm', v: 'a neon-lit modern city street at night' },
-            ],
-            poses: [
-                { l: 'Đứng thẳng', v: 'standing straight, arms relaxed, full body' },
-                { l: 'Sải bước', v: 'walking mid-stride catwalk, dynamic' },
-                { l: 'Ngồi', v: 'sitting elegantly on a high studio stool, one leg extended' },
-                { l: 'Xoay', v: 'twirling gracefully, skirt flaring' },
-            ],
-            angles: [
-                { l: 'Toàn thân', v: 'full body shot' },
-                { l: 'Cận trên', v: 'torso crop shot, chest to mid-thigh' },
-                { l: 'Đặc tả', v: 'extreme close-up of the garment' },
-            ],
-        },
+
         previewId: null,
         viewGen: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false, step: 1,
@@ -591,6 +577,7 @@ document.addEventListener('alpine:init', () => {
             let _trDeb = null;
             this.$watch('output.image_prompt_en', (val) => {
                 clearTimeout(_trDeb);
+                if (this._skipTranslate) { this._skipTranslate = false; return; } // Xong set EN from VI -> don't re-translate
                 const v = String(val || '').trim();
                 if (!v) return;
                 _trDeb = setTimeout(() => { this.silentTranslate(v); }, 600);
@@ -867,7 +854,7 @@ document.addEventListener('alpine:init', () => {
         async saveTranslateVi() {
             if (!this.viPrompt.trim()) { Alpine.store('toast').show('Prompt tiếng Việt trống.', 'error'); return; }
             this.translating = true;
-            try { const d = await this.api('/studio/translate', { text: this.viPrompt.trim(), direction: 'en' }); this.output.image_prompt_en = d.text || this.viPrompt.trim(); Alpine.store('toast').show('Đã cập nhật prompt (dịch sang tiếng Anh).'); }
+            try { const d = await this.api('/studio/translate', { text: this.viPrompt.trim(), direction: 'en' }); this._skipTranslate = true; this.output.image_prompt_en = d.text || this.viPrompt.trim(); Alpine.store('toast').show('Đã cập nhật prompt (dịch sang tiếng Anh).'); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.translating = false; this.translateViOpen = false; }
         },
@@ -908,7 +895,7 @@ document.addEventListener('alpine:init', () => {
             const tmpId = 'tmp-' + Date.now();
             this.addGen({ id: tmpId, type: 'image', status: 'processing', model: '', provider: this.imgProvider || '', media_url: null, error: null, credits_cost: 1, created_at: 'Đang tạo' });
             try {
-                const data = await this.api('/studio/generate', { prompt: this.composedPrompt(), resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null, variants: Number(this.variantCount) || 1 });
+                const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null, variants: Number(this.variantCount) || 1 });
                 this.generations = this.generations.filter(g => g.id !== tmpId);
                 const items = Array.isArray(data.items) ? data.items : [data];
                 items.forEach((it) => {
@@ -972,81 +959,6 @@ document.addEventListener('alpine:init', () => {
             finally { this.suggesting = false; }
         },
 
-        // Tạo ảnh MỚI từ ảnh tham khảo: giữ đặc điểm trang phục (mô tả qua vision) + áp tư thế/hậu cảnh/
-        // góc máy/phong cách bạn chọn ở Presets (đổi biến thể nhưng giữ "bản sắc" trang phục).
-        async createFromRef() {
-            if ((!this.refFile && !this.refUrl && !this.refImage) || this.refBusy) return;
-            this.refBusy = true;
-            try {
-                // PHẪU THUẬT ảnh tham khảo theo preset đã chọn: dùng model chỉnh sửa (qwen-edit) trên
-                // chính ảnh tham khảo làm BASE — GIỮ NGUYÊN trang phục/khuôn mặt/người, chỉ đổi theo preset
-                // (tư thế/hậu cảnh/góc/phong cách). Khuôn mặt (👤) sẽ được đồng bộ ở bước render nếu bật.
-                const variation = ['pose', 'background', 'camera', 'style']
-                    .map((c) => this.selectedPresetText(c)).filter(Boolean).join(', ');
-                let instruction = 'Keep the exact garment, outfit, person, face and camera as in the reference image.';
-                if (variation) instruction += ' Change only these: ' + variation + '.';
-                else instruction += ' Keep everything identical, only refine the details and quality.';
-                let refUrl = this.refUrl;
-                if (refUrl && String(refUrl).startsWith('blob:')) refUrl = null;
-                if (!refUrl && this.refFile) {
-                    const fd = new FormData(); fd.append('image', this.refFile);
-                    const up = await this.upload('/studio/upload-ref', fd);
-                    refUrl = up.url;
-                }
-                if (!refUrl) { Alpine.store('toast').show('Ảnh tham khảo cần là URL lưu trữ — chọn từ sản phẩm/kết quả hoặc tải ảnh mới.', 'error'); return; }
-                const data = await this.api('/studio/generate', { prompt: instruction, base_image: refUrl, edit: '1', history_id: this.output.history_id, project_id: this.currentProjectId || null });
-                const items = Array.isArray(data.items) ? data.items : [data];
-                items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' }));
-                if (items.length) this.previewId = items[0].generation_id;
-                if (items.length) Alpine.store('toast').show('Đang phẫu thuật ảnh tham khảo (theo preset)… #' + items[0].generation_id);
-                Alpine.store('toast').show('Đã tạo mới từ ảnh tham khảo (không phẫu thuật) — giữ bản sắc, dùng tư thế/hậu cảnh bạn chọn.');
-            } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
-            finally { this.refBusy = false; }
-        },
-
-        // Giữ chính xác từng pixel: dùng model chỉnh sửa (qwen-edit) trên ảnh tham khảo làm BASE —
-        // thay nền/tư thế/góc nhưng GIỮ NGUYÊN trang phục & khuôn mặt như ảnh gốc.
-        async editRef(instruction) {
-            if ((!this.refFile && !this.refUrl && !this.refImage) || this.refBusy) return;
-            this.refBusy = true;
-            try {
-                let refUrl = this.refUrl;
-                if (refUrl && String(refUrl).startsWith('blob:')) refUrl = null;
-                if (!refUrl && this.refFile) {
-                    const fd = new FormData(); fd.append('image', this.refFile);
-                    const up = await this.upload('/studio/upload-ref', fd);
-                    refUrl = up.url;
-                }
-                if (!refUrl) { Alpine.store('toast').show('Ảnh tham khảo cần là URL lưu trữ — chọn từ sản phẩm/kết quả hoặc tải ảnh mới.', 'error'); return; }
-                const data = await this.api('/studio/generate', { prompt: instruction, base_image: refUrl, edit: '1', history_id: this.output.history_id, project_id: this.currentProjectId || null });
-                const items = Array.isArray(data.items) ? data.items : [data];
-                items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' }));
-                if (items.length) this.previewId = items[0].generation_id;
-                if (items.length) Alpine.store('toast').show('Đang đổi nhanh (giữ nguyên trang phục)… #' + items[0].generation_id);
-            } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
-            finally { this.refBusy = false; }
-        },
-
-        // Đổi nhanh CHỈ tạo ảnh sau khi người dùng xác nhận (tránh tốn credit ngoài ý muốn).
-        quickEdit(instruction) {
-            if (!confirm('Tạo ảnh MỚI từ ảnh tham khảo (giữ nguyên trang phục)? Bước này sẽ tạo 1 ảnh.')) return;
-            this.editRef(instruction);
-        },
-        // Toggle một "lựa chọn nhanh" (Nền/Tư thế/Góc) — chỉ ghi vào prompt, KHÔNG tự tạo ảnh.
-        toggleQuick(cat, val) { this.quickOptions[cat] = this.quickOptions[cat] === val ? '' : val; },
-        quickText() {
-            const o = this.quickOptions; const parts = [];
-            if (o.background) parts.push('background: ' + o.background);
-            if (o.pose) parts.push('pose: ' + o.pose);
-            if (o.angle) parts.push('camera: ' + o.angle);
-            return parts.join(', ');
-        },
-        composedPrompt() {
-            let p = (this.output.image_prompt_en || '').trim();
-            const q = this.quickText();
-            if (q && !p.toLowerCase().includes(q.toLowerCase())) p = (p ? p + ', ' : '') + q;
-            return p;
-        },
 
         addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else { gen._t0 = Date.now(); this.generations.unshift(gen); } this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
         async syncLatest() { try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); if (d && d.items) this.generations = d.items; } catch (e) {} },

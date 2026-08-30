@@ -28,9 +28,8 @@ class StudioController extends Controller
 
         return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount')
             + [
-                'faceSync' => [   // trạng thái đồng bộ khuôn mặt cho ô 👤
+                'faceSync' => [   // trạng thái đồng bộ khuôn mặt cho ô 👤 (mô tả vào prompt khi tạo ảnh mới)
                     'enabled' => filter_var(setting('studio_face_sync_enabled', config('studio.face_sync_enabled', true)), FILTER_VALIDATE_BOOL),
-                    'edit_sync' => filter_var(setting('studio_face_edit_sync', config('studio.face_edit_sync', false)), FILTER_VALIDATE_BOOL),
                     'has_ref' => (bool) setting('studio_face_ref', ''),
                 ],
             ]);
@@ -860,7 +859,6 @@ class StudioController extends Controller
             'dashscope_base' => setting('studio_dashscope_base', config('studio.dashscope_base')),
             'dashscope_token_plan_base' => setting('studio_dashscope_token_plan_base', config('studio.dashscope_token_plan_base')),
             'face_sync_enabled' => setting('studio_face_sync_enabled', config('studio.face_sync_enabled')),
-            'face_edit_sync' => setting('studio_face_edit_sync', config('studio.face_edit_sync')),
             'processing' => setting('studio_processing', config('studio.processing')),
             'image_resolution' => setting('studio_image_resolution', config('studio.image_resolution')),
             'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
@@ -999,7 +997,6 @@ class StudioController extends Controller
             'dashscope_base' => ['required', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
             'dashscope_token_plan_base' => ['nullable', 'string', 'max:255', 'regex:/^https?:\/\/[^\/]+$/'],
             'face_sync_enabled' => ['nullable', 'boolean'],
-            'face_edit_sync' => ['nullable', 'boolean'],
             'processing' => ['required', 'string', 'in:sync,queue'],
             'image_resolution' => ['required', 'string', 'in:1K,2K'],
             'video_resolution' => ['required', 'string', 'in:480,720,1080'],
@@ -1024,7 +1021,6 @@ class StudioController extends Controller
         set_setting('studio_dashscope_base', $data['dashscope_base']);
         set_setting('studio_dashscope_token_plan_base', $data['dashscope_token_plan_base'] ?? config('studio.dashscope_token_plan_base'));
         set_setting('studio_face_sync_enabled', isset($data['face_sync_enabled']) ? ($data['face_sync_enabled'] ? '1' : '0') : '1');
-        set_setting('studio_face_edit_sync', isset($data['face_edit_sync']) ? ($data['face_edit_sync'] ? '1' : '0') : '0');
         set_setting('studio_processing', $data['processing']);
         set_setting('studio_image_resolution', $data['image_resolution']);
         set_setting('studio_video_resolution', $data['video_resolution']);
