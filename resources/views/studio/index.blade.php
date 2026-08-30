@@ -222,6 +222,9 @@
                 <!-- Media area -->
                 <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
 
+                    <!-- Clean canvas -->
+                    <button x-show="preview || selectedImageId || videoSourceId" @click="cleanCanvas()" class="absolute left-3 top-3 z-20 rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-cream-200 shadow backdrop-blur transition-colors hover:bg-red-600 hover:text-white" title="Dọn canvas — xoá ảnh/video đang xem và các nguồn (Chỉnh sửa, Video) đang dùng" @pointerdown.stop @click.stop>🗑 Dọn canvas</button>
+
                     <!-- Canvas contextual actions (per-step) -->
                     <div class="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint).">✏️ Sửa ảnh</button>
@@ -653,11 +656,19 @@ document.addEventListener('alpine:init', () => {
             Alpine.store('toast').show('Đã ghép prompt video từ ý tưởng + preset (chỉnh tay nếu cần).');
         },
 
+        resetForRef() {
+            // Reference image changed/removed -> clear the derived prompt & suggestion to avoid overlap.
+            this.suggestResult = { styles: [], background: '', image_prompt_en: '' };
+            this.output.image_prompt_en = '';
+            this.output.video_prompt_en = '';
+            this.refinePrompt = '';
+        },
         onRefChange(e) {
             const f = e.target.files && e.target.files[0];
             if (!f) return;
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refFile = f; this.refImage = URL.createObjectURL(f); this.refUrl = null;
+            this.resetForRef();
         },
         clearPresets() { this.presetIds = []; },
         async openRefPicker() {
@@ -670,16 +681,24 @@ document.addEventListener('alpine:init', () => {
         chooseProduct(item) {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refUrl = item.url; this.refImage = item.url; this.refFile = null; this.refOpen = false;
+            this.resetForRef();
         },
         openOutputsRef() { this.outputsRefOpen = true; },
         useOutputRef(g) {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refUrl = g.media_url; this.refImage = g.media_url; this.refFile = null; this.outputsRefOpen = false;
+            this.resetForRef();
             Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm ảnh tham khảo.');
         },
         clearRef() {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refImage = null; this.refFile = null; this.refUrl = null;
+            this.resetForRef();
+        },
+        cleanCanvas() {
+            this.previewId = null; this.selectedImageId = null; this.videoSourceId = null; this.viewGen = null;
+            this.palette = []; this.pan = { x: 0, y: 0 }; this.zoom = 1;
+            Alpine.store('toast').show('Đã dọn canvas — bỏ ảnh/video đang xem & các nguồn đang dùng.', 'info');
         },
 
         async processNow() {
