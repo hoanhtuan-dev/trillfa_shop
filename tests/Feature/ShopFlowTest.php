@@ -827,7 +827,7 @@ class ShopFlowTest extends TestCase
             'history_id' => null,
         ])->assertOk()->json();
 
-        $gen = \App\Models\Generation::find($image['generation_id']);
+        $gen = \App\Models\Generation::find($image['items'][0]['generation_id']);
         $this->assertSame('pending', $gen->status);
         $this->getJson('/studio/generations/'.$gen->id)->assertOk();
         $this->assertSame('completed', $gen->fresh()->status);
@@ -887,7 +887,7 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin);
 
         $img = $this->postJson('/studio/generate', ['prompt' => 'a silk gown', 'resolution' => '2K', 'ratio' => '9:16'])->assertOk();
-        $gen = \App\Models\Generation::find($img->json('generation_id'));
+        $gen = \App\Models\Generation::find($img->json('items.0.generation_id'));
         $this->assertSame('2K', $gen->resolution);
         $this->assertSame('9:16', $gen->ratio);
 

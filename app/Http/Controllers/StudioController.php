@@ -89,11 +89,32 @@ class StudioController extends Controller
             'ratio' => ['nullable', 'string', 'in:1:1,4:3,3:4,16:9,9:16,4:5,21:9,19:6'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
+            'variants' => ['nullable', 'integer', 'in:1,2,4'],
         ]);
 
-        $cost = (int) studio_config('image_credits', 1);
+        // Ensure a shared prompt-history so all variants group as one "generation run".
+        if (empty($data['history_id'])) {
+            $history = auth()->user()->prompts()->create([
+                'idea' => null,
+                'image_prompt_en' => $data['prompt'],
+                'video_prompt_en' => null,
+                'json_response' => ['image_prompt_en' => $data['prompt']],
+            ]);
+            $data['history_id'] = $history->id;
+        }
 
-        return $this->queueGeneration('image', $data, $cost);
+        $cost = (int) studio_config('image_credits', 1);
+        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
+
+        $items = [];
+        for ($i = 0; $i < $variants; $i++) {
+            $items[] = $this->queueGeneration('image', $data, $cost)->getData(true);
+        }
+
+        return response()->json([
+            'items' => $items,
+            'credits_left' => auth()->user()->fresh()->credits_balance,
+        ]);
     }
 
     /**

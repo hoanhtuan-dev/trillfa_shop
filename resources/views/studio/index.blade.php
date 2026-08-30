@@ -46,11 +46,11 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <div class="grid gap-4 pb-6 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
+    <div class="grid gap-4 pb-6 lg:h-full lg:grid-cols-[minmax(0,1fr)_400px_150px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-2 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
+        <div class="space-y-4 lg:order-2 lg:h-full lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
             <!-- Idea -->
             <div class="card p-5" x-show="step===1" x-transition.opacity>
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
@@ -105,6 +105,14 @@
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select>
                     <select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
+                    <div class="col-span-2">
+                        <label class="label">Số biến thể / lần tạo</label>
+                        <div class="flex gap-1.5">
+                            <template x-for="n in [1, 2, 4]" :key="n">
+                                <button type="button" @click="variantCount = n" class="flex-1 rounded-lg border py-1.5 text-xs font-semibold transition-colors" :class="variantCount === n ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="n"></span></button>
+                            </template>
+                        </div>
+                    </div>
                     <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
                 </div>
             </div>
@@ -190,9 +198,9 @@
         <!-- ===== CENTER: Canvas preview ===== -->
         <!-- =============================================================== -->
         <div class="min-w-0 lg:order-1" x-show="!isMobile || step===2">
-            <div class="card flex flex-col overflow-hidden p-0 lg:sticky lg:top-16">
+            <div class="card flex flex-col overflow-hidden p-0 lg:h-full">
                 <!-- Media area -->
-                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-[calc(100dvh-17rem)]" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
+                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
                     <!-- Step indicator (Progressive Disclosure) — floated over the canvas -->
                     <div class="pointer-events-auto absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-ink-900/80 p-1 text-[11px] font-semibold shadow-lg backdrop-blur" @pointerdown.stop @click.stop>
                         <button @click="step=1" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===1?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/25':'bg-white/10'">1</span> Concept</button>
@@ -254,8 +262,8 @@
                         <span class="truncate text-xs text-cream-300" x-text="preview ? genInfoLine(preview) + ' · ' + preview.credits_cost + ' token' : ''"></span>
                     </span>
                     <span class="flex flex-wrap items-center gap-2">
-                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Chỉnh sửa (Inpaint) ở bảng AI Design Inputs.">✏️ Sửa ảnh <span x-show="selectedImageId === preview.id" class="ml-0.5 text-[10px]">✓</span></button>
-                        <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Render Video catwalk ở bảng Generation Parameters.">🎬 Tạo video <span x-show="videoSourceId === preview.id" class="ml-0.5 text-[10px] text-brand-700">✓</span></button>
+                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Chỉnh sửa (Inpaint) ở bảng AI Design Inputs.">✏️ Sửa ảnh <span x-show="preview && selectedImageId === preview.id" class="ml-0.5 text-[10px]">✓</span></button>
+                        <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="preview && preview.type === 'image'" title="Chọn ảnh này làm nguồn để Render Video catwalk ở bảng Generation Parameters.">🎬 Tạo video <span x-show="preview && videoSourceId === preview.id" class="ml-0.5 text-[10px] text-brand-700">✓</span></button>
                         <a :href="preview ? '/studio/generations/' + preview.id + '/download' : '#'" class="btn-outline btn-sm" x-show="preview && preview.media_url">Tải xuống</a>
                         <button @click="cancelGeneration(preview)" :disabled="!preview || !isActive(preview.status)" class="btn-outline btn-sm text-red-600" x-show="preview && isActive(preview.status)">Dừng</button>
                         <button @click="removeGeneration(preview)" class="btn-outline btn-sm text-red-600">Xóa</button>
@@ -271,7 +279,7 @@
         <!-- =============================================================== -->
         <!-- ===== RIGHT: Generation Parameters ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-3" x-show="!isMobile || step===3">
+        <div class="space-y-4 lg:order-3 lg:h-full lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===3">
             <!-- Outputs grid -->
             <div class="card p-4">
                 <div class="mb-3 flex items-center justify-between">
@@ -399,7 +407,7 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('studioApp', (presets, gens, projects, credits, currentProject, catLabels, imageRes, videoRes, imageRatio, videoDuration, creativeLevel) => ({
         presets, projects, catLabels,
-        imageRes: imageRes || '2K', videoRes: videoRes || '720', imageRatio: imageRatio || '1:1', videoDuration: videoDuration || '10',
+        imageRes: imageRes || '2K', videoRes: videoRes || '720', imageRatio: imageRatio || '1:1', videoDuration: videoDuration || '10', variantCount: 1,
         creativeLevel: Number(creativeLevel) || 6,
         idea: '', presetIds: [],
         loading: false, generating: false, videoBusy: false, refining: false,
@@ -471,19 +479,37 @@ document.addEventListener('alpine:init', () => {
             return this.generations.filter(g => g.id === p.id);
         },
         setPreview(g) { if (g) { this.previewId = g.id; this.loadPalette(g.id); } },
-        zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25).toFixed(2)); },
-        zoomOut() { this.zoom = Math.max(0.6, +(this.zoom - 0.25).toFixed(2)); },
+        _zoomAt(cx, cy, factor) {
+            const old = this.zoom;
+            const nz = Math.min(4, Math.max(0.6, +(old * factor).toFixed(2)));
+            if (nz === old) return;
+            const k = nz / old;
+            this.pan.x = +((1 - k) * cx + k * this.pan.x).toFixed(2);
+            this.pan.y = +((1 - k) * cy + k * this.pan.y).toFixed(2);
+            this.zoom = nz;
+        },
+        zoomIn() { this._zoomAt(0, 0, 1.25); },
+        zoomOut() { this._zoomAt(0, 0, 0.8); },
         resetZoom() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
         panBy(dx, dy) { this.pan.x += dx; this.pan.y += dy; },
         startPan(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
         movePan(e) { if (!this._drag) return; this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); },
         endPan() { this._drag = null; },
-        onWheel(e) { const delta = e.deltaY > 0 ? -0.25 : 0.25; this.zoom = Math.min(4, Math.max(0.6, +(this.zoom + delta).toFixed(2))); },
+        onWheel(e) {
+            const r = e.currentTarget.getBoundingClientRect();
+            const cx = e.clientX - (r.left + r.width / 2), cy = e.clientY - (r.top + r.height / 2);
+            this._zoomAt(cx, cy, e.deltaY > 0 ? 0.82 : 1.22);
+        },
         _touchDist: null,
         onTouchPinch(e) {
             if (e.touches.length === 2) {
-                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                if (this._touchDist) { const f = d / this._touchDist; this.zoom = Math.max(0.6, Math.min(4, +(this.zoom * f).toFixed(2))); }
+                const t0 = e.touches[0], t1 = e.touches[1];
+                const d = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+                if (this._touchDist) {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const cx = ((t0.clientX + t1.clientX) / 2) - (r.left + r.width / 2), cy = ((t0.clientY + t1.clientY) / 2) - (r.top + r.height / 2);
+                    this._zoomAt(cx, cy, d / this._touchDist);
+                }
                 this._touchDist = d;
             } else { this._touchDist = null; }
         },
@@ -492,10 +518,23 @@ document.addEventListener('alpine:init', () => {
         closeGenView() { this.viewGen = null; },
         openLightbox() { this.lbZoom = 1; this.lbPan = { x: 0, y: 0 }; this.lightbox = true; document.body.style.overflow = 'hidden'; },
         closeLightbox() { this.lightbox = false; document.body.style.overflow = ''; },
-        lbZoomIn() { this.lbZoom = Math.min(8, +(this.lbZoom + 0.5).toFixed(2)); },
-        lbZoomOut() { this.lbZoom = Math.max(0.6, +(this.lbZoom - 0.5).toFixed(2)); },
+        _lbZoomAt(cx, cy, factor) {
+            const old = this.lbZoom;
+            const nz = Math.min(8, Math.max(0.6, +(old * factor).toFixed(2)));
+            if (nz === old) return;
+            const k = nz / old;
+            this.lbPan.x = +((1 - k) * cx + k * this.lbPan.x).toFixed(2);
+            this.lbPan.y = +((1 - k) * cy + k * this.lbPan.y).toFixed(2);
+            this.lbZoom = nz;
+        },
+        lbZoomIn() { this._lbZoomAt(0, 0, 1.5); },
+        lbZoomOut() { this._lbZoomAt(0, 0, 0.66); },
         lbReset() { this.lbZoom = 1; this.lbPan = { x: 0, y: 0 }; },
-        onLbWheel(e) { const d = e.deltaY > 0 ? -0.5 : 0.5; this.lbZoom = Math.min(8, Math.max(0.6, +(this.lbZoom + d).toFixed(2))); },
+        onLbWheel(e) {
+            const el = e.currentTarget; const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+            const cx = e.clientX - (r.left + r.width / 2), cy = e.clientY - (r.top + r.height / 2);
+            this._lbZoomAt(cx, cy, e.deltaY > 0 ? 0.82 : 1.22);
+        },
         lbStartPan(e) { this._lbDrag = { x: e.clientX, y: e.clientY, px: this.lbPan.x, py: this.lbPan.y }; },
         lbMovePan(e) { if (!this._lbDrag) return; this.lbPan.x = this._lbDrag.px + (e.clientX - this._lbDrag.x); this.lbPan.y = this._lbDrag.py + (e.clientY - this._lbDrag.y); },
         lbEndPan() { this._lbDrag = null; },
@@ -650,12 +689,17 @@ document.addEventListener('alpine:init', () => {
             const tmpId = 'tmp-' + Date.now();
             this.addGen({ id: tmpId, type: 'image', status: 'processing', model: '', provider: this.imgProvider || '', media_url: null, error: null, credits_cost: 1, created_at: 'Đang tạo' });
             try {
-                const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null });
+                const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null, variants: Number(this.variantCount) || 1 });
                 this.generations = this.generations.filter(g => g.id !== tmpId);
-                this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' });
-                this.creditsLeft = data.credits_left;
-                if (data.status === 'completed') { Alpine.store('toast').show('Đã tạo xong ảnh #' + data.generation_id); if (this.isMobile) this.step = 2; }
-                this.maybePoll(data.generation_id, data.status);
+                const items = Array.isArray(data.items) ? data.items : [data];
+                items.forEach((it) => {
+                    this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' });
+                });
+                if (items.length) this.previewId = items[0].generation_id;
+                this.creditsLeft = data.credits_left != null ? data.credits_left : this.creditsLeft;
+                const first = items[0];
+                if (first && first.status === 'completed') { Alpine.store('toast').show('Đã tạo xong ' + items.length + ' biến thể.'); if (this.isMobile) this.step = 2; }
+                items.forEach(it => this.maybePoll(it.generation_id, it.status));
             } catch (e) {
                 this.generations = this.generations.filter(g => g.id !== tmpId);
                 Alpine.store('toast').show(e.message || 'Lỗi.', 'error');

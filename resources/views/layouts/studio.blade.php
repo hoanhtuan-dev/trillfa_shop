@@ -30,8 +30,8 @@
         $routeName = request()->route()?->getName();
     @endphp
 </head>
-<body class="min-h-screen bg-ink-800 text-cream-100 antialiased">
-    <div class="flex min-h-screen" x-data="{ sidebarCollapsed: false, navOpen: { ai: true, pm: true, catwalk: true, asset: true, sys: true } }">
+<body class="h-screen overflow-hidden bg-ink-800 text-cream-100 antialiased">
+    <div class="flex h-screen" x-data="{ sidebarCollapsed: false, navOpen: { ai: true, pm: true, catwalk: true, asset: true, sys: true } }">
         <!-- ===== Left sidebar ===== -->
         <aside class="hidden shrink-0 flex-col border-r border-ink-700 bg-ink-800 transition-[width] duration-300" :class="sidebarCollapsed ? 'lg:flex lg:w-16' : 'lg:flex lg:w-60'">
             <a href="{{ route('studio.index') }}" class="flex items-center gap-2 border-b border-ink-700 px-3 py-4">
@@ -60,45 +60,51 @@
                 <a href="{{ route('admin.dashboard') }}" class="studio-nav" :class="sidebarCollapsed ? 'justify-center px-1.5' : ''" :title="sidebarCollapsed ? 'Quản trị shop' : null"><svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7l1.5-3h15L21 7M4 7v13h16V7M9 20v-6h6v6"/></svg><span class="truncate" x-show="!sidebarCollapsed">Quản trị shop</span></a>
             </nav>
             <div class="border-t border-ink-700 px-3 py-3" x-show="!sidebarCollapsed">
-                <div class="flex items-center justify-between text-xs"><span class="text-cream-300">Tín dụng</span><span class="font-semibold text-cream-50">{{ $credits }}</span></div>
-                <div class="mt-1 flex items-center gap-1 text-[11px] text-cream-300"><span class="inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>{{ $connected ? 'Kết nối AI' : 'Chế độ Stub' }}</div>
+                <div class="mb-2 flex items-center justify-between">
+                    <span class="font-display text-sm font-semibold text-cream-50">@yield('title', 'Trillfa Studio')</span>
+                    <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 hover:text-white" :title="'Ẩn thanh bên'">«</button>
+                </div>
+                <div class="mb-2 flex items-center gap-1 text-[11px] text-cream-300"><span class="inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>{{ $connected ? 'Kết nối AI' : 'Chế độ Stub' }}</div>
+                <div class="space-y-1 text-xs">
+                    <div class="flex items-center justify-between"><span class="text-cream-300">Tín dụng</span><span class="font-semibold text-cream-50">{{ $credits }}</span></div>
+                    <div class="flex items-center justify-between"><span class="text-cream-300">Đã dùng</span><span class="text-cream-200">{{ $creditsUsed }}</span></div>
+                    <div class="flex items-center justify-between"><span class="text-cream-300">Queue</span><span class="text-cream-200">{{ $pendingCount }} pending</span></div>
+                    <div class="flex items-center justify-between"><span class="text-cream-300">User</span><span class="text-cream-200">{{ $u?->name }}</span></div>
+                </div>
+                <div class="mt-3 flex items-center gap-2">
+                    <a href="{{ route('studio.settings') }}" class="link text-xs">Trợ giúp</a>
+                    <form method="POST" action="{{ route('logout') }}" class="ml-auto">@csrf
+                        <button type="submit" class="rounded-full border border-ink-700 px-3 py-1 text-xs font-semibold text-cream-100 hover:bg-ink-700 hover:text-white">Đăng xuất</button>
+                    </form>
+                </div>
             </div>
-            <div class="border-t border-ink-700 px-3 py-3 text-center" x-show="sidebarCollapsed">
-                <span class="block text-sm font-semibold text-cream-50">{{ $credits }}</span>
-                <span class="mt-1 inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
+            <div class="flex flex-col items-center gap-2 border-t border-ink-700 px-2 py-3" x-show="sidebarCollapsed">
+                <button @click="sidebarCollapsed = !sidebarCollapsed" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-700 text-cream-200 hover:bg-ink-700" :title="'Hiện thanh bên'">»</button>
+                <span class="text-xs font-semibold text-cream-50">{{ $credits }}</span>
+                <span class="inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>
+                <form method="POST" action="{{ route('logout') }}">@csrf
+                    <button type="submit" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-700 text-cream-200 hover:bg-ink-700" title="Đăng xuất">⎋</button>
+                </form>
             </div>
         </aside>
 
         <!-- ===== Main region ===== -->
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-4 border-b border-ink-700 bg-ink-800/95 px-4 backdrop-blur">
+            <header class="sticky top-0 z-40 flex h-12 items-center justify-between gap-4 border-b border-ink-700 bg-ink-800/95 px-4 backdrop-blur lg:hidden">
                 <div class="flex items-center gap-2 text-sm">
-                    <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 transition-colors hover:bg-ink-700 hover:text-white" :title="sidebarCollapsed ? 'Hiện thanh bên' : 'Ẩn thanh bên'"><span x-text="sidebarCollapsed ? '»' : '«'"></span></button>
                     <span class="font-display text-sm font-semibold text-cream-50">@yield('title', 'Trillfa Studio')</span>
-                    <span class="hidden badge bg-ink-700 text-cream-200 sm:inline-flex">{{ $connected ? 'AI Connected' : 'Stub' }}</span>
+                    <span class="badge bg-ink-700 text-cream-200">{{ $connected ? 'AI' : 'Stub' }}</span>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="badge bg-brand-900/50 text-brand-200">Tín dụng: <span class="font-bold">{{ $credits }}</span></span>
-                    <span class="hidden text-xs text-cream-300 md:inline">{{ $u?->name }}</span>
+                <div class="flex items-center gap-2">
                     <form method="POST" action="{{ route('logout') }}">@csrf
-                        <button type="submit" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 transition-colors hover:bg-ink-700 hover:text-white">Đăng xuất</button>
+                        <button type="submit" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 hover:bg-ink-700 hover:text-white">Đăng xuất</button>
                     </form>
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto bg-ink-900 p-4 sm:p-6 studio-dark">
+            <main class="flex-1 overflow-y-auto bg-ink-900 p-4 sm:p-6 studio-dark lg:overflow-hidden">
                 @yield('content')
             </main>
-
-            <!-- ===== Status bar ===== -->
-            <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-700 bg-ink-800 px-4 py-2 text-[11px] text-cream-300">
-                <span>User: <b class="text-cream-50">{{ $u?->name }}</b></span>
-                <span>Credits: <b class="text-cream-50">{{ $credits }}</b></span>
-                <span>Used: <b class="text-cream-50">{{ $creditsUsed }}</b></span>
-                <span>Job Queue: <b class="text-cream-50">{{ $pendingCount }}</b> pending</span>
-                <span>Sync Status: <b class="{{ $connected ? 'text-emerald-400' : 'text-amber-400' }}">{{ $connected ? 'Connected' : 'Stub' }}</b></span>
-                <span class="ml-auto"><a href="{{ route('studio.settings') }}" class="link">Trợ giúp</a></span>
-            </footer>
         </div>
     </div>
 
