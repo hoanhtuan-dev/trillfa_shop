@@ -439,6 +439,10 @@ document.addEventListener('alpine:init', () => {
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
         async init() {
+            // "Catwalk Video" nav (/studio#catwalk) opens Step 3 (Director / catwalk) directly.
+            const goCatwalk = () => { if (location.hash === '#catwalk') this.step = 3; };
+            goCatwalk();
+            window.addEventListener('hashchange', goCatwalk);
             const q = new URLSearchParams(location.search).get('gen');
             let target = null;
             if (q) {
