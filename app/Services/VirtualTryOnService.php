@@ -93,16 +93,17 @@ class VirtualTryOnService
 
     // Fallback khi try-on không khả dụng (region/intl hoặc free-trial hết): dùng qwen-image-edit để
     // đổi người mẫu/dáng trên ảnh thiết kế, GIỮ NGUYÊN 100% trang phục.
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = ''): ?string
     {
         // Dùng model được quản lý cho "Thay Đổi Người Mẫu" (studio.swap_model) qua swapEdit (có retry 429).
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
+        $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Change the person to a '.$modelDesc.' and set the pose to '.$pose.'.';
+        if ($background && strtolower($background) !== 'keep') {
+            $instr .= ' Set the background to '.$background.'.';
+        }
+        $instr .= ' Photorealistic, full body, high fashion.';
         $svc = app(ImageAIService::class);
-        return $svc->swapEdit(
-            'Keep the exact garment, outfit and all its details 100% unchanged. Change the person to a '.$modelDesc.' and set the pose to '.$pose.'. Photorealistic, full body, high fashion.',
-            $designImage,
-            $swapModel
-        );
+        return $svc->swapEdit($instr, $designImage, $swapModel);
     }
 
     public function status(string $taskId): array

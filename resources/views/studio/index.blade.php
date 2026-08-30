@@ -206,7 +206,13 @@
                             </template>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 border-t border-ink-700 px-5 py-3">
+                    <p class="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🏙 Hậu cảnh</p>
+                        <div class="mb-3 flex flex-wrap gap-1.5">
+                            <template x-for="bg in swapBackgrounds" :key="bg.v">
+                                <button @click="swapBackground = bg.v" class="rounded-full border px-2 py-1 text-[11px] transition-colors" :class="swapBackground === bg.v ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 bg-ink-700/40 text-cream-200 hover:bg-ink-700'" x-text="bg.l"></button>
+                            </template>
+                        </div>
+                        <div class="flex items-center gap-2 border-t border-ink-700 px-5 py-3">
                         <button class="btn-outline btn-sm mr-auto" @click="$refs.swapModelInput.click()">➕ Thêm khuôn mặt</button>
                         <button class="btn-outline btn-sm" @click="$refs.swapPoseInput.click()">➕ Thêm dáng</button>
                         <input x-ref="swapModelInput" type="file" accept="image/*" @change="addSwapAsset('model', $event)" class="hidden">
@@ -585,6 +591,14 @@ document.addEventListener('alpine:init', () => {
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
         swapOpen: false, swapModelIds: [], swapPoseIds: [], swapLoading: false, lookbook: [], lookbookOpen: false,
+        swapBackground: '', swapBackgrounds: [
+            { v: '', l: 'Giữ nền gốc' },
+            { v: 'a clean white studio background', l: 'Studio trắng' },
+            { v: 'an old-town cobblestone street', l: 'Phố cổ' },
+            { v: 'a lush green nature landscape', l: 'Thiên nhiên' },
+            { v: 'a serene seaside beach at golden hour', l: 'Bờ biển' },
+            { v: 'a neon-lit city street at night', l: 'Đường đêm' },
+        ],
         swapModels: [
             { id: 'model01', name: 'Mẫu 1', img: '/samples/model-01.png' },
             { id: 'model02', name: 'Mẫu 2', img: '/samples/model-02.png' },
