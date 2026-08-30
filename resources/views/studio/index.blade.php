@@ -274,60 +274,6 @@
                 </template>
             </div>
 
-            <!-- Fitting Room: Đồng bộ khuôn mặt -->
-            <div class="card p-5" x-show="step===2">
-                <div class="flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">👤 Đồng bộ khuôn mặt</h2>
-                    <button class="text-[10px] text-cream-300/60 hover:text-red-300" @click="clearEditFace()" x-show="editFace">Bỏ</button>
-                </div>
-                <p class="mt-1 text-xs text-ink-500">Tải ảnh khuôn mặt mẫu → phẫu thuật sẽ đồng bộ nhân vật.</p>
-                <div class="mt-2 flex items-center gap-2">
-                    <button class="btn-outline btn-sm" @click="$refs.editFaceInput.click()">Tải ảnh mặt</button>
-                    <template x-if="editFace"><img :src="editFace" class="h-12 w-12 rounded-full bg-ink-900 object-cover" alt="Khuôn mặt"></template>
-                </div>
-                <input x-ref="editFaceInput" type="file" accept="image/*" @change="onEditFaceChange" class="hidden">
-            </div>
-
-            <!-- Fitting Room: Preset (Bối cảnh + Dáng) -->
-            <div class="card p-5" x-show="step===2">
-                <div class="flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">🎛 Preset</h2>
-                    <button class="btn-brand btn-sm" @click="editPresetOpen = true">Chọn <span x-show="editPresetIds.length" x-text="'(' + editPresetIds.length + ')'"></span></button>
-                </div>
-                <p class="mt-1 text-xs text-ink-500">Chọn bối cảnh / dáng để đưa vào lệnh phẫu thuật.</p>
-                <div class="mt-2 space-y-1 text-[11px]">
-                    <p x-show="editPresetText('background')" class="text-brand-200">Nền: <span x-text="editPresetText('background')"></span></p>
-                    <p x-show="editPresetText('pose')" class="text-brand-200">Dáng: <span x-text="editPresetText('pose')"></span></p>
-                </div>
-                <div x-show="editPresetOpen" x-cloak @click="editPresetOpen=false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
-                        <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
-                            <h3 class="font-display text-base font-semibold text-cream-50">🎛 Preset (Bối cảnh · Dáng)</h3>
-                            <button class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" @click="editPresetOpen=false">✕</button>
-                        </div>
-                        <div class="max-h-[70vh] overflow-y-auto p-5">
-                            <template x-for="cat in ['background','pose']" :key="cat">
-                                <div class="mb-4">
-                                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70" x-text="catLabels[cat] || cat"></p>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <template x-for="item in (presets.find(g => g.category === cat) || {items:[]}).items" :key="item.id">
-                                            <label class="flex cursor-pointer items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] transition-colors" :class="editPresetIds.includes(item.id) ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 bg-ink-700/40 text-cream-200 hover:bg-ink-700'" :title="item.note">
-                                                <input type="checkbox" class="hidden" :checked="editPresetIds.includes(item.id)" @change="toggleEditPreset(item.id)">
-                                                <span x-text="item.key || item.label"></span>
-                                            </label>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                        <div class="flex items-center justify-end gap-2 border-t border-ink-700 px-5 py-3">
-                            <button class="btn-outline btn-sm" @click="editPresetOpen=false">Huỷ</button>
-                            <button class="btn-brand btn-sm" @click="editPresetOpen=false">Áp dụng & Đóng</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Fitting Room: Phẫu thuật Ảnh -->
             <div class="card p-5" x-show="step===2">
                 <h2 class="mb-2 font-display text-base font-semibold text-ink-900">✏️ Phẫu thuật Ảnh</h2>
@@ -414,7 +360,7 @@
                     <div class="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint).">✏️ Sửa ảnh</button>
                         <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="step>=2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Render Video.">🎬 Tạo video</button>
-                        <button @click="openSwap()" class="btn-outline btn-sm whitespace-nowrap text-brand-200" x-show="preview && preview.type==='image' && preview.status==='completed'" title="Thay đổi người mẫu — thử trang phục lên khuôn mặt + dáng bạn chọn.">🔄 Thay Đổi Người Mẫu</button>
+                        <button @click="openSwap()" class="btn-outline btn-sm whitespace-nowrap text-brand-200" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Thay đổi người mẫu — thử trang phục lên khuôn mặt + dáng bạn chọn.">🔄 Thay Đổi Người Mẫu</button>
                     </div>
 
                     <!-- Canvas zoom toolbar (vertical, right edge) -->
@@ -427,8 +373,8 @@
                     </div>
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
-                        <template x-if="preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url">
-                            <img :src="preview.media_url" class="max-h-full max-w-full cursor-zoom-in object-contain" onerror="this.src='/images/placeholder.svg'" @click="openLightbox()">
+                        <template x-if="canvasImg || (preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url)">
+                            <img :src="canvasImg || preview.media_url" class="max-h-full max-w-full cursor-zoom-in object-contain" onerror="this.src='/images/placeholder.svg'" @click="openLightbox()">
                         </template>
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'video' && preview.media_url">
                             <video :src="preview.media_url" class="max-h-full max-w-full object-contain" controls loop muted playsinline></video>
@@ -440,7 +386,7 @@
                                 <p class="mt-1 text-xs text-cream-300" x-show="preview.model" x-text="preview.provider + ' · ' + preview.model"></p>
                             </div>
                         </template>
-                        <template x-if="!preview">
+                        <template x-if="!preview && !canvasImg">
                             <div class="text-center">
                                 <div x-show="opening" class="mx-auto mb-3 h-16 w-16 animate-spin rounded-full border-4 border-brand-600 border-t-transparent"></div>
                                 <div x-show="!opening" class="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-brand-50 text-brand-700">
@@ -648,7 +594,7 @@ document.addEventListener('alpine:init', () => {
             { id: 'pose12', name: 'Bước ngang', img: '/samples/pose-12.png', sk: 'M12 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 9l-3 11h2l1-4 2 4h2l-3-8z' },
         ],
         pickTarget: 'ref',
-        editSource: null, editSourceTmp: '', editFace: '', editFaceRef: '',
+        editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: null,
 
@@ -964,20 +910,21 @@ document.addEventListener('alpine:init', () => {
                 const up = await this.upload('/studio/upload-ref', fd);
                 this.editSource = { url: up.url, label: 'Ảnh tải lên' };
                 this.editSourceTmp = URL.createObjectURL(f);
+                this.canvasImg = this.editSourceTmp; this.selectedImageId = null;
                 Alpine.store('toast').show('Đã chọn ảnh tải lên để chỉnh sửa.');
             } catch (err) { Alpine.store('toast').show(err.message, 'error'); }
         },
         chooseEditProduct(item) {
             this.editSource = { url: item.url, label: item.name || 'Từ sản phẩm' };
-            this.editSourceTmp = item.url; this.refOpen = false;
+            this.editSourceTmp = item.url; this.canvasImg = item.url; this.selectedImageId = null; this.refOpen = false;
             Alpine.store('toast').show('Đã chọn ảnh sản phẩm để chỉnh sửa.');
         },
         useEditOutput(g) {
             this.editSource = { url: g.media_url, label: 'Kết quả #' + g.id, generationId: g.id };
-            this.editSourceTmp = g.media_url; this.selectedImageId = g.id; this.outputsRefOpen = false;
+            this.editSourceTmp = g.media_url; this.canvasImg = g.media_url; this.selectedImageId = g.id; this.outputsRefOpen = false;
         },
         clearEditSource() {
-            this.editSource = null; this.editSourceTmp = '';
+            this.editSource = null; this.editSourceTmp = ''; this.canvasImg = '';
             if (this.selectedImageId) this.selectedImageId = null;
         },
         async onEditFaceChange(e) {
@@ -1188,7 +1135,7 @@ document.addEventListener('alpine:init', () => {
 
         addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else { gen._t0 = Date.now(); this.generations.unshift(gen); } this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
         async syncLatest() { try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); if (d && d.items) this.generations = d.items; } catch (e) {} },
-        selectImage(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.selectedImageId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Chỉnh sửa.'); },
+        selectImage(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.selectedImageId = g.id; this.previewId = g.id; this.editSource = { url: g.media_url, label: 'Ảnh nguồn #' + g.id, generationId: g.id }; this.editSourceTmp = g.media_url; this.canvasImg = ''; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Chỉnh sửa.'); },
         selectVideo(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.videoSourceId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Video.'); },
 
         statusLabel(s) { return { pending:'Đang chờ', processing:'Đang tạo', completed:'Hoàn tất', failed:'Lỗi', cancelled:'Đã hủy' }[s] || s; },

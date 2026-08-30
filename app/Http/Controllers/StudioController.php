@@ -951,6 +951,7 @@ class StudioController extends Controller
             'vision_provider' => setting('studio_vision_provider', config('studio.vision_provider')),
             'prompt_model' => setting('studio_prompt_model', config('studio.prompt_model')),
             'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
+            'swap_model' => setting('studio_swap_model', config('studio.swap_model')),
             'image_model' => setting('studio_image_model', config('studio.image_model')),
             'wan_model' => setting('studio_wan_model', config('studio.wan_model')),
             'qwen_model' => setting('studio_qwen_model', config('studio.qwen_model')),
@@ -1090,6 +1091,7 @@ class StudioController extends Controller
             'vision_provider' => ['required', 'string', 'in:gemini,qwen'],
             'prompt_model' => ['required', 'string', 'max:255'],
             'translate_model' => ['nullable', 'string', 'max:255'],
+            'swap_model' => ['nullable', 'string', 'max:255'],
             'image_model' => ['nullable', 'string', 'max:255'],
             'wan_model' => ['required', 'string', 'max:255'],
             'qwen_model' => ['required', 'string', 'max:255'],
@@ -1115,6 +1117,7 @@ class StudioController extends Controller
         set_setting('studio_vision_provider', $data['vision_provider']);
         set_setting('studio_prompt_model', $data['prompt_model']);
         if (isset($data['translate_model'])) set_setting('studio_translate_model', $data['translate_model']);
+        if (isset($data['swap_model'])) set_setting('studio_swap_model', $data['swap_model']);
         set_setting('studio_image_model', $data['image_model'] ?? '');
         set_setting('studio_wan_model', $data['wan_model']);
         set_setting('studio_qwen_model', $data['qwen_model']);
