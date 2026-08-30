@@ -26,8 +26,11 @@ class VideoAIService
                 } catch (\Throwable $e) {
                     $last = $e->getMessage();
                     capture_provider_quota_reset($last);
-                    if (! is_qwen_quota_error($last)) {
-                        throw $e; // non-quota error -> don't rotate keys
+                    $lower = strtolower((string) $last);
+                    // Rotate to the next key/host on quota exhaustion OR a model-not-exist (wrong host/key type),
+                    // so a pay-go error falls through to the plan slot (and vice versa) before giving up.
+                    if (! is_qwen_quota_error($last) && ! str_contains($lower, 'model not exist') && ! str_contains($lower, 'invalidparameter')) {
+                        throw $e;
                     }
                 }
             }

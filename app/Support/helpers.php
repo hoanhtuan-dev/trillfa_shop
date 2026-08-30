@@ -307,11 +307,12 @@ if (! function_exists('studio_qwen_credentials')) {
             }
         }
 
-        if ($task === 'edit') {
-            return array_merge($paygo, $plan);
-        }
-
-        return array_merge($plan, $paygo);
+        // GEN (image/video/edit) models live on the Pay-As-You-Go host; TEXT/Chat (prompt/vision) live on
+        // the Token/Coding-Plan host. Order accordingly so a video/image request isn't sent to the plan host
+        // (which has no image/video model -> "Model not exist") and doesn't burn the free-tier plan quota.
+        return in_array($task, ['prompt', 'vision'], true)
+            ? array_merge($plan, $paygo)   // text/vision: plan first
+            : array_merge($paygo, $plan);  // image/video/edit: pay-go first
     }
 }
 

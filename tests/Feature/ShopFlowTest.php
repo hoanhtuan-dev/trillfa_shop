@@ -1082,10 +1082,13 @@ class ShopFlowTest extends TestCase
         set_setting('api_qwen_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-sp-plan-123456'));
         set_setting('api_qwen_edit_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-ws-paygo-123456'));
 
-        // Generation prioritises Token Plan first, then Pay-As-You-Go.
+        // Generation (image/video) models live on the Pay-As-You-Go host -> pay-go first, then Token Plan.
         $gen = studio_qwen_credentials('image');
-        $this->assertSame('sk-sp-plan-123456', $gen[0]);
-        $this->assertSame('sk-ws-paygo-123456', $gen[1]);
+        $this->assertSame('sk-ws-paygo-123456', $gen[0]);
+        $this->assertSame('sk-sp-plan-123456', $gen[1]);
+        // Text/Chat (prompt/vision) live on the Token/Coding-Plan host -> plan first.
+        $prompt = studio_qwen_credentials('prompt');
+        $this->assertSame('sk-sp-plan-123456', $prompt[0]);
 
         // Edit (Inpaint) prioritises Pay-As-You-Go first, then Token Plan.
         $edit = studio_qwen_credentials('edit');
