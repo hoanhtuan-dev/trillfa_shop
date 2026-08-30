@@ -46,11 +46,11 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <div class="grid gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_300px_240px]">
+    <div class="grid gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(400px,30vw)_240px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-2 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
+        <div class="space-y-4 lg:order-2 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
             <!-- Idea -->
             <div class="card p-5" x-show="step===1" x-transition.opacity>
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
@@ -131,6 +131,15 @@
                 <button @click="refine()" :disabled="refining || !refinePrompt" class="btn-outline mt-3 w-full"><span x-show="!refining">Cập nhật Ảnh</span><span x-show="refining">Đang gửi…</span></button>
             </div>
 
+            <!-- Color Palette (Bước 2) -->
+            <div class="card p-5" x-show="step===2" x-transition.opacity>
+                <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🎨 Color Palette</h2>
+                <div class="flex items-center gap-1.5" x-show="palette.length">
+                    <template x-for="c in palette" :key="c"><button type="button" class="h-7 w-7 rounded-full border border-ink-700" :style="{ background: c }" :title="c" @click="Alpine.store('toast').show('Màu ' + c, 'info')"></button></template>
+                </div>
+                <p class="text-xs text-cream-300" x-show="!palette.length">Chọn một ảnh ở Outputs để trích màu chủ đạo.</p>
+            </div>
+
             <!-- Bước 3 · Ghế Đạo Diễn -->
             <div class="card p-5" x-show="step===3" x-transition.opacity>
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
@@ -169,9 +178,9 @@
         <!-- ===== CENTER: Canvas preview ===== -->
         <!-- =============================================================== -->
         <div class="min-w-0 lg:order-1" x-show="!isMobile || step===2">
-            <div class="card overflow-hidden p-0 lg:sticky lg:top-20">
+            <div class="card flex flex-col overflow-hidden p-0 lg:sticky lg:top-16 lg:h-[calc(100dvh-9rem)]">
                 <!-- Media area -->
-                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
+                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
                     <!-- Step indicator (Progressive Disclosure) — floated over the canvas -->
                     <div class="pointer-events-auto absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-ink-900/80 p-1 text-[11px] font-semibold shadow-lg backdrop-blur" @pointerdown.stop @click.stop>
                         <button @click="step=1" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===1?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/25':'bg-white/10'">1</span> Concept</button>
@@ -244,33 +253,6 @@
                     <span x-show="preview && selectedImageId === preview.id">✓ Đã chọn làm nguồn Chỉnh sửa (Inpaint)</span>
                     <span x-show="preview && videoSourceId === preview.id">✓ Đã chọn làm nguồn Video</span>
                 </div>
-
-                <!-- ===== Video Rendering Timeline ===== -->
-                <div class="border-t border-cream-200 px-4 py-3" x-show="false">
-                    <div class="mb-2 flex items-center justify-between">
-                        <h3 class="font-display text-sm font-semibold text-ink-900">Video Rendering Timeline</h3>
-                        <span class="text-[10px] text-ink-500">Camera keyframes</span>
-                    </div>
-                    <!-- time ruler -->
-                    <div class="relative mb-1 h-4 rounded bg-cream-100 px-1 text-[9px] leading-4 text-ink-500">
-                        <span class="absolute left-0">0s</span><span class="absolute left-1/4">15s</span><span class="absolute left-1/2">30s</span><span class="absolute left-3/4">45s</span><span class="absolute right-0">60s</span>
-                    </div>
-                    <!-- camera dropdown -->
-                    <div>
-                        <label class="label">Kịch bản quay</label>
-                        <select x-model="videoScene" class="input !py-2">
-                            <option value="">— Chọn kịch bản quay —</option>
-                            <template x-for="scene in videoScenes" :key="scene.id"><option :value="scene.value" :title="scene.note" x-text="scene.label + (scene.note ? ' · ' + scene.note : '')"></option></template>
-                        </select>
-                        <p class="mt-1 text-[10px] text-brand-700" x-show="videoScene" x-text="'Kịch bản quay sẽ được áp dụng: ' + videoSceneLabel"></p>
-                    </div>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                        <select x-model="videoDuration" class="input !py-2"><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option></select>
-                        <select x-model="videoRes" class="input !py-2"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select>
-                        <button @click="renderVideo()" :disabled="videoBusy || !videoSourceId" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!videoBusy">Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
-                    </div>
-                    <p class="mt-2 text-[10px] text-ink-500" x-text="videoSourceId ? 'Nguồn ảnh #' + videoSourceId : 'Chọn ảnh nguồn trước khi Render (bấm nút “Tạo video”).'"></p>
-                </div>
             </div>
         </div>
 
@@ -292,7 +274,7 @@
                     <h2 class="font-display text-sm font-semibold text-ink-900">Outputs</h2>
                     <a href="{{ route('studio.library') }}" class="link text-xs">Thư viện</a>
                 </div>
-                <div class="grid max-h-[64vh] grid-cols-2 gap-2 overflow-y-auto pr-1">
+                <div class="grid max-h-[64vh] grid-cols-1 gap-2 overflow-y-auto pr-1">
                     <template x-for="g in generations" :key="g.id">
                         <button type="button" @click="openGenView(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
                             <div class="relative">
@@ -318,14 +300,6 @@
                 <p class="mt-2 text-[10px] text-ink-500">Áp dụng khi render với model AI thật; ở chế độ mô phỏng (stub) chỉ là giao diện.</p>
             </div>
 
-            <!-- Color palette (Bước 2) -->
-            <div class="card p-4" x-show="step===2">
-                <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">Color Palette</h2>
-                <div class="flex items-center gap-1.5" x-show="palette.length">
-                    <template x-for="c in palette" :key="c"><button type="button" class="h-7 w-7 rounded-full border border-cream-200" :style="{ background: c }" :title="c" @click="Alpine.store('toast').show('Màu ' + c, 'info')"></button></template>
-                </div>
-                <p class="text-[10px] text-ink-500" x-show="!palette.length">Chọn một ảnh ở Outputs để trích màu chủ đạo.</p>
-            </div>
 
                     </div>
     </div>
