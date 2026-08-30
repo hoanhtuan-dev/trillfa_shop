@@ -26,13 +26,7 @@ class StudioController extends Controller
         $creditsUsed = (int) $user->generations()->where('status', 'completed')->sum('credits_cost');
         $pendingCount = (int) $user->generations()->whereIn('status', ['pending', 'processing'])->count();
 
-        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount')
-            + [
-                'faceSync' => [   // trạng thái đồng bộ khuôn mặt cho ô 👤 (mô tả vào prompt khi tạo ảnh mới)
-                    'enabled' => filter_var(setting('studio_face_sync_enabled', config('studio.face_sync_enabled', true)), FILTER_VALIDATE_BOOL),
-                    'has_ref' => (bool) setting('studio_face_ref', ''),
-                ],
-            ]);
+        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount'));
     }
 
     public function storeProject(Request $request)
@@ -490,21 +484,6 @@ class StudioController extends Controller
         $path = $request->file('image')->store('studio/ref', 'public');
 
         return response()->json(['url' => '/storage/'.$path]);
-    }
-
-    /**
-     * Upload a face reference for character consistency (syncs the person in generated images/videos).
-     */
-    public function storeFace(Request $request)
-    {
-        $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
-        $path = '/storage/'.$request->file('image')->store('studio/ref', 'public');
-        set_setting('studio_face_ref', $path);
-        // New face -> invalidate the cached describeFace result so it is re-described once.
-        set_setting('studio_face_desc', '');
-        set_setting('studio_face_desc_hash', '');
-
-        return response()->json(['url' => $path]);
     }
 
     /**

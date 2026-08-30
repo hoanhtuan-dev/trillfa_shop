@@ -169,27 +169,6 @@
                     <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
                     <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
 
-                    <!-- Face reference (đồng bộ nhân vật) -->
-                    <div class="mt-3 rounded-xl border border-ink-700 bg-ink-800/70 p-3">
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs font-semibold text-cream-200">👤 Khuôn mặt (đồng bộ nhân vật)</p>
-                            <button type="button" @click="clearFace()" class="text-[10px] text-cream-300/60 hover:text-red-300">Bỏ</button>
-                        </div>
-                        @php($fs = $faceSync)
-                        @if(! $fs['has_ref'])
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-300/60">Chưa đặt ảnh mặt</span>
-                        @elseif(! $fs['enabled'])
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">⚠️ Đã đặt mặt — cần bật “đồng bộ khuôn mặt” trong Cài đặt</span>
-                        @else
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">✅ Đồng bộ khuôn mặt (mô tả vào prompt khi tạo ảnh mới)</span>
-                        @endif
-                        <p class="mt-0.5 text-[10px] text-cream-200/50">Ảnh mặt này dùng để AI mô tả khuôn mặt và nhúng vào prompt khi tạo ảnh/video mới, giữ nhân vật nhất quán — miễn phí, không thêm lệnh gọi.</p>
-                        <div class="mt-2 flex flex-wrap items-center gap-2">
-                            <button type="button" @click="$refs.faceInput.click()" class="btn-outline btn-sm whitespace-nowrap">Tải ảnh mặt</button>
-                            <template x-if="faceImage"><img :src="faceImage" class="h-12 w-12 rounded-full bg-ink-900 object-cover" alt="Khuôn mặt"></template>
-                        </div>
-                        <input x-ref="faceInput" type="file" accept="image/*" @change="onFaceChange" class="hidden">
-                    </div>
                 </div>
             </div>
 
@@ -512,7 +491,7 @@ document.addEventListener('alpine:init', () => {
             { label: 'Wan 2.1 · i2v turbo', model: 'wan2.1-i2v-turbo' },
         ],
         newProjectName: '', showNewProject: false, refinePrompt: '', preserveBg: true, preserveFace: true,
-        refFile: null, refImage: null, refUrl: null, faceImage: '', suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
+        refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
@@ -818,24 +797,6 @@ document.addEventListener('alpine:init', () => {
             if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
             this.refImage = null; this.refFile = null; this.refUrl = null;
             this.resetForRef();
-        },
-        async onFaceChange(e) {
-            const f = e.target.files && e.target.files[0];
-            if (!f) return;
-            this.refBusy = true;
-            try {
-                if (this.faceImage && String(this.faceImage).startsWith('blob:')) URL.revokeObjectURL(this.faceImage);
-                const fd = new FormData(); fd.append('image', f);
-                const up = await this.upload('/studio/face', fd);
-                this.faceImage = up.url || URL.createObjectURL(f);
-                Alpine.store('toast').show('Đã lưu khuôn mặt mẫu — AI sẽ giữ nhất quán nhân vật.');
-            } catch (err) { Alpine.store('toast').show(err.message || 'Không lưu được ảnh mặt.', 'error'); }
-            finally { this.refBusy = false; }
-        },
-        clearFace() {
-            if (this.faceImage && String(this.faceImage).startsWith('blob:')) URL.revokeObjectURL(this.faceImage);
-            this.faceImage = '';
-            Alpine.store('toast').show('Đã bỏ khuôn mặt mẫu (khuôn mặt trong Cài đặt vẫn giữ nếu có).', 'info');
         },
         // Mở popup sửa prompt tiếng Việt: dịch prompt EN hiện tại sang VI.
         async openTranslateVi() {
