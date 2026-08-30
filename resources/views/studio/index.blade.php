@@ -46,7 +46,7 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <div class="grid gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(400px,30vw)_240px]">
+    <div class="grid gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
@@ -138,6 +138,18 @@
                     <template x-for="c in palette" :key="c"><button type="button" class="h-7 w-7 rounded-full border border-ink-700" :style="{ background: c }" :title="c" @click="Alpine.store('toast').show('Màu ' + c, 'info')"></button></template>
                 </div>
                 <p class="text-xs text-cream-300" x-show="!palette.length">Chọn một ảnh ở Outputs để trích màu chủ đạo.</p>
+            </div>
+
+            <!-- Texture (Bước 2) -->
+            <div class="card p-5" x-data="{ texture: 5 }" x-show="step===2" x-transition.opacity>
+                <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🧵 Texture</h2>
+                <input type="range" min="0" max="10" x-model="texture" class="w-full accent-brand-500">
+                <div class="mt-2 flex items-center justify-between text-xs">
+                    <span class="text-cream-300">0 · Mịn</span>
+                    <span class="font-semibold text-cream-50" x-text="texture"></span>
+                    <span class="text-cream-300">10 · Chi tiết bề mặt</span>
+                </div>
+                <p class="mt-2 text-xs text-cream-300">Áp dụng khi render với model AI thật; ở chế độ mô phỏng (stub) chỉ là giao diện.</p>
             </div>
 
             <!-- Bước 3 · Ghế Đạo Diễn -->
@@ -263,7 +275,7 @@
             <!-- Generation Parameters -->
             <div class="card p-4">
                 <div class="flex items-center justify-between">
-                    <h2 class="font-display text-sm font-semibold text-ink-900">⚙️ Generation Parameters</h2>
+                    <h2 class="font-display text-sm font-semibold text-ink-900">⚙️ Params</h2>
                     <span class="badge text-xs" :class="preview && preview.status==='completed' ? 'bg-emerald-500 text-white' : 'bg-cream-200 text-ink-700'" x-text="preview && preview.status==='completed' ? 'Sẵn sàng' : 'Chờ kết quả'"></span>
                 </div>
             </div>
@@ -290,14 +302,6 @@
                     </template>
                 </div>
                 <div class="mt-3 text-center text-xs text-ink-500" x-show="!generations.length">Chưa có kết quả.</div>
-            </div>
-
-            <!-- Texture (Bước 2) -->
-            <div class="card p-4" x-data="{ texture: 5 }" x-show="step===2">
-                <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">Texture</h2>
-                <input type="range" min="0" max="10" x-model="texture" class="w-full accent-brand-600">
-                <div class="mt-1 flex justify-between text-[10px] text-ink-500"><span>0 · Mịn</span><span class="font-semibold text-ink-900" x-text="texture"></span><span>10 · Chi tiết bề mặt</span></div>
-                <p class="mt-2 text-[10px] text-ink-500">Áp dụng khi render với model AI thật; ở chế độ mô phỏng (stub) chỉ là giao diện.</p>
             </div>
 
 
