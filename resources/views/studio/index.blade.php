@@ -235,21 +235,23 @@
             <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500);">
                 <div class="flex items-center justify-between">
                     <h2 class="font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
-                    <button @click="openSwap()" class="btn-brand btn-sm whitespace-nowrap">Chọn Người Mẫu & Tư thế</button>
+                    <button @click="openSwap()" class="btn-brand btn-sm whitespace-nowrap">Chọn</button>
                 </div>
-                <p class="mt-1 text-xs text-ink-500">Tạo nhiều phiên bản cho cùng thiết kế: giữ <b>nguyên 100% trang phục</b>, chỉ thay khuôn mặt + dáng. Bạn chỉ bấm chọn ảnh — hệ thống tự ghép.</p>
-                <div class="mt-3 flex items-center gap-3" x-show="swapModelId">
-                    <div class="flex items-center gap-2">
-                        <img :src="(swapModels.find(m=>m.id===swapModelId)||{}).img || '/images/placeholder.svg'" class="h-12 w-12 rounded-xl bg-ink-900 object-cover" alt="Khuôn mặt">
-                        <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapModels.find(m=>m.id===swapModelId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Khuôn mặt</p></div>
+                <template x-if="swapModelId">
+                    <div class="mt-3 flex items-center gap-3">
+                        <div class="relative flex items-center gap-2">
+                            <img :src="(swapModels.find(m=>m.id===swapModelId)||{}).img || '/images/placeholder.svg'" class="h-16 w-16 rounded-2xl bg-ink-900 object-cover" alt="Khuôn mặt">
+                            <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapModels.find(m=>m.id===swapModelId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Khuôn mặt</p></div>
+                        </div>
+                        <div class="relative flex items-center gap-2">
+                            <img :src="(swapPoses.find(p=>p.id===swapPoseId)||{}).img || '/images/placeholder.svg'" class="h-16 w-16 rounded-2xl bg-ink-900 object-cover" alt="Tư thế">
+                            <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapPoses.find(p=>p.id===swapPoseId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Tư thế</p></div>
+                        </div>
+                        <button @click="clearSwap()" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-300 hover:bg-red-600 hover:text-white" title="Xoá lựa chọn khuôn mặt & dáng">✕</button>
+                        <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm ml-auto whitespace-nowrap"><span x-show="!swapLoading">Áp Dụng</span><span x-show="swapLoading">Đang ghép…</span></button>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <img :src="(swapPoses.find(p=>p.id===swapPoseId)||{}).img || '/images/placeholder.svg'" class="h-12 w-12 rounded-xl bg-ink-900 object-cover" alt="Tư thế">
-                        <div class="text-xs"><p class="font-semibold text-cream-200" x-text="(swapPoses.find(p=>p.id===swapPoseId)||{}).name"></p><p class="text-[10px] text-cream-200/50">Tư thế</p></div>
-                    </div>
-                    <button @click="runSwap()" :disabled="swapLoading" class="btn-outline btn-sm ml-auto whitespace-nowrap"><span x-show="!swapLoading">Áp Dụng</span><span x-show="swapLoading">Đang ghép…</span></button>
-                </div>
-                <p class="mt-2 text-[10px] text-ink-500" x-show="!swapModelId">Bấm "Chọn Người Mẫu & Tư thế" để mở thư viện <b>6 khuôn mặt + 12 dáng</b> rồi chọn.</p>
+                </template>
+                <p class="mt-2 text-[10px] text-ink-500" x-show="!swapModelId">Bấm "Chọn" để chọn khuôn mặt + dáng (giữ nguyên 100% trang phục).</p>
             </div>
 
             <!-- Fitting Room: Ảnh để chỉnh sửa -->
@@ -965,8 +967,9 @@ document.addEventListener('alpine:init', () => {
             finally { this.editSurging = false; }
         },
         // ===== Thay Đổi Người Mẫu (Click-to-Swap) =====
+        clearSwap() { this.swapModelId = ''; this.swapPoseId = ''; this.swapDesign = ''; Alpine.store('toast').show('Đã xoá lựa chọn khuôn mặt & dáng.', 'info'); },
         openSwap() {
-            const img = this.preview && this.preview.media_url;
+            const img = this.canvasImg || (this.preview && this.preview.media_url);
             if (!img) { Alpine.store('toast').show('Chọn một ảnh 2D (kết quả) trước.', 'error'); return; }
             this.swapDesign = img; this.swapModelId = 'model01'; this.swapPoseId = 'pose01'; this.swapOpen = true;
         },
@@ -978,12 +981,14 @@ document.addEventListener('alpine:init', () => {
                 const d = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
                 if (d.media_url) { // fallback qwen-edit (try-on unavailable) -> hoàn tất ngay
+                    this.canvasImg = '';
                     this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.provider || 'qwen', provider: d.provider || 'qwen', media_url: d.media_url, credits_cost: 1, created_at: 'Đã đổi người mẫu' });
                     this.previewId = d.generation_id;
                     Alpine.store('toast').show('Đã đổi người mẫu (chế độ dự phòng).');
                     return;
                 }
                 if (!d.task_id) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
+                this.canvasImg = '';
                 this.addGen({ id: d.generation_id, type: 'image', status: 'pending', model: 'tryon', provider: 'tryon', media_url: null, credits_cost: 1, created_at: 'Đang thử đồ' });
                 this.previewId = d.generation_id;
                 this.pollSwap(d.task_id, d.generation_id);
