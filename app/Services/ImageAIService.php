@@ -473,7 +473,7 @@ class ImageAIService
             return null;
         }
 
-        $model = studio_vision_model();
+        $model = studio_vision_model('gemini');
         [$b64, $mime] = $this->downscaleImageBase64($path);
         $text = 'Describe this person\'s face in detail for an AI fashion image so it can be reproduced: '
             .'give ethnicity hint, hair (colour, length, style, texture), face shape, eyebrows, eyes, nose, lips, '
@@ -483,21 +483,27 @@ class ImageAIService
         if ((string) studio_config('vision_provider', 'gemini') === 'qwen') {
             $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
             if ($key) {
-                try {
-                    $base = dashscope_base_url($key).'/compatible-mode/v1';
-                    $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
-                        'model' => studio_vision_model('qwen'),
-                        'messages' => [['role' => 'user', 'content' => [
-                            ['type' => 'text', 'text' => $text],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                        ]]],
-                    ]);
-                    $desc = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                    if ($resp->successful() && $desc) {
-                        return $desc;
+                $base = dashscope_base_url($key).'/compatible-mode/v1';
+                foreach (studio_qwen_vision_models() as $vm) {
+                    try {
+                        $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
+                            'model' => $vm,
+                            'messages' => [['role' => 'user', 'content' => [
+                                ['type' => 'text', 'text' => $text],
+                                ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                            ]]],
+                        ]);
+                        $desc = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                        if ($resp->successful() && $desc) {
+                            return $desc;
+                        }
+                        $body = (string) $resp->body();
+                        if (! (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404)) {
+                            break; // non-404 error -> stop trying models
+                        }
+                    } catch (\Throwable $e) {
+                        logger()->error('Qwen describeFace ('.$vm.') failed: '.$e->getMessage());
                     }
-                } catch (\Throwable $e) {
-                    logger()->error('Qwen describeFace failed: '.$e->getMessage());
                 }
             }
         }

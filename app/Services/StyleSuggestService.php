@@ -41,7 +41,6 @@ class StyleSuggestService
 
     protected function suggestViaQwenVision(string $imagePath, int $creativeLevel): array
     {
-        $model = studio_vision_model('qwen');
         [$b64, $mime] = $this->downscaleBase64($imagePath);
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
@@ -49,37 +48,45 @@ class StyleSuggestService
             .'"image_prompt_en" (a detailed ready-to-use English image prompt), "video_prompt_en" (a matching '
             .'English video-catwalk prompt for the SAME garment), "keywords" (array).';
 
+        // Try several Qwen VISION models × keys (some accounts only expose qwen-vl-max, others only qwen-vl-plus).
         $last = null;
-        foreach (studio_qwen_credentials('vision') as $key) {
-            $base = dashscope_base_url($key).'/compatible-mode/v1';
-            try {
-                $resp = Http::withToken($key)->timeout(90)
-                    ->post($base.'/chat/completions', [
-                        'model' => $model,
-                        'messages' => [['role' => 'user', 'content' => [
-                            ['type' => 'text', 'text' => $prompt],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                        ]]],
-                        'response_format' => ['type' => 'json_object'],
-                    ]);
+        foreach (studio_qwen_vision_models() as $model) {
+            foreach (studio_qwen_credentials('vision') as $key) {
+                $base = dashscope_base_url($key).'/compatible-mode/v1';
+                try {
+                    $resp = Http::withToken($key)->timeout(90)
+                        ->post($base.'/chat/completions', [
+                            'model' => $model,
+                            'messages' => [['role' => 'user', 'content' => [
+                                ['type' => 'text', 'text' => $prompt],
+                                ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                            ]]],
+                            'response_format' => ['type' => 'json_object'],
+                        ]);
 
-                if ($resp->successful()) {
-                    $text = (string) data_get($resp->json(), 'choices.0.message.content');
-                    $json = json_decode(trim($text), true);
-                    if (is_array($json)) {
-                        return $this->finalize($json, $creativeLevel);
+                    if ($resp->successful()) {
+                        $text = (string) data_get($resp->json(), 'choices.0.message.content');
+                        $json = json_decode(trim($text), true);
+                        if (is_array($json)) {
+                            return $this->finalize($json, $creativeLevel);
+                        }
+                        $last = 'Không phân tích được JSON từ Qwen vision ('.$model.').';
+                    } elseif (is_qwen_quota_error((string) $resp->body())) {
+                        $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
+                        continue; // Token Plan quota -> try next key
+                    } else {
+                        // Model-not-exist / unsupported -> try the NEXT vision model; other errors -> give up.
+                        $body = (string) $resp->body();
+                        $last = 'HTTP '.$resp->status().': '.substr($body, 0, 180);
+                        if (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404) {
+                            continue;
+                        }
+                        break 2;
                     }
-                    $last = 'Không phân tích được JSON từ Qwen vision.';
-                } elseif (is_qwen_quota_error((string) $resp->body())) {
-                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
-                    continue; // Token Plan quota -> try Pay-As-You-Go next
-                } else {
-                    $last = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180);
-                    break;
+                } catch (\Throwable $e) {
+                    $last = $e->getMessage();
+                    break 2;
                 }
-            } catch (\Throwable $e) {
-                $last = $e->getMessage();
-                break;
             }
         }
 
@@ -88,7 +95,7 @@ class StyleSuggestService
 
     protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key): array
     {
-        $model = studio_vision_model();
+        $model = studio_vision_model('gemini');
         $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
         $b64 = base64_encode((string) file_get_contents($imagePath));
 

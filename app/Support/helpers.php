@@ -468,3 +468,14 @@ function studio_vision_model(?string $provider = null): string
     return $m ?: 'gemini-2.5-flash';
 }
 
+/**
+ * Candidate Qwen (DashScope) VISION models to try in order — some accounts/hosts only expose a
+ * subset (e.g. qwen-vl-max not qwen-vl-plus), so walking the list makes the vision call robust.
+ */
+function studio_qwen_vision_models(): array
+{
+    $primary = studio_vision_model('qwen');
+    $candidates = [$primary, 'qwen-vl-max', 'qwen2.5-vl-72b-instruct', 'qwen-vl-plus', 'qwen2-vl-plus'];
+    return array_values(array_unique(array_filter($candidates)));
+}
+
