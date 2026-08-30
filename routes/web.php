@@ -113,6 +113,9 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/models', [StudioController::class, 'storeModel'])->name('models.store');
     Route::put('/models/{model}', [StudioController::class, 'updateModel'])->name('models.update');
     Route::delete('/models/{model}', [StudioController::class, 'deleteModel'])->name('models.delete');
+    Route::post('/keys', [StudioController::class, 'storeApiKey'])->name('keys.store');
+    Route::put('/keys/{key}', [StudioController::class, 'updateApiKey'])->name('keys.update');
+    Route::delete('/keys/{key}', [StudioController::class, 'deleteApiKey'])->name('keys.delete');
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');

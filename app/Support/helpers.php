@@ -180,8 +180,35 @@ if (! function_exists('studio_api_key')) {
      * Read a provider API key. Prefers the encrypted DB value managed from the
      * Studio API page; falls back to the env/config value.
      */
+    function studio_api_keys_for(?string $provider = null, ?string $model_id = null, ?string $group = null)
+    {
+        $q = \App\Models\StudioApiKey::query()->where('enabled', true);
+        if ($provider) $q->where('provider', $provider);
+        $rows = $q->orderByDesc('priority')->orderBy('id')->get();
+        if ($rows->isEmpty()) return collect();
+        return $rows->filter(function ($k) use ($model_id, $group) {
+            $sc = $k->scopes ?? ['*'];
+            if (in_array('*', $sc, true)) return true;
+            if ($model_id && in_array($model_id, $sc, true)) return true;
+            if ($group && in_array($group, $sc, true)) return true;
+            return false;
+        })->values();
+    }
+
+    function studio_api_key_value($keyOrValue): ?string
+    {
+        $value = is_object($keyOrValue) ? $keyOrValue->value : $keyOrValue;
+        if (! $value) return null;
+        try { return \Illuminate\Support\Facades\Crypt::decryptString($value); }
+        catch (\Throwable $e) { return $value; }
+    }
+
     function studio_api_key(string $service): ?string
     {
+        // Registered keys first (highest-priority enabled for this provider).
+        $reg = \App\Models\StudioApiKey::where('provider', $service)->where('enabled', true)->orderByDesc('priority')->orderBy('id')->first();
+        if ($reg) return studio_api_key_value($reg);
+
         $stored = setting('api_'.$service.'_key');
 
         if ($stored) {
@@ -255,14 +282,20 @@ if (! function_exists('studio_qwen_credentials')) {
      *   - edit (Inpaint): Pay-As-You-Go first (edit models usually live on the pay-go host), then Token Plan.
      * Keys are gathered from every Qwen/DashScope slot and ordered by their prefix.
      */
-    function studio_qwen_credentials(string $task = 'image'): array
+    function studio_qwen_credentials(string $task = 'image', ?string $model_id = null): array
     {
-        $keys = array_values(array_unique(array_filter([
-            studio_api_key('qwen'),
-            studio_api_key('dashscope'),
-            studio_api_key('qwen_edit'),
-            studio_api_key('wan'),
-        ])));
+        // Registered keys (multi per provider, scope-aware) — fall back to env/config slots.
+        $keys = [];
+        foreach (['qwen', 'dashscope', 'qwen_edit', 'wan'] as $p) {
+            foreach (studio_api_keys_for($p, $model_id, $task === 'edit' ? 'edit' : ($task === 'video' ? 'video' : 'image')) as $k) {
+                $v = studio_api_key_value($k);
+                if ($v) $keys[] = $v;
+            }
+        }
+        $keys = array_merge($keys, array_values(array_unique(array_filter([
+            studio_api_key('qwen'), studio_api_key('dashscope'), studio_api_key('qwen_edit'), studio_api_key('wan'),
+        ]))));
+        $keys = array_values(array_unique(array_filter($keys)));
 
         $plan = [];
         $paygo = [];

@@ -242,5 +242,57 @@
             <button class="btn-brand btn-sm">➕ Thêm model</button>
         </form>
     </div>
+
+    {{-- ===== API Keys Registry ===== --}}
+    <div class="card mt-6 p-6">
+        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">nhiều key/provider · scope theo model/nhóm · ưu tiên · tránh trùng lặp</span></h2>
+        <p class="mt-1 text-xs text-ink-500">Mỗi provider có thể đăng ký <b>nhiều key</b> (vd Qwen: Token-Plan + Pay-As-You-Go). <b>Scope</b> giới hạn key chỉ dùng cho model/nhóm cụ thể (để trống = dùng chung, hoặc gõ model_id/nhóm cách dấu phẩy). Key dùng trước = ưu tiên cao nhất.</p>
+
+        @foreach($api_keys->groupBy('provider') as $provider=>$keys)
+            <div class="mt-5">
+                <h3 class="text-sm font-semibold text-ink-900">{{ $provider }}</h3>
+                <div class="mt-2 space-y-2">
+                    @foreach($keys as $k)
+                        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
+                            <span class="font-semibold text-ink-900">{{ $k->label }}</span>
+                            <span class="text-ink-500">{{ $k->kind ?: $provider }}</span>
+                            <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $k->priority }}</span>
+                            <span class="text-[10px] text-ink-500">Scope: {{ ($k->scopes && !in_array('*',$k->scopes)) ? implode(', ',$k->scopes) : 'Tất cả' }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $k->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $k->enabled ? 'Bật' : 'Tắt' }}</span>
+                            <span class="ml-auto flex flex-wrap items-center gap-1.5">
+                                <form method="POST" action="{{ route('studio.keys.update', $k) }}" class="ml-auto flex flex-wrap items-center gap-1.5">
+                                    @csrf @method('PUT')
+                                    <input type="hidden" name="provider" value="{{ $k->provider }}"><input type="hidden" name="label" value="{{ $k->label }}"><input type="hidden" name="kind" value="{{ $k->kind }}">
+                                    <label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($k->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label>
+                                    <input type="number" name="priority" value="{{ $k->priority }}" min="0" max="100" class="input !w-16 !py-1">
+                                    <button class="btn-outline btn-sm">Lưu</button>
+                                </form>
+                                <form method="POST" action="{{ route('studio.keys.delete', $k) }}" onsubmit="return confirm('Xóa key «{{ $k->label }}»?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn-outline btn-sm text-red-600">Xóa</button>
+                                </form>
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endforeach
+
+        {{-- Add API key --}}
+        <form method="POST" action="{{ route('studio.keys.store') }}" class="mt-6 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+            @csrf
+            <h3 class="text-sm font-semibold text-ink-900">➕ Thêm API key</h3>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div><label class="label">Provider</label><input name="provider" class="input !py-2" placeholder="qwen / wan / gemini / fal / ..." required></div>
+                <div><label class="label">Nhãn</label><input name="label" class="input !py-2" placeholder="VD: Qwen Token-Plan" required></div>
+                <div><label class="label">Key</label><input name="value" class="input !py-2" placeholder="sk-..." required></div>
+                <div><label class="label">Loại (kind)</label><input name="kind" class="input !py-2" placeholder="plan / paygo / ..."></div>
+                <div><label class="label">Scope (mặc định *)</label><input name="scopes" class="input !py-2" placeholder="model_id, group hoặc để trống"></div>
+                <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="5" min="0" max="100" class="input !py-2"></div>
+                <div class="col-span-2 sm:col-span-3"><label class="label">Ghi chú</label><input name="note" class="input !py-2" placeholder="(tùy chọn)"></div>
+            </div>
+            <button class="btn-brand btn-sm">➕ Thêm API key</button>
+        </form>
+    </div>
 </div>
 @endsection

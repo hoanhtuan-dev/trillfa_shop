@@ -733,6 +733,7 @@ class StudioController extends Controller
             'queue_driver' => config('queue.default'),
             'usage' => studio_usage(auth()->user()),
             'models' => studio_models(), // registry models (grouped by category)
+            'api_keys' => \App\Models\StudioApiKey::orderBy('provider')->orderByDesc('priority')->orderBy('id')->get(),
         ]);
     }
 
@@ -777,6 +778,51 @@ class StudioController extends Controller
         $model->delete();
         if (request()->wantsJson()) return response()->json(['ok' => true]);
         return back()->with('success', 'Đã xóa model.');
+    }
+
+    public function storeApiKey(Request $request)
+    {
+        $data = $request->validate([
+            'provider' => ['required', 'string', 'max:40'],
+            'label' => ['required', 'string', 'max:120'],
+            'value' => ['required', 'string', 'max:500'],
+            'kind' => ['nullable', 'string', 'max:20'],
+            'scopes' => ['nullable', 'string'],
+            'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['priority'] = (int) ($data['priority'] ?? 0);
+        $data['enabled'] = true;
+        $data['value'] = \Illuminate\Support\Facades\Crypt::encryptString(trim($data['value']));
+        $data['scopes'] = $data['scopes'] ? array_values(array_filter(array_map('trim', explode(',', $data['scopes'])))) : ['*'];
+        \App\Models\StudioApiKey::create($data);
+        return redirect()->back()->with('success', 'Đã thêm API key.');
+    }
+
+    public function updateApiKey(Request $request, \App\Models\StudioApiKey $key)
+    {
+        $data = $request->validate([
+            'provider' => ['required', 'string', 'max:40'],
+            'label' => ['required', 'string', 'max:120'],
+            'value' => ['nullable', 'string', 'max:500'],
+            'kind' => ['nullable', 'string', 'max:20'],
+            'scopes' => ['nullable', 'string'],
+            'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'enabled' => ['nullable', 'boolean'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['priority'] = (int) ($data['priority'] ?? 0);
+        $data['scopes'] = $data['scopes'] ? array_values(array_filter(array_map('trim', explode(',', $data['scopes'])))) : ['*'];
+        if (! empty($data['value'])) $data['value'] = \Illuminate\Support\Facades\Crypt::encryptString(trim($data['value']));
+        else unset($data['value']);
+        $key->update($data);
+        return redirect()->back()->with('success', 'Đã cập nhật API key.');
+    }
+
+    public function deleteApiKey(\App\Models\StudioApiKey $key)
+    {
+        $key->delete();
+        return redirect()->back()->with('success', 'Đã xóa API key.');
     }
 
     public function updateSettings(Request $request)
