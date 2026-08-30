@@ -86,19 +86,27 @@
             <!-- Presets -->
             <div class="card p-5" x-show="step===1">
                 <div class="mb-3 flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(chọn từng nhóm)</span></h2>
+                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(chọn nhiều — bấm để bỏ chọn)</span></h2>
                     <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
                 </div>
                 <div class="space-y-2">
                     <template x-for="group in presetGroups" :key="group.category">
-                        <div>
+                        <div x-data="{ open: false }">
                             <label class="label" x-text="catLabels[group.category] || group.category"></label>
-                            <select class="input !py-2" :value="selectedPresetId(group.category)" @change="setPresetForCategory(group.category, $event.target.value)">
-                                <option value="">— Chọn —</option>
-                                <template x-for="item in group.items" :key="item.id">
-                                    <option :value="item.id" :title="item.note" x-text="item.key || item.label"></option>
-                                </template>
-                            </select>
+                            <div class="relative">
+                                <button type="button" @click="open = !open" class="input flex !py-2 items-center justify-between gap-2 text-left" :class="selectedPresetText(group.category) ? 'border-brand-500/60' : ''">
+                                    <span class="truncate text-cream-100" x-text="selectedPresetText(group.category) || '— Chọn nhiều —'"></span>
+                                    <span class="shrink-0 text-cream-300" x-text="open ? '▲' : '▼'"></span>
+                                </button>
+                                <div x-show="open" @click.outside="open = false" x-cloak class="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-ink-700 bg-ink-800 p-1.5 shadow-xl backdrop-blur">
+                                    <template x-for="item in group.items" :key="item.id">
+                                        <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-cream-200 hover:bg-ink-700" :title="item.note">
+                                            <input type="checkbox" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)" class="h-4 w-4 shrink-0 accent-brand-500">
+                                            <span x-text="item.key || item.label"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
                     </template>
                 </div>
