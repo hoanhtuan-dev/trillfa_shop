@@ -245,6 +245,12 @@ class StudioController extends Controller
      */
     protected function defaultProviderModel(string $type): array
     {
+        // Prefer the registered model registry (highest-priority enabled model for the group).
+        $group = $type === 'video' ? 'video' : ($type === 'inference' ? 'inference' : 'image');
+        $reg = resolve_studio_model($group);
+        if ($reg) return [$reg['provider'], $reg['model']];
+
+        // Registry empty / no enabled -> fall back to legacy configured values.
         if ($type === 'video') {
             return ['wan', (string) studio_config('video_model', 'wan2.5-t2v')];
         }
@@ -309,6 +315,23 @@ class StudioController extends Controller
                 $g->user?->increment('credits_balance', $g->credits_cost);
             }
         }
+    }
+
+    /**
+     * JSON: registered models grouped by capability, for the Studio UI (dropdowns)
+     * and for dynamic model selection.
+     */
+    public function models()
+    {
+        $groups = ['image', 'video', 'inference'];
+        $rows = \App\Models\StudioModel::orderBy('priority', 'desc')->orderBy('id')->get();
+        $out = [];
+        foreach ($groups as $g) {
+            $out[$g] = $rows->where('group', $g)->where('enabled', true)->values()->map(fn ($m) => [
+                'key' => $m->model_id, 'label' => $m->name, 'provider' => $m->provider, 'priority' => $m->priority,
+            ])->all();
+        }
+        return response()->json(['groups' => $out]);
     }
 
     protected function queueGeneration(string $type, array $data, int $cost, ?Generation $source = null)
@@ -709,7 +732,51 @@ class StudioController extends Controller
             'pending_count' => auth()->user()->generations()->whereIn('status', ['pending', 'processing'])->count(),
             'queue_driver' => config('queue.default'),
             'usage' => studio_usage(auth()->user()),
+            'models' => studio_models(), // registry models (grouped by category)
         ]);
+    }
+
+    public function storeModel(Request $request)
+    {
+        $data = $request->validate([
+            'group' => ['required', 'string', 'in:image,video,inference'],
+            'name' => ['required', 'string', 'max:120'],
+            'provider' => ['required', 'string', 'max:40'],
+            'model_id' => ['required', 'string', 'max:160'],
+            'api_key_ref' => ['nullable', 'string', 'max:80'],
+            'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['priority'] = (int) ($data['priority'] ?? 0);
+        $data['enabled'] = true;
+        \App\Models\StudioModel::create($data);
+        if ($request->wantsJson()) return response()->json(['ok' => true]);
+        return back()->with('success', 'Đã thêm model.');
+    }
+
+    public function updateModel(Request $request, \App\Models\StudioModel $model)
+    {
+        $data = $request->validate([
+            'group' => ['required', 'string', 'in:image,video,inference'],
+            'name' => ['required', 'string', 'max:120'],
+            'provider' => ['required', 'string', 'max:40'],
+            'model_id' => ['required', 'string', 'max:160'],
+            'api_key_ref' => ['nullable', 'string', 'max:80'],
+            'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'enabled' => ['nullable', 'boolean'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+        $data['priority'] = (int) ($data['priority'] ?? 0);
+        $model->update($data);
+        if ($request->wantsJson()) return response()->json(['ok' => true]);
+        return back()->with('success', 'Đã cập nhật model.');
+    }
+
+    public function deleteModel(\App\Models\StudioModel $model)
+    {
+        $model->delete();
+        if (request()->wantsJson()) return response()->json(['ok' => true]);
+        return back()->with('success', 'Đã xóa model.');
     }
 
     public function updateSettings(Request $request)

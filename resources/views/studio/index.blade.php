@@ -184,11 +184,12 @@
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
                 <div class="mb-3">
                     <label class="label">Model video</label>
-                    <div class="flex flex-wrap gap-1.5">
+                    <select x-model="videoModel" class="input !py-2">
+                        <option value="">— Mặc định (theo thứ tự ưu tiên) —</option>
                         <template x-for="m in videoModels" :key="m.model">
-                            <button type="button" @click="videoModel = videoModel===m.model ? '' : m.model" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="videoModel===m.model ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400 hover:text-brand-200'"><span x-text="m.label"></span></button>
+                            <option :value="m.model" x-text="m.label"></option>
                         </template>
-                    </div>
+                    </select>
                 </div>
                 <div class="mb-3">
                     <label class="label">Kịch bản quay</label>
@@ -439,6 +440,15 @@ document.addEventListener('alpine:init', () => {
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
         async init() {
+            // Load registered models (dynamic dropdown: video / image / inference) from the registry.
+            try {
+                const mres = await fetch('/studio/models', { headers: { Accept: 'application/json' } });
+                const md = await mres.json();
+                if (md && md.groups) {
+                    const vid = md.groups.video || [];
+                    if (vid.length) this.videoModels = vid.map(mm => ({ label: mm.label, model: mm.key }));
+                }
+            } catch (e) {}
             // "Catwalk Video" nav (/studio#catwalk) opens Step 3 (Director / catwalk) directly.
             const goCatwalk = () => { if (location.hash === '#catwalk') this.step = 3; };
             goCatwalk();

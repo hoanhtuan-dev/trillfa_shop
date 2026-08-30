@@ -109,6 +109,10 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::get('/', [StudioController::class, 'index'])->name('index');
     Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
     Route::post('/ideate', [StudioController::class, 'ideate'])->name('ideate');
+    Route::get('/models', [StudioController::class, 'models'])->name('models');
+    Route::post('/models', [StudioController::class, 'storeModel'])->name('models.store');
+    Route::put('/models/{model}', [StudioController::class, 'updateModel'])->name('models.update');
+    Route::delete('/models/{model}', [StudioController::class, 'deleteModel'])->name('models.delete');
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');

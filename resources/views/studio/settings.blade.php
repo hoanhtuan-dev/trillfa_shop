@@ -186,5 +186,61 @@
         </div>
         @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </form>
+
+    {{-- ===== Model Registry manager ===== --}}
+    <div class="card mt-6 p-6">
+        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🤖 Model Registry <span class="text-xs font-normal text-ink-500">quản lý model theo nhóm (image / video / inference)</span></h2>
+        <p class="mt-1 text-xs text-ink-500">Chọn nhiều model/nhóm, gán <b>ưu tiên</b> (cao = dùng trước). Khi một model hết hạn mức/API lỗi, hệ thống tự chuyển sang model kế tiếp theo độ ưu tiên. Model hiển thị trong Studio theo nhóm tương ứng (Model video = nhóm video).</p>
+
+        @foreach(['image'=>'Ảnh','video'=>'Video','inference'=>'Suy luận'] as $grp=>$grpLabel)
+            <div class="mt-5">
+                <h3 class="text-sm font-semibold text-ink-900">{{ $grpLabel }}</h3>
+                <div class="mt-2 space-y-2">
+                    @forelse($models->where('group', $grp) as $m)
+                        @php $id = data_get($m, 'id'); $name = data_get($m, 'name'); $provider = data_get($m, 'provider'); $modelId = data_get($m, 'model_id'); $priority = data_get($m, 'priority', 0); $enabled = (bool) data_get($m, 'enabled', true); @endphp
+                        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
+                            <span class="font-semibold text-ink-900">{{ $name }}</span>
+                            <span class="text-ink-500">{{ $provider }} · {{ $modelId }}</span>
+                            <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $priority }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $enabled ? 'Bật' : 'Tắt' }}</span>
+                            @if($id)
+                                <form method="POST" action="{{ route('studio.models.update', $m) }}" class="ml-auto flex flex-wrap items-center gap-1.5">
+                                    @csrf @method('PUT')
+                                    <input type="hidden" name="group" value="{{ data_get($m,'group') }}"><input type="hidden" name="name" value="{{ $name }}"><input type="hidden" name="provider" value="{{ $provider }}"><input type="hidden" name="model_id" value="{{ $modelId }}">
+                                    <label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label>
+                                    <input type="number" name="priority" value="{{ $priority }}" min="0" max="100" class="input !w-16 !py-1">
+                                    <button class="btn-outline btn-sm">Lưu</button>
+                                </form>
+                                <form method="POST" action="{{ route('studio.models.delete', $m) }}" onsubmit="return confirm('Xóa model «{{ $name }}»?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn-outline btn-sm text-red-600">Xóa</button>
+                                </form>
+                            @else
+                                <span class="ml-auto text-[10px] text-ink-500">(mặc định — thêm lại để chỉnh sửa)</span>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="text-xs text-ink-500">Chưa có model nhóm {{ $grpLabel }}.</p>
+                    @endforelse
+                </div>
+            </div>
+        @endforeach
+
+        {{-- Add / edit model --}}
+        <form method="POST" action="{{ route('studio.models.store') }}" class="mt-6 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+            @csrf
+            <h3 class="text-sm font-semibold text-ink-900">➕ Thêm model</h3>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div><label class="label">Nhóm</label><select name="group" class="input !py-2"><option value="image">Ảnh</option><option value="video">Video</option><option value="inference">Suy luận</option></select></div>
+                <div><label class="label">Tên hiển thị</label><input name="name" class="input !py-2" placeholder="VD: Wan 2.2 i2v" required></div>
+                <div><label class="label">Provider</label><input name="provider" class="input !py-2" placeholder="wan / qwen / gemini / fal / ..." required></div>
+                <div><label class="label">Model ID</label><input name="model_id" class="input !py-2" placeholder="VD: wan2.2-i2v" required></div>
+                <div><label class="label">API key ref</label><input name="api_key_ref" class="input !py-2" placeholder="wan / dashscope / ..."></div>
+                <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="5" min="0" max="100" class="input !py-2"></div>
+                <div class="col-span-2 sm:col-span-3"><label class="label">Ghi chú</label><input name="note" class="input !py-2" placeholder="(tùy chọn)"></div>
+            </div>
+            <button class="btn-brand btn-sm">➕ Thêm model</button>
+        </form>
+    </div>
 </div>
 @endsection

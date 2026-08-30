@@ -361,4 +361,50 @@ if (! function_exists('menu_tree')) {
 
         return $builder(null);
     }
+/**
+ * Studio model registry — dynamic per group (image | video | inference).
+ * Falls back to a built-in catalog when nothing is registered yet (so it works out-of-the-box).
+ */
+if (! function_exists('studio_model_catalog')) {
+    function studio_model_catalog(): array
+    {
+        return [
+            ['group' => 'image', 'name' => 'Flux Schnell (Fal)', 'provider' => 'fal', 'model_id' => 'flux-1.1-schnell', 'api_key_ref' => 'fal', 'priority' => 5, 'note' => 'Nhanh, rẻ — dùng cho stub/CRUD'],
+            ['group' => 'image', 'name' => 'Qwen Image 3.0 Pro', 'provider' => 'qwen', 'model_id' => 'qwen-image-3.0-pro', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Giàu chi tiết, ưu tiên cao'],
+            ['group' => 'image', 'name' => 'Wan 2.7 Image Pro', 'provider' => 'wan', 'model_id' => 'wan2.7-image-pro', 'api_key_ref' => 'dashscope', 'priority' => 7, 'note' => 'DashScope'],
+            ['group' => 'image', 'name' => 'Gemini Flash Image', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash-image', 'api_key_ref' => 'gemini', 'priority' => 6, 'note' => 'Google'],
+            ['group' => 'video', 'name' => 'Wan 2.2 i2v', 'provider' => 'wan', 'model_id' => 'wan2.2-i2v', 'api_key_ref' => 'wan', 'priority' => 9, 'note' => 'Chất lượng cao'],
+            ['group' => 'video', 'name' => 'Wan 2.5 i2v', 'provider' => 'wan', 'model_id' => 'wan2.5-i2v', 'api_key_ref' => 'wan', 'priority' => 7, 'note' => 'Cân bằng'],
+            ['group' => 'video', 'name' => 'Wan 2.1 i2v Turbo', 'provider' => 'wan', 'model_id' => 'wan2.1-i2v-turbo', 'api_key_ref' => 'wan', 'priority' => 5, 'note' => 'Nhanh'],
+            ['group' => 'video', 'name' => 'Kling i2v', 'provider' => 'kling', 'model_id' => 'kling-v1-6-i2v', 'api_key_ref' => 'kling', 'priority' => 8, 'note' => 'Nếu có key Kling'],
+            ['group' => 'inference', 'name' => 'Gemini (Giám đốc sáng tạo)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 9, 'note' => 'Suy luận prompt'],
+            ['group' => 'inference', 'name' => 'Qwen Chat', 'provider' => 'qwen', 'model_id' => 'qwen-max', 'api_key_ref' => 'qwen', 'priority' => 7, 'note' => 'Suy luận prompt'],
+        ];
+    }
+}
+
+if (! function_exists('studio_models')) {
+    function studio_models(?string $group = null)
+    {
+        $rows = App\Models\StudioModel::query()->get();
+        if ($rows->isEmpty()) {
+            $rows = collect(studio_model_catalog());
+        }
+        return $group ? $rows->where('group', $group)->values() : $rows;
+    }
+}
+
+if (! function_exists('resolve_studio_model')) {
+    // Pick the highest-priority ENABLED model for a group.
+    function resolve_studio_model(string $group): ?array
+    {
+        $m = studio_models($group)
+            ->where('enabled', true)
+            ->sortByDesc('priority')
+            ->first();
+        if (! $m) return null;
+        return ['provider' => $m['provider'], 'model' => $m['model_id'], 'api_key_ref' => $m['api_key_ref'] ?? null];
+    }
+}
+
 }
