@@ -67,6 +67,28 @@
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
                 <textarea x-model="idea" rows="3" class="input" placeholder="VD: A flowing silk evening gown with sequin…" @keydown.enter.prevent="ideate()"></textarea>
                 <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
+                <div class="mt-2 flex gap-2">
+                    <button @click="openTranslateVi()" :disabled="translating || !output.image_prompt_en" class="btn-outline btn-sm flex-1 whitespace-nowrap" title="Hiển thị prompt hiện tại bằng tiếng Việt để chỉnh sửa; bấm Xong sẽ dịch lại và ghi đè prompt tiếng Anh."><span x-show="!translating">🇻🇳 Sửa tiếng Việt</span><span x-show="translating">Đang dịch…</span></button>
+                </div>
+                <textarea x-model="output.image_prompt_en" rows="4" class="input mt-2 !text-xs" placeholder="Image prompt (tiếng Anh) — bấm “Tạo Prompt” để AI viết (ghi đè); hoặc nhập trực tiếp."></textarea>
+                <div class="mt-2 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
+                    <span class="font-medium text-cream-200">Sáng tạo</span>
+                    <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-24 cursor-pointer accent-brand-500">
+                    <span class="font-semibold text-cream-50" x-text="creativeLevel"></span><span class="text-cream-300/70">/10</span>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select>
+                    <select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
+                    <div class="col-span-2">
+                        <label class="label">Số biến thể / lần tạo</label>
+                        <div class="flex gap-1.5">
+                            <template x-for="nv in [1, 2, 4]" :key="nv">
+                                <button type="button" @click="variantCount = nv" class="flex-1 rounded-lg border py-1.5 text-xs font-semibold transition-colors" :class="variantCount === nv ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="nv"></span></button>
+                            </template>
+                        </div>
+                    </div>
+                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
+                </div>
 
                 <!-- Presets (unified, multi-select) -->
                 <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -153,28 +175,21 @@
                 </div>
             </div>
 
-
-            <!-- Prompt + generate -->
-            <div class="card p-5" x-show="step===1">
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tạo ảnh <span class="text-xs font-normal text-ink-500">(nhập trực tiếp hoặc bấm “Tạo Prompt”)</span></h2>
-                <div class="mb-3 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng/preset; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
-                    <span class="font-medium text-cream-200">Sáng tạo</span>
-                    <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-24 cursor-pointer accent-brand-500">
-                    <span class="font-semibold text-cream-50" x-text="creativeLevel"></span><span class="text-cream-300/70">/10</span>
-                </div>
-                <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
-                <div class="mt-3 grid grid-cols-2 gap-2">
-                    <select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select>
-                    <select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
-                    <div class="col-span-2">
-                        <label class="label">Số biến thể / lần tạo</label>
-                        <div class="flex gap-1.5">
-                            <template x-for="n in [1, 2, 4]" :key="n">
-                                <button type="button" @click="variantCount = n" class="flex-1 rounded-lg border py-1.5 text-xs font-semibold transition-colors" :class="variantCount === n ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="n"></span></button>
-                            </template>
+            <!-- Chỉnh sửa prompt tiếng Việt -->
+            <div x-show="translateViOpen" x-cloak @click="translateViOpen=false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
+                    <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
+                        <h3 class="font-display text-base font-semibold text-cream-50">🇻🇳 Chỉnh sửa prompt tiếng Việt</h3>
+                        <button @click="translateViOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
+                    </div>
+                    <div class="p-5">
+                        <p class="mb-2 text-xs text-cream-300/60">Prompt hiện tại đã dịch sang tiếng Việt. Sửa theo ý bạn, bấm <b>Xong</b> để dịch lại tiếng Anh và ghi đè prompt tạo ảnh.</p>
+                        <textarea x-model="viPrompt" rows="8" class="input !text-sm" placeholder="Prompt tiếng Việt…"></textarea>
+                        <div class="mt-3 flex items-center justify-end gap-2">
+                            <button @click="translateViOpen=false" class="btn-outline btn-sm">Huỷ</button>
+                            <button @click="saveTranslateVi()" :disabled="translating" class="btn-brand btn-sm"><span x-show="!translating">Xong</span><span x-show="translating">Đang dịch…</span></button>
                         </div>
                     </div>
-                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
                 </div>
             </div>
 
@@ -483,6 +498,7 @@ document.addEventListener('alpine:init', () => {
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
+        translateViOpen: false, viPrompt: '', translating: false,
         quickOptions: { background: '', pose: '', angle: '' },
         quickRefs: {
             backgrounds: [
@@ -803,6 +819,23 @@ document.addEventListener('alpine:init', () => {
             if (this.faceImage && String(this.faceImage).startsWith('blob:')) URL.revokeObjectURL(this.faceImage);
             this.faceImage = '';
             Alpine.store('toast').show('Đã bỏ khuôn mặt mẫu (khuôn mặt trong Cài đặt vẫn giữ nếu có).', 'info');
+        },
+        // Mở popup sửa prompt tiếng Việt: dịch prompt EN hiện tại sang VI.
+        async openTranslateVi() {
+            const text = (this.output.image_prompt_en || '').trim();
+            if (!text) { Alpine.store('toast').show('Chưa có prompt để dịch.', 'error'); return; }
+            this.translating = true; this.translateViOpen = true; this.viPrompt = '';
+            try { const d = await this.api('/studio/translate', { text, direction: 'vi' }); this.viPrompt = d.text || text; }
+            catch (e) { this.viPrompt = text; Alpine.store('toast').show(e.message, 'error'); }
+            finally { this.translating = false; }
+        },
+        // Xong: dịch ngược VI -> EN và ghi đè prompt hiện tại.
+        async saveTranslateVi() {
+            if (!this.viPrompt.trim()) { Alpine.store('toast').show('Prompt tiếng Việt trống.', 'error'); return; }
+            this.translating = true;
+            try { const d = await this.api('/studio/translate', { text: this.viPrompt.trim(), direction: 'en' }); this.output.image_prompt_en = d.text || this.viPrompt.trim(); Alpine.store('toast').show('Đã cập nhật prompt (dịch sang tiếng Anh).'); }
+            catch (e) { Alpine.store('toast').show(e.message, 'error'); }
+            finally { this.translating = false; this.translateViOpen = false; }
         },
         cleanCanvas() {
             this.previewId = null; this.selectedImageId = null; this.videoSourceId = null; this.viewGen = null;

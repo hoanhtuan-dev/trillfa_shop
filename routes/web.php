@@ -140,6 +140,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/suggest', [StudioController::class, 'suggest'])->name('suggest');
     Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
     Route::post('/face', [StudioController::class, 'storeFace'])->name('face.store');
+    Route::post('/translate', [StudioController::class, 'translate'])->name('translate');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');

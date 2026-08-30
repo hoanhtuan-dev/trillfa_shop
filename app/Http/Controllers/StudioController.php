@@ -501,6 +501,61 @@ class StudioController extends Controller
         return response()->json(['url' => $path]);
     }
 
+    /**
+     * Translate a prompt between Vietnamese and English (used by the "Chỉnh sửa prompt tiếng Việt" popup).
+     */
+    public function translate(Request $request)
+    {
+        $data = $request->validate([
+            'text' => ['required', 'string', 'max:4000'],
+            'direction' => ['required', 'in:en,vi'],
+        ]);
+        $text = trim((string) $data['text']);
+        $target = $data['direction'] === 'vi' ? 'Vietnamese' : 'English';
+        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        $geminiKey = studio_api_key('gemini');
+        $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
+        $instruction = 'You are a professional fashion prompt translator. Translate the following image-generation prompt to '.$target.'. '
+            .'Keep all technical descriptors (fabric, silhouette, camera, lighting) precise. Return ONLY the translated prompt, nothing else.';
+
+        // Try Qwen chat first (if a key + prompt provider), else Gemini.
+        if ($qwenKey) {
+            try {
+                $resp = Http::withToken($qwenKey)->timeout(60)
+                    ->post(dashscope_base_url($qwenKey).'/compatible-mode/v1/chat/completions', [
+                        'model' => $model, 'messages' => [
+                            ['role' => 'system', 'content' => $instruction],
+                            ['role' => 'user', 'content' => $text],
+                        ],
+                    ]);
+                if ($resp->successful()) {
+                    $out = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                    if ($out !== '') { return response()->json(['text' => $out]); }
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Translate (qwen) failed: '.$e->getMessage());
+            }
+        }
+
+        if ($geminiKey) {
+            try {
+                $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(60)
+                    ->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', [
+                        'contents' => [['parts' => [['text' => $instruction."\n\n".$text]]]],
+                        'generationConfig' => ['responseMimeType' => 'text/plain'],
+                    ]);
+                if ($resp->successful()) {
+                    $out = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
+                    if ($out !== '') { return response()->json(['text' => $out]); }
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Translate (gemini) failed: '.$e->getMessage());
+            }
+        }
+
+        return response()->json(['text' => $text]); // no key / failed -> keep as-is
+    }
+
     protected function resolveReferencePath(string $url): ?string
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
