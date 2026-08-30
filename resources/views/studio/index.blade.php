@@ -84,19 +84,19 @@
                             <div class="flex flex-wrap items-center gap-1">
                                 <span class="w-12 shrink-0 text-cream-200/50">Nền</span>
                                 <template x-for="bg in quickRefs.backgrounds" :key="bg.v">
-                                    <button @click="editRef('Keep the exact garment, outfit, person and camera exactly unchanged. Change only the background to ' + bg.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="bg.l"></button>
+                                    <button @click="quickEdit('Keep the exact garment, outfit, person and camera exactly unchanged. Change only the background to ' + bg.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="bg.l"></button>
                                 </template>
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
                                 <span class="w-12 shrink-0 text-cream-200/50">Tư thế</span>
                                 <template x-for="p in quickRefs.poses" :key="p.v">
-                                    <button @click="editRef('Keep the exact identical garment and person. Change only the pose to ' + p.v + ', the garment stays identical.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="p.l"></button>
+                                    <button @click="quickEdit('Keep the exact identical garment and person. Change only the pose to ' + p.v + ', the garment stays identical.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="p.l"></button>
                                 </template>
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
                                 <span class="w-12 shrink-0 text-cream-200/50">Góc</span>
                                 <template x-for="a in quickRefs.angles" :key="a.v">
-                                    <button @click="editRef('Keep the exact garment and person. Change only the camera to ' + a.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="a.l"></button>
+                                    <button @click="quickEdit('Keep the exact garment and person. Change only the camera to ' + a.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="a.l"></button>
                                 </template>
                             </div>
                         </div>
@@ -107,32 +107,61 @@
                 </div>
             </div>
 
-            <!-- Presets -->
+            <!-- Lựa chọn nhanh + Presets (popup) -->
             <div class="card p-5" x-show="step===1">
-                <div class="mb-3 flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(chọn nhiều — bấm để bỏ chọn)</span></h2>
-                    <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-ink-900">Lựa chọn nhanh</h2>
+                    <button @click="presetOpen = true" class="btn-outline btn-sm whitespace-nowrap">🎛 Presets <span x-show="presetIds.length" x-text="'(' + presetIds.length + ')'"></span></button>
                 </div>
-                <div class="space-y-2">
-                    <template x-for="group in presetGroups" :key="group.category">
-                        <div x-data="{ open: false }">
-                            <label class="label" x-text="catLabels[group.category] || group.category"></label>
-                            <div class="relative">
-                                <button type="button" @click="open = !open" class="input flex !py-2 items-center justify-between gap-2 text-left" :class="selectedPresetText(group.category) ? 'border-brand-500/60' : ''">
-                                    <span class="truncate text-cream-100" x-text="selectedPresetText(group.category) || '— Chọn nhiều —'"></span>
-                                    <span class="shrink-0 text-cream-300" x-text="open ? '▲' : '▼'"></span>
-                                </button>
-                                <div x-show="open" @click.outside="open = false" x-cloak class="absolute left-0 right-0 z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-ink-700 bg-ink-800 p-1.5 shadow-xl backdrop-blur">
-                                    <template x-for="item in group.items" :key="item.id">
-                                        <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-cream-200 hover:bg-ink-700" :title="item.note">
-                                            <input type="checkbox" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)" class="h-4 w-4 shrink-0 accent-brand-500">
-                                            <span x-text="item.key || item.label"></span>
-                                        </label>
-                                    </template>
-                                </div>
-                            </div>
+                <p class="mt-1 text-xs text-ink-500">Chọn nhanh nền/tư thế/góc để gộp vào prompt (không tự tạo ảnh). Presets chuyên sâu mở bằng nút “🎛 Presets”.</p>
+                <div class="mt-3 space-y-2 text-[11px]">
+                    <div class="flex flex-wrap items-center gap-1">
+                        <span class="w-10 shrink-0 text-ink-500">Nền</span>
+                        <template x-for="bg in quickRefs.backgrounds" :key="bg.v">
+                            <button @click="toggleQuick('background', bg.v)" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" :class="quickOptions.background === bg.v ? 'bg-brand-600 text-white' : ''" x-text="bg.l"></button>
+                        </template>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1">
+                        <span class="w-10 shrink-0 text-ink-500">Tư thế</span>
+                        <template x-for="p in quickRefs.poses" :key="p.v">
+                            <button @click="toggleQuick('pose', p.v)" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" :class="quickOptions.pose === p.v ? 'bg-brand-600 text-white' : ''" x-text="p.l"></button>
+                        </template>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1">
+                        <span class="w-10 shrink-0 text-ink-500">Góc</span>
+                        <template x-for="a in quickRefs.angles" :key="a.v">
+                            <button @click="toggleQuick('angle', a.v)" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" :class="quickOptions.angle === a.v ? 'bg-brand-600 text-white' : ''" x-text="a.l"></button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Presets modal -->
+                <div x-show="presetOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                    <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-ink-700 bg-ink-800 p-5 shadow-2xl" @click.stop>
+                        <div class="mb-3 flex items-center justify-between">
+                            <h3 class="font-display text-base font-semibold text-cream-50">🎛 Presets chuyên sâu <span class="text-xs font-normal text-cream-300/60">(chọn nhiều — chỉ áp dụng preset đã chọn)</span></h3>
+                            <button @click="presetOpen=false" class="btn-outline btn-sm">✕</button>
                         </div>
-                    </template>
+                        <div class="space-y-4">
+                            <template x-for="group in presetGroups" :key="group.category">
+                                <div>
+                                    <p class="mb-1.5 text-xs font-semibold text-cream-200" x-text="catLabels[group.category] || group.category"></p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <template x-for="item in group.items" :key="item.id">
+                                            <label class="flex cursor-pointer items-center gap-1.5 rounded-full border border-ink-700 bg-ink-700/40 px-2 py-1 text-[11px] text-cream-200 transition-colors hover:bg-ink-700" :class="presetIds.includes(item.id) ? 'border-brand-500 bg-brand-600 text-white' : ''" :title="item.note">
+                                                <input type="checkbox" class="hidden" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)">
+                                                <span x-text="item.key || item.label"></span>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="mt-4 flex items-center justify-between gap-2">
+                            <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
+                            <button @click="presetOpen=false" class="btn-brand btn-sm ml-auto">Áp dụng & Đóng</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -464,6 +493,8 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
+        presetOpen: false,
+        quickOptions: { background: '', pose: '', angle: '' },
         quickRefs: {
             backgrounds: [
                 { l: 'Studio trắng', v: 'a clean seamless white studio background' },
@@ -780,7 +811,7 @@ document.addEventListener('alpine:init', () => {
             const tmpId = 'tmp-' + Date.now();
             this.addGen({ id: tmpId, type: 'image', status: 'processing', model: '', provider: this.imgProvider || '', media_url: null, error: null, credits_cost: 1, created_at: 'Đang tạo' });
             try {
-                const data = await this.api('/studio/generate', { prompt: this.output.image_prompt_en, resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null, variants: Number(this.variantCount) || 1 });
+                const data = await this.api('/studio/generate', { prompt: this.composedPrompt(), resolution: this.imageRes, ratio: this.imageRatio, history_id: this.output.history_id, project_id: this.currentProjectId || null, variants: Number(this.variantCount) || 1 });
                 this.generations = this.generations.filter(g => g.id !== tmpId);
                 const items = Array.isArray(data.items) ? data.items : [data];
                 items.forEach((it) => {
@@ -896,6 +927,27 @@ document.addEventListener('alpine:init', () => {
                 if (items.length) Alpine.store('toast').show('Đang đổi nhanh (giữ nguyên trang phục)… #' + items[0].generation_id);
             } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
             finally { this.refBusy = false; }
+        },
+
+        // Đổi nhanh CHỈ tạo ảnh sau khi người dùng xác nhận (tránh tốn credit ngoài ý muốn).
+        quickEdit(instruction) {
+            if (!confirm('Tạo ảnh MỚI từ ảnh tham khảo (giữ nguyên trang phục)? Bước này sẽ tạo 1 ảnh.')) return;
+            this.editRef(instruction);
+        },
+        // Toggle một "lựa chọn nhanh" (Nền/Tư thế/Góc) — chỉ ghi vào prompt, KHÔNG tự tạo ảnh.
+        toggleQuick(cat, val) { this.quickOptions[cat] = this.quickOptions[cat] === val ? '' : val; },
+        quickText() {
+            const o = this.quickOptions; const parts = [];
+            if (o.background) parts.push('background: ' + o.background);
+            if (o.pose) parts.push('pose: ' + o.pose);
+            if (o.angle) parts.push('camera: ' + o.angle);
+            return parts.join(', ');
+        },
+        composedPrompt() {
+            let p = (this.output.image_prompt_en || '').trim();
+            const q = this.quickText();
+            if (q && !p.toLowerCase().includes(q.toLowerCase())) p = (p ? p + ', ' : '') + q;
+            return p;
         },
 
         addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else { gen._t0 = Date.now(); this.generations.unshift(gen); } this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
