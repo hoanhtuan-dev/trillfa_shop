@@ -120,6 +120,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/swap-model', [StudioController::class, 'swapModel'])->name('swapModel');
+    Route::get('/swap-status/{taskId}', [StudioController::class, 'swapStatus'])->name('swapStatus');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
     Route::get('/pattern', [StudioController::class, 'patternPage'])->name('pattern');

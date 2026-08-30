@@ -994,14 +994,35 @@ document.addEventListener('alpine:init', () => {
         },
         async runSwap() {
             if (!this.swapDesign || this.swapLoading) return;
-            this.swapLoading = true;
+            this.swapLoading = true; this.swapOpen = false;
             try {
                 const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: this.swapModelId, pose_id: this.swapPoseId }) });
                 const d = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
-                if (d.media_url) { this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.provider, provider: d.provider, media_url: d.media_url, credits_cost: 1, created_at: 'Đã đổi người mẫu' }); this.swapOpen = false; Alpine.store('toast').show('Đã tạo người mẫu mới.'); }
+                if (!res.ok || !d.task_id) throw new Error(d.message || 'Thay đổi người mẫu thất bại.');
+                this.addGen({ id: d.generation_id, type: 'image', status: 'pending', model: 'tryon', provider: 'tryon', media_url: null, credits_cost: 1, created_at: 'Đang thử đồ' });
+                this.previewId = d.generation_id;
+                this.pollSwap(d.task_id, d.generation_id);
+                Alpine.store('toast').show('Đang thử đồ lên người mẫu…');
             } catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.swapLoading = false; }
+        },
+        pollSwap(taskId, genId) {
+            const t = setInterval(async () => {
+                try {
+                    const res = await fetch('/studio/swap-status/' + encodeURIComponent(taskId), { headers: { Accept: 'application/json' } });
+                    const d = await res.json().catch(() => ({}));
+                    if (d.status === 'completed' && d.media_url) {
+                        clearInterval(t);
+                        this.addGen({ id: genId, type: 'image', status: 'completed', model: 'tryon', provider: 'tryon', media_url: d.media_url, credits_cost: 1, created_at: 'Đã thử đồ' });
+                        this.previewId = genId;
+                        Alpine.store('toast').show('Đã thử đồ lên người mẫu.');
+                    } else if (d.status === 'failed') {
+                        clearInterval(t);
+                        this.addGen({ id: genId, status: 'failed', error: d.message || 'Thất bại' });
+                        Alpine.store('toast').show(d.message || 'Thay đổi người mẫu thất bại.', 'error');
+                    }
+                } catch (e) {}
+            }, 3000);
         },
         // Mở popup sửa prompt tiếng Việt: dịch prompt EN hiện tại sang VI.
         async openTranslateVi() {

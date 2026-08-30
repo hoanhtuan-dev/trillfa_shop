@@ -500,24 +500,70 @@ class StudioController extends Controller
             'pose_id' => ['required', 'string', 'max:40'],
         ]);
 
-        $res = app(\App\Services\VirtualTryOnService::class)->swap($data['image'], $data['model_id'], $data['pose_id']);
-        if (! ($res['url'] ?? null)) {
-            return response()->json(['message' => $res['error'] ?? 'Không thể thay đổi người mẫu.'], 422);
+        $svc = app(\App\Services\VirtualTryOnService::class);
+        $model = $svc->pickModel($data['model_id']);
+        $pose = $svc->pickPose($data['pose_id']);
+        if (! $model) {
+            return response()->json(['message' => 'Không tìm thấy người mẫu.'], 422);
         }
 
-        // Record a completed Generation so the result appears in Outputs.
+        // garment_image_url: the design image (person in the outfit) — for best results use a clean
+        // flat-lay / background-removed garment, but the design image is a working default.
+        $garmentUrl = url($data['image']);
+        $modelImage = $model['image'] ?? null;
+        if (! $modelImage) {
+            return response()->json(['message' => 'Người mẫu này chưa có ảnh (model_image_url). Thêm ảnh trong catalog.'], 422);
+        }
+        $modelUrl = url($modelImage);
+
+        $category = (string) studio_config('tryon_category', 'dress');
+        $res = $svc->submit($modelUrl, $garmentUrl, $category);
+        if (! empty($res['error'])) {
+            return response()->json(['message' => $res['error']], 422);
+        }
+
+        // Record a pending Generation so it appears in Outputs + the frontend can poll by task_id.
         $gen = auth()->user()->generations()->create([
             'type' => 'image',
-            'status' => 'completed',
-            'media_url' => $res['url'],
-            'prompt' => 'Thay đổi người mẫu (virtual try-on)',
-            'model' => $res['provider'] ?? 'tryon',
-            'provider' => $res['provider'] ?? 'tryon',
+            'status' => 'pending',
+            'prompt' => 'Thay đổi người mẫu (virtual try-on) · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
+            'model' => (string) studio_config('tryon_model', 'wanx-virtual-try-on'),
+            'provider' => 'tryon',
+            'base_image' => $data['image'],
+            'job_id' => $res['task_id'],
             'credits_cost' => 1,
-            'meta' => ['type' => 'image', 'provider' => $res['provider'] ?? 'tryon', 'model' => $res['provider'] ?? 'tryon', 'tryon' => true],
+            'meta' => ['type' => 'image', 'provider' => 'tryon', 'model' => (string) studio_config('tryon_model', 'wanx-virtual-try-on'), 'tryon' => true, 'task_id' => $res['task_id'], 'model_id' => $data['model_id'], 'pose_id' => $data['pose_id']],
         ]);
 
-        return response()->json(['generation_id' => $gen->id, 'media_url' => $res['url'], 'provider' => $res['provider'] ?? 'tryon']);
+        return response()->json(['task_id' => $res['task_id'], 'generation_id' => $gen->id]);
+    }
+
+    /**
+     * Poll a virtual try-on task and complete the matching Generation when the image is ready.
+     */
+    public function swapStatus(Request $request, string $taskId)
+    {
+        $svc = app(\App\Services\VirtualTryOnService::class);
+        $res = $svc->status($taskId);
+
+        $gen = auth()->user()->generations()->where('job_id', $taskId)->latest()->first();
+
+        if (($res['status'] ?? '') === 'succeeded' && ! empty($res['url'])) {
+            $stored = $svc->storeRemoteImage($res['url']);
+            if ($stored) {
+                if ($gen) {
+                    $gen->update(['status' => 'completed', 'media_url' => $stored]);
+                }
+                return response()->json(['status' => 'completed', 'media_url' => $stored, 'generation_id' => $gen?->id]);
+            }
+        }
+
+        if (($res['status'] ?? '') === 'failed') {
+            if ($gen) { $gen->update(['status' => 'failed', 'error' => $res['error'] ?? 'Thay đổi người mẫu thất bại.']); }
+            return response()->json(['status' => 'failed', 'message' => $res['error'] ?? 'Thất bại.']);
+        }
+
+        return response()->json(['status' => $res['status'] ?? 'pending']);
     }
 
     public function translate(Request $request)

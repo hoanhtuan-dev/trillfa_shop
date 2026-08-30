@@ -6,21 +6,17 @@ use IlluminateSupportFacadesHttp;
 use IlluminateSupportStr;
 
 /**
- * "Thay Đổi Người Mẫu" (Click-to-Swap) — Virtual Try-On.
- *
- * TWO-STEP, fully automatic (no masking/prompting by the user):
- *  1) Auto-garment extraction: sends the design image (person wearing the outfit) so the
- *     try-on API isolates the garment.
- *  2) Virtual Try-On: sends garment_image + model_image (from the model library) to the
- *     DashScope virtual-try-on API. Falls back to a regular qwen-image-edit (pose/background
- *     change) if the try-on model is unavailable — so the feature always produces a result.
+ * "Thay Đổi Người Mẫu" (Click-to-Swap) — Qwen / DashScope Virtual Try-On.
+ * Endpoint: POST {base}/api/v1/services/aigc/virtual-try-on/generation (async -> task_id)
+ * Input: model_image_url + garment_image_url + parameters.category. Poll /api/v1/tasks/{taskId};
+ * on SUCCEEDED the image is in output.image_url.
  */
 class VirtualTryOnService
 {
+    protected string $taskBase = 'https://dashscope.aliyuncs.com/api/v1';
+
     public function modelCatalog(): array
     {
-        // Model Library — faces / ethnicities the user picks. Optional image URL (bundle a real
-        // photo or point at a stored asset); desc drives the prompt if there is no image.
         return [
             ['id' => 'asian_f', 'name' => 'Nữ Á Đông', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-asian-f.jpg', 'desc' => 'East Asian female, fair skin, long dark hair'],
             ['id' => 'euro_f', 'name' => 'Nữ Châu Âu', 'ethnicity' => 'European female', 'image' => '/samples/model-euro-f.jpg', 'desc' => 'European female, light skin, blonde hair'],
@@ -32,7 +28,6 @@ class VirtualTryOnService
 
     public function poseCatalog(): array
     {
-        // Pose Presets — the pose the user picks.
         return [
             ['id' => 'stand', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body'],
             ['id' => 'hip', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, confident contrapposto'],
@@ -42,114 +37,55 @@ class VirtualTryOnService
         ];
     }
 
-    public function swap(string $designImage, string $modelId, string $poseId): array
+    public function submit(string $modelImageUrl, string $garmentImageUrl, string $category = 'dress'): array
     {
-        $model = $this->pick($this->modelCatalog(), $modelId);
-        $pose = $this->pick($this->poseCatalog(), $poseId);
-        if (! $model) {
-            return ['url' => null, 'error' => 'Không tìm thấy mẫu người mẫu.'];
-        }
-        $poseName = $pose['skeleton'] ?? ($pose['name'] ?? 'standing');
-
         $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if ($key) {
-            try {
-                $url = $this->callTryOn($key, $designImage, $model, $poseName);
-                if ($url) {
-                    return ['url' => $url, 'provider' => 'tryon'];
-                }
-            } catch (Throwable $e) {
-                logger()->warning('Virtual try-on failed, falling back to edit: '.$e->getMessage());
-            }
-        }
-
-        // Fallback: qwen-image-edit (change the model/pose while keeping the exact garment).
-        try {
-            $url = $this->callEditFallback($designImage, $model, $poseName);
-            if ($url) {
-                return ['url' => $url, 'provider' => 'edit'];
-            }
-        } catch (Throwable $e) {
-            logger()->error('Try-on fallback edit failed: '.$e->getMessage());
-        }
-
-        return ['url' => null, 'error' => 'Không thể thay đổi người mẫu (try-on & edit đều lỗi). Kiểm tra key/model.'];
-    }
-
-    protected function callTryOn(string $key, string $designImage, array $model, string $pose): ?string
-    {
-        $base = dashscope_base_url($key).'/api/v1';
-        $tryonModel = (string) studio_config('tryon_model', 'wanx-virtual-try-on');
-        $modelImage = $model['image'] ?? null;
-
-        $input = [
-            'garment_image' => url($designImage), // the design (person wearing the outfit) -> API extracts garment
-            'user_prompts' => 'Wear the outfit naturally, '.$pose.', photorealistic fashion photo, full body.',
-        ];
-        if ($modelImage) {
-            $input['model_image'] = url($modelImage);
-        }
-        $input = array_filter($input);
-
+        if (! $key) { return ['error' => 'Chưa có key Qwen/DashScope để gọi virtual try-on.']; }
+        $model = (string) studio_config('tryon_model', 'wanx-virtual-try-on');
         $resp = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)
-            ->post($base.'/services/aigc/image-generation/generation', [
-                'model' => $tryonModel,
-                'input' => $input,
-                'parameters' => ['n' => 1],
+            ->post($this->taskBase.'/services/aigc/virtual-try-on/generation', [
+                'model' => $model,
+                'input' => [
+                    'model_image_url' => $modelImageUrl,
+                    'garment_image_url' => $garmentImageUrl,
+                ],
+                'parameters' => ['category' => $category],
             ]);
-
         if (! $resp->successful()) {
-            logger()->warning('Try-on submit: HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 200));
-            return null;
+            logger()->warning('Try-on submit: HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 220));
+            return ['error' => 'Gửi try-on lỗi (HTTP '.$resp->status().'). '.substr((string) $resp->body(), 0, 160)];
         }
-
         $taskId = data_get($resp->json(), 'output.task_id');
-        if (! $taskId) {
-            return null;
-        }
-
-        $deadline = microtime(true) + 90;
-        while (microtime(true) < $deadline) {
-            sleep(3);
-            $q = Http::withToken($key)->timeout(30)->get($base.'/tasks/'.$taskId);
-            $status = (string) data_get($q->json(), 'output.task_status');
-            if ($status === 'SUCCEEDED') {
-                $rurl = data_get($q->json(), 'output.results.0.url');
-                return $rurl ? $this->storeRemoteImage($rurl) : null;
-            }
-            if ($status === 'FAILED') {
-                return null;
-            }
-        }
-
-        return null;
+        return $taskId ? ['task_id' => $taskId] : ['error' => 'Không nhận được task_id try-on.'];
     }
 
-    protected function callEditFallback(string $designImage, array $model, string $pose): ?string
+    public function status(string $taskId): array
     {
-        $service = app(ImageAIService::class);
-        return $service->generate(
-            'Keep the exact garment, outfit and all its details 100% unchanged. Change the person to a '.$model['ethnicity'].' and set the pose to '.$pose.'. Photorealistic, full body, high fashion.',
-            $designImage
-        );
+        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        if (! $key) { return ['status' => 'failed', 'error' => 'no key']; }
+        $q = Http::withToken($key)->timeout(30)->get($this->taskBase.'/tasks/'.$taskId);
+        if (! $q->successful()) { return ['status' => 'failed', 'error' => 'HTTP '.$q->status()]; }
+        $status = (string) data_get($q->json(), 'output.task_status');
+        $url = data_get($q->json(), 'output.image_url') ?: data_get($q->json(), 'output.results.0.url');
+        return ['status' => strtolower($status), 'url' => $url, 'error' => (string) data_get($q->json(), 'output.message', '')];
     }
 
-    protected function pick(array $items, string $id): ?array
+    public function pickModel(string $id): ?array
     {
-        foreach ($items as $it) {
-            if (($it['id'] ?? '') === $id) {
-                return $it;
-            }
-        }
-        return $items[0] ?? null;
+        foreach ($this->modelCatalog() as $m) { if (($m['id'] ?? '') === $id) { return $m; } }
+        return $this->modelCatalog()[0] ?? null;
+    }
+
+    public function pickPose(string $id): ?array
+    {
+        foreach ($this->poseCatalog() as $p) { if (($p['id'] ?? '') === $id) { return $p; } }
+        return $this->poseCatalog()[0] ?? null;
     }
 
     protected function storeRemoteImage(string $url): ?string
     {
         $contents = @file_get_contents($url);
-        if (! $contents) {
-            return null;
-        }
+        if (! $contents) { return null; }
         $name = 'studio/'.Str::uuid().'.jpg';
         IlluminateSupportFacadesStorage::disk('public')->put($name, $contents);
         return '/storage/'.$name;
