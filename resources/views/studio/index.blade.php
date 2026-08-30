@@ -181,6 +181,7 @@
                     </div>
                     <div class="p-5">
                         <p class="mb-2 text-xs text-cream-300/60">Sửa prompt tiếng Việt theo ý bạn, bấm <b>Xong</b> để ghi đè vào ô nhập prompt (giữ nguyên bản tiếng Việt) và đóng.</p>
+                        <p class="mb-2 text-[10px] text-cream-300/40" x-show="translateMeta && translateMeta.provider">Dịch bằng <b x-text="translateMeta.provider"></b><span x-show="translateMeta.model"> (<span x-text="translateMeta.model"></span>)</span> · lần dịch gần nhất.</p>
                         <textarea x-model="viPrompt" rows="8" class="input !text-sm" placeholder="Prompt tiếng Việt…"></textarea>
                         <div class="mt-3 flex items-center justify-end gap-2">
                             <button @click="translateViOpen=false" class="btn-outline btn-sm">Huỷ</button>
@@ -495,7 +496,7 @@ document.addEventListener('alpine:init', () => {
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
-        translateViOpen: false, viPrompt: '', translating: false,
+        translateViOpen: false, viPrompt: '', translating: false, translateMeta: null,
 
         previewId: null,
         viewGen: null,
@@ -566,7 +567,7 @@ document.addEventListener('alpine:init', () => {
             const v = String(en || '').trim();
             if (!v || this.translating || v === this.viPrompt) return;
             this.translating = true;
-            try { const d = await this.api('/studio/translate', { text: v, direction: 'vi' }); if (d.text) this.viPrompt = d.text; }
+            try { const d = await this.api('/studio/translate', { text: v, direction: 'vi' }); if (d.text) this.viPrompt = d.text; this.translateMeta = { provider: d.provider, model: d.model }; }
             catch (e) {}
             finally { this.translating = false; }
         },
@@ -806,7 +807,7 @@ document.addEventListener('alpine:init', () => {
             // Bản tiếng Việt đã được dịch âm thầm & lưu sẵn -> mở tức thì; chỉ dịch bổ sung khi chưa có.
             if (!this.viPrompt) {
                 this.translating = true;
-                try { const d = await this.api('/studio/translate', { text, direction: 'vi' }); this.viPrompt = d.text || text; }
+                try { const d = await this.api('/studio/translate', { text, direction: 'vi' }); this.viPrompt = d.text || text; this.translateMeta = { provider: d.provider, model: d.model }; }
                 catch (e) { this.viPrompt = text; Alpine.store('toast').show(e.message, 'error'); }
                 finally { this.translating = false; }
             }

@@ -504,8 +504,38 @@ class StudioController extends Controller
         $instruction = 'You are a professional fashion prompt translator. Translate the following image-generation prompt to '.$target.'. '
             .'Keep all technical descriptors (fabric, silhouette, camera, lighting) precise. Return ONLY the translated prompt, nothing else.';
 
-        // Try Qwen chat first (if a key + prompt provider), else Gemini.
+        // Gemini translation model candidates — try the configured one, then a safe fallback.
+        $gemModels = array_values(array_unique(array_filter([
+            $translateModel, 'gemini-2.5-flash', 'gemini-2.0-flash',
+        ])));
+        if ($geminiKey) {
+            foreach ($gemModels as $gm) {
+                logger()->info('Translate via GEMINI', ['model' => $gm, 'dir' => $data['direction']]);
+                try {
+                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(60)
+                        ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$gm.':generateContent', [
+                            'contents' => [['parts' => [['text' => $instruction."\n\n".$text]]]],
+                            'generationConfig' => ['responseMimeType' => 'text/plain'],
+                        ]);
+                    if ($resp->successful()) {
+                        $out = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
+                        if ($out !== '') { return response()->json(['text' => $out, 'provider' => 'gemini', 'model' => $gm]); }
+                    }
+                    // 404 / model-not-found -> try the next Gemini model; other errors -> log & stop.
+                    if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')) {
+                        logger()->warning('Translate (gemini) model not found: '.$gm.' - '.substr((string) $resp->body(), 0, 160));
+                        continue;
+                    }
+                    logger()->warning('Translate (gemini) HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 180));
+                } catch (\Throwable $e) {
+                    logger()->error('Translate (gemini) failed: '.$e->getMessage());
+                }
+            }
+        }
+
+        // Qwen chat fallback (if no Gemini key / Gemini failed).
         if ($qwenKey) {
+            logger()->info('Translate via QWEN', ['model' => $qwenModel, 'dir' => $data['direction']]);
             try {
                 $resp = Http::withToken($qwenKey)->timeout(60)
                     ->post(dashscope_base_url($qwenKey).'/compatible-mode/v1/chat/completions', [
@@ -516,30 +546,15 @@ class StudioController extends Controller
                     ]);
                 if ($resp->successful()) {
                     $out = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                    if ($out !== '') { return response()->json(['text' => $out]); }
+                    if ($out !== '') { return response()->json(['text' => $out, 'provider' => 'qwen', 'model' => $qwenModel]); }
                 }
+                logger()->warning('Translate (qwen) HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 180));
             } catch (\Throwable $e) {
                 logger()->error('Translate (qwen) failed: '.$e->getMessage());
             }
         }
 
-        if ($geminiKey) {
-            try {
-                $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(60)
-                    ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$translateModel.':generateContent', [
-                        'contents' => [['parts' => [['text' => $instruction."\n\n".$text]]]],
-                        'generationConfig' => ['responseMimeType' => 'text/plain'],
-                    ]);
-                if ($resp->successful()) {
-                    $out = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
-                    if ($out !== '') { return response()->json(['text' => $out]); }
-                }
-            } catch (\Throwable $e) {
-                logger()->error('Translate (gemini) failed: '.$e->getMessage());
-            }
-        }
-
-        return response()->json(['text' => $text]); // no key / failed -> keep as-is
+        return response()->json(['text' => $text, 'provider' => 'none', 'model' => null]); // no key / failed -> keep as-is
     }
 
     protected function resolveReferencePath(string $url): ?string
