@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
  */
 class VirtualTryOnService
 {
-    protected string $taskBase = 'https://dashscope.aliyuncs.com/api/v1';
+    protected string $taskBase = 'https://dashscope.aliyuncs.com/api/v1'; // overridden to dashscope_base_url($key) per key
 
     public function modelCatalog(): array
     {
@@ -50,13 +50,22 @@ class VirtualTryOnService
         ];
     }
 
+    // Try-on needs a DashScope MODEL key (sk-.../sk-ws-...), NOT a QwenCloud Token-Plan (sk-sp-...).
+    protected function key(): ?string
+    {
+        foreach (studio_qwen_credentials('image') as $k) {
+            if ($k && ! str_starts_with($k, 'sk-sp-')) { return $k; }
+        }
+        return studio_api_key('dashscope');
+    }
+
     public function submit(string $modelImageUrl, string $garmentImageUrl, string $category = 'dress'): array
     {
-        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if (! $key) { return ['error' => 'Chưa có key Qwen/DashScope để gọi virtual try-on.']; }
+        $key = $this->key();
+        if (! $key) { return ['error' => 'Chưa có key DashScope (Pay-As-You-Go) để gọi virtual try-on.']; }
         $model = (string) studio_config('tryon_model', 'wanx-virtual-try-on');
         $resp = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)
-            ->post($this->taskBase.'/services/aigc/virtual-try-on/generation', [
+            ->post(dashscope_base_url($key).'/api/v1/services/aigc/virtual-try-on/generation', [
                 'model' => $model,
                 'input' => [
                     'model_image_url' => $modelImageUrl,
@@ -74,9 +83,9 @@ class VirtualTryOnService
 
     public function status(string $taskId): array
     {
-        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        $key = $this->key();
         if (! $key) { return ['status' => 'failed', 'error' => 'no key']; }
-        $q = Http::withToken($key)->timeout(30)->get($this->taskBase.'/tasks/'.$taskId);
+        $q = Http::withToken($key)->timeout(30)->get(dashscope_base_url($key).'/api/v1/tasks/'.$taskId);
         if (! $q->successful()) { return ['status' => 'failed', 'error' => 'HTTP '.$q->status()]; }
         $status = (string) data_get($q->json(), 'output.task_status');
         $url = data_get($q->json(), 'output.image_url') ?: data_get($q->json(), 'output.results.0.url');
