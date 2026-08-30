@@ -90,6 +90,8 @@ class StudioController extends Controller
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
             'variants' => ['nullable', 'integer', 'in:1,2,4'],
+            'base_image' => ['nullable', 'string', 'max:2048'], // edit path: change bg/pose keeping exact pixels
+            'edit' => ['nullable', 'string', 'in:1,true'],
         ]);
 
         // Ensure a shared prompt-history so all variants group as one "generation run".
@@ -470,6 +472,18 @@ class StudioController extends Controller
         $result = app(StyleSuggestService::class)->suggest($imagePath, $creativeLevel);
 
         return response()->json($result);
+    }
+
+    /**
+     * Upload a reference image (from a local blob) and return a public storage URL so it can be
+     * used as a base_image for the pixel-preserving edit flow.
+     */
+    public function uploadRef(Request $request)
+    {
+        $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
+        $path = $request->file('image')->store('studio/ref', 'public');
+
+        return response()->json(['url' => '/storage/'.$path]);
     }
 
     protected function resolveReferencePath(string $url): ?string

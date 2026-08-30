@@ -138,6 +138,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/generations/{generation}/cancel', [StudioController::class, 'cancel'])->name('generations.cancel');
     Route::delete('/generations/{generation}', [StudioController::class, 'destroy'])->name('generations.destroy');
     Route::post('/suggest', [StudioController::class, 'suggest'])->name('suggest');
+    Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');

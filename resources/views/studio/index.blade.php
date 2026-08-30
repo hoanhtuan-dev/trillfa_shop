@@ -78,6 +78,29 @@
                     </div>
                     <button type="button" @click="suggestStyle()" :disabled="suggesting || (!refFile && !refUrl)" class="btn-brand btn-sm mt-2 w-full whitespace-nowrap"><span x-show="!suggesting">Gợi ý phong cách & prompt</span><span x-show="suggesting">Đang gợi ý…</span></button>
                     <button type="button" @click="createFromRef()" :disabled="refBusy || (!refFile && !refUrl && !refImage)" class="btn-outline btn-sm mt-1.5 w-full whitespace-nowrap text-brand-200" title="Tạo ảnh MỚI từ ảnh tham khảo — giữ đặc điểm trang phục, đổi tư thế/hậu cảnh theo Presets bạn chọn"><span x-show="!refBusy">🖼 Tạo mới từ ảnh tham khảo</span><span x-show="refBusy">Đang tạo…</span></button>
+                    <div class="mt-3 rounded-xl bg-ink-800/60 p-3" x-show="refImage">
+                        <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cream-200/70">⚡ Đổi nhanh — giữ nguyên trang phục</p>
+                        <div class="space-y-1.5 text-[10px]">
+                            <div class="flex flex-wrap items-center gap-1">
+                                <span class="w-12 shrink-0 text-cream-200/50">Nền</span>
+                                <template x-for="bg in quickRefs.backgrounds" :key="bg.v">
+                                    <button @click="editRef('Keep the exact garment, outfit, person and camera exactly unchanged. Change only the background to ' + bg.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="bg.l"></button>
+                                </template>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1">
+                                <span class="w-12 shrink-0 text-cream-200/50">Tư thế</span>
+                                <template x-for="p in quickRefs.poses" :key="p.v">
+                                    <button @click="editRef('Keep the exact identical garment and person. Change only the pose to ' + p.v + ', the garment stays identical.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="p.l"></button>
+                                </template>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1">
+                                <span class="w-12 shrink-0 text-cream-200/50">Góc</span>
+                                <template x-for="a in quickRefs.angles" :key="a.v">
+                                    <button @click="editRef('Keep the exact garment and person. Change only the camera to ' + a.v + '.')" class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-brand-600" x-text="a.l"></button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
                     <input x-ref="refInput" type="file" accept="image/*" @change="onRefChange" class="hidden">
                     <template x-if="refImage"><div class="relative mt-3 overflow-hidden rounded-xl"><img :src="refImage" class="h-36 w-full bg-ink-900 object-cover" alt="Ảnh tham khảo"><button type="button" @click="clearRef()" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white">×</button></div></template>
                     <template x-if="suggestResult.styles.length"><div class="mt-3 rounded-xl bg-brand-900/40 p-3 text-xs text-brand-200"><strong>Gợi ý:</strong> <span x-text="suggestResult.styles.join(', ')"></span><span x-show="suggestResult.background"> · <span x-text="suggestResult.background"></span></span></div></template>
@@ -441,6 +464,26 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
+        quickRefs: {
+            backgrounds: [
+                { l: 'Studio trắng', v: 'a clean seamless white studio background' },
+                { l: 'Phố cổ', v: 'an old-town cobblestone street' },
+                { l: 'Thiên nhiên', v: 'a lush green nature landscape' },
+                { l: 'Bờ biển', v: 'a serene seaside beach at golden hour' },
+                { l: 'Đường đêm', v: 'a neon-lit modern city street at night' },
+            ],
+            poses: [
+                { l: 'Đứng thẳng', v: 'standing straight, arms relaxed, full body' },
+                { l: 'Sải bước', v: 'walking mid-stride catwalk, dynamic' },
+                { l: 'Ngồi', v: 'sitting elegantly on a high studio stool, one leg extended' },
+                { l: 'Xoay', v: 'twirling gracefully, skirt flaring' },
+            ],
+            angles: [
+                { l: 'Toàn thân', v: 'full body shot' },
+                { l: 'Cận trên', v: 'torso crop shot, chest to mid-thigh' },
+                { l: 'Đặc tả', v: 'extreme close-up of the garment' },
+            ],
+        },
         previewId: null,
         viewGen: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false, step: 1,
@@ -828,6 +871,29 @@ document.addEventListener('alpine:init', () => {
                 if (this.step !== 1) this.step = 1;
                 await this.generateImage();
                 Alpine.store('toast').show('Đã tạo mới từ ảnh tham khảo — giữ trang phục, dùng tư thế/hậu cảnh bạn chọn.');
+            } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
+            finally { this.refBusy = false; }
+        },
+
+        // Giữ chính xác từng pixel: dùng model chỉnh sửa (qwen-edit) trên ảnh tham khảo làm BASE —
+        // thay nền/tư thế/góc nhưng GIỮ NGUYÊN trang phục & khuôn mặt như ảnh gốc.
+        async editRef(instruction) {
+            if ((!this.refFile && !this.refUrl && !this.refImage) || this.refBusy) return;
+            this.refBusy = true;
+            try {
+                let refUrl = this.refUrl;
+                if (refUrl && String(refUrl).startsWith('blob:')) refUrl = null;
+                if (!refUrl && this.refFile) {
+                    const fd = new FormData(); fd.append('image', this.refFile);
+                    const up = await this.upload('/studio/upload-ref', fd);
+                    refUrl = up.url;
+                }
+                if (!refUrl) { Alpine.store('toast').show('Ảnh tham khảo cần là URL lưu trữ — chọn từ sản phẩm/kết quả hoặc tải ảnh mới.', 'error'); return; }
+                const data = await this.api('/studio/generate', { prompt: instruction, base_image: refUrl, edit: '1', history_id: this.output.history_id, project_id: this.currentProjectId || null });
+                const items = Array.isArray(data.items) ? data.items : [data];
+                items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' }));
+                if (items.length) this.previewId = items[0].generation_id;
+                if (items.length) Alpine.store('toast').show('Đang đổi nhanh (giữ nguyên trang phục)… #' + items[0].generation_id);
             } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
             finally { this.refBusy = false; }
         },
