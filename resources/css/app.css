@@ -143,7 +143,7 @@
     }
 }
 
-@layer components {
+/* Studio dark theme overrides — UNLAYERED so they beat Tailwind utilities (bg-cream, text-ink, etc.) */
     .studio-dark { @apply bg-ink-900 text-cream-100; }
     .studio-dark .card { @apply border-ink-700 bg-ink-800 shadow-black/30; }
     .studio-dark .card-hover { @apply hover:shadow-black/50; }
@@ -171,8 +171,6 @@
     .studio-dark .text-amber-700 { @apply text-amber-300; }
     .studio-dark .text-red-600 { @apply text-red-400; }
     .studio-dark .bg-white { @apply bg-ink-800; }
-}
-
 
 /* --- Elegant scrollbars (thin, subtle, animated) --- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }

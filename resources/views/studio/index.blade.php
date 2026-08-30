@@ -136,7 +136,7 @@
                     <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveFace" class="h-4 w-4 accent-brand-600"> Giữ nguyên khuôn mặt & dáng</label>
                     <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveBg" class="h-4 w-4 accent-brand-600"> Giữ nguyên nền</label>
                 </div>
-                <button @click="refine()" :disabled="refining || !refinePrompt" class="btn-outline mt-3 w-full"><span x-show="!refining">Cập nhật Ảnh</span><span x-show="refining">Đang gửi…</span></button>
+                <button @click="refine()" :disabled="refining || !refinePrompt" class="btn-brand mt-3 w-full"><span x-show="!refining">Theo dõi → Cập nhật Ảnh</span><span x-show="refining">Đang gửi…</span></button>
             </div>
 
             <!-- Color Palette (Bước 2) -->
