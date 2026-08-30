@@ -79,6 +79,15 @@
         </div>
     </div>
 
+    <!-- Step indicator (Progressive Disclosure) -->
+    <div class="mb-4 flex items-center gap-1 overflow-x-auto rounded-2xl border border-cream-200 bg-cream-50 p-1 text-xs sm:gap-2">
+        <button @click="step=1" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===1 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/20':'bg-cream-200'">1</span> Ý tưởng</button>
+        <span class="text-ink-300">…</span>
+        <button @click="step=2" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===2 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/20':'bg-cream-200'">2</span> Bản thảo</button>
+        <span class="text-ink-300">…</span>
+        <button @click="step=3" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===3 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/20':'bg-cream-200'">3</span> Video</button>
+    </div>
+
     <div class="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)_280px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
@@ -134,7 +143,9 @@
             <div class="card p-5">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Prompt tiếng Anh <span class="text-xs font-normal text-ink-500">(nhập trực tiếp hoặc bấm “Tạo Prompt”)</span></h2>
                 <textarea x-model="output.image_prompt_en" rows="4" class="input !text-xs" placeholder="Image prompt…"></textarea>
-                <div class="mt-2"><label class="label">Video prompt</label><textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs"></textarea></div>
+                <div class="mt-2"><label class="label">Video prompt</label><textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs" placeholder="(để trống để ghép tự động từ ý tưởng + preset + kịch bản quay)"></textarea>
+                    <button type="button" @click="suggestVideoPrompt()" class="btn-outline btn-sm mt-1 w-full" title="Ghép prompt video từ ý tưởng + preset + kịch bản quay (không dùng AI)">✨ Gợi ý prompt video</button>
+                </div>
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select>
                     <select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
@@ -402,7 +413,7 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         previewId: null,
-        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false,
+        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false, step: 1,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(),
 
@@ -510,6 +521,19 @@ document.addEventListener('alpine:init', () => {
             return grp.items
                 .filter((it) => this.presetIds.includes(it.id))
                 .map((it) => it.key || it.label).join(', ');
+        },
+        // Assemble the video prompt from the Step-1 pieces (idea + garment presets) + motion. No AI inference:
+        // the user decides when to press "Gợi ý prompt video". The Kịch bản quay is the camera control and is
+        // shown separately (appended at render).
+        suggestVideoPrompt() {
+            const idea = (this.output.image_prompt_en || this.idea || '').trim();
+            const garment = ['fabric', 'silhouette', 'style', 'background', 'pose']
+                .map((c) => this.selectedPresetText(c)).filter(Boolean).join(', ');
+            let p = 'Cinematic fashion catwalk, a model presenting ' + (idea || 'a high-fashion outfit');
+            if (garment) p += ', ' + garment;
+            p += ', dynamic fabric motion, professional fashion video.';
+            this.output.video_prompt_en = p.trim();
+            Alpine.store('toast').show('Đã ghép prompt video từ ý tưởng + preset (chỉnh tay nếu cần).');
         },
 
         onRefChange(e) {
