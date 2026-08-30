@@ -8,7 +8,7 @@
     {{-- Tabs --}}
     <div class="mt-4 flex flex-wrap gap-1.5 rounded-2xl border border-ink-700 bg-ink-800 p-1 text-xs font-semibold">
         <button @click="tab='general'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='general' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">⚙️ Cấu hình</button>
-        <button @click="tab='models'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='models' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🤖 Nhà cung cấp &amp; Model</button>
+        <button @click="tab='models'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='models' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🤖 Model</button>
         <button @click="tab='keys'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🔑 API Keys</button>
     </div>
 
@@ -228,11 +228,13 @@
             <button class="btn-brand btn-sm">➕ Thêm model</button>
         </form>
     </div>
+    </div>
 
+    <div x-show="tab==='keys'">
     {{-- ===== Provider connections ===== --}}
     <div class="card mt-6 p-6">
         <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔌 Kết nối nhà cung cấp</h2>
-        <p class="mt-1 text-xs text-ink-500">Trạng thái key từng provider. Thêm/sửa key và scope trong <b>API Keys Registry</b> ngay dưới đây.</p>
+        <p class="mt-1 text-xs text-ink-500">Trạng thái key từng provider. Thêm/sửa key và scope trong <b>API Keys Registry</b> bên dưới.</p>
         <div class="mt-3 grid gap-2 sm:grid-cols-2">
             @foreach($providers as $service=>$p)
                 <div class="flex items-center justify-between gap-2 rounded-xl border border-cream-200 p-2.5 text-xs">
@@ -255,9 +257,6 @@
         </div>
     </div>
 
-    </div>
-
-    <div x-show="tab==='keys'">
     {{-- ===== API Keys Registry ===== --}}
     <div class="card mt-6 p-6">
         <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">nhiều key/provider · scope theo model/nhóm · ưu tiên · tránh trùng lặp</span></h2>
