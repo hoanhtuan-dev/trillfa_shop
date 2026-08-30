@@ -597,9 +597,9 @@ class ImageAIService
         return 'data:'.$mime.';base64,'.$b64;
     }
 
-    protected function editImage(string $prompt, string $imageUrl): ?string
+    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null): ?string
     {
-        $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+        $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
         if (! str_contains(strtolower($model), 'edit')) {
             $this->dashscopeError = 'Model “'.$model.'” có vẻ KHÔNG phải model chỉnh sửa ảnh (tên không chứa “edit”). '
                 .'Chọn model Qwen Edit chuyên dụng (vd: qwen-image-edit, qwen-image-edit-plus…) trong Cài đặt — không dùng chung model tạo ảnh (qwen-image-3.0-pro) cho Inpaint.';
@@ -670,6 +670,24 @@ class ImageAIService
 
         logger()->warning('Edit model ultimately failed', ['model' => $model, 'err' => $last]);
 
+        return null;
+    }
+
+    /**
+     * Edit an image with a SPECIFIC model (used by "Thay Đổi Người Mẫu" swap). Retries a couple of
+     * times on a 429 rate-limit so a busy model still produces a result.
+     */
+    public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null): ?string
+    {
+        for ($i = 0; $i < 3; $i++) {
+            $url = $this->editImage($prompt, $imageUrl, $modelOverride);
+            if ($url) { return $url; }
+            if (str_contains(strtolower((string) $this->dashscopeError), '429') || str_contains(strtolower((string) $this->dashscopeError), 'ratelimit')) {
+                sleep(3 * ($i + 1)); // backoff: 3s, 6s, 9s
+                continue;
+            }
+            break; // non-rate-limit error -> give up
+        }
         return null;
     }
 
