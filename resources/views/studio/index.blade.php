@@ -81,11 +81,11 @@
 
     <!-- Step indicator (Progressive Disclosure) -->
     <div class="mb-4 flex items-center gap-1 overflow-x-auto rounded-2xl border border-cream-200 bg-cream-50 p-1 text-xs sm:gap-2">
-        <button @click="step=1" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===1 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/20':'bg-cream-200'">1</span> Ý tưởng</button>
-        <span class="text-ink-300">…</span>
-        <button @click="step=2" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===2 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/20':'bg-cream-200'">2</span> Bản thảo</button>
-        <span class="text-ink-300">…</span>
-        <button @click="step=3" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===3 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/20':'bg-cream-200'">3</span> Video</button>
+        <button @click="step=1" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===1 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/20':'bg-cream-200'">1</span> <span>Bước 1: Concept</span></button>
+        <span class="text-ink-300">›</span>
+        <button @click="step=2" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===2 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/20':'bg-cream-200'">2</span> <span>Bước 2: Fitting Room</span></button>
+        <span class="text-ink-300">›</span>
+        <button @click="step=3" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===3 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/20':'bg-cream-200'">3</span> <span>Bước 3: Director</span></button>
     </div>
 
     <div class="grid gap-4 pb-24 lg:grid-cols-[260px_minmax(0,1fr)_240px]">
@@ -196,16 +196,16 @@
                 </div>
 
                 <!-- Media area -->
-                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-cream-100 active:cursor-grabbing" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)">
+                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)">
                     <!-- interaction legend -->
                     <div class="pointer-events-none absolute bottom-2 left-2 z-10 rounded-lg bg-ink-900/70 px-2 py-1 text-[10px] text-white">
                         <span class="mr-2">🖱 Lăn chuột: Thu phóng</span><span class="mr-2">✋ Kéo / Nhấn phải: Di chuyển</span><span>Zoom <b x-text="zoom.toFixed(2)"></b>x</span>
                     </div>
-                    <!-- floating quick actions over the image -->
-                    <div class="absolute bottom-2 right-2 z-10 flex items-center gap-1" x-show="preview && preview.type==='image' && preview.status==='completed'">
-                        <button @pointerdown.stop @click.stop="selectImage(preview)" class="rounded-full bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow" title="Chọn làm nguồn Chỉnh sửa (Inpaint)">✏️ Sửa</button>
-                        <button @pointerdown.stop @click.stop="selectVideo(preview)" class="rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-white shadow" title="Chọn làm nguồn Video">🎬 Video</button>
-                        <a :href="preview ? '/studio/generations/' + preview.id + '/download' : '#'" @pointerdown.stop @click.stop class="rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-white shadow">⬇ Tải</a>
+                    <!-- floating toolbar (top-centre) over the image -->
+                    <div class="absolute left-1/2 top-2 z-10 -translate-x-1/2 flex items-center gap-1" x-show="preview && preview.status==='completed'">
+                        <button @pointerdown.stop @click.stop="selectImage(preview)" class="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-ink-700 shadow" title="Inpaint / Masking — chọn làm nguồn Chỉnh sửa">✏️ Inpaint / Masking</button>
+                        <button @pointerdown.stop @click.stop="Alpine.store('toast').show('Upscale: sắp có (nâng cấp độ phân giải).', 'info')" class="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-ink-700 shadow" title="Upscale — nâng cấp độ phân giải">⬆ Upscale</button>
+                        <button @pointerdown.stop @click.stop="selectImage(preview)" class="rounded-full bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow" title="Set as Final — đặt làm kết quả chính">✓ Set as Final</button>
                     </div>
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
@@ -218,8 +218,8 @@
                         <template x-if="preview && preview.status !== 'completed'">
                             <div class="text-center">
                                 <span x-show="isActive(preview.status)" class="inline-block h-9 w-9 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></span>
-                                <p class="mt-3 text-sm text-ink-500" x-text="statusText(preview)"></p>
-                                <p class="mt-1 text-xs text-ink-500" x-show="preview.model" x-text="preview.provider + ' · ' + preview.model"></p>
+                                <p class="mt-3 text-sm text-cream-200" x-text="statusText(preview)"></p>
+                                <p class="mt-1 text-xs text-cream-300" x-show="preview.model" x-text="preview.provider + ' · ' + preview.model"></p>
                             </div>
                         </template>
                         <template x-if="!preview">
@@ -528,7 +528,7 @@ document.addEventListener('alpine:init', () => {
         lbStartPan(e) { this._lbDrag = { x: e.clientX, y: e.clientY, px: this.lbPan.x, py: this.lbPan.y }; },
         lbMovePan(e) { if (!this._lbDrag) return; this.lbPan.x = this._lbDrag.px + (e.clientX - this._lbDrag.x); this.lbPan.y = this._lbDrag.py + (e.clientY - this._lbDrag.y); },
         lbEndPan() { this._lbDrag = null; },
-        get stepLabel() { return ['', 'Bước 1 · Lên ý tưởng', 'Bước 2 · Duyệt bản thảo', 'Bước 3 · Ghế đạo diễn'][this.step] || ''; },
+        get stepLabel() { return ['', 'Bước 1 · Concept', 'Bước 2 · Fitting Room', 'Bước 3 · Director'][this.step] || ''; },
         get fabDisabled() {
             if (this.step === 3) return this.videoBusy || !this.videoSourceId;
             if (this.step === 2) return false;
