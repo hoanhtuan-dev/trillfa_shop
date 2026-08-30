@@ -48,9 +48,10 @@ class GeminiService
             .'write BOTH an image-generation prompt and a matching video-catwalk prompt for the SAME garment. '
             .'Keep the garment identity (fabric, silhouette, style, colours) identical across the two prompts so the '
             .'video matches the rendered image. '.$directive.' '
-            .'Return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, concept_en (short English garment '
-            .'concept), category (object with fabric/silhouette/style/background/pose/camera), keywords (array), '
-            .'mood, color_palette (array), style_notes.';
+            .'Return ONLY valid JSON with keys: image_prompt_en, video_prompt_en, negative_prompt (short comma-separated EN '
+            .'phrases to avoid: low quality, distortions, extra limbs, cropped garment, inconsistent face, watermark), '
+            .'concept_en (short English garment concept), category (object with fabric/silhouette/style/background/pose/camera), '
+            .'keywords (array), mood, color_palette (array), style_notes.';
     }
 
     protected function callQwen(string $idea, array $injections, int $creativeLevel): array
@@ -141,7 +142,7 @@ Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
     protected function stub(string $idea, array $injections, int $creativeLevel): array
     {
         return $this->normalize([
-            'concept_en' => $this->clean(trim($idea ?: 'a high-end fashion outfit', ' .,')),
+            'concept_en' => $this->englishConcept($idea, $injections),
             'keywords' => array_values(array_filter([
                 $injections['fabric'] ?? null,
                 $injections['silhouette'] ?? null,
@@ -160,6 +161,20 @@ Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
         $result['provider'] = $provider;
 
         return $result;
+    }
+
+    protected function englishConcept(string $idea, array $injections): string
+    {
+        // Stub: build a coherent ENGLISH concept from the preset tokens (English values),
+        // so the generated prompt is usable even without an AI key. Falls back to the idea.
+        $f = strtolower(trim((string) ($injections['fabric'] ?? '')));
+        $s = strtolower(trim((string) ($injections['silhouette'] ?? '')));
+        $st = strtolower(trim((string) ($injections['style'] ?? '')));
+        if ($f || $s || $st) {
+            $parts = array_filter([$f, $s, $st]);
+            return 'a luxury '.implode(', ', $parts).' garment';
+        }
+        return $this->clean(trim($idea ?: 'a high-end fashion outfit', ' .,'));
     }
 
     protected function clean(string $value): string

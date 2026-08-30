@@ -167,7 +167,7 @@ class CreativeDirectionService
             $parts[] = ', a model walks the runway wearing '.$concept;
         }
         if ($sig !== '') {
-            $parts[] = ', made of '.$sig;
+            $parts[] = ', '.$sig;
         }
         if (! empty($tokens['pose'])) {
             $parts[] = ', '.$this->lowerise((string) $tokens['pose']).' pose';
