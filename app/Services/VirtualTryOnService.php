@@ -97,16 +97,19 @@ class VirtualTryOnService
     {
         // Dùng model được quản lý cho "Thay Đổi Người Mẫu" (studio.swap_model, mặc định qwen-image-edit-plus).
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
-        $prev = config('studio.qwen_edit_model');
-        config(['studio.qwen_edit_model' => $swapModel]);
+        $prev = setting('studio_qwen_edit_model');
+        set_setting('studio_qwen_edit_model', $swapModel); // tạm dùng swap_model cho bước chỉnh sửa
         try {
             $svc = app(ImageAIService::class);
             return $svc->generate(
                 'Keep the exact garment, outfit and all its details 100% unchanged. Change the person to a '.$modelDesc.' and set the pose to '.$pose.'. Photorealistic, full body, high fashion.',
                 $designImage
             );
+        } catch (\Throwable $e) {
+            logger()->warning('Swap fallback edit failed: '.$e->getMessage());
+            return null;
         } finally {
-            config(['studio.qwen_edit_model' => $prev]);
+            set_setting('studio_qwen_edit_model', (string) $prev);
         }
     }
 

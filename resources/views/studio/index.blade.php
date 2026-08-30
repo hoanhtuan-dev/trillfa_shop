@@ -190,7 +190,7 @@
                                     <img :src="m.img" class="h-20 w-20 rounded-2xl bg-ink-900 object-cover ring-2 transition-transform group-hover:scale-105" :class="swapModelIds.includes(m.id) ? 'ring-brand-500' : 'ring-transparent'" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" alt="Khuôn mặt">
                                     <span class="hidden h-20 w-20 place-items-center rounded-2xl bg-ink-700 text-xs font-bold text-cream-200" x-text="m.name"></span>
                                     <span class="text-[10px] text-cream-200" x-text="m.name"></span>
-                                    <button @click="removeSwapAsset(m)" class="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600 text-[10px] text-white" x-show="m.assetId" title="Xoá khỏi thư viện">×</button>
+                                    <span @click.stop="removeSwapAsset(m)" class="absolute -right-1.5 -top-1.5 grid h-5 w-5 cursor-pointer place-items-center rounded-full bg-red-600 text-[10px] text-white" x-show="m.assetId" title="Xoá khỏi thư viện">×</span>
                                 </button>
                             </template>
                         </div>
@@ -201,7 +201,7 @@
                                     <img :src="p.img" class="aspect-[3/4] w-full rounded-xl bg-ink-900 object-cover object-top transition-transform group-hover:scale-[1.02]" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'" alt="Dáng">
                                     <svg viewBox="0 0 24 24" class="hidden h-10 w-10 text-cream-300"><path :d="p.sk" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     <span class="text-[10px] text-cream-200" x-text="p.name"></span>
-                                    <button @click="removeSwapAsset(p)" class="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600 text-[10px] text-white" x-show="p.assetId" title="Xoá khỏi thư viện">×</button>
+                                    <span @click.stop="removeSwapAsset(p)" class="absolute -right-1.5 -top-1.5 grid h-5 w-5 cursor-pointer place-items-center rounded-full bg-red-600 text-[10px] text-white" x-show="p.assetId" title="Xoá khỏi thư viện">×</span>
                                 </button>
                             </template>
                         </div>
@@ -610,7 +610,7 @@ document.addEventListener('alpine:init', () => {
         pickTarget: 'ref',
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
-        translateViOpen: false, viPrompt: '', translating: false, translateMeta: null,
+        translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
 
         previewId: null,
         viewGen: null,
@@ -1031,6 +1031,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 for (const job of jobs) {
                     const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: job.m, pose_id: job.p }) });
+                    await new Promise(r => setTimeout(r, 1500)); // nghỉ 1.5s giữa các lần gọi (tránh rate-limit 429)
                     const d = await res.json().catch(() => ({}));
                     if (!res.ok) { Alpine.store('toast').show(d.message || 'Thay đổi người mẫu thất bại.', 'error'); continue; }
                     if (d.media_url) { // fallback qwen-edit -> hoàn tất ngay
