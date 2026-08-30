@@ -186,8 +186,8 @@
                     <label class="label">Model video</label>
                     <select x-model="videoModel" class="input !py-2">
                         <option value="">— Mặc định (theo thứ tự ưu tiên) —</option>
-                        <template x-for="m in videoModels" :key="m.model">
-                            <option :value="m.model" x-text="m.label"></option>
+                        <template x-for="m in videoModels" :key="m.id">
+                            <option :value="m.id" x-text="m.label + (m.provider ? ' · ' + m.provider : '')"></option>
                         </template>
                     </select>
                 </div>
@@ -452,7 +452,7 @@ document.addEventListener('alpine:init', () => {
                 const md = await mres.json();
                 if (md && md.groups) {
                     const vid = md.groups.video || [];
-                    if (vid.length) this.videoModels = vid.map(mm => ({ label: mm.label, model: mm.key }));
+                    if (vid.length) this.videoModels = vid.map(mm => ({ id: mm.id, label: mm.label, provider: mm.provider, model: mm.key }));
                 }
             } catch (e) {}
             // "Catwalk Video" nav (/studio#catwalk) opens Step 3 (Director / catwalk) directly.
@@ -755,7 +755,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.videoSourceId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, model: this.videoModel || null, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') { Alpine.store('toast').show('Đã render xong video #' + data.generation_id); this.haptic(40); if (this.isMobile) this.step = 2; } }
+            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, model: (this.videoModels.find(m => Number(m.id) === Number(this.videoModel)) || {}).model || null, model_registry_id: this.videoModel || null, provenance: 'registry', resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') { Alpine.store('toast').show('Đã render xong video #' + data.generation_id); this.haptic(40); if (this.isMobile) this.step = 2; } }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },

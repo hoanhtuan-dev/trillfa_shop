@@ -127,6 +127,8 @@ class StudioController extends Controller
             'base_image' => ['nullable', 'string', 'max:2048'],
             'camera' => ['nullable', 'string', 'max:1000'], // Kịch bản quay (video_scene) injection có thể dài
             'model' => ['nullable', 'string', 'max:120'], // video-model override (multi-model selector)
+            'model_registry_id' => ['nullable', 'integer'],
+            'provenance' => ['nullable', 'string', 'max:20'],
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
             'duration' => ['nullable', 'string', 'in:5,8,10,15,20'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
@@ -135,8 +137,16 @@ class StudioController extends Controller
 
         $cost = (int) studio_config('video_credits', 10);
 
-        // Multi-model selector: allow a per-render video model override (stored so the job uses it).
-        if (! empty($data['model'])) {
+        // Multi-model selector: resolve the chosen registered model (unique id) so the render uses
+        // exactly that provider + model_id (not the highest-priority default). Avoids model_id collisions.
+        if (! empty($data['model_registry_id'])) {
+            $reg = \App\Models\StudioModel::find($data['model_registry_id']);
+            if ($reg) {
+                $data['provider'] = $reg->provider;
+                $data['model'] = $reg->model_id;
+                $data['api_key_ref'] = $reg->api_key_ref;
+            }
+        } elseif (! empty($data['model'])) {
             set_setting('studio_video_model', $data['model']);
         }
 
@@ -328,7 +338,8 @@ class StudioController extends Controller
         $out = [];
         foreach ($groups as $g) {
             $out[$g] = $rows->where('group', $g)->where('enabled', true)->values()->map(fn ($m) => [
-                'key' => $m->model_id, 'label' => $m->name, 'provider' => $m->provider, 'priority' => $m->priority,
+                'id' => $m->id, 'key' => $m->model_id, 'label' => $m->name,
+                'provider' => $m->provider, 'priority' => $m->priority,
             ])->all();
         }
         return response()->json(['groups' => $out]);
@@ -346,7 +357,10 @@ class StudioController extends Controller
             $provider = 'qwen';
             $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
         } else {
-            [$provider, $model] = $this->defaultProviderModel($type);
+            // Explicit provider/model from the registry selector wins; else resolve the default.
+            [$provider, $model] = (! empty($data['provider']) && ! empty($data['model']))
+                ? [(string) $data['provider'], (string) $data['model']]
+                : $this->defaultProviderModel($type);
         }
 
         $generation = $user->generations()->create([

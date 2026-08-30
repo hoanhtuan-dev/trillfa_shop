@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
  */
 class VideoAIService
 {
-    public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null, ?string $duration = null, ?int $generationId = null): string
+    public function render(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution = null, ?string $duration = null, ?int $generationId = null, ?string $model = null, ?string $provider = null): string
     {
         // Failover: try Token Plan first, then Pay-As-You-Go on a quota error (studio_qwen_credentials('video')).
         $keys = studio_qwen_credentials('video');
@@ -22,7 +22,7 @@ class VideoAIService
             $last = null;
             foreach ($keys as $key) {
                 try {
-                    return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, $key, $generationId);
+                    return $this->callDashscopeVideo($prompt, $imageUrl, $cameraPreset, $resolution, $duration, $key, $generationId, $model, $provider);
                 } catch (\Throwable $e) {
                     $last = $e->getMessage();
                     capture_provider_quota_reset($last);
@@ -40,10 +40,10 @@ class VideoAIService
         return '/samples/studio-catwalk.mp4';
     }
 
-    protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key, ?int $generationId = null): string
+    protected function callDashscopeVideo(string $prompt, string $imageUrl, string $cameraPreset, ?string $resolution, ?string $duration, string $key, ?int $generationId = null, ?string $modelOverride = null, ?string $provider = null): string
     {
         $base = dashscope_base_url($key).'/api/v1';
-        $model = (string) studio_config('video_model', 'wan2.5-t2v');
+        $model = $modelOverride ?: (string) studio_config('video_model', 'wan2.5-t2v');
         $size = $this->videoSize($resolution);
 
         $prompt = trim($prompt);

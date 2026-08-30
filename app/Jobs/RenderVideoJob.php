@@ -60,6 +60,8 @@ class RenderVideoJob implements ShouldQueue
                 $generation->resolution,
                 $generation->duration,
                 $generation->id,
+                $generation->model,
+                $generation->provider,
             );
 
             $generation->update([
