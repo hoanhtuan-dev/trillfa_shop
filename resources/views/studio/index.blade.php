@@ -88,14 +88,14 @@
         <button @click="step=3" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===3 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/20':'bg-cream-200'">3</span> <span>Bước 3: Director</span></button>
     </div>
 
-    <div class="grid gap-4 pb-24 lg:grid-cols-[260px_minmax(0,1fr)_240px]">
+    <div class="grid gap-4 pb-24 lg:grid-cols-[minmax(0,1fr)_300px_240px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1">
+        <div class="space-y-4 lg:order-2 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1">
             <!-- Idea -->
             <div class="card p-5">
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Text-to-Image · Ý tưởng</h2>
+                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
                 <textarea x-model="idea" rows="3" class="input" placeholder="VD: A flowing silk evening gown with sequin…" @keydown.enter.prevent="ideate()"></textarea>
                 <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
 
@@ -117,23 +117,19 @@
             <!-- Presets -->
             <div class="card p-5">
                 <div class="mb-3 flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(bấm chip để chọn)</span></h2>
+                    <h2 class="font-display text-base font-semibold text-ink-900">Presets <span class="text-xs font-normal text-ink-500">(chọn từng nhóm)</span></h2>
                     <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
                 </div>
-                <div class="space-y-4">
+                <div class="space-y-2">
                     <template x-for="group in presetGroups" :key="group.category">
                         <div>
                             <label class="label" x-text="catLabels[group.category] || group.category"></label>
-                            <div class="flex flex-wrap gap-1.5">
+                            <select class="input !py-2" :value="selectedPresetId(group.category)" @change="setPresetForCategory(group.category, $event.target.value)">
+                                <option value="">— Chọn —</option>
                                 <template x-for="item in group.items" :key="item.id">
-                                    <button type="button" @click="togglePreset(item.id)"
-                                        :title="item.key + ': ' + item.value + (item.note ? ' · ' + item.note : '')"
-                                        class="rounded-full border px-3 py-1.5 text-xs transition-colors"
-                                        :class="presetIds.includes(item.id) ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800' : 'border-cream-300 text-ink-700 hover:border-brand-400 hover:text-brand-700'">
-                                        <span x-text="item.key || item.label"></span>
-                                    </button>
+                                    <option :value="item.id" :title="item.note" x-text="item.key || item.label"></option>
                                 </template>
-                            </div>
+                            </select>
                         </div>
                     </template>
                 </div>
@@ -178,7 +174,7 @@
         <!-- =============================================================== -->
         <!-- ===== CENTER: Canvas preview ===== -->
         <!-- =============================================================== -->
-        <div class="min-w-0" x-show="!isMobile || step===2">
+        <div class="min-w-0 lg:order-1" x-show="!isMobile || step===2">
             <div class="card overflow-hidden p-0 lg:sticky lg:top-20">
                 <!-- Canvas toolbar -->
                 <div class="flex items-center justify-between gap-2 border-b border-cream-200 px-3 py-2 text-xs text-ink-500">
@@ -196,7 +192,7 @@
                 </div>
 
                 <!-- Media area -->
-                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)">
+                <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
                     <!-- interaction legend -->
                     <div class="pointer-events-none absolute bottom-2 left-2 z-10 rounded-lg bg-ink-900/70 px-2 py-1 text-[10px] text-white">
                         <span class="mr-2">🖱 Lăn chuột: Thu phóng</span><span class="mr-2">✋ Kéo / Nhấn phải: Di chuyển</span><span>Zoom <b x-text="zoom.toFixed(2)"></b>x</span>
@@ -301,7 +297,15 @@
         <!-- =============================================================== -->
         <!-- ===== RIGHT: Generation Parameters ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4" x-show="!isMobile || step===3">
+        <div class="space-y-4 lg:order-3" x-show="!isMobile || step===3">
+            <!-- Generation Parameters -->
+            <div class="card p-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-sm font-semibold text-ink-900">⚙️ Generation Parameters</h2>
+                    <span class="badge text-xs" :class="preview && preview.status==='completed' ? 'bg-emerald-500 text-white' : 'bg-cream-200 text-ink-700'" x-text="preview && preview.status==='completed' ? 'Sẵn sàng' : 'Chờ kết quả'"></span>
+                </div>
+            </div>
+
             <!-- Outputs grid -->
             <div class="card p-4">
                 <div class="mb-3 flex items-center justify-between">
@@ -533,6 +537,14 @@ document.addEventListener('alpine:init', () => {
         movePan(e) { if (!this._drag) return; this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); },
         endPan() { this._drag = null; },
         onWheel(e) { const delta = e.deltaY > 0 ? -0.25 : 0.25; this.zoom = Math.min(4, Math.max(0.6, +(this.zoom + delta).toFixed(2))); },
+        _touchDist: null,
+        onTouchPinch(e) {
+            if (e.touches.length === 2) {
+                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                if (this._touchDist) { const f = d / this._touchDist; this.zoom = Math.max(0.6, Math.min(4, +(this.zoom * f).toFixed(2))); }
+                this._touchDist = d;
+            } else { this._touchDist = null; }
+        },
         openLightbox() { this.lbZoom = 1; this.lbPan = { x: 0, y: 0 }; this.lightbox = true; document.body.style.overflow = 'hidden'; },
         closeLightbox() { this.lightbox = false; document.body.style.overflow = ''; },
         lbZoomIn() { this.lbZoom = Math.min(8, +(this.lbZoom + 0.5).toFixed(2)); },
@@ -596,6 +608,21 @@ document.addEventListener('alpine:init', () => {
             if (i >= 0) this.presetIds.splice(i, 1);
             else this.presetIds.push(id);
             this.haptic(12);
+        },
+        selectedPresetId(cat) {
+            const grp = this.presets.find((g) => g.category === cat);
+            if (!grp) return '';
+            const s = grp.items.find((it) => this.presetIds.includes(it.id));
+            return s ? s.id : '';
+        },
+        setPresetForCategory(cat, id) {
+            const grp = this.presets.find((g) => g.category === cat);
+            if (grp) {
+                const gids = grp.items.map((it) => it.id);
+                this.presetIds = this.presetIds.filter((i) => !gids.includes(i));
+            }
+            if (id) this.presetIds.push(Number(id));
+            this.haptic(10);
         },
         selectedPresetText(cat) {
             const grp = this.presets.find((g) => g.category === cat);

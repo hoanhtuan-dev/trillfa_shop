@@ -143,6 +143,36 @@
     }
 }
 
+@layer components {
+    .studio-dark { @apply bg-ink-900 text-cream-100; }
+    .studio-dark .card { @apply border-ink-700 bg-ink-800 shadow-black/30; }
+    .studio-dark .card-hover { @apply hover:shadow-black/50; }
+    .studio-dark .input { @apply border-ink-700 bg-ink-900 text-cream-50 placeholder:text-cream-200/40 focus:border-brand-400 focus:ring-brand-400/20; }
+    .studio-dark .label { @apply text-cream-300; }
+    .studio-dark .btn-outline { @apply border-ink-700 text-cream-100 hover:border-cream-300 hover:bg-cream-300 hover:text-ink-900; }
+    .studio-dark .btn-ghost { @apply text-cream-200 hover:bg-ink-700; }
+    .studio-dark .chip { @apply border-ink-700 bg-ink-900 text-cream-200 hover:border-brand-400 hover:text-brand-200; }
+    .studio-dark .link { @apply text-brand-300 hover:text-brand-200; }
+    .studio-dark .text-ink-900 { @apply text-cream-50; }
+    .studio-dark .text-ink-700 { @apply text-cream-200; }
+    .studio-dark .text-ink-500 { @apply text-cream-300; }
+    .studio-dark .text-ink-300 { @apply text-cream-300/70; }
+    .studio-dark .bg-cream-50 { @apply bg-ink-800; }
+    .studio-dark .bg-cream-100 { @apply bg-ink-800; }
+    .studio-dark .bg-cream-200 { @apply bg-ink-700; }
+    .studio-dark .border-cream-200 { @apply border-ink-700; }
+    .studio-dark .border-cream-300 { @apply border-ink-700; }
+    .studio-dark .hover\:bg-cream-100:hover { @apply bg-ink-700; }
+    .studio-dark .hover\:bg-cream-200:hover { @apply bg-ink-700; }
+    .studio-dark .bg-brand-50 { @apply bg-brand-900/40; }
+    .studio-dark .text-brand-800 { @apply text-brand-200; }
+    .studio-dark .text-brand-700 { @apply text-brand-300; }
+    .studio-dark .bg-amber-100 { @apply bg-amber-500/20; }
+    .studio-dark .text-amber-700 { @apply text-amber-300; }
+    .studio-dark .text-red-600 { @apply text-red-400; }
+    .studio-dark .bg-white { @apply bg-ink-800; }
+}
+
 
 /* --- Elegant scrollbars (thin, subtle, animated) --- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }

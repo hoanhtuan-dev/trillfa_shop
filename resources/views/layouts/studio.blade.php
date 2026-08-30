@@ -75,10 +75,10 @@
                 <div class="flex items-center gap-2 text-sm">
                     <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 transition-colors hover:bg-ink-700 hover:text-white" :title="sidebarCollapsed ? 'Hiện thanh bên' : 'Ẩn thanh bên'"><span x-text="sidebarCollapsed ? '»' : '«'"></span></button>
                     <span class="font-display text-sm font-semibold text-cream-50">@yield('title', 'Trillfa Studio')</span>
-                    <span class="hidden badge bg-cream-200 text-ink-500 sm:inline-flex">{{ $connected ? 'AI Connected' : 'Stub' }}</span>
+                    <span class="hidden badge bg-ink-700 text-cream-200 sm:inline-flex">{{ $connected ? 'AI Connected' : 'Stub' }}</span>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="badge bg-brand-50 text-brand-800">Tín dụng: <span class="font-bold">{{ $credits }}</span></span>
+                    <span class="badge bg-brand-900/50 text-brand-200">Tín dụng: <span class="font-bold">{{ $credits }}</span></span>
                     <span class="hidden text-xs text-cream-300 md:inline">{{ $u?->name }}</span>
                     <form method="POST" action="{{ route('logout') }}">@csrf
                         <button type="submit" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 transition-colors hover:bg-ink-700 hover:text-white">Đăng xuất</button>
@@ -86,7 +86,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto bg-cream-50 p-4 sm:p-6">
+            <main class="flex-1 overflow-y-auto bg-ink-900 p-4 sm:p-6 studio-dark">
                 @yield('content')
             </main>
 
