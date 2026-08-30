@@ -243,6 +243,32 @@
         </form>
     </div>
 
+    {{-- ===== Provider connections ===== --}}
+    <div class="card mt-6 p-6">
+        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔌 Kết nối nhà cung cấp</h2>
+        <p class="mt-1 text-xs text-ink-500">Trạng thái key từng provider. Thêm/sửa key và scope trong <b>API Keys Registry</b> ngay dưới đây.</p>
+        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            @foreach($providers as $service=>$p)
+                <div class="flex items-center justify-between gap-2 rounded-xl border border-cream-200 p-2.5 text-xs">
+                    <span class="min-w-0">
+                        <span class="block font-semibold text-ink-900">{{ $p['label'] }}</span>
+                        <span class="block truncate text-[10px] text-ink-500">env: {{ $p['hint'] }}</span>
+                    </span>
+                    <span class="badge {{ $p['configured'] ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ $p['configured'] ? 'Có key' : 'Chưa có' }}</span>
+                </div>
+            @endforeach
+        </div>
+        <div class="mt-4 rounded-xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
+            <p class="font-semibold">💡 Gợi ý lấy key</p>
+            <ul class="mt-1 list-inside list-disc space-y-0.5">
+                <li>Gemini: <code class="rounded bg-ink-700 px-1 text-cream-100">aistudio.google.com</code> → API Keys.</li>
+                <li>Qwen / Wan (ảnh, chỉnh sửa ảnh & video): <code class="rounded bg-ink-700 px-1 text-cream-100">home.qwencloud.com/api-keys</code> (Token-Plan) hoặc <code class="rounded bg-ink-700 px-1 text-cream-100">dashscope.aliyuncs.com</code> (Pay-As-You-Go).</li>
+                <li>Replicate: <code class="rounded bg-ink-700 px-1 text-cream-100">replicate.com/account/api-tokens</code>.</li>
+            </ul>
+            <p class="mt-2">Khi có key, service tự chuyển từ <b>stub</b> sang gọi API thật. Key trong <b>API Keys Registry</b> ưu tiên hơn env trong <code class="rounded bg-ink-700 px-1 text-cream-100">.env</code>.</p>
+        </div>
+    </div>
+
     {{-- ===== API Keys Registry ===== --}}
     <div class="card mt-6 p-6">
         <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">nhiều key/provider · scope theo model/nhóm · ưu tiên · tránh trùng lặp</span></h2>

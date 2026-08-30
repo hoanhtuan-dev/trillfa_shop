@@ -734,7 +734,22 @@ class StudioController extends Controller
             'usage' => studio_usage(auth()->user()),
             'models' => studio_models(), // registry models (grouped by category)
             'api_keys' => \App\Models\StudioApiKey::orderBy('provider')->orderByDesc('priority')->orderBy('id')->get(),
+            'providers' => $this->providerStatus(),
         ]);
+    }
+
+    protected function providerStatus(): array
+    {
+        return [
+            'gemini' => ['label' => 'Gemini — Giám đốc sáng tạo', 'hint' => 'GEMINI_API_KEY', 'configured' => (bool) studio_api_key('gemini')],
+            'fal' => ['label' => 'Fal.ai — Flux (ảnh)', 'hint' => 'FAL_KEY', 'configured' => (bool) studio_api_key('fal')],
+            'replicate' => ['label' => 'Replicate — Flux (ảnh)', 'hint' => 'REPLICATE_API_TOKEN', 'configured' => (bool) studio_api_key('replicate')],
+            'wan' => ['label' => 'Wan AI — video', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY', 'configured' => (bool) (studio_api_key('wan') ?: studio_api_key('dashscope'))],
+            'veo' => ['label' => 'Google Veo — video', 'hint' => 'GOOGLE_VEO_KEY', 'configured' => (bool) studio_api_key('veo')],
+            'qwen' => ['label' => 'Qwen — ảnh (QwenCloud)', 'hint' => 'QWEN_API_KEY (home.qwencloud.com/api-keys)', 'configured' => (bool) studio_api_key('qwen')],
+            'qwen_edit' => ['label' => 'Qwen Edit — chỉnh sửa ảnh / Inpaint', 'hint' => 'QWEN_EDIT_KEY', 'configured' => (bool) studio_api_key('qwen_edit')],
+            'dashscope' => ['label' => 'DashScope — Wan/Qwen image & video', 'hint' => 'DASHSCOPE_API_KEY', 'configured' => (bool) studio_api_key('dashscope')],
+        ];
     }
 
     public function storeModel(Request $request)

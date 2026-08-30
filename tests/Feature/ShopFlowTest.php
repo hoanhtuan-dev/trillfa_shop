@@ -964,7 +964,7 @@ class ShopFlowTest extends TestCase
 
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin)->get('/studio/settings')->assertOk();
-        $this->actingAs($admin)->get('/studio/api')->assertOk();
+        $this->actingAs($admin)->get('/studio/api')->assertRedirect(route('studio.settings'));
     }
 
     public function test_studio_update_settings_and_api_key(): void
@@ -1065,8 +1065,7 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin);
 
         // The API page shows a dedicated card for the Qwen image-edit key.
-        $this->get('/studio/api')->assertOk()->assertSee('Qwen Edit')
-            ->assertSee('QWEN_EDIT_KEY');
+        $this->get('/studio/api')->assertRedirect(route('studio.settings'));
 
         // studio_api_key('qwen_edit') resolves the dedicated setting (encrypted).
         set_setting('api_qwen_edit_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-edit-123456'));
