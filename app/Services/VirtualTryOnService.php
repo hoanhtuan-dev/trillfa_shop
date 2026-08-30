@@ -28,14 +28,21 @@ class VirtualTryOnService
 
     public function poseCatalog(): array
     {
-        // Each pose carries its OWN IMAGE (a model/mannequin in that pose) — required because the
-        // VTON API reads the body geometry from model_image_url (pose cannot be a text prompt).
+        // 12 pose presets — each with its OWN image (a model in that pose) + a text skeleton for
+        // Step-1 text-to-image. VTON uses the image as model_image_url.
         return [
-            ['id' => 'stand', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body', 'image' => '/samples/pose-stand.jpg'],
-            ['id' => 'hip', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, confident contrapposto', 'image' => '/samples/pose-hip.jpg'],
-            ['id' => 'walk', 'name' => 'Đang bước', 'skeleton' => 'walking mid-stride catwalk, dynamic', 'image' => '/samples/pose-walk.jpg'],
-            ['id' => 'twist', 'name' => 'Xoay lưng', 'skeleton' => 'turned away, looking back over the shoulder', 'image' => '/samples/pose-twist.jpg'],
-            ['id' => 'squat', 'name' => 'Ngồi xổm', 'skeleton' => 'stylish squat pose, knees apart', 'image' => '/samples/pose-squat.jpg'],
+            ['id' => 'pose01', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body', 'image' => '/samples/pose-01.png'],
+            ['id' => 'pose02', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, one leg crossed', 'image' => '/samples/pose-02.png'],
+            ['id' => 'pose03', 'name' => 'Hai tay chống hông', 'skeleton' => 'standing, both hands on hips', 'image' => '/samples/pose-03.png'],
+            ['id' => 'pose04', 'name' => 'Chống hông chéo chân', 'skeleton' => 'standing, hands on hips, legs crossed', 'image' => '/samples/pose-04.png'],
+            ['id' => 'pose05', 'name' => 'Chống hông (trắng-đen)', 'skeleton' => 'standing, both hands on hips', 'image' => '/samples/pose-05.png'],
+            ['id' => 'pose06', 'name' => 'Ngồi ghế', 'skeleton' => 'sitting on a high stool, one leg extended', 'image' => '/samples/pose-06.png'],
+            ['id' => 'pose07', 'name' => 'Tay đút túi', 'skeleton' => 'side view, hand in pocket, relaxed', 'image' => '/samples/pose-07.png'],
+            ['id' => 'pose08', 'name' => 'Ngồi xổm', 'skeleton' => 'stylish squat pose, knees apart', 'image' => '/samples/pose-08.png'],
+            ['id' => 'pose09', 'name' => 'Sải bước', 'skeleton' => 'walking mid-stride catwalk, hand on hip', 'image' => '/samples/pose-09.png'],
+            ['id' => 'pose10', 'name' => 'Xoay lưng', 'skeleton' => 'back view, turned away', 'image' => '/samples/pose-10.png'],
+            ['id' => 'pose11', 'name' => 'Tựa ghế', 'skeleton' => 'leaning on a stool, hand to head', 'image' => '/samples/pose-11.png'],
+            ['id' => 'pose12', 'name' => 'Bước ngang', 'skeleton' => 'walking, side profile, dynamic', 'image' => '/samples/pose-12.png'],
         ];
     }
 
