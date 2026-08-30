@@ -46,7 +46,7 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <div class="grid gap-4 lg:h-full lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
+    <div class="grid gap-4 lg:h-[calc(100dvh-3rem)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->

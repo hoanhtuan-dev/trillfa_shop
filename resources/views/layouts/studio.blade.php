@@ -84,7 +84,7 @@
         </aside>
 
         <!-- ===== Main region ===== -->
-        <div class="flex min-w-0 flex-1 flex-col">
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col">
             <header class="sticky top-0 z-40 flex h-12 items-center justify-between gap-4 border-b border-ink-700 bg-ink-800/95 px-4 backdrop-blur lg:hidden">
                 <div class="flex items-center gap-2 text-sm">
                     <span class="font-display text-sm font-semibold text-cream-50">@yield('title', 'Trillfa Studio')</span>
@@ -97,7 +97,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto bg-ink-900 p-4 sm:p-6 studio-dark lg:overflow-hidden">
+            <main class="flex-1 min-h-0 overflow-y-auto bg-ink-900 p-4 sm:p-6 studio-dark lg:overflow-hidden">
                 @yield('content')
             </main>
         </div>
