@@ -679,11 +679,14 @@ class ImageAIService
      */
     public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null): ?string
     {
-        for ($i = 0; $i < 3; $i++) {
+        // Rate-limit on these models can take ~20-30s to clear; back off progressively (5/10/20/35s).
+        $waits = [5, 10, 20, 35];
+        foreach ($waits as $i => $wait) {
             $url = $this->editImage($prompt, $imageUrl, $modelOverride);
             if ($url) { return $url; }
             if (str_contains(strtolower((string) $this->dashscopeError), '429') || str_contains(strtolower((string) $this->dashscopeError), 'ratelimit')) {
-                sleep(3 * ($i + 1)); // backoff: 3s, 6s, 9s
+                logger()->warning('swapEdit rate-limited, backing off '.$wait.'s');
+                sleep($wait);
                 continue;
             }
             break; // non-rate-limit error -> give up
