@@ -97,7 +97,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 min-h-0 overflow-y-auto bg-ink-900 p-4 sm:p-6 studio-dark lg:overflow-hidden">
+            <main class="flex-1 min-h-0 overflow-y-auto bg-ink-900 p-4 sm:p-6 studio-dark">
                 @yield('content')
             </main>
         </div>

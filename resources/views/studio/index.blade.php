@@ -280,28 +280,35 @@
         <!-- ===== RIGHT: Generation Parameters ===== -->
         <!-- =============================================================== -->
         <div class="space-y-4 lg:order-3 lg:h-full lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden lg:pr-1" x-show="!isMobile || step===3">
+            <!-- Thư viện card (top) -->
+            <div class="card flex shrink-0 items-center justify-between gap-2 p-4">
+                <h2 class="font-display text-sm font-semibold text-ink-900">🗂 Thư viện</h2>
+                <a href="{{ route('studio.library') }}" class="btn-outline btn-sm whitespace-nowrap">Mở library</a>
+            </div>
             <!-- Outputs grid -->
-            <div class="card flex flex-1 flex-col overflow-hidden p-4 lg:min-h-0">
+            <div class="card flex min-h-0 flex-1 flex-col overflow-hidden p-4">
                 <div class="mb-3 flex shrink-0 items-center justify-between">
                     <h2 class="font-display text-sm font-semibold text-ink-900">Outputs</h2>
-                    <a href="{{ route('studio.library') }}" class="link text-xs">Thư viện</a>
+                    <span class="text-xs text-ink-500" x-text="'(' + generations.length + ')'"></span>
                 </div>
-                <div class="grid flex-1 grid-cols-1 gap-2 overflow-y-auto pr-1 lg:min-h-0">
-                    <template x-for="g in generations" :key="g.id">
-                        <button type="button" @click="openGenView(g)" class="overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
-                            <div class="relative">
-                                <template x-if="g.status === 'completed' && g.media_url">
-                                    <div class="relative aspect-[3/4] w-full bg-cream-100">
-                                        <img :src="g.media_url" class="absolute inset-0 h-full w-full object-cover" onerror="this.src='/images/placeholder.svg'">
-                                        <template x-if="g.type === 'video'"><div class="absolute inset-0 grid place-items-center"><span class="grid h-10 w-10 place-items-center rounded-full bg-ink-900/70 text-white">▶</span></div></template>
-                                    </div>
-                                </template>
-                                <template x-if="g.status !== 'completed'"><div class="grid aspect-[3/4] w-full place-items-center bg-cream-100"><span x-show="isActive(g.status)" class="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></span></div></template>
-                            </div>
-                        </button>
-                    </template>
+                <div class="min-h-0 flex-1 overflow-y-auto pr-1">
+                    <div class="flex flex-col gap-2">
+                        <template x-for="g in generations" :key="g.id">
+                            <button type="button" @click="openGenView(g)" class="w-full overflow-hidden rounded-xl border text-left" :class="previewId === g.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200'" :title="gTitle(g)">
+                                <div class="relative">
+                                    <template x-if="g.status === 'completed' && g.media_url">
+                                        <div class="relative aspect-[3/4] w-full bg-cream-100">
+                                            <img :src="g.media_url" class="absolute inset-0 h-full w-full object-cover" onerror="this.src='/images/placeholder.svg'">
+                                            <template x-if="g.type === 'video'"><div class="absolute inset-0 grid place-items-center"><span class="grid h-10 w-10 place-items-center rounded-full bg-ink-900/70 text-white">▶</span></div></template>
+                                        </div>
+                                    </template>
+                                    <template x-if="g.status !== 'completed'"><div class="grid aspect-[3/4] w-full place-items-center bg-cream-100"><span x-show="isActive(g.status)" class="inline-block h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent"></span></div></template>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
                 </div>
-                <div class="mt-3 text-center text-xs text-ink-500" x-show="!generations.length">Chưa có kết quả.</div>
+                <div class="mt-3 shrink-0 text-center text-xs text-ink-500" x-show="!generations.length">Chưa có kết quả.</div>
             </div>
 
 
