@@ -434,26 +434,39 @@ class ImageAIService
             return null;
         }
         $base = dashscope_base_url($key).'/api/v1';
+        // Self-contained images (base64 data URIs) so the host can read them even though /storage is internal.
+        $main = $this->imageDataUri($imageUrl);
+        $face = $this->imageDataUri($faceRef);
+        if (! $main || ! $face) {
+            logger()->warning('applyFace: cannot read source/face image', ['imageUrl' => $imageUrl, 'face' => $faceRef]);
+            return null;
+        }
 
         try {
             $resp = Http::withToken($key)->timeout(180)
                 ->post($base.'/services/aigc/multimodal-generation/generation', [
                     'model' => $model,
                     'input' => ['messages' => [['role' => 'user', 'content' => [
-                        ['image' => url($imageUrl)],
-                        ['image' => url($faceRef)],
+                        ['image' => $main],
+                        ['image' => $face],
                         ['text' => 'Keep the outfit, pose, background, colours and lighting exactly as in the first image. Replace the person\'s face with the face from the second reference image, naturally and consistently.'],
                     ]]]],
                     'parameters' => ['watermark' => false],
                 ]);
 
             if (! $resp->successful()) {
+                logger()->warning('applyFace: HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 220));
                 return null;
             }
             $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
                 ->pluck('image')->first();
+            if (! $editUrl) {
+                logger()->warning('applyFace: no image in response', ['resp' => substr((string) $resp->body(), 0, 220)]);
+                return null;
+            }
 
-            return $editUrl ? $this->storeRemoteImage($editUrl) : null;
+            logger()->info('applyFace succeeded (face swapped)');
+            return $this->storeRemoteImage($editUrl);
         } catch (\Throwable $e) {
             logger()->error('Face sync failed: '.$e->getMessage());
 
