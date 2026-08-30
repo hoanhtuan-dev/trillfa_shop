@@ -46,7 +46,18 @@
   {{ Js::from($videoDuration) }},
   {{ Js::from($creativeLevel) }}
 )">
-    <div class="grid gap-4 lg:h-[calc(100dvh-3rem)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
+    <!-- Step indicator (Progressive Disclosure) — always visible -->
+    <div class="sticky top-0 z-30 mb-3 flex justify-center">
+        <div class="flex items-center gap-1 overflow-x-auto rounded-2xl border border-ink-700 bg-ink-800/95 p-1 text-[11px] font-semibold shadow-lg backdrop-blur">
+            <button @click="goStep(1)" class="flex min-w-fit items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===1?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/25':'bg-white/10'">1</span> Concept</button>
+            <span class="text-cream-300/60">›</span>
+            <button @click="goStep(2)" class="flex min-w-fit items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===2?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/25':'bg-white/10'">2</span> Fitting Room</button>
+            <span class="text-cream-300/60">›</span>
+            <button @click="goStep(3)" class="flex min-w-fit items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===3?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/25':'bg-white/10'">3</span> Director</button>
+        </div>
+    </div>
+
+    <div class="grid gap-4 lg:h-[calc(100dvh-6.5rem)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
@@ -201,17 +212,9 @@
             <div class="card flex flex-col overflow-hidden p-0 lg:h-full lg:min-h-0">
                 <!-- Media area -->
                 <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
-                    <!-- Step indicator (Progressive Disclosure) — floated over the canvas -->
-                    <div class="pointer-events-auto absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-ink-900/80 p-1 text-[11px] font-semibold shadow-lg backdrop-blur" @pointerdown.stop @click.stop>
-                        <button @click="goStep(1)" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===1?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===1?'bg-white/25':'bg-white/10'">1</span> Concept</button>
-                        <span class="text-cream-300/60">›</span>
-                        <button @click="goStep(2)" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===2?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===2?'bg-white/25':'bg-white/10'">2</span> Fitting Room</button>
-                        <span class="text-cream-300/60">›</span>
-                        <button @click="goStep(3)" class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 transition-colors" :class="step===3?'bg-brand-600 text-white':'text-cream-200 hover:bg-ink-700'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/25':'bg-white/10'">3</span> Director</button>
-                    </div>
 
                     <!-- Canvas contextual actions (per-step) -->
-                    <div class="absolute left-1/2 top-14 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
+                    <div class="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint).">✏️ Sửa ảnh</button>
                         <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="step>=2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Render Video.">🎬 Tạo video</button>
                     </div>
