@@ -184,20 +184,20 @@
                     </div>
                     <div class="max-h-[72vh] overflow-y-auto p-5">
                         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70">👤 Bộ sưu tập Người mẫu</p>
-                        <div class="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        <div class="mb-5 grid grid-cols-3 gap-3 sm:grid-cols-6">
                             <template x-for="m in swapModels" :key="m.id">
-                                <button @click="swapModelId = m.id" class="flex flex-col items-center gap-1 rounded-xl border p-2 transition-all" :class="swapModelId === m.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
-                                    <img :src="m.img" class="h-14 w-14 rounded-full bg-ink-900 object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" alt="Khuôn mặt">
-                                    <span class="hidden h-14 w-14 place-items-center rounded-full bg-ink-700 text-[10px] font-bold text-cream-200" x-text="m.name"></span>
+                                <button @click="swapModelId = m.id" class="group flex flex-col items-center gap-1.5 rounded-2xl border p-3 transition-all" :class="swapModelId === m.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
+                                    <img :src="m.img" class="h-20 w-20 rounded-2xl bg-ink-900 object-cover ring-2 transition-transform group-hover:scale-105" :class="swapModelId === m.id ? 'ring-brand-500' : 'ring-transparent'" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" alt="Khuôn mặt">
+                                    <span class="hidden h-20 w-20 place-items-center rounded-2xl bg-ink-700 text-xs font-bold text-cream-200" x-text="m.name"></span>
                                     <span class="text-[10px] text-cream-200" x-text="m.name"></span>
                                 </button>
                             </template>
                         </div>
                         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70">🧍 Bộ sưu tập Tư thế</p>
-                        <div class="grid grid-cols-5 gap-2">
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                             <template x-for="p in swapPoses" :key="p.id">
-                                <button @click="swapPoseId = p.id" class="flex flex-col items-center gap-1 rounded-xl border p-2 transition-all" :class="swapPoseId === p.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
-                                    <img :src="p.img" class="h-14 w-full max-w-[3.5rem] rounded-lg bg-ink-900 object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'" alt="Dáng">
+                                <button @click="swapPoseId = p.id" class="group flex flex-col items-center gap-1.5 rounded-2xl border p-2 transition-all" :class="swapPoseId === p.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-700/40 hover:border-brand-500/50'">
+                                    <img :src="p.img" class="aspect-[3/4] w-full rounded-xl bg-ink-900 object-cover object-top transition-transform group-hover:scale-[1.02]" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'" alt="Dáng">
                                     <svg viewBox="0 0 24 24" class="hidden h-10 w-10 text-cream-300"><path :d="p.sk" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     <span class="text-[10px] text-cream-200" x-text="p.name"></span>
                                 </button>
