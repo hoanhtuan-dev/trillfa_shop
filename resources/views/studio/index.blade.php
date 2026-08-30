@@ -88,11 +88,11 @@
         <button @click="step=3" class="flex min-w-fit items-center gap-1 rounded-xl px-3 py-2 font-semibold" :class="step===3 ? 'bg-brand-600 text-white' : 'text-ink-700 hover:bg-cream-200'"><span class="grid h-5 w-5 place-items-center rounded-full" :class="step===3?'bg-white/20':'bg-cream-200'">3</span> Video</button>
     </div>
 
-    <div class="grid gap-4 pb-24 lg:grid-cols-[300px_minmax(0,1fr)_280px]">
+    <div class="grid gap-4 pb-24 lg:grid-cols-[260px_minmax(0,1fr)_240px]">
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1">
+        <div class="space-y-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1">
             <!-- Idea -->
             <div class="card p-5">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Text-to-Image · Ý tưởng</h2>
@@ -178,7 +178,7 @@
         <!-- =============================================================== -->
         <!-- ===== CENTER: Canvas preview ===== -->
         <!-- =============================================================== -->
-        <div class="min-w-0">
+        <div class="min-w-0" x-show="!isMobile || step===2">
             <div class="card overflow-hidden p-0 lg:sticky lg:top-20">
                 <!-- Canvas toolbar -->
                 <div class="flex items-center justify-between gap-2 border-b border-cream-200 px-3 py-2 text-xs text-ink-500">
@@ -200,6 +200,12 @@
                     <!-- interaction legend -->
                     <div class="pointer-events-none absolute bottom-2 left-2 z-10 rounded-lg bg-ink-900/70 px-2 py-1 text-[10px] text-white">
                         <span class="mr-2">🖱 Lăn chuột: Thu phóng</span><span class="mr-2">✋ Kéo / Nhấn phải: Di chuyển</span><span>Zoom <b x-text="zoom.toFixed(2)"></b>x</span>
+                    </div>
+                    <!-- floating quick actions over the image -->
+                    <div class="absolute bottom-2 right-2 z-10 flex items-center gap-1" x-show="preview && preview.type==='image' && preview.status==='completed'">
+                        <button @pointerdown.stop @click.stop="selectImage(preview)" class="rounded-full bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow" title="Chọn làm nguồn Chỉnh sửa (Inpaint)">✏️ Sửa</button>
+                        <button @pointerdown.stop @click.stop="selectVideo(preview)" class="rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-white shadow" title="Chọn làm nguồn Video">🎬 Video</button>
+                        <a :href="preview ? '/studio/generations/' + preview.id + '/download' : '#'" @pointerdown.stop @click.stop class="rounded-full bg-ink-900/80 px-3 py-1.5 text-[11px] font-semibold text-white shadow">⬇ Tải</a>
                     </div>
                     <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
@@ -281,7 +287,7 @@
         <!-- =============================================================== -->
         <!-- ===== RIGHT: Generation Parameters ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4">
+        <div class="space-y-4" x-show="!isMobile || step===3">
             <!-- Outputs grid -->
             <div class="card p-4">
                 <div class="mb-3 flex items-center justify-between">
@@ -459,7 +465,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false, step: 1,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
-        _timers: {}, now: Date.now(),
+        _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
         async init() {
             const q = new URLSearchParams(location.search).get('gen');
@@ -491,6 +497,10 @@ document.addEventListener('alpine:init', () => {
             this.generations.forEach(g => { if (this.isActive(g.status)) { g._t0 = g._t0 || Date.now(); this.poll(g.id); } });
             // Live clock so the status text shows a running "(Xs)" while a task is generating.
             setInterval(() => { this.now = Date.now(); }, 1000);
+            // Mobile wizard: show one screen (step) at a time below lg.
+            const onResize = () => { this.isMobile = window.innerWidth < 1024; };
+            window.addEventListener('resize', onResize);
+            onResize();
         },
         openGem(g) {
             if (!g) { this.previewId = null; this.selectedImageId = null; this.palette = []; return; }
@@ -658,7 +668,7 @@ document.addEventListener('alpine:init', () => {
                 this.generations = this.generations.filter(g => g.id !== tmpId);
                 this.addGen({ id: data.generation_id, type: 'image', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 1, created_at: 'Vừa gửi' });
                 this.creditsLeft = data.credits_left;
-                if (data.status === 'completed') Alpine.store('toast').show('Đã tạo xong ảnh #' + data.generation_id);
+                if (data.status === 'completed') { Alpine.store('toast').show('Đã tạo xong ảnh #' + data.generation_id); if (this.isMobile) this.step = 2; }
                 this.maybePoll(data.generation_id, data.status);
             } catch (e) {
                 this.generations = this.generations.filter(g => g.id !== tmpId);
@@ -669,7 +679,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.videoSourceId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, model: this.videoModel || null, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') { Alpine.store('toast').show('Đã render xong video #' + data.generation_id); this.haptic(40); } }
+            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, model: this.videoModel || null, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') { Alpine.store('toast').show('Đã render xong video #' + data.generation_id); this.haptic(40); if (this.isMobile) this.step = 2; } }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },
