@@ -180,7 +180,7 @@
                         <button @click="translateViOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
                     </div>
                     <div class="p-5">
-                        <p class="mb-2 text-xs text-cream-300/60">Prompt hiện tại đã dịch sang tiếng Việt. Sửa theo ý bạn, bấm <b>Xong</b> để dịch lại tiếng Anh và ghi đè prompt tạo ảnh.</p>
+                        <p class="mb-2 text-xs text-cream-300/60">Sửa prompt tiếng Việt theo ý bạn, bấm <b>Xong</b> để ghi đè vào ô nhập prompt (giữ nguyên bản tiếng Việt) và đóng.</p>
                         <textarea x-model="viPrompt" rows="8" class="input !text-sm" placeholder="Prompt tiếng Việt…"></textarea>
                         <div class="mt-3 flex items-center justify-end gap-2">
                             <button @click="translateViOpen=false" class="btn-outline btn-sm">Huỷ</button>
@@ -814,10 +814,11 @@ document.addEventListener('alpine:init', () => {
         // Xong: dịch ngược VI -> EN và ghi đè prompt hiện tại.
         async saveTranslateVi() {
             if (!this.viPrompt.trim()) { Alpine.store('toast').show('Prompt tiếng Việt trống.', 'error'); return; }
-            this.translating = true;
-            try { const d = await this.api('/studio/translate', { text: this.viPrompt.trim(), direction: 'en' }); this._skipTranslate = true; this.output.image_prompt_en = d.text || this.viPrompt.trim(); Alpine.store('toast').show('Đã cập nhật prompt (dịch sang tiếng Anh).'); }
-            catch (e) { Alpine.store('toast').show(e.message, 'error'); }
-            finally { this.translating = false; this.translateViOpen = false; }
+            // Hành vi đúng: ghi đè bản tiếng Việt đã sửa vào ô nhập prompt rồi thoát — KHÔNG dịch lại.
+            this._skipTranslate = true;
+            this.output.image_prompt_en = this.viPrompt.trim();
+            Alpine.store('toast').show('Đã cập nhật prompt.');
+            this.translateViOpen = false;
         },
         cleanCanvas() {
             this.previewId = null; this.selectedImageId = null; this.videoSourceId = null; this.viewGen = null;
