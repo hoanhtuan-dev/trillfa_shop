@@ -257,7 +257,6 @@
             <!-- Fitting Room: Ảnh để chỉnh sửa -->
             <div class="card p-5" x-show="step===2">
                 <h2 class="mb-2 font-display text-base font-semibold text-ink-900">🖼 Ảnh để chỉnh sửa</h2>
-                <p class="mb-3 text-xs text-ink-500">Chọn ảnh từ 3 nguồn để phẫu thuật (chỉnh sửa theo prompt + preset).</p>
                 <div class="flex flex-wrap gap-2">
                     <button class="btn-outline btn-sm" @click="$refs.editImgInput.click()">Tải ảnh</button>
                     <button class="btn-outline btn-sm" @click="pickTarget='edit'; openOutputsRef()">Từ kết quả</button>
@@ -279,7 +278,6 @@
             <!-- Fitting Room: Phẫu thuật Ảnh -->
             <div class="card p-5" x-show="step===2">
                 <h2 class="mb-2 font-display text-base font-semibold text-ink-900">✏️ Phẫu thuật Ảnh</h2>
-                <p class="mb-3 text-xs text-ink-500">Nhập mô tả chỉnh sửa (hoặc bỏ trống để dùng prompt Bước 1) → áp bối cảnh/dáng preset + đồng bộ khuôn mặt.</p>
                 <textarea x-model="refinePrompt" rows="2" class="input" placeholder="VD: add puff sleeve, change background to a beach…"></textarea>
                 <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-700">
                     <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveFace" class="h-4 w-4 accent-brand-600"> Giữ nguyên khuôn mặt & dáng</label>
@@ -306,7 +304,6 @@
                     <span class="font-semibold text-cream-50" x-text="texture"></span>
                     <span class="text-cream-300">10 · Chi tiết bề mặt</span>
                 </div>
-                <p class="mt-2 text-xs text-cream-300">Áp dụng khi render với model AI thật; ở chế độ mô phỏng (stub) chỉ là giao diện.</p>
             </div>
 
             <!-- Bước 3 · Ghế Đạo Diễn -->
@@ -506,7 +503,7 @@
     </template>
 
     <!-- Fullscreen lightbox (self-contained zoom/pan; captures wheel & drag, blocks the layer below) -->
-    <template x-if="lightbox && preview && preview.media_url">
+    <template x-if="lightbox && (canvasImg || (preview && preview.media_url))">
         <div class="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden bg-ink-900/95 p-4"
              @wheel.prevent="onLbWheel($event)" @click.self="closeLightbox()">
             <button @click="closeLightbox()" class="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-ink-900/80 text-cream-200 hover:text-white">×</button>
@@ -515,7 +512,7 @@
                 <button @click="lbReset()" class="rounded-lg border border-cream-200 bg-ink-900/70 px-2.5 py-1.5 text-xs text-cream-100 hover:bg-ink-700" title="Vừa khung">Vừa</button>
                 <button @click="lbZoomIn()" class="grid h-9 w-9 place-items-center rounded-lg border border-cream-200 bg-ink-900/70 text-cream-100 hover:bg-ink-700" title="Phóng to">+</button>
             </div>
-            <img :src="preview.media_url"
+            <img :src="canvasImg || preview.media_url"
                  class="max-h-[92vh] max-w-[94vw] cursor-grab select-none rounded-xl object-contain shadow-2xl active:cursor-grabbing"
                  :style="{ transform: 'translate(' + lbPan.x + 'px, ' + lbPan.y + 'px) scale(' + lbZoom + ')', transformOrigin: 'center' }"
                  @pointerdown="lbStartPan($event)" @pointermove="lbMovePan($event)" @pointerup="lbEndPan" @pointerleave="lbEndPan"
