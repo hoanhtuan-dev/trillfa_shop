@@ -1,9 +1,9 @@
 <?php
 
-namespace AppServices;
+namespace App\Services;
 
-use IlluminateSupportFacadesHttp;
-use IlluminateSupportStr;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 /**
  * "Thay Đổi Người Mẫu" (Click-to-Swap) — Qwen / DashScope Virtual Try-On.
@@ -100,7 +100,7 @@ class VirtualTryOnService
         $contents = @file_get_contents($url);
         if (! $contents) { return null; }
         $name = 'studio/'.Str::uuid().'.jpg';
-        IlluminateSupportFacadesStorage::disk('public')->put($name, $contents);
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $contents);
         return '/storage/'.$name;
     }
 }
