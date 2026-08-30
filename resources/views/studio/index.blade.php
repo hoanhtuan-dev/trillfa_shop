@@ -64,13 +64,15 @@
         <div x-ref="leftPanel" class="scrollbar-hide order-2 space-y-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===2 || step===3">
             <!-- Idea -->
             <div class="card p-5" x-show="step===1">
-                <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
-                <textarea x-model="idea" rows="3" class="input" placeholder="VD: A flowing silk evening gown with sequin…" @keydown.enter.prevent="ideate()"></textarea>
-                <button @click="ideate()" :disabled="loading || !idea" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
-                <div class="mt-2 flex gap-2">
-                    <button @click="openTranslateVi()" :disabled="translating || !output.image_prompt_en" class="btn-outline btn-sm flex-1 whitespace-nowrap" title="Hiển thị prompt hiện tại bằng tiếng Việt để chỉnh sửa; bấm Xong sẽ dịch lại và ghi đè prompt tiếng Anh."><span x-show="!translating">🇻🇳 Sửa tiếng Việt</span><span x-show="translating">Đang dịch…</span></button>
+                <div class="mb-2 flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-ink-900">🎛 Prompt</h2>
+                    <span class="text-[10px] text-cream-300/50">Tạo Prompt để AI viết (ghi đè) · nhập trực tiếp để giữ nguyên.</span>
                 </div>
-                <textarea x-model="output.image_prompt_en" rows="4" class="input mt-2 !text-xs" placeholder="Image prompt (tiếng Anh) — bấm “Tạo Prompt” để AI viết (ghi đè); hoặc nhập trực tiếp."></textarea>
+                <textarea x-model="output.image_prompt_en" rows="5" class="input !text-xs" placeholder="Nhập ý tưởng/prompt (tiếng Việt hoặc tiếng Anh) — bấm “Tạo Prompt” để AI viết prompt tiếng Anh, hoặc nhập trực tiếp." @keydown.enter.prevent="ideate()"></textarea>
+                <div class="mt-2 flex gap-2">
+                    <button @click="ideate()" :disabled="loading || !output.image_prompt_en" class="btn-brand btn-sm flex-1 whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
+                    <button @click="openTranslateVi()" :disabled="translating || !output.image_prompt_en" class="btn-outline btn-sm flex-1 whitespace-nowrap" title="Hiển thị prompt bằng tiếng Việt để chỉnh sửa; bấm Xong sẽ dịch lại và ghi đè prompt tiếng Anh."><span x-show="!translating">🇻🇳 Sửa tiếng Việt</span><span x-show="translating">Đang dịch…</span></button>
+                </div>
                 <div class="mt-2 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
                     <span class="font-medium text-cream-200">Sáng tạo</span>
                     <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-24 cursor-pointer accent-brand-500">
@@ -574,6 +576,24 @@ document.addEventListener('alpine:init', () => {
             const onResize = () => { this.isMobile = window.innerWidth < 1024; };
             window.addEventListener('resize', onResize);
             onResize();
+
+            // Âm thầm dịch prompt EN -> VI ngay khi có prompt, để popup "Sửa tiếng Việt" mở tức thì và
+            // BẢN TIẾNG VIỆT LUÔN ĐƯỢC LƯU (không mất khi đóng popup).
+            let _trDeb = null;
+            this.$watch('output.image_prompt_en', (val) => {
+                clearTimeout(_trDeb);
+                const v = String(val || '').trim();
+                if (!v) return;
+                _trDeb = setTimeout(() => { this.silentTranslate(v); }, 600);
+            });
+        },
+        async silentTranslate(en) {
+            const v = String(en || '').trim();
+            if (!v || this.translating || v === this.viPrompt) return;
+            this.translating = true;
+            try { const d = await this.api('/studio/translate', { text: v, direction: 'vi' }); if (d.text) this.viPrompt = d.text; }
+            catch (e) {}
+            finally { this.translating = false; }
         },
         openGem(g) {
             if (!g) { this.previewId = null; this.selectedImageId = null; this.palette = []; return; }
@@ -825,10 +845,14 @@ document.addEventListener('alpine:init', () => {
         async openTranslateVi() {
             const text = (this.output.image_prompt_en || '').trim();
             if (!text) { Alpine.store('toast').show('Chưa có prompt để dịch.', 'error'); return; }
-            this.translating = true; this.translateViOpen = true; this.viPrompt = '';
-            try { const d = await this.api('/studio/translate', { text, direction: 'vi' }); this.viPrompt = d.text || text; }
-            catch (e) { this.viPrompt = text; Alpine.store('toast').show(e.message, 'error'); }
-            finally { this.translating = false; }
+            this.translateViOpen = true;
+            // Bản tiếng Việt đã được dịch âm thầm & lưu sẵn -> mở tức thì; chỉ dịch bổ sung khi chưa có.
+            if (!this.viPrompt) {
+                this.translating = true;
+                try { const d = await this.api('/studio/translate', { text, direction: 'vi' }); this.viPrompt = d.text || text; }
+                catch (e) { this.viPrompt = text; Alpine.store('toast').show(e.message, 'error'); }
+                finally { this.translating = false; }
+            }
         },
         // Xong: dịch ngược VI -> EN và ghi đè prompt hiện tại.
         async saveTranslateVi() {
@@ -862,9 +886,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         async ideate() {
-            if (!this.idea.trim() || this.loading) return;
+            if (!this.output.image_prompt_en.trim() || this.loading) return;
             this.loading = true;
-            try { const data = await this.api('/studio/ideate', { idea: this.idea, preset_ids: this.presetIds, creative_level: this.creativeLevel }); this.output.image_prompt_en = data.image_prompt_en; this.output.video_prompt_en = data.video_prompt_en; this.output.history_id = data.history_id; if (data.creative_level) this.creativeLevel = Number(data.creative_level); }
+            try { const data = await this.api('/studio/ideate', { idea: this.output.image_prompt_en, preset_ids: this.presetIds, creative_level: this.creativeLevel }); this.output.image_prompt_en = data.image_prompt_en; this.output.video_prompt_en = data.video_prompt_en; this.output.history_id = data.history_id; if (data.creative_level) this.creativeLevel = Number(data.creative_level); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.loading = false; }
         },
