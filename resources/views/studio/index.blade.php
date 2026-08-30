@@ -263,7 +263,7 @@
                                 <div class="text-xs"><p class="font-semibold text-cream-200" x-text="swapPoseIds.length + ' dáng'"></p></div>
                             </div>
                             <button @click="clearSwap()" class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-cream-300 hover:bg-red-600 hover:text-white" title="Xoá lựa chọn khuôn mặt & dáng">✕</button>
-                            <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm ml-auto whitespace-nowrap"><span x-show="!swapLoading">Áp Dụng · ' + (swapModelIds.length * swapPoseIds.length) + ' phiên bản</span><span x-show="swapLoading">Đang ghép…</span></button>
+                            <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm ml-auto whitespace-nowrap"><span x-show="!swapLoading">Áp Dụng · <b x-text="swapModelIds.length * swapPoseIds.length"></b> phiên bản</span><span x-show="swapLoading">Đang ghép…</span></button>
                         </div>
                         <div class="mt-3 grid grid-cols-3 gap-2" x-show="lookbook.length">
                             <template x-for="item in lookbook" :key="item.id">

@@ -558,8 +558,8 @@ class StudioController extends Controller
                 $gen = auth()->user()->generations()->create([
                     'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
                     'prompt' => 'Thay đổi người mẫu (qwen-edit) · '.($model['name'] ?? 'model'),
-                    'model' => 'qwen-image-edit', 'provider' => 'qwen', 'credits_cost' => 1,
-                    'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => 'qwen-image-edit', 'fallback' => true],
+                    'model' => (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'), 'provider' => 'qwen', 'credits_cost' => 1,
+                    'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'), 'fallback' => true],
                 ]);
                 return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'task_id' => null]);
             }
