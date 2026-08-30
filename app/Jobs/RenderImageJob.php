@@ -71,13 +71,12 @@ class RenderImageJob implements ShouldQueue
                 $generation->ratio,
             );
 
-            // Face sync via the image-edit model: after rendering (a NEW image OR a surgical edit of the
-            // reference), swap the person's face to the reference face for identity-consistent looks. Runs
-            // whenever face sync is enabled (default ON) AND a face reference is set — a second qwen-edit
-            // call. Falls back to the original image if it fails (keeps the result usable).
-            // Surgical edits (base_image set) always swap the face if sync is on; fresh generations keep the
-            // prompt-injection path above unless the user explicitly opts into the edit-model swap too.
-            $faceSwap = (bool) $generation->base_image || filter_var(studio_config('face_edit_sync', false), FILTER_VALIDATE_BOOL);
+            // Face swap (model chỉnh sửa) is OPT-IN — only runs when "Đồng bộ khuôn mặt (model chỉnh sửa)"
+            // is turned on in Settings, so the default surgical edit stays fast (~20s). When enabled it swaps
+            // the reference face onto the result (a second qwen-edit call, ~40s total). Falls back to the
+            // original image if it fails (keeps the result usable). Fresh generations keep the prompt-injection
+            // path above (describeFace) unless this opt-in is on too.
+            $faceSwap = filter_var(studio_config('face_edit_sync', false), FILTER_VALIDATE_BOOL);
             if ($faceSwap && $faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/')) {
                 logger()->info('Applying face sync (edit model)', ['generation_id' => $generation->id, 'face' => $faceRef]);
                 $edited = $images->applyFace($url, $faceRef);
