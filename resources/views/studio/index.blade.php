@@ -250,7 +250,7 @@
                 </div>
 
                 <!-- ===== Video Rendering Timeline ===== -->
-                <div class="border-t border-cream-200 px-4 py-3" x-show="output.video_prompt_en || videoSourceId">
+                <div class="border-t border-cream-200 px-4 py-3" x-show="false">
                     <div class="mb-2 flex items-center justify-between">
                         <h3 class="font-display text-sm font-semibold text-ink-900">Video Rendering Timeline</h3>
                         <span class="text-[10px] text-ink-500">Camera keyframes</span>
@@ -308,16 +308,44 @@
                 <div class="mt-3 text-center text-xs text-ink-500" x-show="!generations.length">Chưa có kết quả.</div>
             </div>
 
-            <!-- Texture -->
-            <div class="card p-4" x-data="{ texture: 5 }">
+            <!-- Bước 3 · Ghế Đạo Diễn -->
+            <div class="card p-4" x-show="step===3">
+                <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🎬 Ghế Đạo Diễn</h2>
+                <div class="mb-3">
+                    <label class="label">Model video</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="m in videoModels" :key="m.model">
+                            <button type="button" @click="videoModel = videoModel===m.model ? '' : m.model" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="videoModel===m.model ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800' : 'border-cream-300 text-ink-700 hover:border-brand-400 hover:text-brand-700'"><span x-text="m.label"></span></button>
+                        </template>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="label">Kịch bản quay</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="scene in videoScenes" :key="scene.id">
+                            <button type="button" @click="videoScene = videoScene===scene.value ? '' : scene.value" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="videoScene===scene.value ? 'border-brand-600 bg-brand-50 font-semibold text-brand-800' : 'border-cream-300 text-ink-700 hover:border-brand-400 hover:text-brand-700'" :title="scene.note"><span x-text="scene.label.split(' (')[0]"></span></button>
+                        </template>
+                    </div>
+                    <p class="mt-1 text-[10px] text-brand-700" x-show="videoScene" x-text="'Kịch bản sẽ được áp dụng: ' + videoSceneLabel"></p>
+                </div>
+                <div class="mb-3 grid grid-cols-2 gap-2">
+                    <div><label class="label">Thời lượng</label><select x-model="videoDuration" class="input !py-2"><option>5</option><option>8</option><option>10</option><option>15</option><option>20</option></select></div>
+                    <div><label class="label">Độ phân giải</label><select x-model="videoRes" class="input !py-2"><option>480</option><option>720</option><option>1080</option></select></div>
+                </div>
+                <button @click="renderVideo()" :disabled="videoBusy || !videoSourceId" class="btn-brand w-full whitespace-nowrap"><span x-show="!videoBusy">🔥 Action! (Render Video)</span><span x-show="videoBusy">Đang gửi…</span></button>
+                <p class="mt-2 text-[10px] text-ink-500" x-text="videoSourceId ? 'Nguồn ảnh #' + videoSourceId : 'Chọn ảnh nguồn (Bước 2) để Render.'"></p>
+            </div>
+
+            <!-- Texture (Bước 2) -->
+            <div class="card p-4" x-data="{ texture: 5 }" x-show="step===2">
                 <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">Texture</h2>
                 <input type="range" min="0" max="10" x-model="texture" class="w-full accent-brand-600">
                 <div class="mt-1 flex justify-between text-[10px] text-ink-500"><span>0 · Mịn</span><span class="font-semibold text-ink-900" x-text="texture"></span><span>10 · Chi tiết bề mặt</span></div>
                 <p class="mt-2 text-[10px] text-ink-500">Áp dụng khi render với model AI thật; ở chế độ mô phỏng (stub) chỉ là giao diện.</p>
             </div>
 
-            <!-- Color palette -->
-            <div class="card p-4">
+            <!-- Color palette (Bước 2) -->
+            <div class="card p-4" x-show="step===2">
                 <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">Color Palette</h2>
                 <div class="flex items-center gap-1.5" x-show="palette.length">
                     <template x-for="c in palette" :key="c"><button type="button" class="h-7 w-7 rounded-full border border-cream-200" :style="{ background: c }" :title="c" @click="Alpine.store('toast').show('Màu ' + c, 'info')"></button></template>
@@ -409,6 +437,12 @@ document.addEventListener('alpine:init', () => {
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
         generations: gens, creditsLeft: Number(credits),
         currentProjectId: currentProject, selectedImageId: null, videoSourceId: null, videoScene: '',
+        videoModel: '', videoModels: [
+            { label: 'HappyHorse · i2v', model: 'happyhorse-1.1-i2v' },
+            { label: 'Wan 2.2 · i2v', model: 'wan2.2-i2v' },
+            { label: 'Wan 2.5 · t2v', model: 'wan2.5-t2v' },
+            { label: 'Wan 2.1 · i2v turbo', model: 'wan2.1-i2v-turbo' },
+        ],
         newProjectName: '', showNewProject: false, refinePrompt: '', preserveBg: true, preserveFace: true,
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
@@ -611,7 +645,7 @@ document.addEventListener('alpine:init', () => {
         async renderVideo() {
             if (!this.videoSourceId || this.videoBusy) return;
             this.videoBusy = true;
-            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
+            try { const src = this.generations.find(g => g.id === this.videoSourceId); const camera = this.videoScene || 'slow tracking shot'; let prompt = this.output.video_prompt_en || this.output.image_prompt_en || (src && src.prompt) || ''; if (prompt && !this.output.video_prompt_en) { prompt = 'Cinematic fashion catwalk: ' + prompt + ', dynamic fabric motion, professional fashion video.'; } const data = await this.api('/studio/video', { prompt: prompt || 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video', base_image: src ? src.media_url : '', camera, model: this.videoModel || null, resolution: this.videoRes, duration: this.videoDuration, history_id: this.output.history_id, project_id: this.currentProjectId || null }); this.addGen({ id: data.generation_id, type: 'video', status: data.status, model: data.model, provider: data.provider, media_url: data.media_url, error: data.error, credits_cost: 10, created_at: 'Vừa gửi' }); this.creditsLeft = data.credits_left; this.maybePoll(data.generation_id, data.status); if (data.status === 'completed') Alpine.store('toast').show('Đã render xong video #' + data.generation_id); }
             catch (e) { Alpine.store('toast').show(e.message, 'error'); }
             finally { this.videoBusy = false; }
         },

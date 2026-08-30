@@ -105,6 +105,7 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'base_image' => ['nullable', 'string', 'max:2048'],
             'camera' => ['nullable', 'string', 'max:1000'], // Kịch bản quay (video_scene) injection có thể dài
+            'model' => ['nullable', 'string', 'max:120'], // video-model override (multi-model selector)
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
             'duration' => ['nullable', 'string', 'in:5,8,10,15,20'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
@@ -112,6 +113,11 @@ class StudioController extends Controller
         ]);
 
         $cost = (int) studio_config('video_credits', 10);
+
+        // Multi-model selector: allow a per-render video model override (stored so the job uses it).
+        if (! empty($data['model'])) {
+            set_setting('studio_video_model', $data['model']);
+        }
 
         return $this->queueGeneration('video', $data, $cost);
     }
