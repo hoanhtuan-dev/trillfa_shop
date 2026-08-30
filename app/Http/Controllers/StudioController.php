@@ -891,8 +891,8 @@ class StudioController extends Controller
     public function updateSettings(Request $request)
     {
         $data = $request->validate([
-            'image_credits' => ['required', 'integer', 'min:0', 'max:1000'],
-            'video_credits' => ['required', 'integer', 'min:0', 'max:1000'],
+            'image_credits' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'video_credits' => ['nullable', 'integer', 'min:0', 'max:1000'],
             'max_generations' => ['nullable', 'integer', 'min:1', 'max:500'],
             'image_provider' => ['required', 'string', 'in:flux,wan,qwen,gemini'],
             'prompt_provider' => ['required', 'string', 'in:gemini,qwen'],
@@ -916,9 +916,9 @@ class StudioController extends Controller
             'video_duration' => ['required', 'string', 'in:5,8,10,15,20'],
         ]);
 
-        set_setting('studio_image_credits', (string) $data['image_credits']);
-        set_setting('studio_video_credits', (string) $data['video_credits']);
-        set_setting('studio_max_generations', (string) ($data['max_generations'] ?? 50));
+        if (isset($data['image_credits'])) set_setting('studio_image_credits', (string) $data['image_credits']);
+        if (isset($data['video_credits'])) set_setting('studio_video_credits', (string) $data['video_credits']);
+        if (isset($data['max_generations'])) set_setting('studio_max_generations', (string) ($data['max_generations'] ?? 50));
         set_setting('studio_image_provider', $data['image_provider']);
         set_setting('studio_prompt_provider', $data['prompt_provider']);
         set_setting('studio_vision_provider', $data['vision_provider']);

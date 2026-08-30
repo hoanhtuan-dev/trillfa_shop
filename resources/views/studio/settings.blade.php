@@ -1,41 +1,20 @@
 @extends('layouts.studio')
 @section('title', 'Cài đặt Studio')
 @section('content')
-<div class="mx-auto max-w-2xl">
+<div class="mx-auto max-w-2xl" x-data="{ tab: 'general' }">
     <h1 class="font-display text-2xl font-semibold text-ink-900">Cài đặt Studio</h1>
-    <p class="mt-1 text-sm text-ink-500">Tinh chỉnh tín dụng và giới hạn cho công cụ AI nội bộ.</p>
+    <p class="mt-1 text-sm text-ink-500">Cấu hình nhà cung cấp AI, model &amp; API key dùng cho công cụ nội bộ.</p>
 
-    {{-- usage card inserted above the form --}}
-    <div class="card mt-6 p-5">
-        <h2 class="mb-3 font-display text-base font-semibold text-ink-900">Sử dụng &amp; Hạn mức</h2>
-        <div class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Tín dụng (còn)</p><p class="mt-1 text-lg font-bold text-ink-900">{{ number_format($usage['balance']) }}</p></div>
-            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Đã dùng (tổng)</p><p class="mt-1 text-lg font-bold text-ink-900">{{ number_format($usage['used_total']) }}</p></div>
-            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Hôm nay</p><p class="mt-1 text-lg font-bold text-ink-900">{{ number_format($usage['used_today']) }}</p></div>
-            <div class="rounded-xl bg-cream-100 p-3"><p class="text-[10px] uppercase tracking-wide text-ink-500">Hạn mức (quota)</p><p class="mt-1 text-lg font-bold text-ink-900">{{ $usage['limit'] > 0 ? number_format($usage['limit']) : 'Không giới hạn' }}</p></div>
-        </div>
-        @if($usage['quota_resets_at'])
-            <p class="mt-3 text-xs text-amber-700">⚠️ Hạn mức nhà cung cấp vừa hết — reset lúc <b>{{ $usage['quota_resets_at'] }} UTC</b>. Kiểm tra/gia hạn hạn mức tài khoản, hoặc dùng key khác.</p>
-        @endif
-        <p class="mt-2 text-xs text-ink-500">Quota là tín dụng token/credit đã xài với nhà cung cấp (QwenCloud/DashScope). Giới hạn hiển thị nếu bạn đặt <code class="rounded bg-white px-1">STUDIO_QUOTA_LIMIT</code>.</p>
+    {{-- Tabs --}}
+    <div class="mt-4 flex flex-wrap gap-1.5 rounded-2xl border border-ink-700 bg-ink-800 p-1 text-xs font-semibold">
+        <button @click="tab='general'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='general' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">⚙️ Cấu hình</button>
+        <button @click="tab='models'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='models' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🤖 Nhà cung cấp &amp; Model</button>
+        <button @click="tab='keys'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🔑 API Keys</button>
     </div>
 
+    <div x-show="tab==='general'">
     <form method="POST" action="{{ route('studio.settings.update') }}" enctype="multipart/form-data" class="card mt-6 space-y-5 p-6">
         @csrf
-        <div>
-            <label class="label">Tín dụng / ảnh</label>
-            <input type="number" name="image_credits" value="{{ old('image_credits', $image_credits) }}" min="0" max="1000" class="input">
-            <p class="mt-1 text-xs text-ink-500">Số tín dụng trừ khi tạo 1 ảnh.</p>
-        </div>
-        <div>
-            <label class="label">Tín dụng / video</label>
-            <input type="number" name="video_credits" value="{{ old('video_credits', $video_credits) }}" min="0" max="1000" class="input">
-            <p class="mt-1 text-xs text-ink-500">Số tín dụng trừ khi render 1 video.</p>
-        </div>
-        <div>
-            <label class="label">Giới hạn số generation mỗi project</label>
-            <input type="number" name="max_generations" value="{{ old('max_generations', $max_generations) }}" min="1" max="500" class="input">
-        </div>
         <div>
             <label class="label">Nhà cung cấp sinh ảnh</label>
             <select name="image_provider" class="input">
@@ -190,7 +169,9 @@
         </div>
         @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </form>
+    </div>
 
+    <div x-show="tab==='models'">
     {{-- ===== Model Registry manager ===== --}}
     <div class="card mt-6 p-6">
         <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🤖 Model Registry <span class="text-xs font-normal text-ink-500">quản lý model theo nhóm (image / video / inference)</span></h2>
@@ -274,6 +255,9 @@
         </div>
     </div>
 
+    </div>
+
+    <div x-show="tab==='keys'">
     {{-- ===== API Keys Registry ===== --}}
     <div class="card mt-6 p-6">
         <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">nhiều key/provider · scope theo model/nhóm · ưu tiên · tránh trùng lặp</span></h2>
@@ -324,6 +308,7 @@
             </div>
             <button class="btn-brand btn-sm">➕ Thêm API key</button>
         </form>
+    </div>
     </div>
 </div>
 @push('scripts')
