@@ -50,7 +50,7 @@
         <!-- =============================================================== -->
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
-        <div x-ref="leftPanel" class="scrollbar-hide space-y-4 lg:order-2 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===3">
+        <div x-ref="leftPanel" class="scrollbar-hide order-2 space-y-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===2 || step===3">
             <!-- Idea -->
             <div class="card p-5" x-show="step===1">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎛 AI Design Inputs · Ý tưởng</h2>
@@ -197,7 +197,7 @@
         <!-- =============================================================== -->
         <!-- ===== CENTER: Canvas preview ===== -->
         <!-- =============================================================== -->
-        <div class="min-w-0 lg:order-1" x-show="!isMobile || step===2">
+        <div class="order-1 min-w-0" x-show="!isMobile || step===2 || step===3">
             <div class="card flex flex-col overflow-hidden p-0 lg:h-full lg:min-h-0">
                 <!-- Media area -->
                 <div class="relative h-[58vh] cursor-grab touch-none overflow-hidden bg-gradient-to-b from-ink-900 to-ink-800 active:cursor-grabbing lg:h-auto lg:min-h-0 lg:flex-1" @contextmenu.prevent @pointerdown="startPan($event)" @pointermove="movePan($event)" @pointerup="endPan" @pointerleave="endPan" @wheel.prevent="onWheel($event)" @touchstart="onTouchPinch($event)" @touchmove.prevent="onTouchPinch($event)">
@@ -211,7 +211,7 @@
                     </div>
 
                     <!-- Canvas contextual actions (per-step) -->
-                    <div class="absolute left-3 top-3 z-20 flex gap-1.5" @pointerdown.stop @click.stop>
+                    <div class="absolute left-1/2 top-14 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint).">✏️ Sửa ảnh</button>
                         <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="step>=2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Render Video.">🎬 Tạo video</button>
                     </div>
@@ -268,7 +268,7 @@
         <!-- =============================================================== -->
         <!-- ===== RIGHT: Generation Parameters ===== -->
         <!-- =============================================================== -->
-        <div class="space-y-4 lg:order-3 lg:h-full lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden lg:pr-1" x-show="!isMobile || step===3">
+        <div class="order-3 space-y-4 lg:h-full lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden lg:pr-1" x-show="!isMobile">
             <!-- Thư viện card (top) -->
             <div class="card flex shrink-0 items-center justify-between gap-2 p-2.5">
                 <a href="{{ route('studio.library') }}" class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600/20 text-brand-300 transition-colors hover:bg-brand-600 hover:text-white" title="Mở thư viện">
