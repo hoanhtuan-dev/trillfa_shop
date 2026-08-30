@@ -266,7 +266,7 @@
                         </div>
                     </div>
                 </template>
-                <p class="mt-2 text-[10px] text-ink-500" x-show="!swapModelId">Bấm "Chọn" để chọn khuôn mặt + dáng (giữ nguyên 100% trang phục).</p>
+                <p class="mt-2 text-[10px] text-ink-500" x-show="!swapModelIds.length">Bấm "Chọn" để chọn khuôn mặt + dáng (giữ nguyên 100% trang phục).</p>
             </div>
 
             <!-- Fitting Room: Ảnh để chỉnh sửa -->
