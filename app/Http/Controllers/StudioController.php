@@ -549,6 +549,47 @@ class StudioController extends Controller
         return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
     }
 
+    public function reframe(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate(['image' => ['required', 'string', 'max:2048'], 'ratio' => ['required', 'string', 'max:12']]);
+        $ratio = in_array($data['ratio'], ['1:1', '3:4', '4:5', '9:16', '16:9', '2:3', '3:2', '4:3'], true) ? $data['ratio'] : '3:4';
+        return $this->processAndStore($data['image'], function (\GdImage $img) use ($ratio) { return $this->cropReframe($img, $ratio); }, 'Reframe '.$ratio, 'reframe');
+    }
+
+    public function retouch(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate(['image' => ['required', 'string', 'max:2048'], 'level' => ['nullable', 'integer', 'min:0', 'max:10']]);
+        $level = max(1, min(10, (int) ($data['level'] ?? 5)));
+        return $this->processAndStore($data['image'], function (\GdImage $img) use ($level) { $this->faceRetouch($img, $level); $this->unsharpMask($img, 0.3); return $img; }, 'Retouch da '.$level, 'retouch');
+    }
+
+    public function background(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate(['image' => ['required', 'string', 'max:2048'], 'target' => ['nullable', 'string', 'max:40'], 'level' => ['nullable', 'integer', 'min:0', 'max:10']]);
+        $level = max(1, min(10, (int) ($data['level'] ?? 6)));
+        $target = (string) ($data['target'] ?? '#b8b0a4');
+        return $this->processAndStore($data['image'], function (\GdImage $img) use ($target, $level) { $this->bgReplace($img, $target, $level); return $img; }, 'Nền '.($target === 'transparent' ? 'trong suốt' : $target), 'background');
+    }
+
+    protected function processAndStore(string $srcUrl, callable $cb, string $prompt, string $model): \Illuminate\Http\JsonResponse
+    {
+        $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) { if (is_file($cand)) { $file = $cand; break; } }
+        if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
+        $img = $cb($img);
+        $name = 'studio/'.Str::slug($model).'-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
+        imagedestroy($img);
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
+            'prompt' => $prompt, 'model' => $model, 'provider' => $model, 'credits_cost' => 0,
+        ]);
+        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+    }
+
     public function upscale(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->validate([
@@ -832,6 +873,89 @@ class StudioController extends Controller
                 imagesetpixel($img, $x, $y, imagecolorallocate($img,
                     (int) ((($cc >> 16) & 0xFF) * $v), (int) ((($cc >> 8) & 0xFF) * $v), (int) (($cc & 0xFF) * $v)));
             } }
+        }
+    }
+
+    protected function hexToRgb(string $hex): array
+    {
+        $hex = ltrim($hex, '#');
+        if (strlen($hex) !== 6) { return [184, 176, 164]; }
+        return [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
+    }
+
+    /**
+     * Center-crop / reframe to a target aspect ratio (presets).
+     */
+    protected function cropReframe(\GdImage $img, string $ratio): \GdImage
+    {
+        $w = imagesx($img); $h = imagesy($img);
+        $map = ['1:1' => [1, 1], '3:4' => [3, 4], '4:5' => [4, 5], '9:16' => [9, 16], '16:9' => [16, 9], '2:3' => [2, 3], '3:2' => [3, 2], '4:3' => [4, 3]];
+        [$rw, $rh] = $map[$ratio] ?? [3, 4];
+        $target = $rw / $rh; $cur = $w / $h;
+        if ($cur > $target) { $nw = (int) round($h * $target); $x0 = (int) (($w - $nw) / 2); $y0 = 0; $nh = $h; }
+        else { $nh = (int) round($w / $target); $y0 = (int) (($h - $nh) / 2); $x0 = 0; $nw = $w; }
+        $out = imagecreatetruecolor($nw, $nh);
+        imagecopy($out, $img, 0, 0, $x0, $y0, $nw, $nh);
+        imagedestroy($img);
+        return $out;
+    }
+
+    /**
+     * Face/body retouch: smooth blemishes on skin (mask) by blending with a blurred copy; fabric stays sharp.
+     */
+    protected function faceRetouch(\GdImage $img, int $level): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        $blur = imagecreatetruecolor($w, $h);
+        imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+        @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+        @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+        $mix = 0.20 + 0.50 * $k;
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                if ($this->isSkinPixel($r, $g, $b)) {
+                    $bb = imagecolorat($blur, $x, $y);
+                    $br = ($bb >> 16) & 0xFF; $bg = ($bb >> 8) & 0xFF; $bbl = $bb & 0xFF;
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                        max(0, min(255, (int) round($r * (1 - $mix) + $br * $mix))),
+                        max(0, min(255, (int) round($g * (1 - $mix) + $bg * $mix))),
+                        max(0, min(255, (int) round($b * (1 - $mix) + $bbl * $mix)))));
+                }
+            }
+        }
+        imagedestroy($blur);
+    }
+
+    /**
+     * Background detection + replace (or remove) via border-color similarity.
+     */
+    protected function bgReplace(\GdImage $img, string $target, int $level): void
+    {
+        $w = imagesx($img); $h = imagesy($img);
+        $samples = [[0, 0], [$w - 1, 0], [0, $h - 1], [$w - 1, $h - 1], [(int) ($w / 2), 0], [(int) ($w / 2), $h - 1], [0, (int) ($h / 2)], [$w - 1, (int) ($h / 2)]];
+        $sr = 0; $sg = 0; $sb = 0;
+        foreach ($samples as [$sx, $sy]) { $c = imagecolorat($img, $sx, $sy); $sr += ($c >> 16) & 0xFF; $sg += ($c >> 8) & 0xFF; $sb += $c & 0xFF; }
+        $sr = (int) ($sr / count($samples)); $sg = (int) ($sg / count($samples)); $sb = (int) ($sb / count($samples));
+        $remove = $target === 'transparent' || $target === '';
+        [$tr, $tg, $tb] = $remove ? [0, 0, 0] : $this->hexToRgb($target);
+        $tol = (int) (42 + 26 * ($level / 10.0));
+        if ($remove) { imagealphablending($img, false); imagesavealpha($img, true); }
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $d = sqrt(($r - $sr) ** 2 + ($g - $sg) ** 2 + ($b - $sb) ** 2);
+                if ($d < $tol) {
+                    if ($remove) {
+                        imagesetpixel($img, $x, $y, imagecolorallocatealpha($img, 0, 0, 0, 127));
+                    } else {
+                        imagesetpixel($img, $x, $y, imagecolorallocate($img, $tr, $tg, $tb));
+                    }
+                }
+            }
         }
     }
 

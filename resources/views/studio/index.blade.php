@@ -453,6 +453,51 @@
                 <button @click="applyLook()" :disabled="looking || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!looking">🎨 Áp dụng Look</span><span x-show="looking">Đang áp dụng…</span></button>
             </div>
 
+            <!-- Card: Reframe / Crop -->
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(90,140,170,.13), rgba(74,122,144,.06));">
+                <h2 class="mb-1 font-display text-base font-semibold text-brand-300">📐 Reframe / Crop</h2>
+                <p class="text-[11px] text-ink-500">Cắt lại khung hình theo tỷ lệ (giữ chủ thể giữa).</p>
+                <label class="label mt-3">Tỷ lệ khung</label>
+                <div class="flex flex-wrap gap-1.5">
+                    <template x-for="r in ['1:1','3:4','4:5','9:16','16:9','2:3']" :key="r">
+                        <button type="button" @click="reframeRatio = r" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="reframeRatio === r ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="r"></span></button>
+                    </template>
+                </div>
+                <button @click="runReframe()" :disabled="reframing || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!reframing">📐 Cắt khung</span><span x-show="reframing">Đang cắt…</span></button>
+            </div>
+
+            <!-- Card: Retouch da -->
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,150,150,.13), rgba(74,122,144,.06));">
+                <h2 class="mb-1 font-display text-base font-semibold text-brand-300">👤 Retouch da</h2>
+                <p class="text-[11px] text-ink-500">Làm mịn khuyết điểm da (chỉ vùng da, vải giữ nét).</p>
+                <label class="label mt-3">Cường độ</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Mức</span>
+                    <input type="range" min="0" max="10" step="1" x-model="retouchLevel" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="retouchLevel + '/10'"></span>
+                </div>
+                <button @click="runRetouch()" :disabled="retouching || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!retouching">👤 Retouch da</span><span x-show="retouching">Đang retouch…</span></button>
+            </div>
+
+            <!-- Card: Đổi nền -->
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(120,150,120,.13), rgba(74,122,144,.06));">
+                <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🖼 Nền (Xóa / Đổi)</h2>
+                <p class="text-[11px] text-ink-500">Thay nền studio (giữ chủ thể).</p>
+                <label class="label mt-3">Nền đích</label>
+                <div class="flex flex-wrap gap-1.5">
+                    <template x-for="[v,l] in [['transparent','Trong suốt'],['#b8b0a4','Studio be'],['#ffffff','Trắng'],['#1c1c1c','Đen'],['#f3e8d8','Ống kính']]" :key="v">
+                        <button type="button" @click="bgTarget = v" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="bgTarget === v ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="l"></span></button>
+                    </template>
+                </div>
+                <label class="label mt-3">Cường độ phát hiện nền</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Mức</span>
+                    <input type="range" min="0" max="10" step="1" x-model="bgLevel" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="bgLevel + '/10'"></span>
+                </div>
+                <button @click="runBackground()" :disabled="bgDoing || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!bgDoing">🖼 Đổi nền</span><span x-show="bgDoing">Đang xử lý…</span></button>
+            </div>
+
             <!-- Bước 3 · Ghế Đạo Diễn -->
             <div class="card p-5" x-show="step===3" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.12), rgba(124,58,237,.06));">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
@@ -780,7 +825,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
-        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, skinDetail: 4, lightShadow: 5, fabricDetail: 5, upscaling: false, lookPreset: 'studio', lookLevel: 5, looking: false,
+        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, skinDetail: 4, lightShadow: 5, fabricDetail: 5, upscaling: false, lookPreset: 'studio', lookLevel: 5, looking: false, reframeRatio: '3:4', reframing: false, retouchLevel: 5, retouching: false, bgTarget: '#b8b0a4', bgLevel: 6, bgDoing: false,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
@@ -1120,6 +1165,27 @@ document.addEventListener('alpine:init', () => {
         },
         get upscaleSrc() { return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
         get upscaleName() { return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
+        async runReframe() {
+            const src = this.upscaleSrc; if (!src || this.reframing) return;
+            this.reframing = true;
+            try { const d = await this.api('/studio/reframe', { image: src, ratio: this.reframeRatio }); this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt khung' }); this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' }); Alpine.store('toast').show('Đã cắt khung ' + this.reframeRatio + '.'); }
+            catch (e) { Alpine.store('toast').show(e.message || 'Lỗi cắt khung.', 'error'); }
+            finally { this.reframing = false; }
+        },
+        async runRetouch() {
+            const src = this.upscaleSrc; if (!src || this.retouching) return;
+            this.retouching = true;
+            try { const d = await this.api('/studio/retouch', { image: src, level: Number(this.retouchLevel) || 5 }); this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'retouch', provider: 'retouch', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa retouch' }); this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' }); Alpine.store('toast').show('Đã retouch da.'); }
+            catch (e) { Alpine.store('toast').show(e.message || 'Lỗi retouch.', 'error'); }
+            finally { this.retouching = false; }
+        },
+        async runBackground() {
+            const src = this.upscaleSrc; if (!src || this.bgDoing) return;
+            this.bgDoing = true;
+            try { const d = await this.api('/studio/background', { image: src, target: this.bgTarget, level: Number(this.bgLevel) || 6 }); this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'background', provider: 'background', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa đổi nền' }); this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' }); Alpine.store('toast').show('Đã xử lý nền.'); }
+            catch (e) { Alpine.store('toast').show(e.message || 'Lỗi nền.', 'error'); }
+            finally { this.bgDoing = false; }
+        },
         async applyLook() {
             const src = this.upscaleSrc;
             if (!src || this.looking) return;
