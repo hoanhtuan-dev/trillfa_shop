@@ -520,6 +520,22 @@ class StudioController extends Controller
     }
 
     /**
+     * Serve a garment avatar via a Laravel route (Cache-Control: no-store) so the
+     * Hostinger hcdn / LiteSpeed static cache never serves a stale clone.
+     */
+    public function assetSample(string $file): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+    {
+        if (! preg_match('/^[a-z0-9-]+\.(png|jpg|webp)$/', $file)) {
+            return response()->json(['error' => 'invalid'], 404);
+        }
+        $path = public_path('assets/garments/'.$file);
+        if (! is_file($path)) {
+            return response()->json(['error' => 'not found'], 404);
+        }
+        return response()->file($path, ['Cache-Control' => 'no-store, max-age=0']);
+    }
+
+    /**
      * ✨ Thuật sỹ ảo — guided fashion-stylist wizard.
      */
     public function stylistTypes(): \Illuminate\Http\JsonResponse
