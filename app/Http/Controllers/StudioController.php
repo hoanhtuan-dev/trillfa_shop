@@ -564,10 +564,7 @@ class StudioController extends Controller
         $sw = imagesx($src); $sh = imagesy($src);
         // If Real-ESRGAN already produced the scaled image, keep its size (no double upscale).
         $us = isset($erUsed) && $erUsed ? 1 : $scale;
-        $tw = (int) max(1, round($sw * $us)); $th = (int) max(1, round($sh * $us));
-        $dst = imagecreatetruecolor($tw, $th);
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, $sw, $sh);
-        if ($scale > 1 && $photoreal == 0 && function_exists('imageconvolution')) { @imageconvolution($dst, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
+        $dst = $this->smartUpscale($src, $us);
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
@@ -610,6 +607,48 @@ class StudioController extends Controller
                 imagesetpixel($img, $x, $y, imagecolorallocate($img, (int) $r, (int) $g, (int) $b));
             }
         }
+    }
+
+    /**
+     * High-quality no-key upscale: resizes in steps (fewer aliasing artifacts than one big jump) and
+     * applies a light unsharp mask (blur-subtract) so edges crispen without amplifying noise.
+     */
+    protected function smartUpscale(\GdImage $src, int $scale): \GdImage
+    {
+        if ($scale <= 1) { return $src; }
+        $img = $src; $isCopy = false;
+        $steps = $scale >= 4 ? [2, (int) round($scale / 2)] : [$scale];
+        foreach ($steps as $s) {
+            $nw = (int) max(1, round(imagesx($img) * $s));
+            $nh = (int) max(1, round(imagesy($img) * $s));
+            $next = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($next, $img, 0, 0, 0, 0, $nw, $nh, imagesx($img), imagesy($img));
+            if ($isCopy) { imagedestroy($img); }
+            $img = $next; $isCopy = true;
+        }
+        $w = imagesx($img); $h = imagesy($img);
+        if (function_exists('imagefilter') && $w * $h <= 16000000) {
+            $blur = imagecreatetruecolor($w, $h);
+            imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+            @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+            @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+            $amount = 0.55;
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
+                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                    $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
+                    $nr = max(0, min(255, (int) round($cr + $amount * ($cr - $br))));
+                    $ng = max(0, min(255, (int) round($cg + $amount * ($cg - $bg))));
+                    $nb = max(0, min(255, (int) round($cb + $amount * ($cb - $bb))));
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                }
+            }
+            imagedestroy($blur);
+        } elseif (function_exists('imageconvolution')) {
+            @imageconvolution($img, [[0, -1, 0], [-1, 5, -1], [0, -1, 0]], 1, 0);
+        }
+        return $img;
     }
 
     protected function pngBytes(\GdImage $img): string
