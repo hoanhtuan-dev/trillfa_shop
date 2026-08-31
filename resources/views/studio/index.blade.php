@@ -320,11 +320,14 @@
                                             </div>
                                         </div>
                                         <div class="rounded-xl bg-black/30 p-3">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-white/50" x-text="stylistPromptLang==='vi' ? 'Prompt tiếng Việt' : 'Prompt tiếng Anh'"></p>
-                                            <p class="mt-1 text-xs leading-relaxed text-white/90" x-text="stylistPromptLang==='vi' ? stylistPromptVi : stylistPromptEn"></p>
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-white/50" x-text="stylistPromptLang==='vi' ? 'Prompt tiếng Việt (chỉnh được)' : 'Prompt tiếng Anh (chỉnh được)'"></p>
+                                            <textarea x-model="stylistPromptLang==='vi' ? stylistPromptVi : stylistPromptEn" rows="7" class="mt-1 w-full resize-y rounded-lg border border-white/12 bg-white/5 px-3 py-2 text-xs leading-relaxed text-white/90 focus:border-brand-400 focus:outline-none"></textarea>
                                         </div>
+                                        <template x-if="stylistAdvice"><div class="mt-3 rounded-xl border border-brand-500/30 bg-brand-600/10 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-brand-300">💡 Lời khuyên từ thuật sỹ</p><p class="mt-1 whitespace-pre-line text-xs leading-relaxed text-white/90" x-text="stylistAdvice"></p></div></template>
+                                        <button @click="refineStylist()" :disabled="stylistLoading" class="btn-outline mt-3 w-full"><span x-show="!stylistLoading">✨ Tinh chỉnh & nâng cấp (thuật sỹ)</span><span x-show="stylistLoading">Đang tinh chỉnh…</span></button>
                                         <button @click="applyStylistPrompt()" class="btn-brand mt-3 w-full">Dùng prompt này → Tạo ảnh 2D</button>
-                                        <button @click="stylistPromptEn=''; stylistAnswers = {};" class="mt-2 w-full text-xs text-white/60 hover:text-white/80">← Chỉnh lại câu trả lời</button>
+                                        <button @click="saveAndEditAnswers()" class="mt-2 w-full text-xs text-white/60 hover:text-white/80">← Chỉnh lại câu trả lời (lưu bản này)</button>
+                                        <button @click="restoreStylistVersion(stylistVersions.length-1)" class="mt-1 w-full text-xs text-brand-300 hover:text-brand-200" x-show="stylistVersions.length">↩ Quay lại bản trước (đã lưu)</button>
                                     </div>
                                 </div>
                             </div>
@@ -736,7 +739,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
-        stylistOpen: false, stylistType: '', stylistTypes: @json($stylistTypes), stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '',
+        stylistOpen: false, stylistType: '', stylistTypes: @json($stylistTypes), stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '', stylistAdvice: '', stylistVersions: [],
 
         previewId: null,
         viewGen: null,
@@ -1146,6 +1149,27 @@ document.addEventListener('alpine:init', () => {
             finally { this.stylistLoading = false; }
         },
         setStylistAnswer(key, val) { if (val) { this.stylistAnswers[key] = val; } },
+        async refineStylist() {
+            this.stylistLoading = true;
+            try {
+                const d = await this.api('/studio/stylist/refine', { type: this.stylistType, prompt_en: this.stylistPromptEn, answers: this.stylistAnswers });
+                if (d.refined_en) { this.stylistPromptEn = d.refined_en; }
+                if (d.refined_vi) { this.stylistPromptVi = d.refined_vi; }
+                this.stylistAdvice = d.advice || '';
+                Alpine.store('toast').show('Đã tinh chỉnh prompt.');
+            } catch (e) { Alpine.store('toast').show(e.message || 'Lỗi tinh chỉnh.', 'error'); }
+            finally { this.stylistLoading = false; }
+        },
+        saveAndEditAnswers() {
+            this.stylistVersions = this.stylistVersions.concat([{ answers: { ...this.stylistAnswers }, promptEn: this.stylistPromptEn, promptVi: this.stylistPromptVi, advice: this.stylistAdvice }]);
+            this.stylistPromptEn = ''; this.stylistPromptVi = ''; this.stylistAdvice = ''; this.stylistAnswers = {};
+            Alpine.store('toast').show('Đã lưu bản trước — bạn có thể chỉnh lại & quay về.');
+        },
+        restoreStylistVersion(i) {
+            const v = this.stylistVersions[i]; if (!v) return;
+            this.stylistAnswers = { ...v.answers }; this.stylistPromptEn = v.promptEn; this.stylistPromptVi = v.promptVi; this.stylistAdvice = v.advice;
+            this.stylistVersions.splice(i, 1);
+        },
         async submitStylist() {
             const answered = Object.values(this.stylistAnswers).filter(Boolean);
             if (!answered.length) { Alpine.store('toast').show('Chọn ít nhất một câu trả lời.', 'error'); return; }

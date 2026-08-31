@@ -63,10 +63,11 @@ class StylistService
                 'Cận trung niên 40-50, quyến rũ, tóc búi, da sáng',
             ]],
             ['key' => 'silhouette', 'q' => 'Phom/ silhouette '.$g.' (kỹ thuật dựng):', 'opts' => [
-                'Ôm sát (fitted): may co giãn 2-4%, tôn dáng, đường may princess',
-                'Suông (straight): cắt đơn giản, rộng vừa, không chiết ly',
-                'A-line: xòe dần từ eo, độ rộng gấu +8-12cm',
-                'Xòe cong (flare): chân váy xòe rộng, dún hoặc chéo sợi',
+                'Ôm sát (fitted): may co giãn 2-4%, tôn dáng, đường may princess tách eo',
+                'Suông (straight): cắt đơn giản, rộng vừa, không chiết ly, phom H',
+                'A-line: xòe dần từ eo, độ rộng gấu +8-12cm, phom A mềm mại',
+                'Xòe cong (flare): chân váy xòe rộng, dún hoặc chéo sợi 45°',
+                'Oversized/boxy: rộng rộng, tay rộng, phong cách street',
             ]],
             ['key' => 'fabric', 'q' => 'Chất liệu (kỹ thuật dệt):', 'opts' => [
                 'Lụa satin mềm (độ bóng cao, rũ đẹp, 12-16 momme)',
@@ -79,16 +80,53 @@ class StylistService
                 'Đen huyền bí', 'Đỏ rượu vang (đô)', 'Pastel hồng/be (nhãn)', 'Xanh navy thanh lịch', 'Trắng/cream sạch sẽ',
             ]],
             ['key' => 'details', 'q' => 'Chi tiết may (kỹ thuật):', 'opts' => [
-                'Cổ chữ V sâu', 'Tay phồng bồng (xếp ly cánh tay)', 'Thắt eo/corset (xương + ren)', 'Viền ren, dún lưng', 'Khuy thắt + phối màu tương phản',
+                'Cổ chữ V sâu + gọng ngực ẩn', 'Tay phồng bồng (xếp ly cánh tay, độ phồng 2 lần vai)', 'Corset thắt eo (xương mềm + ren, tách eo 60cm)', 'Viền ren + dún lưng (độ rũ 1.5 lần)', 'Khuy thắt + phối màu tương phản', 'Chi tiết xếp tầng 3-4 lớp (layer)', 'Túi hộp may nổi + nẹp viền',
             ]],
             ['key' => 'occasion', 'q' => 'Dịp & bối cảnh (thị trường VN):', 'opts' => [
-                'Tiệc tối sang trọng', 'Đi làm thanh lịch', 'Dạo phố trẻ trung', 'Sự kiện/catwalk', 'Hẹn hò lãng mạn',
+                'Tiệc tối sang trọng', 'Đi làm thanh lịch', 'Dạo phố trẻ trung', 'Sự kiện/catwalk', 'Hẹn hò lãng mạn', 'Lễ cưới / dự lễ',
+            ]],
+            ['key' => 'setting', 'q' => 'Bối cảnh & ánh sáng (chụp):', 'opts' => [
+                'Studio tối giản, ánh sáng mềm (softbox)', 'Phố cổ / kiến trúc, nắng vàng (golden hour)', 'Thiên nhiên xanh, ánh sáng tự nhiên', 'Catwalk / sàn diễn, đèn neon', 'Trong nhà sang trọng, ánh đèn chùm',
+            ]],
+            ['key' => 'style', 'q' => 'Phong cách / cảm hứng (trend):', 'opts' => [
+                'Minimal thanh lịch', 'Luxury couture', 'Boho tự do', 'Streetwear hiện đại', 'Retro/cổ điển', 'Futuristic avant-garde',
             ]],
         ];
     }
 
     /** Build a high-quality EN prompt from the cluster answers (technical detail). */
     /** Vietnamese-readable prompt (choice) from the same answers. */
+    /**
+     * Giai đoạn 2: tinh chỉnh & nâng cấp prompt — thuật sỹ đề xuất cải thiện + lời khuyên,
+     * trả về prompt song ngữ (EN/VI) chi tiết hơn.
+     */
+    public function refine(string $type, string $promptEn, array $answers): array
+    {
+        $g = $this->nameOf($type);
+        $instruction = <<<PROMPT
+You are a senior high-fashion prompt engineer. The user designed a {$g}. Here is the current image-generation prompt:
+
+{$promptEn}
+
+Task:
+- REFINE it into a richer, more detailed EN prompt (fabric construction, silhouette/pattern detail, fit, trims, styling, hair/makeup, pose, lighting, camera lens, background, mood, 4k editorial).
+- Also produce a natural Vietnamese version (refined_vi).
+- Add concise, expert ADVICE in Vietnamese (2-4 short bullet points) on what makes the prompt higher-quality (e.g., add specific fabric weight, construction, lighting, or details you recommend).
+
+Reply ONLY JSON:
+{"refined_en":"...","refined_vi":"...","advice":"- ...\n- ...\n- ..."}
+PROMPT;
+        $json = $this->chat($instruction);
+        if ($json === null || ! is_array($json)) {
+            return ['refined_en' => $promptEn, 'refined_vi' => $this->buildPromptVi($type, $answers), 'advice' => '• Thêm chất liệu + trọng lượng/cấu trúc • Mô tả ánh sáng & camera • Nêu bối cảnh & tâm trạng • Chỉnh cho sát kiểu dáng bạn muốn.'];
+        }
+        return [
+            'refined_en' => (string) ($json['refined_en'] ?? $promptEn),
+            'refined_vi' => (string) ($json['refined_vi'] ?? $this->buildPromptVi($type, $answers)),
+            'advice' => (string) ($json['advice'] ?? ''),
+        ];
+    }
+
     public function buildPromptVi(string $type, array $answers): string
     {
         $g = $this->nameOf($type);
@@ -116,8 +154,10 @@ class StylistService
         if (! empty($answers['details'])) { $seg[] = 'featuring '.$answers['details'].' construction'; }
         $model = ! empty($answers['model']) ? $answers['model'] : 'a stylish Vietnamese model';
         $occ = ! empty($answers['occasion']) ? $answers['occasion'] : 'an elegant occasion';
+        $set = ! empty($answers['setting']) ? $answers['setting'] : 'a clean minimal studio';
+        $style = ! empty($answers['style']) ? $answers['style'] : 'refined editorial';
         $desc = $seg ? implode(', ', $seg) : 'an elegant contemporary design';
-        return 'A high-fashion editorial photo of a '.$g.', '.$desc.', worn by '.$model.', styled for '.$occ.', premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, clean minimal background, ultra detailed, 4k';
+        return 'A high-fashion editorial photo of a '.$g.', '.$desc.', worn by '.$model.', styled for '.$occ.', '.$style.' aesthetic, set in '.$set.', premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, ultra detailed, 4k';
     }
 
 

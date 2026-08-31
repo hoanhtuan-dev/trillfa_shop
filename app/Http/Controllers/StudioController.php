@@ -549,6 +549,17 @@ class StudioController extends Controller
         return response()->json(['questions' => app(\App\Services\StylistService::class)->cluster((string) $data['type'])]);
     }
 
+    public function stylistRefine(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'type' => ['required', 'string', 'max:40'],
+            'prompt_en' => ['required', 'string', 'max:4000'],
+            'answers' => ['nullable', 'array'],
+            'answers.*' => ['nullable', 'string', 'max:500'],
+        ]);
+        return response()->json(app(\App\Services\StylistService::class)->refine((string) $data['type'], (string) $data['prompt_en'], (array) ($data['answers'] ?? [])));
+    }
+
     public function stylistPrompt(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->validate([
