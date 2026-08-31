@@ -93,17 +93,32 @@ class VirtualTryOnService
 
     // Fallback khi try-on không khả dụng (region/intl hoặc free-trial hết): dùng qwen-image-edit để
     // đổi người mẫu/dáng trên ảnh thiết kế, GIỮ NGUYÊN 100% trang phục.
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = ''): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', int $texture = 5): ?string
     {
         // Dùng model được quản lý cho "Thay Đổi Người Mẫu" (studio.swap_model) qua swapEdit (có retry 429).
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
-        $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Change the person to a '.$modelDesc.' and set the pose to '.$pose.'.';
-        if ($background && strtolower($background) !== 'keep') {
-            $instr .= ' Set the background to '.$background.'.';
+        $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.';
+        // Hậu cảnh: đưa lên đầu + dùng "replace the ENTIRE background" để model thực sự thay nền (không bỏ qua).
+        if ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original') {
+            $instr = 'Replace the ENTIRE background of the scene with: '.$background.'. '.$instr;
+        }
+        // Texture: tái dùng cùng textureHint (0 mịn -> 10 dệt kim thô).
+        $tex = $this->textureEnglish($texture);
+        if ($tex) {
+            $instr .= ' Make the outfit fabric '.$tex.'.';
         }
         $instr .= ' Photorealistic, full body, high fashion.';
         $svc = app(ImageAIService::class);
         return $svc->swapEdit($instr, $designImage, $swapModel);
+    }
+
+    protected function textureEnglish(int $v): string
+    {
+        if ($v <= 1) { return 'smooth silk fabric, sleek'; }
+        if ($v <= 3) { return 'soft matte fabric'; }
+        if ($v <= 5) { return 'natural subtle fabric texture'; }
+        if ($v <= 7) { return 'lightly woven textured fabric'; }
+        return 'heavy knit, coarse weave, visible thread detail';
     }
 
     public function status(string $taskId): array

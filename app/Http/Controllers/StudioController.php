@@ -528,6 +528,7 @@ class StudioController extends Controller
             'model_id' => ['required', 'string', 'max:40'],
             'pose_id' => ['required', 'string', 'max:40'],
             'background' => ['nullable', 'string', 'max:400'],
+            'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -553,7 +554,7 @@ class StudioController extends Controller
             // Try-on không khả dụng (vùng/intl hoặc free-trial hết) -> fallback qwen-image-edit
             // đổi người mẫu/dáng, giữ nguyên 100% trang phục.
             logger()->warning('Try-on khả dụng, fallback qwen-edit: '.($res['error'] ?? ''));
-            $fallback = $svc->fallbackEdit($data['image'], $model['desc'] ?? ($model['ethnicity'] ?? 'a model'), $pose['skeleton'] ?? ($pose['name'] ?? 'standing'), (string) ($data['background'] ?? ''));
+            $fallback = $svc->fallbackEdit($data['image'], $model['desc'] ?? ($model['ethnicity'] ?? 'a model'), $pose['skeleton'] ?? ($pose['name'] ?? 'standing'), (string) ($data['background'] ?? ''), (int) ($data['texture'] ?? 5));
             if ($fallback) {
                 $gen = auth()->user()->generations()->create([
                     'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,

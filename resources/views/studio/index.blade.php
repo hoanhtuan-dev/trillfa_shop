@@ -1070,7 +1070,7 @@ document.addEventListener('alpine:init', () => {
             for (const m of this.swapModelIds) for (const p of this.swapPoseIds) jobs.push({ m, p });
             try {
                 for (const job of jobs) {
-                    const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: job.m, pose_id: job.p }) });
+                    const res = await fetch('/studio/swap-model', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ image: this.swapDesign, model_id: job.m, pose_id: job.p, background: this.swapBackground, texture: this.texture }) });
                     await new Promise(r => setTimeout(r, 1500)); // nghỉ 1.5s giữa các lần gọi (tránh rate-limit 429)
                     const d = await res.json().catch(() => ({}));
                     if (!res.ok) { Alpine.store('toast').show(d.message || 'Thay đổi người mẫu thất bại.', 'error'); continue; }
