@@ -1124,7 +1124,7 @@ class StudioController extends Controller
         $data['priority'] = (int) ($data['priority'] ?? 0);
         $data['enabled'] = true;
         $data['value'] = \Illuminate\Support\Facades\Crypt::encryptString(trim($data['value']));
-        $data['scopes'] = $data['scopes'] ? array_values(array_filter(array_map('trim', explode(',', $data['scopes'])))) : ['*'];
+        $data['scopes'] = ['*']; // key dùng chung (độc lập model)
         \App\Models\StudioApiKey::create($data);
         return redirect()->back()->with('success', 'Đã thêm API key.');
     }
@@ -1142,7 +1142,7 @@ class StudioController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
         ]);
         $data['priority'] = (int) ($data['priority'] ?? 0);
-        $data['scopes'] = $data['scopes'] ? array_values(array_filter(array_map('trim', explode(',', $data['scopes'])))) : ['*'];
+        $data['scopes'] = ['*']; // key dùng chung (độc lập model)
         if (! empty($data['value'])) $data['value'] = \Illuminate\Support\Facades\Crypt::encryptString(trim($data['value']));
         else unset($data['value']);
         $key->update($data);
