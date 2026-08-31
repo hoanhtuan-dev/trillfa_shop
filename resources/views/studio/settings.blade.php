@@ -251,7 +251,6 @@
                             <span class="font-semibold text-ink-900">{{ $k->label }}</span>
                             <span class="text-ink-500">{{ $k->kind ?: $provider }}</span>
                             <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $k->priority }}</span>
-                            <span class="text-[10px] text-ink-500">Scope: {{ ($k->scopes && !in_array('*',$k->scopes)) ? implode(', ',$k->scopes) : 'Tất cả' }}</span>
                             <span class="rounded-full px-2 py-0.5 text-[10px] {{ $k->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $k->enabled ? 'Bật' : 'Tắt' }}</span>
                             <span class="ml-auto flex flex-wrap items-center gap-1.5">
                                 <form method="POST" action="{{ route('studio.keys.update', $k) }}" class="ml-auto flex flex-wrap items-center gap-1.5">
@@ -277,11 +276,16 @@
             @csrf
             <h3 class="text-sm font-semibold text-ink-900">➕ Thêm API key</h3>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div><label class="label">Provider</label><input id="apikey-provider" name="provider" class="input !py-2" placeholder="qwen / wan / gemini / fal / ..." required></div>
+                <div><label class="label">Provider</label><select id="apikey-provider" name="provider" class="input !py-2" required>
+                    <option value="">— Chọn provider —</option>
+                    <option value="qwen">Qwen (ảnh/chỉnh sửa)</option><option value="qwen_edit">Qwen Edit (inpaint)</option>
+                    <option value="wan">Wan AI (video)</option><option value="dashscope">DashScope (Wan/Qwen)</option>
+                    <option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option>
+                    <option value="fal">Fal.ai (Flux)</option><option value="replicate">Replicate (Flux)</option><option value="veo">Google Veo</option>
+                </select></div>
                 <div><label class="label">Nhãn</label><input name="label" class="input !py-2" placeholder="VD: Qwen Token-Plan" required></div>
                 <div><label class="label">Key</label><input name="value" class="input !py-2" placeholder="sk-..." required></div>
                 <div><label class="label">Loại (kind)</label><input name="kind" class="input !py-2" placeholder="plan / paygo / ..."></div>
-                <div><label class="label">Scope (mặc định *)</label><input name="scopes" class="input !py-2" placeholder="model_id, group hoặc để trống"></div>
                 <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="5" min="0" max="100" class="input !py-2"></div>
                 <div class="col-span-2 sm:col-span-3"><label class="label">Ghi chú</label><input name="note" class="input !py-2" placeholder="(tùy chọn)"></div>
             </div>
