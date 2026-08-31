@@ -523,16 +523,20 @@ class StudioController extends Controller
      * Serve a garment avatar via a Laravel route (Cache-Control: no-store) so the
      * Hostinger hcdn / LiteSpeed static cache never serves a stale clone.
      */
-    public function assetSample(string $file): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+    /**
+     * Public garment-avatar endpoint — serves the avatar from a fixed location with a
+     * correct immutable cache header (versioned URL => safe to cache). Public, no auth.
+     */
+    public function garmentAvatar(string $id): \Symfony\Component\Http\Foundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
     {
-        if (! preg_match('/^[a-z0-9-]+\.(png|jpg|webp)$/', $file)) {
+        if (! preg_match('/^[a-z0-9-]+$/', $id)) {
             return response()->json(['error' => 'invalid'], 404);
         }
-        $path = public_path('assets/garments/'.$file);
+        $path = public_path('assets/garments/garment-'.$id.'.png');
         if (! is_file($path)) {
             return response()->json(['error' => 'not found'], 404);
         }
-        return response()->file($path, ['Cache-Control' => 'no-store, max-age=0']);
+        return response()->file($path, ['Cache-Control' => 'public, max-age=31536000, immutable']);
     }
 
     /**

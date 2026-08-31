@@ -158,6 +158,9 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
 });
 
+// Public garment-avatar endpoint (bypasses auth + static cache — served by Laravel with immutable cache).
+Route::get('/garment/{id}', [StudioController::class, 'garmentAvatar'])->name('garment.avatar');
+
 // Blog
 Route::prefix('blog')->name('blog.')->group(function () {
     Route::get('/', [BlogController::class, 'index'])->name('index');
