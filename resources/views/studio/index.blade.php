@@ -1224,7 +1224,7 @@ document.addEventListener('alpine:init', () => {
             Alpine.store('toast').show('Đã xoá khỏi thư viện.', 'info');
         },
         openSwap() {
-            const img = this.canvasImg || (this.preview && this.preview.media_url);
+            const img = (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url);
             if (!img) { Alpine.store('toast').show('Chọn một ảnh 2D (kết quả) trước.', 'error'); return; }
             this.swapDesign = img; if (!this.swapModelIds.length) this.swapModelIds = ['model01']; if (!this.swapPoseIds.length) this.swapPoseIds = ['pose01']; this.swapOpen = true;
         },
