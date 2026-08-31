@@ -188,7 +188,7 @@
 
             <!-- ✨ Trợ lý thiết kế -->
             <div x-show="stylistOpen" x-cloak @click="stylistOpen=false" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                <div class="w-full max-w-2xl overflow-hidden rounded-3xl border border-brand-500/30 shadow-2xl shadow-brand-500/10 backdrop-blur-xl" @click.stop style="background: linear-gradient(160deg, #17203a 0%, #2a1f56 45%, #14203c 100%);">
+                <div class="w-full max-w-2xl overflow-hidden rounded-3xl border border-brand-500/40 shadow-2xl shadow-brand-500/10 backdrop-blur-xl" @click.stop style="background-color:#24284a; background-image: linear-gradient(160deg, rgba(74,122,144,.45), rgba(124,58,237,.30));">
                     <div class="flex items-center justify-between border-b border-white/10 bg-white/5 px-5 py-3.5">
                         <div class="flex items-center gap-2">
                             <span class="grid h-9 w-9 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-violet-600 text-lg shadow-lg shadow-brand-500/40">✨</span>
@@ -849,6 +849,12 @@ document.addEventListener('alpine:init', () => {
             if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
             return data;
         },
+        async del(url) {
+            const res = await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' } });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
+            return data;
+        },
         get workflowSteps() {
             let cur = 1;
             if (this.output.image_prompt_en) cur = 2;
@@ -1168,6 +1174,11 @@ document.addEventListener('alpine:init', () => {
             if (! silent) { Alpine.store('toast').show('Đã dọn canvas — bỏ ảnh/video đang xem & các nguồn đang dùng.', 'info'); }
         },
 
+        async loadPalette(id) {
+            if (!id) { this.palette = []; return; }
+            try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
+            catch (e) { this.palette = []; }
+        },
         async processNow() {
             try {
                 const res = await fetch('/studio/process', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' } });
