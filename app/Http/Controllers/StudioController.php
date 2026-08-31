@@ -526,10 +526,14 @@ class StudioController extends Controller
             'scale' => ['nullable', 'integer', 'min:1', 'max:4'],
             'refine' => ['nullable', 'integer', 'min:0', 'max:10'],
             'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'skin_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
         $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
+        $skinDetail = max(0, min(10, (int) ($data['skin_detail'] ?? 0)));
+        $lightShadow = max(0, min(10, (int) ($data['light_shadow'] ?? 0)));
         $srcUrl = (string) $data['image'];
 
         // COMBINED upscale: (old) AI-edit refine for photoreal human detail, then (new) Real-ESRGAN
@@ -558,6 +562,8 @@ class StudioController extends Controller
         $sw = imagesx($src); $sh = imagesy($src);
         $dst = $this->smartUpscale($src, $scale);
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
+        if ($skinDetail > 0) { $this->skinTexturePass($dst, $skinDetail); }
+        if ($lightShadow > 0) { $this->lightShadowPass($dst, $lightShadow); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
         imagedestroy($src); imagedestroy($dst);
@@ -635,6 +641,57 @@ class StudioController extends Controller
      * High-quality no-key upscale: resizes in steps (fewer aliasing artifacts than one big jump) and
      * applies a light unsharp mask (blur-subtract) so edges crispen without amplifying noise.
      */
+    /**
+     * Controlled skin detail: detects warm skin tones and adds fine pores (subtle high-frequency
+     * noise) plus a few small freckles/marks (low-opacity darker spots), scaled by level.
+     */
+    protected function skinTexturePass(\GdImage $img, int $level): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                // warm skin tone heuristic (R>G>B, not too bright/dark, not saturated background)
+                if ($r > 85 && $r > $g && $g > $b && ($r - $b) > 14 && $r < 246 && $g > 55) {
+                    $p = (int) ((mt_rand(-300, 300) / 1000.0) * 4 * $k);       // fine pores
+                    $f = 0;
+                    if (mt_rand(0, 1000) < (4 + 32 * $k)) { $f = (int) round(-7 * $k * mt_rand(5, 16) / 10.0); } // subtle freckle/nam
+                    $nr = max(0, min(255, $r + $p + $f));
+                    $ng = max(0, min(255, $g + $p + $f));
+                    $nb = max(0, min(255, $b + (int) ($p * 0.6) + $f));
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                }
+            }
+        }
+    }
+
+    /**
+     * Controlled light & shadow: a soft directional light from the upper-left (brightens that
+     * side, deepens the opposite) plus a gentle contrast so shadows gain depth.
+     */
+    protected function lightShadowPass(\GdImage $img, int $level): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $nx = ($w / 2 - $x) / max(1, $w); $ny = ($h / 2 - $y) / max(1, $h);
+                $d = ($nx + $ny) / 2.0; // -0.5..0.5; positive = upper-left side
+                $lift = (int) round($d * 28 * $k);
+                $c = imagecolorat($img, $x, $y);
+                $r = max(0, min(255, (($c >> 16) & 0xFF) + $lift));
+                $g = max(0, min(255, (($c >> 8) & 0xFF) + $lift));
+                $b = max(0, min(255, ($c & 0xFF) + $lift));
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
+            }
+        }
+        if (function_exists('imagefilter')) {
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(6 * $k));
+        }
+    }
+
     protected function smartUpscale(\GdImage $src, int $scale): \GdImage
     {
         if ($scale <= 1) { return $src; }
