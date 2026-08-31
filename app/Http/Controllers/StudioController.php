@@ -230,7 +230,7 @@ class StudioController extends Controller
     protected function defaultProviderModel(string $type): array
     {
         // Prefer the registered model registry (highest-priority enabled model for the group).
-        $group = $type === 'video' ? 'video' : ($type === 'inference' ? 'inference' : 'image');
+        $group = in_array($type, ['video', 'inference', 'text']) ? $type : 'image';
         $reg = resolve_studio_model($group);
         if ($reg) return [$reg['provider'], $reg['model']];
 
@@ -1070,7 +1070,7 @@ class StudioController extends Controller
     public function storeModel(Request $request)
     {
         $data = $request->validate([
-            'group' => ['required', 'string', 'in:image,video,inference'],
+            'group' => ['required', 'string', 'in:image,video,inference,text'],
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:40'],
             'model_id' => ['required', 'string', 'max:160'],
@@ -1088,7 +1088,7 @@ class StudioController extends Controller
     public function updateModel(Request $request, \App\Models\StudioModel $model)
     {
         $data = $request->validate([
-            'group' => ['required', 'string', 'in:image,video,inference'],
+            'group' => ['required', 'string', 'in:image,video,inference,text'],
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:40'],
             'model_id' => ['required', 'string', 'max:160'],

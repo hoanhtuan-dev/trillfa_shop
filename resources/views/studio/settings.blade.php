@@ -155,10 +155,11 @@
     <div x-show="tab==='models'">
     {{-- ===== Model Registry manager ===== --}}
     <div class="card mt-6 p-6">
+        <p class="mb-3 text-xs text-ink-500">⚙️ <b>{{ $api_keys->pluck('provider')->unique()->count() }}</b> nhóm API · <b>{{ $api_keys->count() }}</b> key đã đăng ký. Chọn <b>API key</b> → tự nhận provider → gán <b>vai trò</b> (Ảnh/Video/Suy luận/Ngôn ngữ) + <b>Ưu tiên</b>.</p>
         <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🤖 Model Registry <span class="text-xs font-normal text-ink-500">quản lý model theo nhóm (image / video / inference)</span></h2>
         <p class="mt-1 text-xs text-ink-500">Chọn nhiều model/nhóm, gán <b>ưu tiên</b> (cao = dùng trước). Khi một model hết hạn mức/API lỗi, hệ thống tự chuyển sang model kế tiếp theo độ ưu tiên. Model hiển thị trong Studio theo nhóm tương ứng (Model video = nhóm video).</p>
 
-        @foreach(['image'=>'Ảnh','video'=>'Video','inference'=>'Suy luận'] as $grp=>$grpLabel)
+        @foreach(['image'=>'Ảnh','video'=>'Video','inference'=>'Suy luận','text'=>'Ngôn ngữ (text/prompt)'] as $grp=>$grpLabel)
             <div class="mt-5">
                 <h3 class="text-sm font-semibold text-ink-900">{{ $grpLabel }}</h3>
                 <div class="mt-2 space-y-2">
@@ -198,12 +199,12 @@
             @csrf
             <h3 class="text-sm font-semibold text-ink-900">➕ Thêm model</h3>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div><label class="label">Nhóm</label><select name="group" class="input !py-2"><option value="image">Ảnh</option><option value="video">Video</option><option value="inference">Suy luận</option></select></div>
+                <div><label class="label">Vai trò</label><select name="group" class="input !py-2"><option value="image">Ảnh (image)</option><option value="video">Video</option><option value="inference">Suy luận (inference)</option><option value="text">Ngôn ngữ (text/prompt)</option></select></div>
                 <div><label class="label">Tên hiển thị</label><input name="name" class="input !py-2" placeholder="VD: Wan 2.2 i2v" required></div>
-                <div><label class="label">Provider</label><input name="provider" class="input !py-2" placeholder="wan / qwen / gemini / fal / ..." required></div>
+                <div><label class="label">Provider (tự nhận từ key)</label><input name="provider" id="model-provider" class="input !py-2" placeholder="auto từ key" readonly required></div>
                 <div><label class="label">Model ID</label><input name="model_id" class="input !py-2" placeholder="VD: wan2.2-i2v" required></div>
-                <div><label class="label">Khóa (API key)</label><select name="api_key_ref" class="input !py-2">
-                    <option value="">— Chọn khóa / provider —</option>
+                <div><label class="label">Khóa (API key)</label><select name="api_key_ref" class="input !py-2" onchange="document.getElementById('model-provider').value = this.value; this.closest('form').querySelector('[name=name]').placeholder = this.options[this.selectedIndex].text || 'VD: Wan 2.2 i2v'">
+                    <option value="">— Chọn API key —</option>
                     @php $seen = []; @endphp
                     @foreach($api_keys as $ak)
                         @if(in_array($ak->provider, $seen)) @continue @endif
@@ -225,8 +226,8 @@
     <div x-show="tab==='keys'">
     {{-- ===== API Keys Registry ===== --}}
     <div class="card mt-6 p-6">
-        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">nhiều key/provider · scope theo model/nhóm · ưu tiên · tránh trùng lặp</span></h2>
-        <p class="mt-1 text-xs text-ink-500">Mỗi provider có thể đăng ký <b>nhiều key</b> (vd Qwen: Token-Plan + Pay-As-You-Go). <b>Scope</b> giới hạn key chỉ dùng cho model/nhóm cụ thể (để trống = dùng chung, hoặc gõ model_id/nhóm cách dấu phẩy). Key dùng trước = ưu tiên cao nhất.</p>
+        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">đăng ký key độc lập — model chỉ cần chọn key</span></h2>
+        <p class="mt-1 text-xs text-ink-500">⚙️ <b>{{ $api_keys->pluck('provider')->unique()->count() }}</b> nhóm API · <b>{{ $api_keys->count() }}</b> key. Chỉ cần đăng ký <b>provider + key</b> (không phụ thuộc model); <b>Model Registry</b> sẽ chọn key theo <b>vai trò + ưu tiên</b>. Mỗi provider có thể có nhiều key (Qwen: Token-Plan + Pay-As-You-Go…).</p>
         <div class="mt-3 rounded-xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
             <p class="font-semibold">💡 Gợi ý lấy key</p>
             <ul class="mt-1 list-inside list-disc space-y-0.5">
