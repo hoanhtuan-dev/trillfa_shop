@@ -683,15 +683,18 @@ class StudioController extends Controller
     {
         if ($level <= 0) { return; }
         $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
-        for ($y = 0; $y < $h; $y++) {
-            for ($x = 0; $x < $w; $x++) {
+        // SPARSE fine pores (not a dense scale-like pattern) with low amplitude so it blends naturally,
+        // plus a few very subtle freckles/nam — reads as real skin, not "snake skin".
+        for ($y = 0; $y < $h; $y += 3) {
+            for ($x = 0; $x < $w; $x += 3) {
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
                 if ($this->isSkinPixel($r, $g, $b)) {
-                    $boost = $r > 165 ? 1.4 : 1.0; // brighter warm (the face) gets a little more
-                    $p = (int) ((mt_rand(-360, 360) / 1000.0) * 7 * $k * $boost);
+                    // soft radial fade: weaker toward block edges so texture melts into the skin
+                    $edge = 1.0 - (($x % 3) / 3.0 * 0.5 + ($y % 3) / 3.0 * 0.5);
+                    $p = (int) ((mt_rand(-150, 150) / 1000.0) * 2.4 * $k * $edge);      // fine, soft pores
                     $f = 0;
-                    if (mt_rand(0, 1000) < (6 + 40 * $k)) { $f = (int) round(-9 * $k * $boost * mt_rand(5, 18) / 10.0); }
+                    if (mt_rand(0, 1000) < (2 + 14 * $k)) { $f = (int) round(-4 * $k * mt_rand(3, 9) / 10.0); $p = (int) ($p * 0.5); } // gentle freckle/nam
                     $nr = max(0, min(255, $r + $p + $f));
                     $ng = max(0, min(255, $g + $p + $f));
                     $nb = max(0, min(255, $b + (int) ($p * 0.6) + $f));
