@@ -311,6 +311,10 @@
                                                 </template>
                                             </div>
                                             <button @click="skipStylist()" class="inline-flex items-center gap-1 text-xs text-white/50 transition-colors hover:text-white/80">⏭ Bỏ qua câu này</button>
+                                            <div class="flex gap-2 pt-1">
+                                                <input x-model="stylistCustom" @keydown.enter="submitCustomStylist()" placeholder="Hoặc nhập câu trả lời của bạn…" class="flex-1 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm text-white placeholder:text-white/40 focus:border-brand-400 focus:outline-none">
+                                                <button @click="submitCustomStylist()" class="btn-brand btn-sm whitespace-nowrap rounded-full">Gửi</button>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>
@@ -735,7 +739,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
-        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [],
+        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '',
 
         previewId: null,
         viewGen: null,
@@ -1170,6 +1174,12 @@ document.addEventListener('alpine:init', () => {
             const q = (this.stylistStep && this.stylistStep.question) || '';
             this.stylistMessages = this.stylistMessages.concat([{ role: 'stylist', text: q }, { role: 'user', text: 'Bỏ qua ⏭' }]);
             await this.stylistNext(this.stylistHistory);
+        },
+        submitCustomStylist() {
+            const t = (this.stylistCustom || '').trim();
+            if (!t) return;
+            this.stylistCustom = '';
+            this.pickStylistOption(t);
         },
         applyStylistPrompt() {
             const p = this.stylistStep && this.stylistStep.prompt;

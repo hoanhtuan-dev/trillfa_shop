@@ -12,6 +12,13 @@ class StylistService
 {
     /** Skeleton "backbone" the stylist always walks through (deep layer comes from the LLM). */
     protected $skeleton = [
+        ['model' => true, 'en' => 'Vietnamese model character', 'vi' => 'Nhân vật người mẫu (Việt)', 'opts' => [
+            'Trẻ trung (18-25), thanh mảnh, tóc dài đen, da sáng',
+            'Thanh xuân (25-32), cao ráo, tóc dài xoăn, da nâu vàng',
+            'Trưởng thành (32-40), đầy đặn, tóc ngắn cá tính, da ngăm',
+            'Cận trung niên (40-50), quyến rũ, tóc búi, da sáng',
+            'Nhẹ nhàng, tóc dài thẳng, da trắng sáng, dáng thon',
+        ]],
         ['en' => 'silhouette and fit',            'vi' => 'Phom dáng / sự vừa vặn',   'opts' => ['Ôm / fitted', 'Suông / straight', 'Rộng / oversized', 'Bồng / volume']],
         ['en' => 'fabric and texture',            'vi' => 'Chất liệu / bề mặt',       'opts' => ['Lụa mềm', 'Cotton', 'Dệt kim', 'Da', 'Thô / linen']],
         ['en' => 'color and print',               'vi' => 'Màu sắc / họa tiết',       'opts' => ['Pastel nhẹ', 'Tối / trầm', 'Tươi sáng', 'Đen - trắng', 'Trung tính (be/cream)']],
@@ -58,6 +65,8 @@ class StylistService
         }
 
         $cat = $skeleton[$stepNum];
+        $isModel = ! empty($cat['model']);
+        $topicText = $isModel ? 'describe a realistic VIETNAMESE female model (age 18-50): age, body, hair and skin tone' : $cat['vi'].' ('.$cat['en'].')';
         $historyText = '';
         if ($history) {
             $historyText = implode("
@@ -73,7 +82,8 @@ Choices so far:
 {$historyText}
 
 Rules:
-- Ask ONE deep, specific, fashion-expert question in Vietnamese about the current topic for this {$typeName}. Make it feel like a stylist advising a client (not a form).
+- The user may have typed a CUSTOM free-text answer; if so, PRIORITISE reasoning from it (offer options that refine it). Otherwise rely on your fashion knowledge.
+- Ask ONE deep, specific, fashion-expert question in Vietnamese about: {$topicText} for this {$typeName}. Make it feel like a stylist advising a client (not a form).
 - Give 3-5 concrete, distinct options that are rich fashion descriptors (not generic).
 - Do NOT move to other topics; only the current one.
 - Reply ONLY with JSON:
@@ -99,10 +109,17 @@ PROMPT;
     protected function buildPrompt(string $type, array $history): string
     {
         $typeName = $this->nameOf($type);
-        $parts = [];
-        foreach ($history as $h) { if (! empty($h['answer'])) { $parts[] = strtolower(trim((string) $h['answer'])); } }
-        $desc = $parts ? implode(', ', $parts) : 'elegant contemporary design';
-        return 'A high-fashion editorial photo of a '.$typeName.', '.$desc.', premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, clean minimal background, ultra detailed, 4k';
+        $model = ''; $design = [];
+        foreach ($history as $i => $h) {
+            if (! empty($h['answer'])) {
+                $a = trim((string) $h['answer']);
+                if ($i === 0 && ! empty($this->skeleton[0]['model'])) { $model = $a; }
+                else { $design[] = strtolower($a); }
+            }
+        }
+        $desc = $design ? implode(', ', $design) : 'elegant contemporary design';
+        $modelPart = $model ? 'worn by a '.$model.', ' : '';
+        return 'A high-fashion editorial photo of a '.$typeName.', '.$desc.', '.$modelPart.'premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, clean minimal background, ultra detailed, 4k';
     }
 
     protected function buildSummary(array $history): string
