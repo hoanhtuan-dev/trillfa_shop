@@ -533,7 +533,7 @@ class StudioController extends Controller
         if ($refine > 0) {
             try {
                 $out = app(\App\Services\ImageAIService::class)->generate(
-                    'Enhance this fashion photograph at high resolution (photo-realistic): rebuild realistic fabric weave and material texture, reconstruct visible seam/stitching/button details, natural skin texture and pores, crisp sharp edges, rich color, keep the exact garment, model, pose and composition unchanged. Ultra-detailed, 4K.',
+                    'Enhance this fashion photograph at high resolution (photo-realistic): rebuild realistic fabric weave and material texture, reconstruct visible seam/stitching/button details, natural skin texture and pores, detailed flowing hair with individual strands and natural shine, sharp detailed eyes with iris texture, eyelashes and catchlight, crisp sharp edges, rich color, keep the exact garment, model, pose and composition unchanged. Ultra-detailed, 4K.',
                     $srcUrl
                 );
                 if ($out) { $srcUrl = $out; }
