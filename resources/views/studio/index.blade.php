@@ -68,10 +68,10 @@
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
         <div x-ref="leftPanel" class="scrollbar-hide order-2 space-y-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===2 || step===3">
-            <!-- ✨ Thuật sỹ ảo (nổi bật, đầu Bước 1) -->
-            <div class="card p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500); background: linear-gradient(135deg, rgba(232,87,125,.16), rgba(74,122,144,.12));">
+            <!-- ✨ Trợ lý thiết kế (nổi bật, đầu Bước 1) -->
+            <div class="card p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
                 <div class="flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-brand-300">✨ Thuật sỹ ảo</h2>
+                    <h2 class="font-display text-base font-semibold text-brand-300">✨ Trợ lý thiết kế</h2>
                     <button @click="openStylist()" class="btn-brand btn-sm whitespace-nowrap">Bắt đầu</button>
                 </div>
                 <div class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -186,15 +186,15 @@
                 </div>
             </div>
 
-            <!-- ✨ Thuật sỹ ảo -->
+            <!-- ✨ Trợ lý thiết kế -->
             <div x-show="stylistOpen" x-cloak @click="stylistOpen=false" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                <div class="w-full max-w-2xl overflow-hidden rounded-3xl border border-brand-500/20 shadow-2xl shadow-brand-500/10 backdrop-blur-xl" @click.stop style="background: linear-gradient(160deg, #1a1230 0%, #2a1a4a 40%, #1a2340 100%);">
+                <div class="w-full max-w-2xl overflow-hidden rounded-3xl border border-brand-500/30 shadow-2xl shadow-brand-500/10 backdrop-blur-xl" @click.stop style="background: linear-gradient(160deg, #17203a 0%, #2a1f56 45%, #14203c 100%);">
                     <div class="flex items-center justify-between border-b border-white/10 bg-white/5 px-5 py-3.5">
                         <div class="flex items-center gap-2">
                             <span class="grid h-9 w-9 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-violet-600 text-lg shadow-lg shadow-brand-500/40">✨</span>
                             <div>
-                                <h3 class="font-display text-base font-semibold text-white">Thuật sỹ ảo</h3>
-                                <p class="text-[10px] text-white/50">Trực tuyến · tư vấn thiết kế thời trang</p>
+                                <h3 class="font-display text-base font-semibold text-white">Trợ lý thiết kế</h3>
+                                <p class="text-[10px] text-white/50">Trực tuyến · đồng hành thiết kế thời trang</p>
                             </div>
                         </div>
                         <button @click="closeStylist()" class="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/80 hover:bg-white/20">✕</button>
@@ -738,7 +738,7 @@ document.addEventListener('alpine:init', () => {
             // Dịch prompt tiếng Việt chỉ chạy khi người dùng bấm nút "Sửa tiếng Việt" (không tự động).
             // Load custom model/pose library assets (Thư viện upload riêng).
             this.loadSwapAssets();
-            // Load stylist garment types (✨ Thuật sỹ card).
+            // Load stylist garment types (✨ Trợ lý thiết kế card).
             this.loadStylistTypes();
         },
         async silentTranslate(en) {
