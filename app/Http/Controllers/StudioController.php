@@ -801,6 +801,52 @@ class StudioController extends Controller
         return $img;
     }
 
+    /**
+     * Light unsharp mask helper (blur-subtract) for crisping edges without amplifying noise.
+     */
+    protected function unsharpMask(\GdImage $img, float $amount = 0.6): void
+    {
+        $w = imagesx($img); $h = imagesy($img);
+        if (! function_exists('imagefilter') || $w * $h > 24000000) { return; }
+        $blur = imagecreatetruecolor($w, $h);
+        imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+        @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
+                $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    max(0, min(255, (int) round($cr + $amount * ($cr - $br)))),
+                    max(0, min(255, (int) round($cg + $amount * ($cg - $bg)))),
+                    max(0, min(255, (int) round($cb + $amount * ($cb - $bb))))));
+            }
+        }
+        imagedestroy($blur);
+    }
+
+    /**
+     * Re-apply detail to a swapped image: crisp + restore fabric texture, patterns and skin.
+     * Used after virtual try-on / fallback so the result keeps the original garment quality.
+     */
+    protected function enhanceStoredImage(string $url, int $fabric = 6, int $skin = 3): ?string
+    {
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) { if (is_file($cand)) { $file = $cand; break; } }
+        if (! $file) { return null; }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return null; }
+        $this->unsharpMask($img, 0.65);
+        if ($fabric > 0) { $this->fabricTexturePass($img, $fabric); }
+        if ($skin > 0) { $this->skinTexturePass($img, $skin); }
+        $this->unsharpMask($img, 0.35); // final gentle crisp
+        $name = 'studio/swapdetail-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
+        imagedestroy($img);
+        return '/storage/'.$name;
+    }
+
     protected function pngBytes(\GdImage $img): string
     {
         ob_start(); imagepng($img); return (string) ob_get_clean();
@@ -900,6 +946,8 @@ class StudioController extends Controller
             logger()->warning('Try-on khả dụng, fallback qwen-edit: '.($res['error'] ?? ''));
             $fallback = $svc->fallbackEdit($data['image'], $model['desc'] ?? ($model['ethnicity'] ?? 'a model'), $pose['skeleton'] ?? ($pose['name'] ?? 'standing'), (string) ($data['background'] ?? ''), (int) ($data['texture'] ?? 5));
             if ($fallback) {
+                $det = $this->enhanceStoredImage($fallback, 6, 3);
+                if ($det) { $fallback = $det; }
                 $gen = auth()->user()->generations()->create([
                     'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
                     'prompt' => 'Thay đổi người mẫu (qwen-edit) · '.($model['name'] ?? 'model'),
@@ -940,6 +988,8 @@ class StudioController extends Controller
         if (($res['status'] ?? '') === 'succeeded' && ! empty($res['url'])) {
             $stored = $svc->storeRemoteImage($res['url']);
             if ($stored) {
+                $det = $this->enhanceStoredImage($stored, 6, 3);
+                if ($det) { $stored = $det; }
                 if ($gen) {
                     $gen->update(['status' => 'completed', 'media_url' => $stored]);
                 }
