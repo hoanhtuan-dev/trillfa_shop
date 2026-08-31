@@ -557,9 +557,10 @@ class StudioController extends Controller
         ]);
         $svc = app(\App\Services\StylistService::class);
         $answers = array_filter((array) ($data['answers'] ?? []), fn ($v) => ! empty($v));
-        $prompt = $svc->buildPrompt((string) $data['type'], $answers);
-        $summary = 'Thiết kế '.strtolower($svc->nameOf((string) $data['type'])).' với: '.implode(' · ', $answers).'.';
-        return response()->json(['prompt' => $prompt, 'summary' => $summary]);
+        $type = (string) $data['type'];
+        $promptEn = $svc->buildPrompt($type, $answers);
+        $promptVi = $svc->buildPromptVi($type, $answers);
+        return response()->json(['prompt_en' => $promptEn, 'prompt_vi' => $promptVi]);
     }
 
     /**

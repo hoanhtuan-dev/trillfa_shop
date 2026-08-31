@@ -281,7 +281,9 @@
                         <template x-if="stylistType && !stylistPrompt">
                             <div class="flex flex-1 flex-col overflow-hidden">
                                 <div class="flex-1 overflow-y-auto p-5">
-                                    <p class="mb-3 text-sm text-white">Cùng thiết kế «<b x-text="(stylistTypes.find(t=>t.id===stylistType)||{}).name"></b>» — trả lời nhanh các câu bên dưới, bỏ trống câu không cần:</p>
+                                    <div class="mb-3 flex justify-start">
+                                        <div class="max-w-[85%] rounded-2xl rounded-bl-md border border-white/10 bg-white/8 px-4 py-2.5 text-sm leading-relaxed text-white/90">Chào bạn 👋 Tôi là <b>thuật sỹ thời trang</b>. Cùng thiết kế «<b x-text="(stylistTypes.find(t=>t.id===stylistType)||{}).name"></b>» — bấm chọn hoặc nhập câu trả lời bên dưới (bỏ trống câu không cần):</div>
+                                    </div>
                                     <div class="space-y-3" x-show="!stylistLoading">
                                         <template x-for="q in stylistQuestions" :key="q.key">
                                             <div class="stylist-anim rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -291,6 +293,7 @@
                                                         <button @click="setStylistAnswer(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-all duration-150 hover:scale-[1.03] active:scale-[0.97]" :class="stylistAnswers[q.key] === opt ? 'border-brand-400 bg-brand-500/25 text-white shadow-lg shadow-brand-500/20' : 'border-white/15 bg-white/5 text-white/80 hover:border-brand-400'"><span x-text="opt"></span></button>
                                                     </template>
                                                 </div>
+                                                <input x-model="stylistAnswers[q.key]" @keydown.enter="submitStylist()" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-white/12 bg-white/8 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400 focus:outline-none">
                                             </div>
                                         </template>
                                     </div>
@@ -305,15 +308,23 @@
                             </div>
                         </template>
                         <!-- Kết quả: prompt + summary -->
-                        <template x-if="stylistType && stylistPrompt">
+                        <template x-if="stylistType && stylistPromptEn">
                             <div class="flex flex-1 flex-col overflow-hidden">
                                 <div class="flex-1 overflow-y-auto p-5">
                                     <div class="stylist-anim rounded-2xl border border-brand-500/40 p-4" style="background: linear-gradient(150deg, rgba(232,87,125,.15), rgba(124,58,237,.12));">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-300">✨ Tóm tắt thiết kế</p>
-                                        <p class="mt-1 text-sm font-medium text-white" x-text="stylistSummary"></p>
-                                        <div class="mt-3 rounded-xl bg-black/30 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-white/50">Prompt (tiếng Anh)</p><p class="mt-1 text-xs leading-relaxed text-white/90" x-text="stylistPrompt"></p></div>
+                                        <div class="mb-3 flex items-center justify-between">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-300">✨ Prompt thiết kế</p>
+                                            <div class="flex overflow-hidden rounded-full border border-white/15 text-xs">
+                                                <button @click="stylistPromptLang='vi'" class="px-3 py-1 transition-colors" :class="stylistPromptLang==='vi' ? 'bg-brand-500/30 text-white' : 'text-white/60 hover:text-white'">🇻🇳 Tiếng Việt</button>
+                                                <button @click="stylistPromptLang='en'" class="px-3 py-1 transition-colors" :class="stylistPromptLang==='en' ? 'bg-brand-500/30 text-white' : 'text-white/60 hover:text-white'">🇬🇧 Tiếng Anh</button>
+                                            </div>
+                                        </div>
+                                        <div class="rounded-xl bg-black/30 p-3">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-white/50" x-text="stylistPromptLang==='vi' ? 'Prompt tiếng Việt' : 'Prompt tiếng Anh'"></p>
+                                            <p class="mt-1 text-xs leading-relaxed text-white/90" x-text="stylistPromptLang==='vi' ? stylistPromptVi : stylistPromptEn"></p>
+                                        </div>
                                         <button @click="applyStylistPrompt()" class="btn-brand mt-3 w-full">Dùng prompt này → Tạo ảnh 2D</button>
-                                        <button @click="stylistPrompt = ''; stylistAnswers = {};" class="mt-2 w-full text-xs text-white/60 hover:text-white/80">← Chỉnh lại câu trả lời</button>
+                                        <button @click="stylistPromptEn=''; stylistAnswers = {};" class="mt-2 w-full text-xs text-white/60 hover:text-white/80">← Chỉnh lại câu trả lời</button>
                                     </div>
                                 </div>
                             </div>
@@ -725,7 +736,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
-        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPrompt: '', stylistSummary: '',
+        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '',
 
         previewId: null,
         viewGen: null,
@@ -784,14 +795,7 @@ document.addEventListener('alpine:init', () => {
             // Âm thầm dịch prompt EN -> VI ngay khi có prompt, để popup "Sửa tiếng Việt" mở tức thì và
             // BẢN TIẾNG VIỆT LUÔN ĐƯỢC LƯU (không mất khi đóng popup).
             let _trDeb = null;
-            this.$watch('output.image_prompt_en', (val) => {
-                clearTimeout(_trDeb);
-                if (this._skipTranslate) { this._skipTranslate = false; return; } // Xong set EN from VI -> don't re-translate
-                const v = String(val || '').trim();
-                if (!v) return;
-                _trDeb = setTimeout(() => { this.silentTranslate(v); }, 600);
-            });
-
+            // Dịch prompt tiếng Việt chỉ chạy khi người dùng bấm nút "Sửa tiếng Việt" (không tự động).
             // Load custom model/pose library assets (Thư viện upload riêng).
             this.loadSwapAssets();
             // Load stylist garment types (✨ Thuật sỹ card).
@@ -1135,7 +1139,7 @@ document.addEventListener('alpine:init', () => {
         closeStylist() { this.stylistOpen = false; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; this.stylistMessages = []; },
         async startStylist(id) {
             this.stylistFlash = id; setTimeout(() => { this.stylistFlash = ''; }, 450);
-            this.stylistType = id; this.stylistHistory = []; this.stylistStep = null; this.stylistQuestions = []; this.stylistAnswers = {}; this.stylistPrompt = ''; this.stylistSummary = '';
+            this.stylistType = id; this.stylistHistory = []; this.stylistStep = null; this.stylistQuestions = []; this.stylistAnswers = {}; this.stylistPromptEn = ''; this.stylistPromptVi = ''; this.stylistPromptLang = 'en'; this.stylistSummary = '';
             this.stylistLoading = true;
             try { const d = await this.api('/studio/stylist/cluster', { type: id }); this.stylistQuestions = (d && d.questions) || []; }
             catch (e) { Alpine.store('toast').show(e.message || 'Lỗi tải cụm câu hỏi.', 'error'); }
@@ -1146,7 +1150,7 @@ document.addEventListener('alpine:init', () => {
             const answered = Object.values(this.stylistAnswers).filter(Boolean);
             if (!answered.length) { Alpine.store('toast').show('Chọn ít nhất một câu trả lời.', 'error'); return; }
             this.stylistLoading = true;
-            try { const d = await this.api('/studio/stylist/prompt', { type: this.stylistType, answers: this.stylistAnswers }); this.stylistPrompt = d.prompt; this.stylistSummary = d.summary; }
+            try { const d = await this.api('/studio/stylist/prompt', { type: this.stylistType, answers: this.stylistAnswers }); this.stylistPromptEn = d.prompt_en; this.stylistPromptVi = d.prompt_vi; this.stylistPromptLang = 'en'; this.stylistSummary = ''; }
             catch (e) { Alpine.store('toast').show(e.message || 'Lỗi tạo prompt.', 'error'); }
             finally { this.stylistLoading = false; }
         },
@@ -1178,7 +1182,7 @@ document.addEventListener('alpine:init', () => {
             this.pickStylistOption(t);
         },
         applyStylistPrompt() {
-            const p = this.stylistPrompt || (this.stylistStep && this.stylistStep.prompt);
+            const p = this.stylistPromptEn || (this.stylistStep && this.stylistStep.prompt);
             if (!p) { Alpine.store('toast').show('Chưa có prompt hoàn chỉnh.', 'error'); return; }
             this.output.image_prompt_en = p;
             Alpine.store('toast').show('Đã áp dụng prompt từ thuật sỹ vào Bước 1.');

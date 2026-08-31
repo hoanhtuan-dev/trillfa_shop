@@ -88,6 +88,21 @@ class StylistService
     }
 
     /** Build a high-quality EN prompt from the cluster answers (technical detail). */
+    /** Vietnamese-readable prompt (choice) from the same answers. */
+    public function buildPromptVi(string $type, array $answers): string
+    {
+        $g = $this->nameOf($type);
+        $seg = [];
+        if (! empty($answers['fabric'])) { $seg[] = 'chất liệu '.$answers['fabric']; }
+        if (! empty($answers['silhouette'])) { $seg[] = 'phom '.$answers['silhouette']; }
+        if (! empty($answers['color'])) { $seg[] = 'màu '.$answers['color']; }
+        if (! empty($answers['details'])) { $seg[] = 'chi tiết '.$answers['details']; }
+        $model = ! empty($answers['model']) ? $answers['model'] : 'người mẫu Việt thanh lịch';
+        $occ = ! empty($answers['occasion']) ? $answers['occasion'] : 'dịp sang trọng';
+        $desc = $seg ? implode(', ', $seg) : 'thiết kế hiện đại thanh lịch';
+        return 'Ảnh thời trang cao cấp của '.$g.', '.$desc.', mặc bởi '.$model.', phong cách '.$occ.', chụp full-body, ánh sáng studio dịu, nền tối giản, chi tiết sắc nét, 4k';
+    }
+
     public function buildPrompt(string $type, array $answers): string
     {
         $g = $this->nameOf($type);
