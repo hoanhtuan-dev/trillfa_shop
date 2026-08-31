@@ -527,7 +527,7 @@ class StudioController extends Controller
      * Public garment-avatar endpoint — serves the avatar from a fixed location with a
      * correct immutable cache header (versioned URL => safe to cache). Public, no auth.
      */
-    public function garmentAvatar(string $id): \Symfony\Component\Http\Foundation\Response
+    public function garmentAvatar(string $id)
     {
         if (! preg_match('/^[a-z0-9-]+$/', $id)) {
             return response()->json(['error' => 'invalid'], 404);
