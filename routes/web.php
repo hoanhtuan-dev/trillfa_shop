@@ -128,7 +128,6 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');
-    Route::post('/retouch', [StudioController::class, 'retouch'])->name('retouch');
     Route::post('/background', [StudioController::class, 'background'])->name('background');
     Route::get('/assets', [StudioController::class, 'assetIndex'])->name('assets');
     Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');

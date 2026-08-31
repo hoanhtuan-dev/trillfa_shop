@@ -577,13 +577,6 @@ class StudioController extends Controller
         return $this->processAndStore($data['image'], function (\GdImage $img) use ($ratio) { return $this->cropReframe($img, $ratio); }, 'Reframe '.$ratio, 'reframe');
     }
 
-    public function retouch(Request $request): \Illuminate\Http\JsonResponse
-    {
-        $data = $request->validate(['image' => ['required', 'string', 'max:2048'], 'level' => ['nullable', 'integer', 'min:0', 'max:10']]);
-        $level = max(1, min(10, (int) ($data['level'] ?? 5)));
-        return $this->processAndStore($data['image'], function (\GdImage $img) use ($level) { $this->faceRetouch($img, $level); $this->unsharpMask($img, 0.3); return $img; }, 'Retouch da '.$level, 'retouch');
-    }
-
     public function background(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->validate(['image' => ['required', 'string', 'max:2048'], 'target' => ['nullable', 'string', 'max:40'], 'level' => ['nullable', 'integer', 'min:0', 'max:10']]);
