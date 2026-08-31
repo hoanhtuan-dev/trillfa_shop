@@ -683,22 +683,30 @@ class StudioController extends Controller
     {
         if ($level <= 0) { return; }
         $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
-        // SPARSE fine pores (not a dense scale-like pattern) with low amplitude so it blends naturally,
-        // plus a few very subtle freckles/nam — reads as real skin, not "snake skin".
-        for ($y = 0; $y < $h; $y += 3) {
-            for ($x = 0; $x < $w; $x += 3) {
+        // Random soft pores that are DENSER but blended: fewer on bright skin (so highlights stay clean),
+        // each pore is a soft 2x2 radial dot (center stronger, edge fades) so it melts into the skin.
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
                 if ($this->isSkinPixel($r, $g, $b)) {
-                    // soft radial fade: weaker toward block edges so texture melts into the skin
-                    $edge = 1.0 - (($x % 3) / 3.0 * 0.5 + ($y % 3) / 3.0 * 0.5);
-                    $p = (int) ((mt_rand(-150, 150) / 1000.0) * 2.4 * $k * $edge);      // fine, soft pores
-                    $f = 0;
-                    if (mt_rand(0, 1000) < (2 + 14 * $k)) { $f = (int) round(-4 * $k * mt_rand(3, 9) / 10.0); $p = (int) ($p * 0.5); } // gentle freckle/nam
-                    $nr = max(0, min(255, $r + $p + $f));
-                    $ng = max(0, min(255, $g + $p + $f));
-                    $nb = max(0, min(255, $b + (int) ($p * 0.6) + $f));
-                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                    $bright = $r > 180 ? 0.35 : ($r > 150 ? 0.65 : 1.0);   // fewer pores on bright skin
+                    if (mt_rand(0, 1000) < (14 + 70 * $k) * $bright) {
+                        $amp = (int) ((mt_rand(-150, 150) / 1000.0) * 3 * $k * (0.55 + 0.45 * $bright));
+                        for ($dy = 0; $dy < 2; $dy++) {
+                            for ($dx = 0; $dx < 2; $dx++) {
+                                $px = $x + $dx; $py = $y + $dy;
+                                if ($px >= $w || $py >= $h) { continue; }
+                                $cc = imagecolorat($img, $px, $py);
+                                $rr = ($cc >> 16) & 0xFF; $gg = ($cc >> 8) & 0xFF; $bb = $cc & 0xFF;
+                                $fade = ($dx + $dy === 0) ? 1.0 : 0.65;
+                                imagesetpixel($img, $px, $py, imagecolorallocate($img,
+                                    max(0, min(255, $rr + (int) ($amp * $fade))),
+                                    max(0, min(255, $gg + (int) ($amp * $fade))),
+                                    max(0, min(255, $bb + (int) ($amp * $fade * 0.8)))));
+                            }
+                        }
+                    }
                 }
             }
         }
