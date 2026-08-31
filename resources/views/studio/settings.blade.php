@@ -166,7 +166,7 @@
                         @php $id = data_get($m, 'id'); $name = data_get($m, 'name'); $provider = data_get($m, 'provider'); $modelId = data_get($m, 'model_id'); $priority = data_get($m, 'priority', 0); $enabled = (bool) data_get($m, 'enabled', true); @endphp
                         <div class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
                             <span class="font-semibold text-ink-900">{{ $name }}</span>
-                            <span class="text-ink-500">{{ $provider }} · {{ $modelId }}</span>
+                            <span class="text-ink-500">{{ $provider }} · {{ $modelId }}@if(data_get($m,'api_key_ref')) <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">🔑 {{ data_get($m,'api_key_ref') }}</span>@endif</span>
                             <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $priority }}</span>
                             <span class="rounded-full px-2 py-0.5 text-[10px] {{ $enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $enabled ? 'Bật' : 'Tắt' }}</span>
                             @if($id)<button type="button" class="btn-outline btn-sm" onclick="studioTestModel(this, {{ $id }})" :title="'Kiểm tra model này'">🔍 Kiểm tra</button><span class="test-result block w-full text-[10px]"></span>@endif
@@ -202,7 +202,18 @@
                 <div><label class="label">Tên hiển thị</label><input name="name" class="input !py-2" placeholder="VD: Wan 2.2 i2v" required></div>
                 <div><label class="label">Provider</label><input name="provider" class="input !py-2" placeholder="wan / qwen / gemini / fal / ..." required></div>
                 <div><label class="label">Model ID</label><input name="model_id" class="input !py-2" placeholder="VD: wan2.2-i2v" required></div>
-                <div><label class="label">API key ref</label><input name="api_key_ref" class="input !py-2" placeholder="wan / dashscope / ..."></div>
+                <div><label class="label">Khóa (API key)</label><select name="api_key_ref" class="input !py-2">
+                    <option value="">— Chọn khóa / provider —</option>
+                    @php $seen = []; @endphp
+                    @foreach($api_keys as $ak)
+                        @if(in_array($ak->provider, $seen)) @continue @endif
+                        @php $seen[] = $ak->provider; @endphp
+                        <option value="{{ $ak->provider }}" @selected(old('api_key_ref') === $ak->provider)>{{ $ak->provider }} · {{ $ak->label ?: ($ak->kind ?: '') }}</option>
+                    @endforeach
+                    @foreach(['qwen','qwen_edit','wan','dashscope','gemini','deepseek','fal','replicate'] as $p)
+                        @if(!in_array($p, $seen))<option value="{{ $p }}" @selected(old('api_key_ref') === $p)>{{ $p }}</option>@endif
+                    @endforeach
+                </select></div>
                 <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="5" min="0" max="100" class="input !py-2"></div>
                 <div class="col-span-2 sm:col-span-3"><label class="label">Ghi chú</label><input name="note" class="input !py-2" placeholder="(tùy chọn)"></div>
             </div>
