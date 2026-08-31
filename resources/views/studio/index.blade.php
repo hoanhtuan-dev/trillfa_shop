@@ -1108,12 +1108,12 @@ document.addEventListener('alpine:init', () => {
         },
         async loadStylistTypes() {
             if (this.stylistTypes.length) return;
-            try { const d = await this.api('/studio/stylist/types'); this.stylistTypes = d.types || []; } catch (e) {}
+            try { const d = await (await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } })).json(); this.stylistTypes = (d && d.types) || []; } catch (e) {}
         },
         openStylist() {
             this.stylistOpen = true; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; this.stylistDone = false;
             if (!this.stylistTypes.length) {
-                this.api('/studio/stylist/types').then(d => { this.stylistTypes = d.types || []; }).catch(() => {});
+                fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }).then(r => r.json()).then(d => { this.stylistTypes = (d && d.types) || []; }).catch(() => {});
             }
         },
         closeStylist() { this.stylistOpen = false; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; },
