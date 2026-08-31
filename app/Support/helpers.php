@@ -326,8 +326,8 @@ if (! function_exists('replicate_upscale_image')) {
         if (! $token) { return null; }
         try {
             $pred = \Illuminate\Support\Facades\Http::withToken($token)->timeout(30)->post('https://api.replicate.com/v1/predictions', [
-                'model' => 'ai-forever/real-esrgan',
-                'input' => ['image' => $imageUrl, 'scale' => max(2, min(4, $scale))],
+                'model' => 'nightmareai/real-esrgan',
+                'input' => ['image' => $imageUrl, 'scale' => max(2, min(4, $scale)), 'face_enhance' => true],
             ]);
             if (! $pred->successful()) { logger()->warning('Replicate pred start failed: '.$pred->status().' '.substr((string) $pred->body(), 0, 160)); return null; }
             $id = data_get($pred->json(), 'id');
