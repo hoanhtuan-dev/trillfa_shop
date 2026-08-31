@@ -15,14 +15,14 @@ class StylistService
     public function garmentTypes(): array
     {
         return [
-            ['id' => 'dress',   'name' => 'Đầm',              'emoji' => '👗', 'color' => '#e8577d'],
-            ['id' => 'top',     'name' => 'Áo sơ mi / Blouse','emoji' => '👚', 'color' => '#7aa7e0'],
-            ['id' => 'pants',   'name' => 'Quần',             'emoji' => '👖', 'color' => '#6a8f6a'],
-            ['id' => 'skirt',   'name' => 'Chân váy',         'emoji' => '🩰', 'color' => '#b57bd0'],
-            ['id' => 'shorts',  'name' => 'Quần short',       'emoji' => '🩳', 'color' => '#e0a95a'],
-            ['id' => 'jacket',  'name' => 'Áo khoác',         'emoji' => '🧥', 'color' => '#8a6a4a'],
-            ['id' => 'aodai',   'name' => 'Áo dài',           'emoji' => '👘', 'color' => '#d04a4a'],
-            ['id' => 'set',     'name' => 'Set đồ',           'emoji' => '🧥', 'color' => '#4a7a90'],
+            ['id' => 'dress',   'name' => 'Đầm',              'emoji' => '👗', 'color' => '#e8577d', 'img' => '/samples/garment-dress.png'],
+            ['id' => 'top',     'name' => 'Áo sơ mi / Blouse','emoji' => '👚', 'color' => '#7aa7e0', 'img' => '/samples/garment-top.png'],
+            ['id' => 'pants',   'name' => 'Quần',             'emoji' => '👖', 'color' => '#6a8f6a', 'img' => '/samples/garment-pants.png'],
+            ['id' => 'skirt',   'name' => 'Chân váy',         'emoji' => '🩰', 'color' => '#b57bd0', 'img' => '/samples/garment-skirt.png'],
+            ['id' => 'shorts',  'name' => 'Quần short',       'emoji' => '🩳', 'color' => '#e0a95a', 'img' => '/samples/garment-shorts.png'],
+            ['id' => 'jacket',  'name' => 'Áo khoác',         'emoji' => '🧥', 'color' => '#8a6a4a', 'img' => '/samples/garment-jacket.png'],
+            ['id' => 'aodai',   'name' => 'Áo dài',           'emoji' => '👘', 'color' => '#d04a4a', 'img' => '/samples/garment-aodai.png'],
+            ['id' => 'set',     'name' => 'Set đồ',           'emoji' => '🧥', 'color' => '#4a7a90', 'img' => '/samples/garment-set.png'],
         ];
     }
 

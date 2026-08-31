@@ -62,6 +62,24 @@
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
         <div x-ref="leftPanel" class="scrollbar-hide order-2 space-y-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===2 || step===3">
+            <!-- ✨ Thuật sỹ ảo (nổi bật, đầu Bước 1) -->
+            <div class="card p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500); background: linear-gradient(135deg, rgba(232,87,125,.16), rgba(74,122,144,.12));">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-brand-300">✨ Thuật sỹ ảo</h2>
+                    <button @click="openStylist()" class="btn-brand btn-sm whitespace-nowrap">Bắt đầu</button>
+                </div>
+                <p class="mt-1 text-xs text-cream-300">Thuật sỹ hướng dẫn bạn <b>TỪNG BƯỚC</b> để tạo prompt thiết kế — bấm chọn 1 loại trang phục dưới đây.</p>
+                <div class="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
+                    <template x-for="t in stylistTypes" :key="t.id">
+                        <button @click="openStylist(); pickStylistType(t.id)" class="group relative aspect-[3/4] overflow-hidden rounded-xl border border-ink-700 bg-ink-900 transition-all hover:border-brand-500/60">
+                            <img x-show="t.img" :src="t.img" class="h-full w-full object-cover opacity-90 transition-transform group-hover:scale-105" onerror="this.style.display='none'" alt="Trang phục">
+                            <span class="absolute inset-0 flex-col items-center justify-center gap-1 bg-ink-900/80 text-center" x-show="!t.img"><span class="text-2xl" x-text="t.emoji"></span><span class="px-1 text-[10px] text-cream-100" x-text="t.name"></span></span>
+                            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1 pb-1 pt-4 text-center text-[10px] font-medium text-white" x-text="t.name"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
             <!-- Idea -->
             <div class="card p-5" x-show="step===1">
                 <div class="mb-2 flex items-center justify-between">
@@ -89,8 +107,7 @@
                             </template>
                         </div>
                     </div>
-                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
-                    <button @click="openStylist()" class="btn-outline col-span-2 whitespace-nowrap">✨ Thuật sỹ</button>
+                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
                 </div>
             </div>
 
@@ -761,6 +778,8 @@ document.addEventListener('alpine:init', () => {
 
             // Load custom model/pose library assets (Thư viện upload riêng).
             this.loadSwapAssets();
+            // Load stylist garment types (✨ Thuật sỹ card).
+            this.loadStylistTypes();
         },
         async silentTranslate(en) {
             const v = String(en || '').trim();
@@ -1086,6 +1105,10 @@ document.addEventListener('alpine:init', () => {
                 this.generations.unshift({ id: item.id, type: 'image', status: 'completed', model: 'swap', provider: 'swap', media_url: item.url, credits_cost: 1, created_at: 'Phiên bản' });
             }
             this.previewId = item.id;
+        },
+        async loadStylistTypes() {
+            if (this.stylistTypes.length) return;
+            try { const d = await this.api('/studio/stylist/types'); this.stylistTypes = d.types || []; } catch (e) {}
         },
         openStylist() {
             this.stylistOpen = true; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; this.stylistDone = false;
