@@ -612,12 +612,13 @@ class StudioController extends Controller
             @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(7 * $k));
             @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
         }
-        // 2) SUBTLE FILM GRAIN — a touch more presence (photographic), still low amplitude, on shadows/midtones.
+        // 2) SUBTLE FILM GRAIN — on shadows/midtones, but SKIPS skin (the mask) so the face stays clean.
         for ($y = 0; $y < $h; $y += 3) {
             for ($x = 0; $x < $w; $x += 3) {
                 $c = imagecolorat($img, $x, $y);
-                $lum = (($c >> 16) & 0xFF) * 0.3 + (($c >> 8) & 0xFF) * 0.6 + ($c & 0xFF) * 0.1;
-                if ($lum < 215) {
+                $r3 = ($c >> 16) & 0xFF; $g3 = ($c >> 8) & 0xFF; $b3 = $c & 0xFF;
+                $lum = $r3 * 0.3 + $g3 * 0.6 + $b3 * 0.1;
+                if ($lum < 215 && ! $this->isSkinPixel($r3, $g3, $b3)) {
                     $n = (int) ((mt_rand(-450, 450) / 1000.0) * 6 * $k);
                     $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
                     $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
@@ -666,19 +667,31 @@ class StudioController extends Controller
      * Controlled skin detail: detects warm skin tones and adds fine pores (subtle high-frequency
      * noise) plus a few small freckles/marks (low-opacity darker spots), scaled by level.
      */
+    /**
+     * Skin mask: a robust warm-skin detector shared by the skin, fabric and grain passes so each
+     * operates on the right region (face/body skin vs fabric vs background) and they don't cross.
+     */
+    protected function isSkinPixel(int $r, int $g, int $b): bool
+    {
+        return $r > 70 && $r > $g && $g > $b && ($r - $b) > 12 && $r < 250 && $g > 45 && $g < 235 && $b > 30;
+    }
+
+    /**
+     * Skin (face/body) detail: natural pores + subtle freckles/nam, ONLY on skin mask pixels.
+     */
     protected function skinTexturePass(\GdImage $img, int $level): void
     {
         if ($level <= 0) { return; }
         $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
-        for ($y = 0; $y < $h; $y += 2) {
-            for ($x = 0; $x < $w; $x += 2) {
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
-                // warm skin tone heuristic (R>G>B, not too bright/dark, not saturated background)
-                if ($r > 85 && $r > $g && $g > $b && ($r - $b) > 14 && $r < 246 && $g > 55) {
-                    $p = (int) ((mt_rand(-300, 300) / 1000.0) * 4 * $k);       // fine pores
+                if ($this->isSkinPixel($r, $g, $b)) {
+                    $boost = $r > 165 ? 1.4 : 1.0; // brighter warm (the face) gets a little more
+                    $p = (int) ((mt_rand(-360, 360) / 1000.0) * 7 * $k * $boost);
                     $f = 0;
-                    if (mt_rand(0, 1000) < (4 + 32 * $k)) { $f = (int) round(-7 * $k * mt_rand(5, 16) / 10.0); } // subtle freckle/nam
+                    if (mt_rand(0, 1000) < (6 + 40 * $k)) { $f = (int) round(-9 * $k * $boost * mt_rand(5, 18) / 10.0); }
                     $nr = max(0, min(255, $r + $p + $f));
                     $ng = max(0, min(255, $g + $p + $f));
                     $nb = max(0, min(255, $b + (int) ($p * 0.6) + $f));
@@ -726,9 +739,8 @@ class StudioController extends Controller
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
                 $lum = $r * 0.3 + $g * 0.6 + $b * 0.1;
-                $isSkin = ($r > 85 && $r > $g && $g > $b && ($r - $b) > 14 && $r < 246 && $g > 55);
-                // garment/fabric: not skin, mid-tone (excludes very dark & bright background)
-                if (! $isSkin && $lum > 70 && $lum < 205) {
+                // garment/fabric: NOT skin (face excluded via the mask), mid-tone (excludes dark + bright bg)
+                if (! $this->isSkinPixel($r, $g, $b) && $lum > 70 && $lum < 205) {
                     $weave = ((($x + $y) % 4) < 2) ? 1 : -1;
                     $n = (int) (($weave * (2 + 2.5 * $k)) + ((mt_rand(-140, 140) / 1000.0) * 6 * $k));
                     $nr = max(0, min(255, $r + $n));
