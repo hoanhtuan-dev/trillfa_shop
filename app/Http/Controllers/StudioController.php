@@ -552,7 +552,7 @@ class StudioController extends Controller
         $h = (int) (imagesy($src) * $scale);
         $dst = imagecreatetruecolor($w, $h);
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, imagesx($src), imagesy($src));
-        $name = 'studio/upscale-'.Str::uuid().'.png';
+        $name = 'studio/upscale-'.IlluminateSupportStr::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
         imagedestroy($src); imagedestroy($dst);
 
