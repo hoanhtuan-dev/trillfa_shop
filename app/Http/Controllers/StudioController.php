@@ -681,18 +681,6 @@ class StudioController extends Controller
     /**
      * Upload a face reference (Fitting Room face-sync) — sets the global face so the edit/surgery applies it.
      */
-    public function storeFace(Request $request)
-    {
-        $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
-        $path = '/storage/'.$request->file('image')->store('studio/ref', 'public');
-        set_setting('studio_face_ref', $path);
-        // Invalidate cached face description so it is re-described once.
-        set_setting('studio_face_desc', '');
-        set_setting('studio_face_desc_hash', '');
-
-        return response()->json(['url' => $path]);
-    }
-
     protected function resolveReferencePath(string $url): ?string
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
@@ -997,8 +985,6 @@ class StudioController extends Controller
             'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
             'image_ratio' => setting('studio_image_ratio', config('studio.image_ratio')),
             'video_duration' => setting('studio_video_duration', config('studio.video_duration')),
-            'brand_logo' => setting('studio_brand_logo', ''),
-            'face_ref' => setting('studio_face_ref', ''),
             'pending_count' => auth()->user()->generations()->whereIn('status', ['pending', 'processing'])->count(),
             'queue_driver' => config('queue.default'),
             'usage' => studio_usage(auth()->user()),
@@ -1164,15 +1150,6 @@ class StudioController extends Controller
         set_setting('studio_image_ratio', $data['image_ratio']);
         set_setting('studio_video_duration', $data['video_duration']);
 
-        if ($request->hasFile('brand_logo') && $request->file('brand_logo')->isValid()) {
-            set_setting('studio_brand_logo', '/storage/'.$request->file('brand_logo')->store('studio/logo', 'public'));
-        }
-        if ($request->hasFile('face_ref') && $request->file('face_ref')->isValid()) {
-            set_setting('studio_face_ref', '/storage/'.$request->file('face_ref')->store('studio/ref', 'public'));
-            // New face -> invalidate the cached face description so it is re-described once.
-            set_setting('studio_face_desc', '');
-            set_setting('studio_face_desc_hash', '');
-        }
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }

@@ -361,10 +361,7 @@ class ImageAIService
     protected function dashscopeContent(string $prompt, ?string $faceRef): array
     {
         $parts = [];
-        $face = $faceRef ?: (string) setting('studio_face_ref', '');
-        if ($face && str_starts_with($face, '/storage/')) {
-            $parts[] = ['image' => url($face)];
-        }
+        // Face reference injection ("Khuôn mặt mẫu") was removed — generation no longer pins a face image.
         $parts[] = ['text' => $prompt];
 
         return $parts;
@@ -426,123 +423,6 @@ class ImageAIService
      * (best-effort via the qwen-edit image model). Returns null on failure so the
      * original image is kept.
      */
-    public function applyFace(string $imageUrl, string $faceRef): ?string
-    {
-        $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
-        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if (! $key) {
-            return null;
-        }
-        $base = dashscope_base_url($key).'/api/v1';
-        // Self-contained images (base64 data URIs) so the host can read them even though /storage is internal.
-        $main = $this->imageDataUri($imageUrl);
-        $face = $this->imageDataUri($faceRef);
-        if (! $main || ! $face) {
-            logger()->warning('applyFace: cannot read source/face image', ['imageUrl' => $imageUrl, 'face' => $faceRef]);
-            return null;
-        }
-
-        try {
-            $resp = Http::withToken($key)->timeout(180)
-                ->post($base.'/services/aigc/multimodal-generation/generation', [
-                    'model' => $model,
-                    'input' => ['messages' => [['role' => 'user', 'content' => [
-                        ['image' => $main],
-                        ['image' => $face],
-                        ['text' => 'Keep the outfit, pose, background, colours and lighting exactly as in the first image. Replace the person\'s face with the face from the second reference image, naturally and consistently.'],
-                    ]]]],
-                    'parameters' => ['watermark' => false],
-                ]);
-
-            if (! $resp->successful()) {
-                logger()->warning('applyFace: HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 220));
-                return null;
-            }
-            $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
-                ->pluck('image')->first();
-            if (! $editUrl) {
-                logger()->warning('applyFace: no image in response', ['resp' => substr((string) $resp->body(), 0, 220)]);
-                return null;
-            }
-
-            logger()->info('applyFace succeeded (face swapped)');
-            return $this->storeRemoteImage($editUrl);
-        } catch (\Throwable $e) {
-            logger()->error('Face sync failed: '.$e->getMessage());
-
-            return null;
-        }
-    }
-
-    /**
-     * Describe the reference face's features using the configured vision provider, so the
-     * generated image can reproduce that face via the prompt (no edit model required).
-     */
-    public function describeFace(string $faceRef): ?string
-    {
-        $rel = ltrim((string) parse_url($faceRef, PHP_URL_PATH), '/');
-        $path = storage_path('app/public/'.str_replace('storage/', '', $rel));
-        if (! is_file($path)) {
-            return null;
-        }
-
-        $model = studio_vision_model('gemini');
-        [$b64, $mime] = $this->downscaleImageBase64($path);
-        $text = 'Describe this person\'s face in detail for an AI fashion image so it can be reproduced: '
-            .'give ethnicity hint, hair (colour, length, style, texture), face shape, eyebrows, eyes, nose, lips, '
-            .'skin tone, makeup, and any distinguishing features. Return a short paragraph (max 80 words), plain text, '
-            .'no intro.';
-
-        if ((string) studio_config('vision_provider', 'gemini') === 'qwen') {
-            $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-            if ($key) {
-                $base = dashscope_base_url($key).'/compatible-mode/v1';
-                foreach (studio_qwen_vision_models() as $vm) {
-                    try {
-                        $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
-                            'model' => $vm,
-                            'messages' => [['role' => 'user', 'content' => [
-                                ['type' => 'text', 'text' => $text],
-                                ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                            ]]],
-                        ]);
-                        $desc = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                        if ($resp->successful() && $desc) {
-                            return $desc;
-                        }
-                        $body = (string) $resp->body();
-                        if (! (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404)) {
-                            break; // non-404 error -> stop trying models
-                        }
-                    } catch (\Throwable $e) {
-                        logger()->error('Qwen describeFace ('.$vm.') failed: '.$e->getMessage());
-                    }
-                }
-            }
-        }
-
-        $key = studio_api_key('gemini');
-        if ($key) {
-            try {
-                $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
-                    ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
-                        'contents' => [['parts' => [
-                            ['inlineData' => ['mimeType' => $mime, 'data' => $b64]],
-                            ['text' => $text],
-                        ]]],
-                    ]);
-                $desc = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
-                if ($resp->successful() && $desc) {
-                    return $desc;
-                }
-            } catch (\Throwable $e) {
-                logger()->error('Gemini describeFace failed: '.$e->getMessage());
-            }
-        }
-
-        return null;
-    }
-
     protected function downscaleImageBase64(string $path, int $max = 768): array
     {
         $img = @imagecreatefromstring((string) file_get_contents($path));

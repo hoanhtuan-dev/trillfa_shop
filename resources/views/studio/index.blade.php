@@ -1218,7 +1218,7 @@ document.addEventListener('alpine:init', () => {
 
 
         addGen(gen) { const existing = this.generations.find(g => g.id === gen.id); if (existing) Object.assign(existing, gen); else { gen._t0 = Date.now(); this.generations.unshift(gen); } this.previewId = gen.id; if (gen.status === 'completed') this.loadPalette(gen.id); this.syncLatest(); },
-        async syncLatest() { try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); if (d && d.items) this.generations = d.items; } catch (e) {} },
+        async syncLatest() { try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); if (d && Array.isArray(d.items)) { const ids = new Set(d.items.map(x => x.id)); const localOnly = this.generations.filter(x => !ids.has(x.id) && x._t0); this.generations = [...localOnly, ...d.items]; } } catch (e) {} },
         selectImage(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.selectedImageId = g.id; this.previewId = g.id; this.editSource = { url: g.media_url, label: 'Ảnh nguồn #' + g.id, generationId: g.id }; this.editSourceTmp = g.media_url; this.canvasImg = ''; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Chỉnh sửa.'); },
         selectVideo(g) { if (g.type !== 'image' || g.status !== 'completed') return; this.videoSourceId = g.id; this.previewId = g.id; Alpine.store('toast').show('Đã chọn ảnh #' + g.id + ' làm nguồn Video.'); },
 

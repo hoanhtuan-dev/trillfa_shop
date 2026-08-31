@@ -141,26 +141,6 @@
             <p class="mt-2 text-xs text-ink-500">Đang chờ (nâng cao): <b class="text-ink-900">{{ $pending_count }}</b> · Driver: <b class="text-ink-900">{{ $queue_driver }}</b></p>
             <p class="mt-1 text-xs text-ink-500">Nếu chỉ muốn chạy thủ công: <code class="rounded bg-white px-1">php artisan studio:process</code>.</p>
         </div>
-        <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
-            <h3 class="mb-2 font-display text-sm font-semibold text-ink-900">Thương hiệu & Khuôn mặt mẫu</h3>
-            <div class="grid gap-3 sm:grid-cols-2">
-                <div>
-                    <label class="label">Logo thương hiệu (chèn vào hậu cảnh ảnh)</label>
-                    <input type="file" name="brand_logo" accept="image/*" class="input !py-2">
-                    @if($brand_logo)<img src="{{ $brand_logo }}" class="mt-2 h-10 w-40 rounded bg-white object-contain" alt="Logo">@endif
-                </div>
-                <div>
-                    <label class="label">Khuôn mặt mẫu (đồng bộ nhân vật)</label>
-                    <input type="file" name="face_ref" accept="image/*" class="input !py-2">
-                    @if($face_ref)<img src="{{ $face_ref }}" class="mt-2 h-16 w-16 rounded-full bg-white object-cover" alt="Mặt mẫu">@endif
-                </div>
-            </div>
-            <label class="mb-0 mt-3 flex items-center gap-2 text-xs text-ink-700">
-                <input type="checkbox" name="face_sync_enabled" value="1" @checked(old('face_sync_enabled', $face_sync_enabled)) class="h-4 w-4 accent-brand-600">
-                <span>Bật <strong>đồng bộ khuôn mặt (mô tả)</strong> — AI mô tả khuôn mặt mẫu rồi nhúng vào prompt tạo ảnh để giữ nhất quán nhân vật (mô tả chạy 1 lần, kết quả được cache).</span>
-            </label>
-            <p class="mt-2 text-xs text-ink-500">Logo được dán vào góc ảnh; khuôn mặt mẫu dùng làm tham chiếu nhất quán nhân vật (mô tả khuôn mặt vào prompt khi tạo ảnh mới).</p>
-        </div>
         <div class="flex items-center gap-3">
             <button type="submit" class="btn-brand">Lưu cài đặt</button>
             <a href="{{ route('studio.index') }}" class="btn-ghost">Quay lại</a>

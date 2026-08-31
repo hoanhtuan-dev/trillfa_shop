@@ -36,32 +36,8 @@ class RenderImageJob implements ShouldQueue
                 return;
             }
 
-            // Face sync (no edit model): describe the reference face via the vision provider, then
-            // inject that description into the prompt so the model reproduces the face. The face is
-            // static, so the description is cached — a ~90s vision call should NOT run on every image.
+            // (Face sync "Khuôn mặt mẫu" was removed — no vision description step, keeps generation fast.)
             $prompt = (string) $generation->prompt;
-            $faceRef = (string) setting('studio_face_ref', '');
-            $faceSyncOn = filter_var(studio_config('face_sync_enabled', true), FILTER_VALIDATE_BOOL);
-            $faceDesc = '';
-            // Chỉ nhúng mô tả khuôn mặt cho lần TẠO MỚI (không có ảnh nguồn). Với Inpaint (có base_image),
-            // ảnh nguồn đã chứa khuôn mặt → mô tả lại làm model vẽ lại toàn bộ, gây trôi/không bảo toàn.
-            if ($faceSyncOn && $faceRef && str_starts_with($faceRef, '/storage/') && ! $generation->base_image) {
-                $hash = md5($faceRef);
-                $faceDesc = ((string) setting('studio_face_desc_hash', '') === $hash)
-                    ? (string) setting('studio_face_desc', '')
-                    : '';
-                if ($faceDesc === '') {
-                    $faceDesc = (string) ($images->describeFace($faceRef) ?? '');
-                    if ($faceDesc !== '') {
-                        set_setting('studio_face_desc', $faceDesc);
-                        set_setting('studio_face_desc_hash', $hash);
-                    }
-                }
-                if ($faceDesc !== '') {
-                    $prompt = 'The model has this face: '.$faceDesc.'. '.$prompt;
-                    $generation->update(['prompt' => $prompt]);
-                }
-            }
 
             $url = $images->generate(
                 $prompt,
@@ -75,10 +51,6 @@ class RenderImageJob implements ShouldQueue
             // applyFace edit pass here — it doubled the edit time (2 edits instead of 1). Keep the edit
             // a single pass so phẫu thuật ảnh is as fast as Thay Đổi Người Mẫu.
 
-            // Brand logo stamping is disabled for now (opt-in via studio.brand_logo_enabled).
-            if (studio_config('brand_logo_enabled', false)) {
-                $url = $this->applyBrandLogo($url);
-            }
 
             $pr = (array) ($generation->promptsHistory?->json_response ?? []);
             $generation->update([
@@ -94,7 +66,6 @@ class RenderImageJob implements ShouldQueue
                     'creative_level' => $pr['creative_level'] ?? null,
                     'adherence' => $pr['adherence'] ?? null,
                     'negative_prompt' => $pr['negative_prompt'] ?? null,
-                    'face_sync' => ($faceDesc !== ''),
                 ],
             ]);
             logger()->info('Image generation completed', [
@@ -112,51 +83,6 @@ class RenderImageJob implements ShouldQueue
         }
     }
 
-    protected function applyBrandLogo(string $url): string
-    {
-        $logoUrl = (string) setting('studio_brand_logo', '');
-        if (! $logoUrl || ! str_starts_with($logoUrl, '/storage/')) {
-            return $url;
-        }
-
-        $rel = ltrim((string) parse_url($logoUrl, PHP_URL_PATH), '/');
-        $logoPath = storage_path('app/public/'.str_replace('storage/', '', $rel));
-        if (! is_file($logoPath)) {
-            return $url;
-        }
-
-        $relImg = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $imgPath = storage_path('app/public/'.str_replace('storage/', '', $relImg));
-        if (! is_file($imgPath)) {
-            return $url;
-        }
-
-        $img = @imagecreatefromstring((string) file_get_contents($imgPath));
-        $logo = @imagecreatefromstring((string) file_get_contents($logoPath));
-        if (! $img || ! $logo) {
-            return $url;
-        }
-
-        $iw = imagesx($img);
-        $lh = imagesy($logo);
-        $lw = imagesx($logo);
-        $targetW = max(36, (int) round($iw * 0.13));
-        $targetH = max(1, (int) round($lh * ($targetW / $lw)));
-        $pad = max(14, (int) round($iw * 0.04));
-        // Top-centre (background wall behind the model) reads as a natural backdrop sign.
-        $dx = (int) (($iw - $targetW) / 2);
-        imagecopyresampled($img, $logo, $dx, $pad, 0, 0, $targetW, $targetH, $lw, $lh);
-
-        if (str_ends_with($relImg, '.png')) {
-            imagepng($img, $imgPath);
-        } else {
-            imagejpeg($img, $imgPath, 92);
-        }
-        imagedestroy($img);
-        imagedestroy($logo);
-
-        return $url;
-    }
 
     protected function refund(Generation $generation): void
     {
