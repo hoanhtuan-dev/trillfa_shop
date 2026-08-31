@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 /**
  * "Thay Đổi Người Mẫu" (Click-to-Swap) — Qwen / DashScope Virtual Try-On.
@@ -144,12 +143,4 @@ class VirtualTryOnService
         return $this->poseCatalog()[0] ?? null;
     }
 
-    protected function storeRemoteImage(string $url): ?string
-    {
-        $contents = @file_get_contents($url);
-        if (! $contents) { return null; }
-        $name = 'studio/'.Str::uuid().'.jpg';
-        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $contents);
-        return '/storage/'.$name;
-    }
 }

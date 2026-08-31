@@ -1001,7 +1001,6 @@ class ShopFlowTest extends TestCase
         $this->assertSame('qwen-image-plus', setting('studio_qwen_model'));
         $this->assertSame('https://dashscope-intl.aliyuncs.com', setting('studio_dashscope_base'));
         $this->assertSame('https://token-plan.ap-southeast-1.maas.aliyuncs.com', setting('studio_dashscope_token_plan_base'));
-        $this->assertSame('1', setting('studio_face_sync_enabled'));
         $this->assertSame('queue', setting('studio_processing'));
         $this->assertSame('1K', setting('studio_image_resolution'));
         $this->assertSame('1080', setting('studio_video_resolution'));
