@@ -690,9 +690,9 @@ class StudioController extends Controller
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
                 if ($this->isSkinPixel($r, $g, $b)) {
-                    $bright = $r > 185 ? 0.18 : ($r > 165 ? 0.38 : ($r > 148 ? 0.65 : 1.0));   // face (bright) gets far fewer pores
+                    $bright = $r > 185 ? 0.09 : ($r > 165 ? 0.19 : ($r > 148 ? 0.33 : 1.0));   // face (bright) 50% fewer again
                     if (mt_rand(0, 1000) < (14 + 70 * $k) * $bright) {
-                        $amp = (int) ((mt_rand(-135, 135) / 1000.0) * 2.6 * $k * (0.45 + 0.55 * $bright));
+                        $amp = (int) ((mt_rand(-120, 120) / 1000.0) * 2.2 * $k * (0.4 + 0.6 * $bright));
                         for ($dy = 0; $dy < 2; $dy++) {
                             for ($dx = 0; $dx < 2; $dx++) {
                                 $px = $x + $dx; $py = $y + $dy;
