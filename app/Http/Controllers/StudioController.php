@@ -545,7 +545,7 @@ class StudioController extends Controller
 
         // Real-ESRGAN super-resolution (best-effort) — reconstruct real fabric/stitching/skin detail.
         if ($scale >= 2 && function_exists('replicate_upscale_image')) {
-            $er = eplicate_upscale_image($srcUrl, $scale);
+            $er = \replicate_upscale_image($srcUrl, $scale);
             if ($er) { $srcUrl = $er; }
         }
 
