@@ -594,7 +594,7 @@ document.addEventListener('alpine:init', () => {
         refBusy: false,
         presetOpen: false, presetSection: 'Trang phục',
         swapOpen: false, swapModelIds: [], swapPoseIds: [], swapLoading: false, lookbook: [], lookbookOpen: false,
-        swapBackground: '', swapBackgrounds: [
+        swapBackground: '', _swapBgFallback: [
             { v: '', l: 'Giữ nền gốc' },
             { v: 'a clean white studio background', l: 'Studio trắng' },
             { v: 'an old-town cobblestone street', l: 'Phố cổ' },
@@ -792,6 +792,12 @@ document.addEventListener('alpine:init', () => {
             // Step 1: ensure a prompt then generate a 2D design.
             if (!this.output.image_prompt_en && this.idea.trim()) await this.ideate();
             this.generateImage();
+        },
+        // Hậu cảnh cho swap: dùng chung danh mục 'background' trong Presets (nếu có), fallback danh sách cứng.
+        get swapBackgrounds() {
+            const grp = this.presets.find(x => x.category === 'background');
+            const fromPresets = grp && grp.items ? grp.items.map(i => ({ v: i.value || i.key || '', l: i.label || i.note || i.key })) : [];
+            return [...this._swapBgFallback, ...fromPresets.filter(i => i.v && !this._swapBgFallback.some(f => f.v === i.v))];
         },
         get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
         get videoSceneLabel() { const s = this.videoScenes.find(x => x.value === this.videoScene); return s ? (s.label + (s.note ? ' · ' + s.note : '')) : ''; },
