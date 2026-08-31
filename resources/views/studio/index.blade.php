@@ -1075,15 +1075,12 @@ document.addEventListener('alpine:init', () => {
             const src = this.upscaleSrc;
             if (!src || this.upscaling) return;
             this.upscaling = true;
-            const tmpId = 'up-' + Date.now();
-            this.addGen({ id: tmpId, type: 'image', status: 'processing', model: 'upscale', provider: 'upscale', media_url: null, error: null, credits_cost: 0, created_at: 'Đang nâng cấp' });
             try {
                 const d = await this.api('/studio/upscale', { image: src, scale: Number(this.upscaleScale) || 2, refine: Number(this.upscaleRefine) || 0 });
-                this.generations = this.generations.filter(g => g.id !== tmpId);
                 this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'upscale', provider: 'upscale', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa nâng cấp' });
                 this.previewId = d.generation_id; this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' });
                 Alpine.store('toast').show('Đã nâng cấp ảnh (' + this.upscaleScale + 'x).');
-            } catch (e) { this.generations = this.generations.filter(g => g.id !== tmpId); Alpine.store('toast').show(e.message || 'Lỗi nâng cấp ảnh.', 'error'); }
+            } catch (e) { Alpine.store('toast').show(e.message || 'Lỗi nâng cấp ảnh.', 'error'); }
             finally { this.upscaling = false; }
         },
         toggleStylistAnswer(key, val) {
