@@ -228,10 +228,10 @@
                                                 <p class="mb-2 text-xs font-semibold text-brand-200" x-text="q.q"></p>
                                                 <div class="flex flex-wrap gap-1.5">
                                                     <template x-for="(opt,oi) in q.opts" :key="oi">
-                                                        <button @click="setStylistAnswer(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-all duration-150 hover:scale-[1.03] active:scale-[0.97]" :class="stylistAnswers[q.key] === opt ? 'border-brand-400 bg-brand-500/25 text-white shadow-lg shadow-brand-500/20' : 'border-white/15 bg-white/5 text-white/80 hover:border-brand-400'"><span x-text="opt"></span></button>
+                                                        <button @click="toggleStylistAnswer(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-all duration-150 hover:scale-[1.03] active:scale-[0.97]" :class="(stylistAnswers[q.key] || []).includes(opt) ? 'border-brand-400 bg-brand-500/25 text-white shadow-lg shadow-brand-500/20' : 'border-white/15 bg-white/5 text-white/80 hover:border-brand-400'"><span x-text="opt"></span></button>
                                                     </template>
                                                 </div>
-                                                <input x-model="stylistAnswers[q.key]" @keydown.enter="submitStylist()" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-white/12 bg-white/8 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400 focus:outline-none">
+                                                <input x-model="stylistCustom[q.key]" @keydown.enter="submitStylist()" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-white/12 bg-white/8 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400 focus:outline-none"><p class="mt-1 text-[10px] text-white/40" x-show="(stylistAnswers[q.key]||[]).length">Đã chọn <b x-text="(stylistAnswers[q.key]||[]).length"></b> mục</p>
                                             </div>
                                         </template>
                                     </div>
@@ -701,7 +701,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
-        stylistOpen: false, stylistType: '', stylistTypes: @json($stylistTypes), stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '', stylistAdvice: '', stylistVersions: [],
+        stylistOpen: false, stylistType: '', stylistTypes: @json($stylistTypes), stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistCustom: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '', stylistAdvice: '', stylistVersions: [],
 
         previewId: null,
         viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
@@ -1043,7 +1043,13 @@ document.addEventListener('alpine:init', () => {
             catch (e) { Alpine.store('toast').show(e.message || 'Lỗi tải cụm câu hỏi.', 'error'); }
             finally { this.stylistLoading = false; }
         },
-        setStylistAnswer(key, val) { if (val) { this.stylistAnswers[key] = val; } },
+        toggleStylistAnswer(key, val) {
+            if (!val) return;
+            const arr = (this.stylistAnswers[key] || []).slice();
+            const i = arr.indexOf(val);
+            if (i >= 0) { arr.splice(i, 1); } else { arr.push(val); }
+            this.stylistAnswers = { ...this.stylistAnswers, [key]: arr };
+        },
         async refineStylist() {
             this.stylistLoading = true;
             try {
@@ -1066,10 +1072,16 @@ document.addEventListener('alpine:init', () => {
             this.stylistVersions.splice(i, 1);
         },
         async submitStylist() {
-            const answered = Object.values(this.stylistAnswers).filter(Boolean);
-            if (!answered.length) { Alpine.store('toast').show('Chọn ít nhất một câu trả lời.', 'error'); return; }
+            const flat = {};
+            Object.keys(this.stylistAnswers).forEach(k => {
+                const arr = (this.stylistAnswers[k] || []).slice();
+                if (this.stylistCustom && this.stylistCustom[k] && this.stylistCustom[k].trim()) arr.push(this.stylistCustom[k].trim());
+                if (arr.length) flat[k] = arr.join(', ');
+            });
+            this.stylistAnswers = flat;
+            if (!Object.keys(flat).length) { Alpine.store('toast').show('Chọn ít nhất một câu trả lời.', 'error'); return; }
             this.stylistLoading = true;
-            try { const d = await this.api('/studio/stylist/prompt', { type: this.stylistType, answers: this.stylistAnswers }); this.stylistPromptEn = d.prompt_en; this.stylistPromptVi = d.prompt_vi; this.stylistPromptLang = 'en'; this.stylistSummary = ''; }
+            try { const d = await this.api('/studio/stylist/prompt', { type: this.stylistType, answers: flat }); this.stylistPromptEn = d.prompt_en; this.stylistPromptVi = d.prompt_vi; this.stylistPromptLang = 'en'; this.stylistSummary = ''; }
             catch (e) { Alpine.store('toast').show(e.message || 'Lỗi tạo prompt.', 'error'); }
             finally { this.stylistLoading = false; }
         },
