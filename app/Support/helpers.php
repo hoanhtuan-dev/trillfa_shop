@@ -228,6 +228,7 @@ if (! function_exists('studio_api_key')) {
             'qwen' => 'qwen_key',
             'qwen_edit' => 'qwen_edit_key',
             'dashscope' => 'dashscope_key',
+            'deepseek' => 'deepseek_key',
         ];
 
         $key = $configKeys[$service] ?? null;
@@ -282,7 +283,40 @@ if (! function_exists('studio_qwen_credentials')) {
      *   - edit (Inpaint): Pay-As-You-Go first (edit models usually live on the pay-go host), then Token Plan.
      * Keys are gathered from every Qwen/DashScope slot and ordered by their prefix.
      */
-    function studio_qwen_credentials(string $task = 'image', ?string $model_id = null): array
+    if (! function_exists('deepseek_base_url')) {
+    function deepseek_base_url(string $key): string
+    {
+        return (string) config('studio.deepseek_base', 'https://api.deepseek.com');
+    }
+}
+
+if (! function_exists('deepseek_chat')) {
+    /**
+     * Simple DeepSeek chat-completion call (text). Returns the assistant reply or null.
+     */
+    function deepseek_chat(string $instruction, ?string $model = null): ?string
+    {
+        $key = studio_api_key('deepseek');
+        if (! $key) { return null; }
+        $model = $model ?: (string) config('studio.deepseek_model', 'deepseek-chat');
+        try {
+            $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(60)
+                ->post((string) config('studio.deepseek_base', 'https://api.deepseek.com').'/chat/completions', [
+                    'model' => $model,
+                    'messages' => [['role' => 'user', 'content' => $instruction]],
+                    'stream' => false,
+                ]);
+            if ($resp->successful()) {
+                $out = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                return $out !== '' ? $out : null;
+            }
+            logger()->warning('DeepSeek chat failed: '.$resp->status().' '.substr((string) $resp->body(), 0, 180));
+        } catch (\Throwable $e) { logger()->warning('DeepSeek chat error: '.$e->getMessage()); }
+        return null;
+    }
+}
+
+function studio_qwen_credentials(string $task = 'image', ?string $model_id = null): array
     {
         // Registered keys (multi per provider, scope-aware) — fall back to env/config slots.
         $keys = [];

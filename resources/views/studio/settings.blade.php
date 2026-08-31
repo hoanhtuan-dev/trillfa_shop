@@ -96,6 +96,7 @@
                     <select name="prompt_provider" class="input !py-2">
                         <option value="gemini" @selected(old('prompt_provider', $prompt_provider) === 'gemini')>Gemini</option>
                         <option value="qwen" @selected(old('prompt_provider', $prompt_provider) === 'qwen')>Qwen (qwen3.8-flash)</option>
+                        <option value="deepseek" @selected(old('prompt_provider', $prompt_provider) === 'deepseek')>DeepSeek (deepseek-chat)</option>
                     </select>
                 </div>
                 <div><label class="label">Prompt model</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-1.5-flash / qwen3.8-flash"></div>
@@ -129,6 +130,7 @@
                     <select name="vision_provider" class="input !py-2">
                         <option value="gemini" @selected(old('vision_provider', $vision_provider) === 'gemini')>Gemini</option>
                         <option value="qwen" @selected(old('vision_provider', $vision_provider) === 'qwen')>Qwen (VL)</option>
+                        <option value="deepseek" @selected(old('vision_provider', $vision_provider) === 'deepseek')>DeepSeek</option>
                     </select>
                 </div>
                 <div><label class="label">Vision model</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-2.5-flash / qwen-vl-max"></div>

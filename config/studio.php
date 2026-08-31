@@ -59,6 +59,9 @@ return [
     'qwen_key' => env('QWEN_API_KEY', ''),
     'qwen_edit_key' => env('QWEN_EDIT_KEY', ''), // khoá riêng cho các model chỉnh sửa ảnh Qwen (mỗi gói có bộ model edit khác nhau)
     'dashscope_key' => env('DASHSCOPE_API_KEY', ''),
+    'deepseek_key' => env('DEEPSEEK_API_KEY', ''),
+    'deepseek_model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
+    'deepseek_base' => env('DEEPSEEK_BASE', 'https://api.deepseek.com'),
     'dashscope_base' => env('DASHSCOPE_BASE', 'https://dashscope-intl.aliyuncs.com'), // Pay-As-You-Go (sk-…): intl = quốc tế
     'dashscope_token_plan_base' => env('DASHSCOPE_TOKEN_PLAN_BASE', 'https://token-plan.ap-southeast-1.maas.aliyuncs.com'), // Token/Coding Plan (sk-sp-…): riêng, không dùng chung
     'face_edit_sync' => (bool) env('STUDIO_FACE_EDIT_SYNC', false), // sau khi tạo ảnh mới, dùng model chỉnh sửa (qwen-edit) đổi mặt về ảnh tham khảo

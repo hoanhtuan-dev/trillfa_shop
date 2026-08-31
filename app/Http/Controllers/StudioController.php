@@ -1224,6 +1224,7 @@ class StudioController extends Controller
             'qwen' => ['label' => 'Qwen — ảnh (QwenCloud, dùng endpoint DashScope)', 'hint' => 'QWEN_API_KEY (home.qwencloud.com/api-keys) · model qwen-image', 'configured' => (bool) studio_api_key('qwen')],
             'qwen_edit' => ['label' => 'Qwen Edit — chỉnh sửa ảnh / Inpaint', 'hint' => 'QWEN_EDIT_KEY · model edit (qwen-image-edit, wanx2.1-imageedit…)', 'configured' => (bool) studio_api_key('qwen_edit')],
             'dashscope' => ['label' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'hint' => 'DASHSCOPE_API_KEY', 'configured' => (bool) studio_api_key('dashscope')],
+            'deepseek' => ['label' => 'DeepSeek — ngôn ngữ / suy luận (prompt, chat)', 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat', 'configured' => (bool) studio_api_key('deepseek')],
         ];
 
         return view('studio.api', compact('providers'));
