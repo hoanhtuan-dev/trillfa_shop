@@ -532,18 +532,10 @@ class StudioController extends Controller
         $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
         $srcUrl = (string) $data['image'];
 
-        if ($refine > 0) {
-            try {
-                $keep = 'keep the exact garment, model, pose and composition unchanged. Ultra-detailed, 4K.';
-                $detail = 'Enhance this fashion photograph at high resolution (hyper-realistic, like a professional fashion editorial): hyper-realistic human skin with natural pores, soft sub-surface tone and realistic specular highlights, individual hair strands with soft natural highlights and flyaways, realistic eyebrow/eyelash texture, natural eye catchlight and iris detail, natural facial volume, rebuild realistic fabric weave and material texture, visible seam/stitching/button details, crisp sharp edges, rich but natural color, '.$keep;
-                $studio = 'Render a high-end professional studio photograph of this fashion garment with hyper-realistic human detail: softbox key light, gentle rim light, neutral white balance, subtle film color grading (rich skin tones, clean highlights, deep shadows), photorealistic skin with natural pores and sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, shallow depth of field (sharp subject, softly blurred background), ultra-sharp micro-detail, premium catalog/product photography. '.$keep;
-                $prompt = $photoreal > 0 ? $studio : $detail;
-                $out = app(\App\Services\ImageAIService::class)->generate($prompt, $srcUrl);
-                if ($out) { $srcUrl = $out; }
-            } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
-        }
-
-        // Real-ESRGAN super-resolution (best-effort) — reconstruct real fabric/stitching/skin detail.
+        // Real-ESRGAN super-resolution FIRST — it preserves the exact image (no crop/regenerate) and
+        // reconstructs real hair/skin/fabric detail. The AI-edit refine is NOT used here because it can
+        // regenerate at a different aspect ratio (crops the composition). If no Real-ESRGAN key is set we
+        // simply upscale the original below with GD so the composition is kept exactly.
         if ($scale >= 2 && function_exists('replicate_upscale_image')) {
             $er = \replicate_upscale_image($srcUrl, $scale);
             if ($er) { $srcUrl = $er; }
