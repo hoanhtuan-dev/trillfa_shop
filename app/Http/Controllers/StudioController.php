@@ -540,6 +540,29 @@ class StudioController extends Controller
     }
 
     /**
+     * ✨ Thuật sỹ — cluster (xương sườn) + build prompt.
+     */
+    public function stylistCluster(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate(['type' => ['required', 'string', 'max:40']]);
+        return response()->json(['questions' => app(\App\Services\StylistService::class)->cluster((string) $data['type'])]);
+    }
+
+    public function stylistPrompt(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'type' => ['required', 'string', 'max:40'],
+            'answers' => ['nullable', 'array'],
+            'answers.*' => ['nullable', 'string', 'max:500'],
+        ]);
+        $svc = app(\App\Services\StylistService::class);
+        $answers = array_filter((array) ($data['answers'] ?? []), fn ($v) => ! empty($v));
+        $prompt = $svc->buildPrompt((string) $data['type'], $answers);
+        $summary = 'Thiết kế '.strtolower($svc->nameOf((string) $data['type'])).' với: '.implode(' · ', $answers).'.';
+        return response()->json(['prompt' => $prompt, 'summary' => $summary]);
+    }
+
+    /**
      * "Thay Đổi Người Mẫu" (Click-to-Swap) — virtual try-on with a chosen model + pose.
      */
     public function swapModel(Request $request)

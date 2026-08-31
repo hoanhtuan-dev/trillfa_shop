@@ -48,6 +48,65 @@ class StylistService
     }
 
     /**
+     * Skeleton data matrix (xương sườn): một cụm câu hỏi ngắn, sát thị trường Việt Nam,
+     * giàu hàm lượng kỹ thuật sản xuất — trình bày MỘT LƯỢT để rút ngắn quá trình.
+     * Điều chỉnh theo loại trang phục đã chọn (trọng tâm chủ đề).
+     */
+    public function cluster(string $type): array
+    {
+        $g = $this->nameOf($type);
+        return [
+            ['key' => 'model', 'q' => 'Người mẫu (Việt):', 'opts' => [
+                'Trẻ trung 18-25, thanh mảnh, tóc dài đen, da sáng',
+                'Thanh xuân 25-32, cao 1m68+, tóc xoăn, da nâu vàng',
+                'Trưởng thành 32-40, đầy đặn, tóc ngắn cá tính, da ngăm',
+                'Cận trung niên 40-50, quyến rũ, tóc búi, da sáng',
+            ]],
+            ['key' => 'silhouette', 'q' => 'Phom/ silhouette '.$g.' (kỹ thuật dựng):', 'opts' => [
+                'Ôm sát (fitted): may co giãn 2-4%, tôn dáng, đường may princess',
+                'Suông (straight): cắt đơn giản, rộng vừa, không chiết ly',
+                'A-line: xòe dần từ eo, độ rộng gấu +8-12cm',
+                'Xòe cong (flare): chân váy xòe rộng, dún hoặc chéo sợi',
+            ]],
+            ['key' => 'fabric', 'q' => 'Chất liệu (kỹ thuật dệt):', 'opts' => [
+                'Lụa satin mềm (độ bóng cao, rũ đẹp, 12-16 momme)',
+                'Chiffon mỏng nhẹ (xếp lớp 2-3 lớp, bay, không bóng)',
+                'Cotton thoáng (GSM 180-240, ít nhăn, dễ bảo quản)',
+                'Dệt kim co giãn (lycra 5-8%, không nhăn, mềm)',
+                'Voan lưới (polyester, xòe cứng cáp, giữ phom)',
+            ]],
+            ['key' => 'color', 'q' => 'Màu nhuộm (xu hướng VN):', 'opts' => [
+                'Đen huyền bí', 'Đỏ rượu vang (đô)', 'Pastel hồng/be (nhãn)', 'Xanh navy thanh lịch', 'Trắng/cream sạch sẽ',
+            ]],
+            ['key' => 'details', 'q' => 'Chi tiết may (kỹ thuật):', 'opts' => [
+                'Cổ chữ V sâu', 'Tay phồng bồng (xếp ly cánh tay)', 'Thắt eo/corset (xương + ren)', 'Viền ren, dún lưng', 'Khuy thắt + phối màu tương phản',
+            ]],
+            ['key' => 'occasion', 'q' => 'Dịp & bối cảnh (thị trường VN):', 'opts' => [
+                'Tiệc tối sang trọng', 'Đi làm thanh lịch', 'Dạo phố trẻ trung', 'Sự kiện/catwalk', 'Hẹn hò lãng mạn',
+            ]],
+        ];
+    }
+
+    /** Build a high-quality EN prompt from the cluster answers (technical detail). */
+    public function buildPrompt(string $type, array $answers): string
+    {
+        $g = $this->nameOf($type);
+        $map = [
+            'model' => 'model', 'silhouette' => 'silhouette', 'fabric' => 'fabric', 'color' => 'color', 'details' => 'details',
+        ];
+        $seg = [];
+        if (! empty($answers['fabric'])) { $seg[] = 'crafted from '.$answers['fabric'].' fabric'; }
+        if (! empty($answers['silhouette'])) { $seg[] = 'with a '.$answers['silhouette'].' silhouette'; }
+        if (! empty($answers['color'])) { $seg[] = 'in '.$answers['color']; }
+        if (! empty($answers['details'])) { $seg[] = 'featuring '.$answers['details'].' construction'; }
+        $model = ! empty($answers['model']) ? $answers['model'] : 'a stylish Vietnamese model';
+        $occ = ! empty($answers['occasion']) ? $answers['occasion'] : 'an elegant occasion';
+        $desc = $seg ? implode(', ', $seg) : 'an elegant contemporary design';
+        return 'A high-fashion editorial photo of a '.$g.', '.$desc.', worn by '.$model.', styled for '.$occ.', premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, clean minimal background, ultra detailed, 4k';
+    }
+
+
+    /**
      * Next step of the stylist conversation. Walks the skeleton matrix; the LLM adds depth.
      * @param string $type
      * @param array  $history [['label'=>..., 'answer'=>...], ...]
@@ -61,7 +120,7 @@ class StylistService
 
         if ($stepNum >= count($skeleton)) {
             // Skeleton done -> finalize a rich prompt.
-            return ['done' => true, 'question' => '', 'options' => [], 'prompt' => $this->buildPrompt($type, $history), 'summary' => $this->buildSummary($history), 'category' => ''];
+            return ['done' => true, 'question' => '', 'options' => [], 'prompt' => $this->buildChatPrompt($type, $history), 'summary' => $this->buildSummary($history), 'category' => ''];
         }
 
         $cat = $skeleton[$stepNum];
@@ -105,8 +164,8 @@ PROMPT;
         ];
     }
 
-    /** Build a rich EN image prompt from the accumulated answers. */
-    protected function buildPrompt(string $type, array $history): string
+    /** Build a rich EN image prompt from the accumulated answers (chat/history flow). */
+    protected function buildChatPrompt(string $type, array $history): string
     {
         $typeName = $this->nameOf($type);
         $model = ''; $design = [];
