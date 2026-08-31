@@ -643,7 +643,7 @@ class StudioController extends Controller
             $blur = imagecreatetruecolor($w, $h);
             imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
             @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
-            $amount = 0.45 + 0.45 * $k;
+            $amount = 0.55 + 0.60 * $k;
             for ($y = 0; $y < $h; $y++) {
                 for ($x = 0; $x < $w; $x++) {
                     $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
