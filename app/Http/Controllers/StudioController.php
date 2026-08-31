@@ -495,8 +495,13 @@ class StudioController extends Controller
      */
     public function assetIndex(): \Illuminate\Http\JsonResponse
     {
-        $assets = \App\Models\StudioAsset::orderBy('type')->orderBy('sort')->get(['id', 'type', 'name', 'path']);
-        return response()->json(['items' => $assets]);
+        try {
+            $assets = \App\Models\StudioAsset::orderBy('type')->orderBy('sort')->get(['id', 'type', 'name', 'path']);
+            return response()->json(['items' => $assets]);
+        } catch (\Throwable $e) {
+            logger()->warning('assetIndex failed: '.$e->getMessage());
+            return response()->json(['items' => []]);
+        }
     }
 
     public function assetStore(Request $request)
@@ -981,7 +986,12 @@ class StudioController extends Controller
             return response()->json(['colors' => []]);
         }
 
-        return response()->json(['colors' => $this->extractPalette($abs, 6)]);
+        try {
+            return response()->json(['colors' => $this->extractPalette($abs, 6)]);
+        } catch (\Throwable $e) {
+            logger()->warning('palette failed: '.$e->getMessage());
+            return response()->json(['colors' => []]);
+        }
     }
 
     protected function extractPalette(string $file, int $count = 6): array
