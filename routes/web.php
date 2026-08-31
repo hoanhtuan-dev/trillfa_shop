@@ -108,7 +108,6 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function
 Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(function () {
     Route::get('/', [StudioController::class, 'index'])->name('index');
     Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
-    Route::post('/ideate', [StudioController::class, 'ideate'])->name('ideate');
     Route::get('/models', [StudioController::class, 'models'])->name('models');
     Route::post('/models', [StudioController::class, 'storeModel'])->name('models.store');
     Route::put('/models/{model}', [StudioController::class, 'updateModel'])->name('models.update');

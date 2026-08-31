@@ -49,35 +49,6 @@ class StudioController extends Controller
     /**
      * Ideation — Gemini turns idea + presets into English image/video prompts.
      */
-    public function ideate(Request $request)
-    {
-        $data = $request->validate([
-            'idea' => ['required', 'string', 'max:1000'],
-            'preset_ids' => ['nullable', 'array'],
-            'preset_ids.*' => ['integer', 'exists:presets,id'],
-            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
-        ]);
-
-        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
-        $injections = $this->resolveInjectedPresets($data['preset_ids'] ?? []);
-        $result = app(GeminiService::class)->generateCreativeDirector($data['idea'], $injections, $creativeLevel);
-
-        $history = auth()->user()->prompts()->create([
-            'idea' => $data['idea'],
-            'image_prompt_en' => $result['image_prompt_en'],
-            'video_prompt_en' => $result['video_prompt_en'],
-            'json_response' => $result,
-        ]);
-
-        return response()->json([
-            'history_id' => $history->id,
-            'image_prompt_en' => $result['image_prompt_en'],
-            'video_prompt_en' => $result['video_prompt_en'],
-            'keywords' => $result['keywords'] ?? [],
-            'creative_level' => $result['creative_level'] ?? $creativeLevel,
-            'adherence' => $result['adherence'] ?? null,
-        ]);
-    }
 
     /**
      * 2D image generation — async via queue.
@@ -90,7 +61,7 @@ class StudioController extends Controller
             'ratio' => ['nullable', 'string', 'in:1:1,4:3,3:4,16:9,9:16,4:5,21:9,19:6'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
-            'variants' => ['nullable', 'integer', 'in:1,2,4'],
+            'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
             'base_image' => ['nullable', 'string', 'max:2048'], // edit path: change bg/pose keeping exact pixels
             'edit' => ['nullable', 'string', 'in:1,true'],
         ]);

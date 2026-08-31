@@ -785,37 +785,6 @@ class ShopFlowTest extends TestCase
         $this->get('/studio')->assertRedirect(route('login'));
     }
 
-    public function test_studio_ideate_returns_prompts(): void
-    {
-        $this->actingAs(User::where('email', 'admin@trillfa.com')->first());
-
-        $this->postJson('/studio/ideate', [
-            'idea' => 'Váy dạ hội biển xanh',
-            'preset_ids' => [],
-        ])->assertOk()->assertJsonStructure(['history_id', 'image_prompt_en', 'video_prompt_en', 'creative_level', 'adherence']);
-    }
-
-    public function test_studio_ideate_honours_creative_level(): void
-    {
-        $this->actingAs(User::where('email', 'admin@trillfa.com')->first());
-
-        // Low creativity -> strict adherence (directive stamped into the prompt).
-        $low = $this->postJson('/studio/ideate', ['idea' => 'Váy dạ hội', 'preset_ids' => [], 'creative_level' => 2])->assertOk()->json();
-        $this->assertSame(2, $low['creative_level']);
-        $this->assertSame(9, $low['adherence']);
-        $this->assertStringContainsString('low', strtolower($low['image_prompt_en']));
-
-        // High creativity -> loose adherence.
-        $high = $this->postJson('/studio/ideate', ['idea' => 'Váy dạ hội', 'preset_ids' => [], 'creative_level' => 9])->assertOk()->json();
-        $this->assertSame(9, $high['creative_level']);
-        $this->assertSame(2, $high['adherence']);
-        $this->assertStringContainsString('high', strtolower($high['image_prompt_en']));
-
-        // The video prompt is always derived consistent with the image prompt.
-        $this->assertNotSame($low['image_prompt_en'], $low['video_prompt_en']);
-        $this->assertNotEmpty($low['video_prompt_en']);
-    }
-
     public function test_studio_generate_image_and_video(): void
     {
         $user = User::where('email', 'admin@trillfa.com')->first();

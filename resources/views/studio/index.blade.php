@@ -85,100 +85,38 @@
                 </div>
             </div>
 
-            <!-- Idea -->
-            <div class="card p-5" x-show="step===1">
-                <div class="mb-2 flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-ink-900">🎛 Prompt</h2>
-                    <span class="text-[10px] text-cream-300/50">Tạo Prompt để AI viết (ghi đè) · nhập trực tiếp để giữ nguyên.</span>
+            <!-- Card: Prompt (Prompt + Sửa tiếng Việt) -->
+            <div class="card p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.14), rgba(74,122,144,.06));">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-display text-base font-semibold text-brand-300">🎛 Prompt</h2>
+                    <button @click="openTranslateVi()" :disabled="translating || !output.image_prompt_en" class="btn-outline btn-sm whitespace-nowrap" title="Hiển thị prompt bằng tiếng Việt để chỉnh sửa; bấm Xong sẽ dịch lại và ghi đè prompt tiếng Anh."><span x-show="!translating">🇻🇳 Sửa tiếng Việt</span><span x-show="translating">Đang dịch…</span></button>
                 </div>
-                <textarea x-model="output.image_prompt_en" rows="5" class="input !text-xs" placeholder="Nhập ý tưởng/prompt (tiếng Việt hoặc tiếng Anh) — bấm “Tạo Prompt” để AI viết prompt tiếng Anh, hoặc nhập trực tiếp." @keydown.enter.prevent="ideate()"></textarea>
-                <div class="mt-2 flex gap-2">
-                    <button @click="ideate()" :disabled="loading || !output.image_prompt_en" class="btn-brand btn-sm flex-1 whitespace-nowrap"><span x-show="!loading">✨ Tạo Prompt</span><span x-show="loading">Đang tạo…</span></button>
-                    <button @click="openTranslateVi()" :disabled="translating || !output.image_prompt_en" class="btn-outline btn-sm flex-1 whitespace-nowrap" title="Hiển thị prompt bằng tiếng Việt để chỉnh sửa; bấm Xong sẽ dịch lại và ghi đè prompt tiếng Anh."><span x-show="!translating">🇻🇳 Sửa tiếng Việt</span><span x-show="translating">Đang dịch…</span></button>
+                <textarea x-model="output.image_prompt_en" rows="6" class="input !text-xs" placeholder="Nhập ý tưởng / prompt (tiếng Việt hoặc tiếng Anh)."></textarea>
+            </div>
+
+            <!-- Card: Sáng tạo (Creative + Số biến thể slider + Tạo ảnh 2D) -->
+            <div class="card p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
+                <h2 class="font-display text-base font-semibold text-brand-300">🎨 Sáng tạo</h2>
+                <div class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs" title="Mức độ sáng tạo khi AI tạo ảnh. Thấp = bám sát ý tưởng; cao = tự do sáng tạo hơn.">
+                    <span class="shrink-0 font-medium text-cream-200">Sáng tạo</span>
+                    <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="creativeLevel"></span><span class="shrink-0 text-cream-300/60">/10</span>
                 </div>
-                <div class="mt-2 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs" title="Mức độ sáng tạo khi AI tạo prompt. Thấp = bám sát ý tưởng; cao = tự do sáng tạo nhưng vẫn giữ bản sắc trang phục.">
-                    <span class="font-medium text-cream-200">Sáng tạo</span>
-                    <input type="range" min="1" max="10" x-model="creativeLevel" class="h-2 w-24 cursor-pointer accent-brand-500">
-                    <span class="font-semibold text-cream-50" x-text="creativeLevel"></span><span class="text-cream-300/70">/10</span>
+                <label class="label mt-3">Số biến thể / lần tạo</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Biến thể</span>
+                    <input type="range" min="1" max="4" step="1" x-model="variantCount" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="variantCount"></span>
                 </div>
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <select x-model="imageRatio" class="input !py-2"><option value="1:1">1:1</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="4:5">4:5</option><option value="21:9">21:9</option><option value="19:6">19:6</option></select>
                     <select x-model="imageRes" class="input !py-2"><option value="1K">1K</option><option value="2K">2K</option></select>
-                    <div class="col-span-2">
-                        <label class="label">Số biến thể / lần tạo</label>
-                        <div class="flex gap-1.5">
-                            <template x-for="nv in [1, 2, 4]" :key="nv">
-                                <button type="button" @click="variantCount = nv" class="flex-1 rounded-lg border py-1.5 text-xs font-semibold transition-colors" :class="variantCount === nv ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="nv"></span></button>
-                            </template>
-                        </div>
-                    </div>
                     <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
                 </div>
             </div>
 
-            <!-- ===== Presets (themed card) ===== -->
-            <div class="card mt-4 p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500);">
-                <div class="flex items-center justify-between">
-                    <h2 class="font-display text-base font-semibold text-brand-300">🎨 Presets <span class="text-xs font-normal text-cream-300/50">(tuỳ chọn)</span></h2>
-                    <button @click="presetOpen = true" class="btn-brand btn-sm whitespace-nowrap">🎛 Chọn preset <span x-show="presetIds.length" x-text="'(' + presetIds.length + ')'"></span></button>
-                </div>
-                <p class="mt-1 text-xs text-cream-200/60">Chọn chất liệu/phom/phong cách/hậu cảnh/góc… để AI tạo prompt chuẩn hơn — chỉ áp dụng preset bạn đã chọn.</p>
-                <div class="mt-2" x-show="presetIds.length">
-                    <span class="text-[11px] text-brand-200" x-text="selectedPresetSummary()"></span>
-                    <button @click="clearPresets()" class="ml-2 btn-outline btn-sm">Đặt lại</button>
-                </div>
-
-                <!-- Presets modal -->
-                <div x-show="presetOpen" x-cloak @click="presetOpen=false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <div class="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
-                        <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
-                            <div>
-                                <h3 class="font-display text-base font-semibold text-cream-50">🎛 Presets</h3>
-                                <p class="text-[11px] text-cream-300/60">Chọn nhiều — chỉ áp dụng preset bạn đã chọn khi tạo.</p>
-                            </div>
-                            <button @click="presetOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
-                        </div>
-
-                        <!-- Siêu-nhóm -->
-                        <div class="flex gap-1.5 px-5 pt-3">
-                            <template x-for="sec in presetSections()" :key="sec.section">
-                                <button @click="presetSection = sec.section" class="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors" :class="presetSection === sec.section ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'"><span x-text="sec.section"></span><span class="ml-1 opacity-70" x-text="'·'+presetSectionCount(sec.section)"></span></button>
-                            </template>
-                        </div>
-
-                        <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                            <template x-for="sec in presetSections()" :key="sec.section">
-                                <div x-show="presetSection === sec.section">
-                                    <template x-for="group in sec.groups" :key="group.category">
-                                        <div class="mb-5">
-                                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-cream-200/70" x-text="catLabels[group.category] || group.category"></p>
-                                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                                <template x-for="item in group.items" :key="item.id">
-                                                    <label class="flex cursor-pointer items-start gap-2 rounded-xl border p-2.5 text-[11px] leading-tight transition-all" :class="presetIds.includes(item.id) ? 'border-brand-500 bg-brand-600/25 text-white' : 'border-ink-700 bg-ink-700/40 text-cream-200 hover:border-brand-500/50 hover:bg-ink-700'" :title="item.note">
-                                                        <input type="checkbox" class="mt-0.5 h-3.5 w-3.5 shrink-0 accent-brand-500" :checked="presetIds.includes(item.id)" @change="togglePreset(item.id)">
-                                                        <span x-text="item.key || item.label"></span>
-                                                    </label>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
-
-                        <div class="flex items-center justify-between gap-2 border-t border-ink-700 px-5 py-3">
-                            <span class="text-xs text-cream-300/60" x-show="presetIds.length" x-text="'Đã chọn ' + presetIds.length + ' preset'"></span>
-                            <div class="ml-auto flex items-center gap-2">
-                                <button @click="clearPresets()" class="btn-outline btn-sm" x-show="presetIds.length">Đặt lại</button>
-                                <button @click="presetOpen=false" class="btn-brand btn-sm">Áp dụng & Đóng</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- ===== Reference + Face ===== -->
-            <div class="card mt-4 p-5" x-show="step===1">
+            <div class="card mt-4 p-5" x-show="step===1" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(90,160,200,.12), rgba(74,122,144,.06));">
                 <!-- Reference source -->
                 <div class="rounded-xl border border-ink-700 bg-ink-800 p-3">
                     <p class="mb-2 text-xs font-semibold text-cream-200">Gợi ý từ ảnh tham khảo</p>
@@ -688,7 +626,7 @@ document.addEventListener('alpine:init', () => {
         presets, projects, catLabels,
         imageRes: imageRes || '2K', videoRes: videoRes || '720', imageRatio: imageRatio || '1:1', videoDuration: videoDuration || '10', variantCount: 1,
         creativeLevel: Number(creativeLevel) || 6,
-        idea: '', presetIds: [],
+        idea: '',
         loading: false, generating: false, videoBusy: false, refining: false,
         output: { image_prompt_en: '', video_prompt_en: '', history_id: null },
         generations: gens, creditsLeft: Number(credits),
@@ -703,7 +641,7 @@ document.addEventListener('alpine:init', () => {
         refFile: null, refImage: null, refUrl: null, suggesting: false, refOpen: false, refProducts: [], refLoading: false, outputsRefOpen: false,
         suggestResult: { styles: [], background: '', image_prompt_en: '' },
         refBusy: false,
-        presetOpen: false, presetSection: 'Trang phục',
+        
         swapOpen: false, swapModelIds: [], swapPoseIds: [], swapLoading: false, lookbook: [], lookbookOpen: false,
         swapBackground: '', _swapBgFallback: [
             { v: '', l: 'Giữ nền gốc' },
@@ -897,38 +835,9 @@ document.addEventListener('alpine:init', () => {
             if (this.step === 3) return this.renderVideo();
             if (this.step === 2) { this.step = 3; return; }
             // Step 1: ensure a prompt then generate a 2D design.
-            if (!this.output.image_prompt_en && this.idea.trim()) await this.ideate();
             this.generateImage();
         },
         // Hậu cảnh cho swap: dùng chung danh mục 'background' trong Presets (nếu có), fallback danh sách cứng.
-        get swapBackgrounds() {
-            const grp = this.presets.find(x => x.category === 'background');
-            const fromPresets = grp && grp.items ? grp.items.map(i => ({ v: i.value || i.key || '', l: i.label || i.note || i.key })) : [];
-            return [...this._swapBgFallback, ...fromPresets.filter(i => i.v && !this._swapBgFallback.some(f => f.v === i.v))];
-        },
-        get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
-        get videoSceneLabel() { const s = this.videoScenes.find(x => x.value === this.videoScene); return s ? (s.label + (s.note ? ' · ' + s.note : '')) : ''; },
-        get presetGroups() { return this.presets.filter(g => g.category !== 'video_scene'); },
-        // Siêu-nhóm preset: chia nhóm theo mục đích dùng để người dùng chọn nhanh & dễ nhìn.
-        presetSections() {
-            const map = [
-                ['Trang phục', ['fabric', 'color', 'silhouette', 'neckline', 'sleeve', 'fit', 'pattern', 'detail']],
-                ['Phong cách', ['style', 'occasion', 'season']],
-                ['Bối cảnh & Dáng', ['background', 'pose', 'camera', 'lens']],
-            ];
-            const out = [];
-            for (const [section, cats] of map) {
-                const groups = this.presetGroups.filter((g) => cats.includes(g.category));
-                if (groups.length) out.push({ section, groups, count: groups.reduce((a, g) => a + g.items.length, 0) });
-            }
-            return out;
-        },
-        presetSectionCount(sec) { return this.presetSections().find((s) => s.section === sec)?.count || 0; },
-        async loadPalette(id) {
-            if (!id) { this.palette = []; return; }
-            try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
-            catch (e) { this.palette = []; }
-        },
         get workflowSteps() {
             let cur = 1;
             if (this.output.image_prompt_en) cur = 2;
@@ -936,92 +845,13 @@ document.addEventListener('alpine:init', () => {
             const labels = ['Ý tưởng', 'Tạo ảnh', 'Chỉnh sửa', 'Video'];
             return labels.map((label, i) => ({ id: i + 1, label, done: (i + 1) < cur, current: (i + 1) === cur, future: (i + 1) > cur }));
         },
-
-        async api(url, body) {
-            const res = await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
-            return data;
+        get swapBackgrounds() {
+            const grp = this.presets.find(x => x.category === 'background');
+            const fromPresets = grp && grp.items ? grp.items.map(i => ({ v: i.value || i.key || '', l: i.label || i.note || i.key })) : [];
+            return [...this._swapBgFallback, ...fromPresets.filter(i => i.v && !this._swapBgFallback.some(f => f.v === i.v))];
         },
-        async upload(url, form) {
-            const res = await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' }, body: form });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
-            return data;
-        },
-        async del(url) {
-            const res = await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' } });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
-            return data;
-        },
-
-        togglePreset(id) {
-            id = Number(id);
-            const i = this.presetIds.indexOf(id);
-            if (i >= 0) this.presetIds.splice(i, 1);
-            else this.presetIds.push(id);
-            this.haptic(12);
-        },
-        selectedPresetId(cat) {
-            const grp = this.presets.find((g) => g.category === cat);
-            if (!grp) return '';
-            const s = grp.items.find((it) => this.presetIds.includes(it.id));
-            return s ? s.id : '';
-        },
-        setPresetForCategory(cat, id) {
-            const grp = this.presets.find((g) => g.category === cat);
-            if (grp) {
-                const gids = grp.items.map((it) => it.id);
-                this.presetIds = this.presetIds.filter((i) => !gids.includes(i));
-            }
-            if (id) this.presetIds.push(Number(id));
-            this.haptic(10);
-        },
-        selectedPresetText(cat) {
-            const grp = this.presets.find((g) => g.category === cat);
-            if (!grp) return '';
-            return grp.items
-                .filter((it) => this.presetIds.includes(it.id))
-                .map((it) => it.key || it.label).join(', ');
-        },
-        selectedPresetSummary() {
-            const parts = [];
-            this.presetGroups.forEach((g) => {
-                const t = this.selectedPresetText(g.category);
-                if (t) parts.push((this.catLabels[g.category] || g.category) + ': ' + t);
-            });
-            return parts.join(' · ');
-        },
-        // Assemble the video prompt from the Step-1 pieces (idea + garment presets) + motion. No AI inference:
-        // the user decides when to press "Gợi ý prompt video". The Kịch bản quay is the camera control and is
-        // shown separately (appended at render).
-        suggestVideoPrompt() {
-            const idea = (this.output.image_prompt_en || this.idea || '').trim();
-            const garment = ['fabric', 'silhouette', 'style', 'background', 'pose']
-                .map((c) => this.selectedPresetText(c)).filter(Boolean).join(', ');
-            let p = 'Cinematic fashion catwalk, a model presenting ' + (idea || 'a high-fashion outfit');
-            if (garment) p += ', ' + garment;
-            p += ', dynamic fabric motion, professional fashion video.';
-            this.output.video_prompt_en = p.trim();
-            Alpine.store('toast').show('Đã ghép prompt video từ ý tưởng + preset (chỉnh tay nếu cần).');
-        },
-
-        resetForRef() {
-            // Reference image changed/removed -> clear the derived prompt & suggestion to avoid overlap.
-            this.suggestResult = { styles: [], background: '', image_prompt_en: '' };
-            this.output.image_prompt_en = '';
-            this.output.video_prompt_en = '';
-            this.refinePrompt = '';
-        },
-        onRefChange(e) {
-            const f = e.target.files && e.target.files[0];
-            if (!f) return;
-            if (this.refImage && String(this.refImage).startsWith('blob:')) URL.revokeObjectURL(this.refImage);
-            this.refFile = f; this.refImage = URL.createObjectURL(f); this.refUrl = null;
-            this.resetForRef();
-        },
-        clearPresets() { this.presetIds = []; },
+        get videoScenes() { const g = this.presets.find(x => x.category === 'video_scene'); return g ? g.items : []; },
+        get videoSceneLabel() { const s = this.videoScenes.find(x => x.value === this.videoScene); return s ? (s.label + (s.note ? ' · ' + s.note : '')) : ''; },
         async openRefPicker() {
             this.refOpen = true; this.refLoading = true;
             try { const res = await fetch('/studio/references', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.refProducts = d.items || []; }
@@ -1344,13 +1174,6 @@ document.addEventListener('alpine:init', () => {
             finally { this.creatingProject = false; }
         },
 
-        async ideate() {
-            if (!this.output.image_prompt_en.trim() || this.loading) return;
-            this.loading = true;
-            try { const data = await this.api('/studio/ideate', { idea: this.output.image_prompt_en, preset_ids: this.presetIds, creative_level: this.creativeLevel }); this.output.image_prompt_en = data.image_prompt_en; this.output.video_prompt_en = data.video_prompt_en; this.output.history_id = data.history_id; if (data.creative_level) this.creativeLevel = Number(data.creative_level); }
-            catch (e) { Alpine.store('toast').show(e.message, 'error'); }
-            finally { this.loading = false; }
-        },
 
         async generateImage() {
             if (!this.output.image_prompt_en || this.generating) return;
