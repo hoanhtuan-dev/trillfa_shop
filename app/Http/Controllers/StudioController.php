@@ -26,7 +26,8 @@ class StudioController extends Controller
         $creditsUsed = (int) $user->generations()->where('status', 'completed')->sum('credits_cost');
         $pendingCount = (int) $user->generations()->whereIn('status', ['pending', 'processing'])->count();
 
-        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount'));
+        $stylistTypes = app(\App\Services\StylistService::class)->garmentTypes();
+        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount', 'stylistTypes'));
     }
 
     public function storeProject(Request $request)

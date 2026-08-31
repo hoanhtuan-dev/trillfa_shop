@@ -278,7 +278,7 @@
                             </div>
                         </template>
                         <!-- Bước 2: cụm câu hỏi xương sườn (một lượt) -->
-                        <template x-if="stylistType && !stylistPrompt">
+                        <template x-if="stylistType && !stylistPromptEn">
                             <div class="flex flex-1 flex-col overflow-hidden">
                                 <div class="flex-1 overflow-y-auto p-5">
                                     <div class="mb-3 flex justify-start">
@@ -736,7 +736,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
-        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '',
+        stylistOpen: false, stylistType: '', stylistTypes: @json($stylistTypes), stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '',
 
         previewId: null,
         viewGen: null,
