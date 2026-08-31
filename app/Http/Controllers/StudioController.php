@@ -592,7 +592,7 @@ class StudioController extends Controller
             @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
             @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
             @imagefilter($soft, IMG_FILTER_BRIGHTNESS, (int) round(9 * $k));
-            $alpha = 0.08 + 0.16 * $k;
+            $alpha = 0.04 + 0.08 * $k;
             for ($y = 0; $y < $h; $y++) {
                 for ($x = 0; $x < $w; $x++) {
                     $c = imagecolorat($img, $x, $y); $s = imagecolorat($soft, $x, $y);
@@ -606,8 +606,7 @@ class StudioController extends Controller
             }
             imagedestroy($soft);
             // smart tone: soft contrast + subtle warm/cool grade + gentle denoise
-            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(6 * $k));
-            @imagefilter($img, IMG_FILTER_SMOOTH, (int) round(2 * $k));
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(7 * $k));
             @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
         }
         // 2) SUBTLE FILM GRAIN — small amplitude, only on shadows/midtones (reads as film, not noise).
@@ -634,6 +633,25 @@ class StudioController extends Controller
                 $r = (int) (($c >> 16) & 0xFF) * $v; $g = (int) (($c >> 8) & 0xFF) * $v; $b = (int) ($c & 0xFF) * $v;
                 imagesetpixel($img, $x, $y, imagecolorallocate($img, (int) $r, (int) $g, (int) $b));
             }
+        }
+        // 4) FINAL UN-SHARP MASK — crisp the edges back after the light/grain/vignette softness.
+        if (function_exists('imagefilter') && $w * $h <= 20000000) {
+            $blur = imagecreatetruecolor($w, $h);
+            imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+            @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+            $amount = 0.45 + 0.45 * $k;
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
+                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                    $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
+                    $nr = max(0, min(255, (int) round($cr + $amount * ($cr - $br))));
+                    $ng = max(0, min(255, (int) round($cg + $amount * ($cg - $bg))));
+                    $nb = max(0, min(255, (int) round($cb + $amount * ($cb - $bb))));
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                }
+            }
+            imagedestroy($blur);
         }
     }
 
