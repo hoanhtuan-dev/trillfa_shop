@@ -519,6 +519,36 @@ class StudioController extends Controller
     /**
      * Nâng cấp & tinh chỉnh ảnh — upscale (GD) + optional AI refine (edit model).
      */
+    /**
+     * Apply a film-look color grade to an image (1-click presets).
+     */
+    public function look(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],
+            'look' => ['required', 'string', 'in:studio,warm,cool,dramatic,retro,mono'],
+            'level' => ['nullable', 'integer', 'min:0', 'max:10'],
+        ]);
+        $level = max(1, min(10, (int) ($data['level'] ?? 5)));
+        $srcUrl = (string) $data['image'];
+        $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) { if (is_file($cand)) { $file = $cand; break; } }
+        if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
+        $this->applyLook($img, (string) $data['look'], $level);
+        $this->unsharpMask($img, 0.4);
+        $name = 'studio/look-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
+        imagedestroy($img);
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
+            'prompt' => 'Film Look · '.$data['look'], 'model' => 'look', 'provider' => 'look', 'credits_cost' => 0,
+        ]);
+        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+    }
+
     public function upscale(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->validate([
@@ -760,6 +790,48 @@ class StudioController extends Controller
                     imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
                 }
             }
+        }
+    }
+
+    /**
+     * Film-look color grading: applies a per-pixel tone curve + split-tinting for a chosen look.
+     * Simple, dependency-free (GD), strength-scaled.
+     */
+    protected function applyLook(\GdImage $img, string $look, int $level): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        $tintR = 0; $tintG = 0; $tintB = 0; $contrast = 0.0; $lift = 0.0; $sat = 1.0;
+        switch ($look) {
+            case 'warm':    $tintR = 12; $tintB = -8; $contrast = 0.18; $lift = 0.02; break;
+            case 'cool':    $tintR = -8; $tintB = 12; $contrast = 0.10; $lift = 0.04; break;
+            case 'dramatic':$contrast = 0.42; $tintR = -4; $tintB = 4; $lift = -0.03; break;
+            case 'retro':   $contrast = 0.10; $lift = 0.14; $tintR = 15; $tintG = 6; $tintB = -14; break;
+            case 'mono':    $sat = 0.0; $contrast = 0.22; $lift = 0.02; break;
+            default:        $contrast = 0.06; $tintR = 4; $tintB = -2; break; // studio neutral
+        }
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $lum = $r * 0.299 + $g * 0.587 + $b * 0.114;
+                // contrast around mid + black lift
+                $nr = $lum + ($r - $lum) * $sat + $contrast * ($r - 128) + $lift * 255 + $tintR * $k;
+                $ng = $lum + ($g - $lum) * $sat + $contrast * ($g - 128) + $lift * 255 + $tintG * $k;
+                $nb = $lum + ($b - $lum) * $sat + $contrast * ($b - 128) + $lift * 255 + $tintB * $k;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    max(0, min(255, (int) round($nr))), max(0, min(255, (int) round($ng))), max(0, min(255, (int) round($nb)))));
+            }
+        }
+        if ($look === 'dramatic' && $level > 4) { // deeper vignette for dramatic
+            $cx = $w / 2; $cy = $h / 2; $maxd = (float) max($w, $h);
+            for ($y = 0; $y < $h; $y += 3) { for ($x = 0; $x < $w; $x += 3) {
+                $d = sqrt(($x - $cx) ** 2 + ($y - $cy) ** 2) / $maxd;
+                $v = 1 - (0.16 * $k * max(0, $d - 0.4));
+                $cc = imagecolorat($img, $x, $y);
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    (int) ((($cc >> 16) & 0xFF) * $v), (int) ((($cc >> 8) & 0xFF) * $v), (int) (($cc & 0xFF) * $v)));
+            } }
         }
     }
 

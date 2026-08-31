@@ -428,6 +428,31 @@
                 <button @click="runUpscale()" :disabled="upscaling || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap" title="Phóng to + tinh chỉnh ảnh đang chọn"><span x-show="!upscaling">🔍 Nâng cấp Ảnh</span><span x-show="upscaling">Đang nâng cấp…</span></button>
             </div>
 
+            <!-- Card: Film Look (color grading) -->
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(180,120,180,.13), rgba(74,122,144,.06));">
+                <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🎨 Film Look</h2>
+                <p class="text-[11px] text-ink-500">Gán tone màu phim cho ảnh đang chọn (1 chạm).</p>
+                <template x-if="upscaleSrc">
+                    <div class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
+                        <img :src="upscaleSrc" class="h-14 w-14 rounded-xl bg-ink-900 object-cover" alt="Nguồn">
+                        <p class="min-w-0 truncate text-xs text-cream-200" x-text="upscaleName"></p>
+                    </div>
+                </template>
+                <label class="label mt-3">Look</label>
+                <div class="flex flex-wrap gap-1.5">
+                    <template x-for="p in [['studio','Studio'],['warm','Ấm'],['cool','Lạnh'],['dramatic','Dramatic'],['retro','Retro'],['mono','Mono']]" :key="p[0]">
+                        <button type="button" @click="lookPreset = p[0]" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="lookPreset === p[0] ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="p[1]"></span></button>
+                    </template>
+                </div>
+                <label class="label mt-3">Cường độ</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Mức</span>
+                    <input type="range" min="0" max="10" step="1" x-model="lookLevel" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="lookLevel + '/10'"></span>
+                </div>
+                <button @click="applyLook()" :disabled="looking || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!looking">🎨 Áp dụng Look</span><span x-show="looking">Đang áp dụng…</span></button>
+            </div>
+
             <!-- Bước 3 · Ghế Đạo Diễn -->
             <div class="card p-5" x-show="step===3" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.12), rgba(124,58,237,.06));">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
@@ -755,7 +780,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
-        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, skinDetail: 4, lightShadow: 5, fabricDetail: 5, upscaling: false,
+        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, skinDetail: 4, lightShadow: 5, fabricDetail: 5, upscaling: false, lookPreset: 'studio', lookLevel: 5, looking: false,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
@@ -1095,6 +1120,18 @@ document.addEventListener('alpine:init', () => {
         },
         get upscaleSrc() { return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
         get upscaleName() { return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
+        async applyLook() {
+            const src = this.upscaleSrc;
+            if (!src || this.looking) return;
+            this.looking = true;
+            try {
+                const d = await this.api('/studio/look', { image: src, look: this.lookPreset, level: Number(this.lookLevel) || 5 });
+                this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'look', provider: 'look', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa áp dụng' });
+                this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' });
+                Alpine.store('toast').show('Đã áp dụng Look ' + this.lookPreset + '.');
+            } catch (e) { Alpine.store('toast').show(e.message || 'Lỗi áp dụng Look.', 'error'); }
+            finally { this.looking = false; }
+        },
         async runUpscale() {
             const src = this.upscaleSrc;
             if (!src || this.upscaling) return;
