@@ -295,7 +295,7 @@
 
             <!-- Bước 2 · Inpaint -->
             <!-- Fitting Room: Thay Đổi Người Mẫu (Click-to-Swap) -->
-            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500);">
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.14), rgba(74,122,144,.06));">
                 <div class="flex items-center justify-between">
                     <h2 class="font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
                     <button @click="openSwap()" class="btn-brand btn-sm whitespace-nowrap">Chọn</button>
@@ -323,11 +323,11 @@
                         </div>
                     </div>
                 </template>
-                <p class="mt-2 text-[10px] text-ink-500" x-show="!swapModelIds.length">Bấm "Chọn" để chọn khuôn mặt + dáng (giữ nguyên 100% trang phục).</p>
+
             </div>
 
             <!-- Fitting Room: Ảnh để chỉnh sửa -->
-            <div class="card p-5" x-show="step===2">
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(230,180,120,.14), rgba(74,122,144,.06));">
                 <h2 class="mb-2 font-display text-base font-semibold text-ink-900">🖼 Ảnh để chỉnh sửa</h2>
                 <div class="flex flex-wrap gap-2">
                     <button class="btn-outline btn-sm" @click="$refs.editImgInput.click()">Tải ảnh</button>
@@ -348,7 +348,7 @@
             </div>
 
             <!-- Fitting Room: Phẫu thuật Ảnh -->
-            <div class="card p-5" x-show="step===2">
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
                 <h2 class="mb-2 font-display text-base font-semibold text-ink-900">✏️ Phẫu thuật Ảnh</h2>
                 <textarea x-model="refinePrompt" rows="2" class="input" placeholder="VD: add puff sleeve, change background to a beach…"></textarea>
                 <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-700">
@@ -359,16 +359,16 @@
             </div>
 
             <!-- Color Palette (Bước 2) -->
-            <div class="card p-5" x-show="step===2">
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(90,160,200,.12), rgba(74,122,144,.06));">
                 <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🎨 Color Palette</h2>
                 <div class="flex items-center gap-1.5" x-show="palette.length">
                     <template x-for="c in palette" :key="c"><button type="button" class="h-7 w-7 rounded-full border border-ink-700" :style="{ background: c }" :title="c" @click="Alpine.store('toast').show('Màu ' + c, 'info')"></button></template>
                 </div>
-                <p class="text-xs text-cream-300" x-show="!palette.length">Chọn một ảnh ở Outputs để trích màu chủ đạo.</p>
+
             </div>
 
             <!-- Texture (Bước 2) -->
-            <div class="card p-5" x-show="step===2">
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(106,143,106,.12), rgba(74,122,144,.06));">
                 <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🧵 Texture</h2>
                 <input type="range" min="0" max="10" x-model="texture" class="w-full accent-brand-500">
                 <div class="mt-2 flex items-center justify-between text-xs">
@@ -376,11 +376,11 @@
                     <span class="font-semibold text-cream-50" x-text="texture"></span>
                     <span class="text-cream-300">10 · Chi tiết bề mặt</span>
                 </div>
-                <p class="mt-2 text-[10px] text-ink-500" x-text="'Tự thêm vào prompt: ' + (textureHint(texture))"></p>
+
             </div>
 
             <!-- Bước 3 · Ghế Đạo Diễn -->
-            <div class="card p-5" x-show="step===3">
+            <div class="card p-5" x-show="step===3" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.12), rgba(124,58,237,.06));">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
                 <div class="mb-3">
                     <label class="label">Model video</label>
@@ -409,7 +409,7 @@
                     <textarea x-model="output.video_prompt_en" rows="3" class="input !text-xs" placeholder="(để trống để ghép tự động từ ý tưởng + preset + kịch bản quay)"></textarea>
                     <button type="button" @click="suggestVideoPrompt()" class="btn-outline btn-sm mt-1 w-full" title="Ghép prompt video từ ý tưởng + preset + kịch bản quay (không dùng AI)">✨ Gợi ý prompt video</button>
                 </div>
-                <button @click="renderVideo()" :disabled="videoBusy || !videoSourceId" class="btn-brand w-full whitespace-nowrap"><span x-show="!videoBusy">🎬 Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
+                <button @click="renderVideo()" :disabled="videoBusy || !videoSourceId" class="w-full whitespace-nowrap rounded-2xl border border-brand-500/60 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/20" style="background: linear-gradient(135deg, rgba(74,122,144,.9), rgba(124,58,237,.85));"><span x-show="!videoBusy">🎬 Render Video</span><span x-show="videoBusy">Đang gửi…</span></button>
                 <p class="mt-2 text-[10px] text-ink-500" x-text="videoSourceId ? 'Nguồn ảnh #' + videoSourceId : 'Chọn ảnh nguồn (Bước 2) để Render.'"></p>
             </div>
         </div>
@@ -430,9 +430,7 @@
 
                     <!-- Canvas contextual actions (per-step) -->
                     <div class="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
-                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-brand btn-sm whitespace-nowrap" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint).">✏️ Sửa ảnh</button>
-                        <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-outline btn-sm whitespace-nowrap" x-show="step>=2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Render Video.">🎬 Tạo video</button>
-                        <button @click="openSwap()" class="btn-outline btn-sm whitespace-nowrap text-brand-200" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Thay đổi người mẫu — thử trang phục lên khuôn mặt + dáng bạn chọn.">🔄 Thay Đổi Người Mẫu</button>
+                        <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-sm whitespace-nowrap rounded-full border border-brand-500/60 text-white shadow-lg shadow-brand-500/20" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint)." style="background: linear-gradient(135deg, rgba(232,87,125,.9), rgba(124,58,237,.85));">✏️ Sửa ảnh</button>
                     </div>
 
                     <!-- Canvas zoom toolbar (vertical, right edge) -->
