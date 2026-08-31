@@ -562,7 +562,7 @@ class StudioController extends Controller
         $h = (int) (imagesy($src) * $scale);
         $dst = imagecreatetruecolor($w, $h);
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, imagesx($src), imagesy($src));
-        if ($scale > 1 && function_exists('imageconvolution')) { @imageconvolution($dst, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
+        if ($scale > 1 && $photoreal == 0 && function_exists('imageconvolution')) { @imageconvolution($dst, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
