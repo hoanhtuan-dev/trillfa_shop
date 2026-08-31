@@ -64,8 +64,9 @@ or
 PROMPT;
 
         $json = $this->chat($instruction);
-        if ($json === null) {
-            return ['done' => false, 'question' => 'Bạn muốn tiếp tục mô tả thiết kế như thế nào?', 'options' => ['Phom dáng', 'Chất liệu', 'Màu sắc', 'Chi tiết / hoạ tiết', 'Xong — tạo prompt'], 'prompt' => '', 'summary' => ''];
+        if ($json === null || ! is_array($json)) {
+            // LLM unavailable -> deterministic step sequence so the wizard NEVER gets stuck.
+            return $this->fallbackStep($type, $history);
         }
 
         $done = (bool) ($json['done'] ?? false);
@@ -79,12 +80,40 @@ PROMPT;
     }
 
     /**
+     * Deterministic fallback so the wizard always progresses (even without the LLM).
+     */
+    protected function fallbackStep(string $type, array $history): array
+    {
+        $steps = [
+            ['label' => 'Phom dáng bạn muốn', 'options' => ['Ôm / fitted', 'Suông / straight', 'Rộng / oversized', 'Bồng / volume']],
+            ['label' => 'Chất liệu nào', 'options' => ['Lụa mềm', 'Cotton', 'Dệt kim', 'Da', 'Thô / linen']],
+            ['label' => 'Màu sắc chủ đạo', 'options' => ['Pastel nhẹ', 'Tối / trầm', 'Tươi sáng', 'Đen - trắng', 'Trung tính (be/cream)']],
+            ['label' => 'Chi tiết / hoạ tiết', 'options' => ['Không hoạ tiết', 'Kẻ sọc', 'Chấm bi', 'Hoa văn', 'Thêu / logo']],
+            ['label' => 'Phong cách tổng thể', 'options' => ['Sang trọng', 'Tối giản', 'Boho', 'Streetwear', 'Cổ điển']],
+        ];
+        $n = count($history);
+        if ($n < count($steps)) {
+            $s = $steps[$n];
+            return ['done' => false, 'question' => $s['label'].'?', 'options' => $s['options'], 'prompt' => '', 'summary' => ''];
+        }
+        return ['done' => true, 'prompt' => $this->buildPrompt($type, $history), 'summary' => 'Đã đủ thông tin — xem prompt bên dưới.'];
+    }
+
+    protected function buildPrompt(string $type, array $history): string
+    {
+        $typeName = $this->nameOf($type);
+        $parts = ['a high-fashion '.$typeName];
+        foreach ($history as $h) { if (! empty($h['answer'])) { $parts[] = strtolower((string) $h['answer']); } }
+        return implode(', ', $parts).', photorealistic, full-body fashion editorial, soft studio lighting, plain background';
+    }
+
+    /**
      * Text chat that returns parsed JSON. Tries Gemini (JSON-ready) then Qwen (DashScope).
      */
     protected function chat(string $instruction): ?array
     {
         $geminiKey = studio_api_key('gemini');
-        $models = ['gemini-2.0-flash', 'gemini-1.5-flash']; // nhanh hơn cho thuật sỹ
+        $models = array_values(array_unique(array_filter([(string) studio_config('translate_model', 'gemini-3.5-flash'), 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'])));
         if ($geminiKey) {
             foreach ($models as $gm) {
                 try {
@@ -104,7 +133,7 @@ PROMPT;
 
         // Qwen fallback (DashScope text-generation).
         $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        $model = (string) studio_config('prompt_model', 'qwen-turbo'); // model nhanh
+        $model = (string) studio_config('prompt_model', 'qwen-plus');
         if ($key) {
             try {
                 $resp = Http::withToken($key)->timeout(60)

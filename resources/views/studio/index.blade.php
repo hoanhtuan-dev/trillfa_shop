@@ -298,12 +298,28 @@
                                         </p>
                                         <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                             <template x-for="(opt,i) in stylistStep.options" :key="i">
-                                                <button @click="pickStylistOption(opt)" class="group relative overflow-hidden rounded-xl border bg-ink-700/30 px-3 py-3 text-left text-sm text-cream-100 transition-all duration-150 hover:scale-[1.02] hover:border-brand-500 hover:bg-brand-600/15 active:scale-[0.98]" :class="stylistFlash === opt ? 'stylist-pick border-brand-500' : 'border-ink-700'" x-text="opt"><span class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-brand-500/0 transition-all group-hover:bg-brand-500/70"></span></button>
+                                                <button @click="pickStylistOption(opt)" class="group relative flex min-h-[52px] items-center overflow-hidden rounded-2xl border px-4 py-3.5 text-left text-[15px] font-semibold text-cream-50 shadow-lg transition-all duration-150 hover:scale-[1.02] hover:border-brand-400 hover:bg-gradient-to-r hover:from-brand-500/25 hover:to-ink-700/40 hover:shadow-brand-500/20 active:scale-[0.98]" :class="stylistFlash === opt ? 'stylist-pick border-brand-400 bg-gradient-to-r from-brand-500/30 to-ink-700/40' : 'border-ink-600/70 bg-gradient-to-r from-ink-700/50 to-ink-800/50'" x-text="opt"><span class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-brand-500/0 transition-all group-hover:bg-brand-500/70"></span></button>
                                             </template>
                                         </div>
                                     </div>
                                 </template>
-                                <p class="mt-3 text-xs text-cream-300" x-show="stylistLoading">Thuật sỹ đang suy nghĩ…</p>
+                                <template x-if="stylistLoading">
+                                    <div class="mt-3 space-y-3">
+                                        <div class="flex items-center gap-3">
+                                            <span class="relative inline-block h-8 w-8 shrink-0 rounded-full bg-ink-700">
+                                                <span class="absolute inset-0 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></span>
+                                                <span class="absolute inset-0 grid place-items-center text-sm">✨</span>
+                                            </span>
+                                            <span class="text-sm font-medium text-brand-200">Thuật sỹ đang suy nghĩ…</span>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40"></div>
+                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40" style="animation-delay:.1s"></div>
+                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40" style="animation-delay:.2s"></div>
+                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40" style="animation-delay:.3s"></div>
+                                        </div>
+                                    </div>
+                                </template>
                                 <p class="mt-2 text-xs text-cream-300/60" x-show="!stylistLoading && !stylistStep">Chờ thuật sỹ gợi ý…</p>
                             </div>
                         </template>
