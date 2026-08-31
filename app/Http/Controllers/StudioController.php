@@ -12,6 +12,7 @@ use App\Services\StyleSuggestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class StudioController extends Controller
 {
@@ -552,7 +553,7 @@ class StudioController extends Controller
         $h = (int) (imagesy($src) * $scale);
         $dst = imagecreatetruecolor($w, $h);
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, imagesx($src), imagesy($src));
-        $name = 'studio/upscale-'.IlluminateSupportStr::uuid().'.png';
+        $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
         imagedestroy($src); imagedestroy($dst);
 
