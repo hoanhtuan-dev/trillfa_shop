@@ -84,7 +84,7 @@ PROMPT;
     protected function chat(string $instruction): ?array
     {
         $geminiKey = studio_api_key('gemini');
-        $models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+        $models = ['gemini-2.0-flash', 'gemini-1.5-flash']; // nhanh hơn cho thuật sỹ
         if ($geminiKey) {
             foreach ($models as $gm) {
                 try {
@@ -104,7 +104,7 @@ PROMPT;
 
         // Qwen fallback (DashScope text-generation).
         $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
+        $model = (string) studio_config('prompt_model', 'qwen-turbo'); // model nhanh
         if ($key) {
             try {
                 $resp = Http::withToken($key)->timeout(60)

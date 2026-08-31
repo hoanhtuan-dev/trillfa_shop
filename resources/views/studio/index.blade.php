@@ -59,6 +59,12 @@
 
     <div class="grid gap-4 lg:h-[calc(100dvh-6.5rem)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px_150px]">
         <!-- =============================================================== -->
+        <style>
+            @keyframes stylistIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+            .stylist-anim { animation: stylistIn .32s cubic-bezier(.22,1,.36,1); }
+            @keyframes stylistPulse { 0% { box-shadow: 0 0 0 0 rgba(232,87,125,.45); } 70% { box-shadow: 0 0 0 12px rgba(232,87,125,0); } 100% { box-shadow: 0 0 0 0 rgba(232,87,125,0); } }
+            .stylist-pick { animation: stylistPulse .5s ease-out; }
+        </style>
         <!-- ===== LEFT: AI Design Inputs ===== -->
         <!-- =============================================================== -->
         <div x-ref="leftPanel" class="scrollbar-hide order-2 space-y-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1" x-show="!isMobile || step===1 || step===2 || step===3">
@@ -68,10 +74,9 @@
                     <h2 class="font-display text-base font-semibold text-brand-300">✨ Thuật sỹ ảo</h2>
                     <button @click="openStylist()" class="btn-brand btn-sm whitespace-nowrap">Bắt đầu</button>
                 </div>
-                <p class="mt-1 text-xs text-cream-300">Thuật sỹ hướng dẫn bạn <b>TỪNG BƯỚC</b> để tạo prompt thiết kế — bấm chọn 1 loại trang phục dưới đây.</p>
-                <div class="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
+                <div class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
                     <template x-for="t in stylistTypes" :key="t.id">
-                        <button @click="openStylist(); pickStylistType(t.id)" class="group relative aspect-[3/4] overflow-hidden rounded-xl border border-ink-700 bg-ink-900 transition-all hover:border-brand-500/60">
+                        <button @click="openStylist(); pickStylistType(t.id)" class="group relative aspect-[3/4] overflow-hidden rounded-xl border bg-ink-900 transition-all duration-150 hover:scale-[1.03] hover:border-brand-500 hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.97]" :class="stylistFlash === t.id ? 'stylist-pick border-brand-500 ring-2 ring-brand-500' : 'border-ink-700'">
                             <img x-show="t.img" :src="t.img" class="h-full w-full object-cover opacity-90 transition-transform group-hover:scale-105" onerror="this.style.display='none'" alt="Trang phục">
                             <span class="absolute inset-0 flex-col items-center justify-center gap-1 bg-ink-900/80 text-center" x-show="!t.img"><span class="text-2xl" x-text="t.emoji"></span><span class="px-1 text-[10px] text-cream-100" x-text="t.name"></span></span>
                             <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1 pb-1 pt-4 text-center text-[10px] font-medium text-white" x-text="t.name"></span>
@@ -286,14 +291,14 @@
                                     </div>
                                 </template>
                                 <template x-if="stylistStep && !stylistStep.done">
-                                    <div>
+                                    <div class="stylist-anim">
                                         <p class="mb-2 flex items-center gap-2 text-sm font-semibold text-cream-100">
                                             <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-brand-500"></span>
                                             <span x-text="stylistStep.question"></span>
                                         </p>
-                                        <div class="grid gap-1.5">
+                                        <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                             <template x-for="(opt,i) in stylistStep.options" :key="i">
-                                                <button @click="pickStylistOption(opt)" class="rounded-xl border border-ink-700 bg-ink-700/40 px-3 py-2 text-left text-sm text-cream-200 transition-colors hover:border-brand-500/60 hover:bg-ink-700" x-text="opt"></button>
+                                                <button @click="pickStylistOption(opt)" class="group relative overflow-hidden rounded-xl border bg-ink-700/30 px-3 py-3 text-left text-sm text-cream-100 transition-all duration-150 hover:scale-[1.02] hover:border-brand-500 hover:bg-brand-600/15 active:scale-[0.98]" :class="stylistFlash === opt ? 'stylist-pick border-brand-500' : 'border-ink-700'" x-text="opt"><span class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-brand-500/0 transition-all group-hover:bg-brand-500/70"></span></button>
                                             </template>
                                         </div>
                                     </div>
@@ -709,7 +714,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
-        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false,
+        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '',
 
         previewId: null,
         viewGen: null,
@@ -1117,7 +1122,7 @@ document.addEventListener('alpine:init', () => {
             }
         },
         closeStylist() { this.stylistOpen = false; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; },
-        async pickStylistType(id) { this.stylistType = id; this.stylistHistory = []; await this.stylistNext([]); },
+        async pickStylistType(id) { this.stylistFlash = id; setTimeout(() => { this.stylistFlash = ''; }, 450); this.stylistType = id; this.stylistHistory = []; await this.stylistNext([]); },
         async stylistNext(history) {
             this.stylistLoading = true;
             try {
@@ -1128,6 +1133,7 @@ document.addEventListener('alpine:init', () => {
         },
         async pickStylistOption(answer) {
             if (!answer) return;
+            this.stylistFlash = answer; setTimeout(() => { this.stylistFlash = ''; }, 450);
             this.stylistHistory = this.stylistHistory.concat([{ label: this.stylistStep && this.stylistStep.question, answer }]);
             await this.stylistNext(this.stylistHistory);
         },
