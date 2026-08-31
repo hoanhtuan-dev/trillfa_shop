@@ -838,6 +838,18 @@ document.addEventListener('alpine:init', () => {
             this.generateImage();
         },
         // Hậu cảnh cho swap: dùng chung danh mục 'background' trong Presets (nếu có), fallback danh sách cứng.
+        async api(url, body) {
+            const res = await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
+            return data;
+        },
+        async upload(url, form) {
+            const res = await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', Accept: 'application/json' }, body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
+            return data;
+        },
         get workflowSteps() {
             let cur = 1;
             if (this.output.image_prompt_en) cur = 2;
