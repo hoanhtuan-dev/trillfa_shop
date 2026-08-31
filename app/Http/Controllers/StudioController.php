@@ -532,13 +532,24 @@ class StudioController extends Controller
         $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
         $srcUrl = (string) $data['image'];
 
-        // Real-ESRGAN super-resolution FIRST — it preserves the exact image (no crop/regenerate) and
-        // reconstructs real hair/skin/fabric detail. The AI-edit refine is NOT used here because it can
-        // regenerate at a different aspect ratio (crops the composition). If no Real-ESRGAN key is set we
-        // simply upscale the original below with GD so the composition is kept exactly.
+        // COMBINED upscale: (old) AI-edit refine for photoreal human detail, then (new) Real-ESRGAN
+        // super-resolution. The refine prompt explicitly preserves the aspect ratio/frame to avoid cropping.
+        if ($refine > 0) {
+            try {
+                $keep = 'Keep the exact aspect ratio and framing of the input image — do NOT crop or change the frame. Keep the exact garment, model, pose, composition unchanged. Ultra-detailed, 4K.';
+                $detail = 'Enhance this fashion photograph at high resolution (hyper-realistic, like a professional fashion editorial): hyper-realistic human skin with natural pores and soft sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, rebuild realistic fabric weave and seam/stitching details, crisp sharp edges, rich natural color, '.$keep;
+                $studio = 'Render a high-end professional studio photograph of this fashion garment with hyper-realistic human detail (softbox light, subtle film color grading, shallow depth of field): photorealistic skin with pores, individual hair strands, realistic eyelashes and eye catchlight, ultra-sharp micro-detail, premium catalog quality, '.$keep;
+                $prompt = $photoreal > 0 ? $studio : $detail;
+                $out = app(\App\Services\ImageAIService::class)->generate($prompt, $srcUrl);
+                if ($out) { $srcUrl = $out; }
+            } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
+        }
+
+        // (new) Real-ESRGAN super-resolution — preserves the image, reconstructs real hair/skin/fabric.
+        $erUsed = false;
         if ($scale >= 2 && function_exists('replicate_upscale_image')) {
             $er = \replicate_upscale_image($srcUrl, $scale);
-            if ($er) { $srcUrl = $er; }
+            if ($er) { $srcUrl = $er; $erUsed = true; }
         }
 
         $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
@@ -550,10 +561,12 @@ class StudioController extends Controller
 
         $src = @imagecreatefromstring((string) file_get_contents($file));
         if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
-        $w = (int) (imagesx($src) * $scale);
-        $h = (int) (imagesy($src) * $scale);
-        $dst = imagecreatetruecolor($w, $h);
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, imagesx($src), imagesy($src));
+        $sw = imagesx($src); $sh = imagesy($src);
+        // If Real-ESRGAN already produced the scaled image, keep its size (no double upscale).
+        $us = isset($erUsed) && $erUsed ? 1 : $scale;
+        $tw = (int) max(1, round($sw * $us)); $th = (int) max(1, round($sh * $us));
+        $dst = imagecreatetruecolor($tw, $th);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, $sw, $sh);
         if ($scale > 1 && $photoreal == 0 && function_exists('imageconvolution')) { @imageconvolution($dst, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
