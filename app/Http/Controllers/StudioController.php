@@ -545,12 +545,6 @@ class StudioController extends Controller
             } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
         }
 
-        // (new) Real-ESRGAN super-resolution — preserves the image, reconstructs real hair/skin/fabric.
-        $erUsed = false;
-        if ($scale >= 2 && function_exists('replicate_upscale_image')) {
-            $er = \replicate_upscale_image($srcUrl, $scale);
-            if ($er) { $srcUrl = $er; $erUsed = true; }
-        }
 
         $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
         $file = null;
@@ -562,9 +556,7 @@ class StudioController extends Controller
         $src = @imagecreatefromstring((string) file_get_contents($file));
         if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
         $sw = imagesx($src); $sh = imagesy($src);
-        // If Real-ESRGAN already produced the scaled image, keep its size (no double upscale).
-        $us = isset($erUsed) && $erUsed ? 1 : $scale;
-        $dst = $this->smartUpscale($src, $us);
+        $dst = $this->smartUpscale($src, $scale);
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
@@ -587,16 +579,46 @@ class StudioController extends Controller
     {
         $k = $level / 10.0; // 0..1
         $w = imagesx($img); $h = imagesy($img);
+        // 1) SOFT LIGHT BLEND — blur + lift a copy and blend it in gently for soft, natural ambient light.
         if (function_exists('imagefilter')) {
-            // gentle denoise first so the sharpen doesn't amplify grain (keeps output clean)
-            @imagefilter($img, IMG_FILTER_SMOOTH, (int) round(2 + 3 * $k));
-            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(10 * $k));
-            @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-4 * $k), (int) round(-2 * $k), (int) round(4 * $k));
+            $soft = imagecreatetruecolor($w, $h);
+            imagecopy($soft, $img, 0, 0, 0, 0, $w, $h);
+            @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
+            @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
+            @imagefilter($soft, IMG_FILTER_BRIGHTNESS, (int) round(9 * $k));
+            $alpha = 0.08 + 0.16 * $k;
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $c = imagecolorat($img, $x, $y); $s = imagecolorat($soft, $x, $y);
+                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                    $sr = ($s >> 16) & 0xFF; $sg = ($s >> 8) & 0xFF; $sb = $s & 0xFF;
+                    $nr = (int) round($cr * (1 - $alpha) + $sr * $alpha);
+                    $ng = (int) round($cg * (1 - $alpha) + $sg * $alpha);
+                    $nb = (int) round($cb * (1 - $alpha) + $sb * $alpha);
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                }
+            }
+            imagedestroy($soft);
+            // smart tone: soft contrast + subtle warm/cool grade + gentle denoise
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(6 * $k));
+            @imagefilter($img, IMG_FILTER_SMOOTH, (int) round(2 * $k));
+            @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
         }
-        // mild unsharp (crisp edges without boosting noise)
-        if (function_exists('imageconvolution')) { @imageconvolution($img, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
-        // (no film grain — it caused visible noise)
-        // very gentle vignette (darken corners slightly)
+        // 2) SUBTLE FILM GRAIN — small amplitude, only on shadows/midtones (reads as film, not noise).
+        for ($y = 0; $y < $h; $y += 4) {
+            for ($x = 0; $x < $w; $x += 4) {
+                $c = imagecolorat($img, $x, $y);
+                $lum = (($c >> 16) & 0xFF) * 0.3 + (($c >> 8) & 0xFF) * 0.6 + ($c & 0xFF) * 0.1;
+                if ($lum < 200) {
+                    $n = (int) ((mt_rand(-400, 400) / 1000.0) * 5 * $k);
+                    $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
+                    $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
+                    $b = max(0, min(255, ($c & 0xFF) + $n));
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
+                }
+            }
+        }
+        // 3) gentle vignette (darken corners slightly, keeps depth)
         $cx = $w / 2; $cy = $h / 2; $maxd = (float) max($w, $h);
         for ($y = 0; $y < $h; $y += 4) {
             for ($x = 0; $x < $w; $x += 4) {
