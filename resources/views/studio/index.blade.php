@@ -431,6 +431,7 @@
                     <!-- Canvas contextual actions (per-step) -->
                     <div class="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 gap-1.5" @pointerdown.stop @click.stop>
                         <button @click="selectImage(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-sm whitespace-nowrap rounded-full border border-brand-500/60 text-white shadow-lg shadow-brand-500/20" x-show="step===2 && preview && preview.type==='image' && preview.status==='completed'" title="Chọn ảnh này làm nguồn Chỉnh sửa (Inpaint)." style="background: linear-gradient(135deg, rgba(232,87,125,.9), rgba(124,58,237,.85));">✏️ Sửa ảnh</button>
+                        <button @click="selectVideo(preview)" :disabled="!preview || preview.type !== 'image' || preview.status !== 'completed'" class="btn-sm whitespace-nowrap rounded-full border border-brand-500/60 text-white shadow-lg shadow-brand-500/20" x-show="step===3 && preview && preview.type==='image' && preview.status==='completed'" title="Dùng ảnh này làm nguồn Render Video." style="background: linear-gradient(135deg, rgba(74,122,144,.9), rgba(124,58,237,.85));">🎬 Tạo video</button>
                     </div>
 
                     <!-- Canvas zoom toolbar (vertical, right edge) -->
