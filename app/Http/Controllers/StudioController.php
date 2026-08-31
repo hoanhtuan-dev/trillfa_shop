@@ -584,25 +584,17 @@ class StudioController extends Controller
     protected function studioPhotoFinish(\GdImage $img, int $level): void
     {
         $k = $level / 10.0; // 0..1
-        if (function_exists('imagefilter')) {
-            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(20 * $k));
-            @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-8 * $k), (int) round(-5 * $k), (int) round(8 * $k));
-            @imagefilter($img, IMG_FILTER_SMOOTH, (int) round(-4 * $k));
-        }
-        if (function_exists('imageconvolution')) { @imageconvolution($img, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
-        // subtle film grain
         $w = imagesx($img); $h = imagesy($img);
-        for ($y = 0; $y < $h; $y += 3) {
-            for ($x = 0; $x < $w; $x += 3) {
-                $n = (int) ((mt_rand(-1000, 1000) / 1000) * 6 * $k);
-                $c = imagecolorat($img, $x, $y);
-                $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
-                $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
-                $b = max(0, min(255, ($c & 0xFF) + $n));
-                imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
-            }
+        if (function_exists('imagefilter')) {
+            // gentle denoise first so the sharpen doesn't amplify grain (keeps output clean)
+            @imagefilter($img, IMG_FILTER_SMOOTH, (int) round(2 + 3 * $k));
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(10 * $k));
+            @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-4 * $k), (int) round(-2 * $k), (int) round(4 * $k));
         }
-        // gentle vignette (darken corners)
+        // mild unsharp (crisp edges without boosting noise)
+        if (function_exists('imageconvolution')) { @imageconvolution($img, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
+        // (no film grain — it caused visible noise)
+        // very gentle vignette (darken corners slightly)
         $cx = $w / 2; $cy = $h / 2; $maxd = (float) max($w, $h);
         for ($y = 0; $y < $h; $y += 4) {
             for ($x = 0; $x < $w; $x += 4) {
