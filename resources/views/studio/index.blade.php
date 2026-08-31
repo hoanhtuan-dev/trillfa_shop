@@ -593,28 +593,47 @@
         </div>
     </template>
 
-    <!-- Output viewer popup -->
+    <!-- Output viewer popup (fullscreen + mouse zoom + nav + info) -->
     <template x-if="viewGen">
-        <div class="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8" @click.self="closeGenView()">
-            <div class="absolute inset-0 bg-ink-900/90" @click="closeGenView()"></div>
-            <div class="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-ink-900 shadow-2xl">
-                <button @click="closeGenView()" class="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-full bg-ink-800 text-cream-200 hover:text-white">×</button>
-                <div class="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-ink-900 p-3">
-                    <template x-if="viewGen && viewGen.type==='video' && viewGen.media_url">
-                        <video :src="viewGen.media_url" class="max-h-[78vh] w-full rounded-2xl object-contain" controls autoplay loop muted playsinline></video>
-                    </template>
-                    <template x-if="viewGen && viewGen.type!=='video' && viewGen.media_url">
-                        <img :src="viewGen.media_url" class="max-h-[78vh] max-w-full rounded-2xl object-contain" onerror="this.src='/images/placeholder.svg'">
-                    </template>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-ink-700 px-4 py-3">
-                    <span class="truncate text-xs text-cream-300" x-text="viewGen ? genInfoLine(viewGen) : ''"></span>
-                    <span class="flex items-center gap-2">
-                        <button @click="openInStudio(viewGen)" class="btn-brand btn-sm whitespace-nowrap" title="Mở trong Studio (canvas)">🖼 Mở trong Studio</button>
-                        <a :href="viewGen ? '/studio/generations/' + viewGen.id + '/download' : '#'" class="btn-outline btn-sm" x-show="viewGen && viewGen.media_url">Tải xuống</a>
-                    </span>
-                </div>
+        <div class="fixed inset-0 z-[80] overflow-hidden bg-ink-900/95" @wheel.prevent="vgWheel($event)" @click.self="closeGenView()">
+            <!-- top bar -->
+            <div class="absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-4 py-3">
+                <button @click="vgToggleInfo()" class="grid h-9 w-9 place-items-center rounded-full bg-ink-800 text-sm text-cream-200 hover:bg-ink-700 hover:text-white" title="Xem thông tin prompt & chi phí">ℹ️</button>
+                <span class="text-xs font-semibold text-cream-200" x-text="genInfoLine(viewGen)"></span>
+                <button @click="closeGenView()" class="grid h-10 w-10 place-items-center rounded-full bg-ink-800 text-cream-200 hover:bg-ink-700 hover:text-white" title="Đóng">×</button>
             </div>
+            <!-- prev / next -->
+            <button @click="vgNav(-1)" class="absolute left-3 top-1/2 z-20 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-ink-800/90 text-2xl text-cream-100 hover:bg-ink-700" title="Ảnh trước">‹</button>
+            <button @click="vgNav(1)" class="absolute right-3 top-1/2 z-20 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-ink-800/90 text-2xl text-cream-100 hover:bg-ink-700" title="Ảnh sau">›</button>
+            <!-- media -->
+            <div class="absolute inset-0 grid place-items-center p-4">
+                <template x-if="viewGen && viewGen.type==='video' && viewGen.media_url">
+                    <video :src="viewGen.media_url" class="max-h-[100vh] max-w-[100vw] object-contain" controls autoplay loop muted playsinline></video>
+                </template>
+                <template x-if="viewGen && viewGen.type!=='video' && viewGen.media_url">
+                    <img :src="viewGen.media_url" class="max-h-[100vh] max-w-[100vw] cursor-grab select-none object-contain active:cursor-grabbing" :style="{ transform: 'translate(' + vgPan.x + 'px, ' + vgPan.y + 'px) scale(' + vgZoom + ')', transformOrigin: 'center' }" @pointerdown="vgStartPan($event)" @pointermove="vgMovePan($event)" @pointerup="vgEndPan" @pointerleave="vgEndPan" onerror="this.src='/images/placeholder.svg'">
+                </template>
+            </div>
+            <!-- zoom controls -->
+            <div class="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full bg-ink-900/80 px-2 py-1.5 shadow-lg backdrop-blur">
+                <button @click="vgZoomAt(0,0,0.66)" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700" title="Thu nhỏ">−</button>
+                <button @click="vgReset()" class="rounded-full px-2 py-1 text-xs text-cream-200 hover:bg-ink-700" title="Vừa khung">Vừa</button>
+                <button @click="vgZoomAt(0,0,1.5)" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700" title="Phóng to">+</button>
+                <span class="px-1 text-xs text-cream-200">Zoom <b x-text="vgZoom.toFixed(2)"></b>x</span>
+            </div>
+            <!-- info panel -->
+            <template x-if="viewGenInfo">
+                <div class="absolute inset-x-0 bottom-0 z-20 border-t border-ink-700 bg-ink-900/95 p-4 backdrop-blur">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-300">ℹ️ Thông tin kết quả</p>
+                    <div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+                        <div><p class="text-cream-300/60">Model</p><p class="text-cream-100" x-text="viewGen.model || '—'"></p></div>
+                        <div><p class="text-cream-300/60">Provider</p><p class="text-cream-100" x-text="viewGen.provider || '—'"></p></div>
+                        <div><p class="text-cream-300/60">Chi phí</p><p class="text-cream-100" x-text="(viewGen.credits_cost || 0) + ' credit'"></p></div>
+                        <div><p class="text-cream-300/60">Trạng thái</p><p class="text-cream-100" x-text="viewGen.status || '—'"></p></div>
+                    </div>
+                    <p class="mt-2 text-xs leading-relaxed text-cream-200"><span class="text-cream-300/60">Prompt:</span> <span x-text="viewGen.prompt || '—'"></span></p>
+                </div>
+            </template>
         </div>
     </template>
 </div>
@@ -679,7 +698,7 @@ document.addEventListener('alpine:init', () => {
         stylistOpen: false, stylistType: '', stylistTypes: @json($stylistTypes), stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '', stylistAdvice: '', stylistVersions: [],
 
         previewId: null,
-        viewGen: null,
+        viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
@@ -799,7 +818,30 @@ document.addEventListener('alpine:init', () => {
                 this._touchDist = d;
             } else { this._touchDist = null; }
         },
-        openGenView(g) { this.viewGen = g; },
+        openGenView(g) { this.viewGen = g; this.vgZoom = 1; this.vgPan = { x: 0, y: 0 }; this.viewGenInfo = false; },
+        vgZoomAt(cx, cy, factor) {
+            const old = this.vgZoom; const nz = Math.min(8, Math.max(0.6, +(old * factor).toFixed(2)));
+            if (nz === old) return; const k = nz / old;
+            this.vgPan.x = +((1 - k) * cx + k * this.vgPan.x).toFixed(2);
+            this.vgPan.y = +((1 - k) * cy + k * this.vgPan.y).toFixed(2); this.vgZoom = nz;
+        },
+        vgWheel(e) {
+            const r = e.currentTarget.getBoundingClientRect();
+            const cx = e.clientX - (r.left + r.width / 2), cy = e.clientY - (r.top + r.height / 2);
+            this.vgZoomAt(cx, cy, e.deltaY > 0 ? 0.82 : 1.22);
+        },
+        vgStartPan(e) { this._vgDrag = { x: e.clientX, y: e.clientY, px: this.vgPan.x, py: this.vgPan.y }; },
+        vgMovePan(e) { if (this._vgDrag) { this.vgPan.x = this._vgDrag.px + (e.clientX - this._vgDrag.x); this.vgPan.y = this._vgDrag.py + (e.clientY - this._vgDrag.y); } },
+        vgEndPan() { this._vgDrag = null; },
+        vgReset() { this.vgZoom = 1; this.vgPan = { x: 0, y: 0 }; },
+        vgIndex() { return this.generations.findIndex(g => g.id === (this.viewGen && this.viewGen.id)); },
+        vgNav(dir) {
+            const list = this.generations.filter(g => g.type === 'image' && g.status === 'completed' && g.media_url);
+            if (!list.length) return;
+            let i = list.findIndex(g => g.id === (this.viewGen && this.viewGen.id));
+            i = (i + dir + list.length) % list.length; this.openGenView(list[i]);
+        },
+        vgToggleInfo() { this.viewGenInfo = !this.viewGenInfo; },
         openInStudio(g) { if (g) { this.setPreview(g); } this.viewGen = null; },
         closeGenView() { this.viewGen = null; },
         openLightbox() { this.lbZoom = 1; this.lbPan = { x: 0, y: 0 }; this.lightbox = true; document.body.style.overflow = 'hidden'; },
