@@ -125,6 +125,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/stylist/cluster', [StudioController::class, 'stylistCluster'])->name('stylist.cluster');
     Route::post('/stylist/prompt', [StudioController::class, 'stylistPrompt'])->name('stylist.prompt');
     Route::post('/stylist/refine', [StudioController::class, 'stylistRefine'])->name('stylist.refine');
+    Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::get('/assets', [StudioController::class, 'assetIndex'])->name('assets');
     Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
     Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');

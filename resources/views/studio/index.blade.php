@@ -379,6 +379,31 @@
 
             </div>
 
+            <!-- Card: Tinh chỉnh & Nâng cấp ảnh -->
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,150,120,.13), rgba(74,122,144,.06));">
+                <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🔍 Tinh chỉnh & Nâng cấp ảnh</h2>
+                <p class="text-[11px] text-ink-500">Phóng to độ phân giải + làm nét/chi tiết ảnh đang chọn (kết quả / ảnh chỉnh sửa).</p>
+                <template x-if="upscaleSrc">
+                    <div class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
+                        <img :src="upscaleSrc" class="h-16 w-16 rounded-xl bg-ink-900 object-cover" alt="Nguồn">
+                        <div class="min-w-0 text-xs text-cream-200"><p class="truncate font-semibold" x-text="upscaleName"></p><p class="text-cream-300/60">Ảnh nguồn · nâng cấp x<button @click="upscaleScale=1" class="ml-1 underline" :class="upscaleScale===1 ? 'text-brand-300' : ''">1</button>/<button @click="upscaleScale=2" class="underline" :class="upscaleScale===2 ? 'text-brand-300' : ''">2</button>/<button @click="upscaleScale=4" class="underline" :class="upscaleScale===4 ? 'text-brand-300' : ''">4</button></p></div>
+                    </div>
+                </template>
+                <label class="label mt-3">Độ phóng to (Upscale)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Độ phóng</span>
+                    <input type="range" min="1" max="4" step="1" x-model="upscaleScale" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="upscaleScale + 'x'"></span>
+                </div>
+                <label class="label mt-3">Tinh chỉnh AI (nét & chi tiết)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Tinh chỉnh</span>
+                    <input type="range" min="0" max="10" step="1" x-model="upscaleRefine" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="upscaleRefine + '/10'"></span>
+                </div>
+                <button @click="runUpscale()" :disabled="upscaling || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap" title="Phóng to + tinh chỉnh ảnh đang chọn"><span x-show="!upscaling">🔍 Nâng cấp Ảnh</span><span x-show="upscaling">Đang nâng cấp…</span></button>
+            </div>
+
             <!-- Bước 3 · Ghế Đạo Diễn -->
             <div class="card p-5" x-show="step===3" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.12), rgba(124,58,237,.06));">
                 <h2 class="mb-3 font-display text-base font-semibold text-ink-900">🎬 Ghế Đạo Diễn · Prompt video</h2>
@@ -706,6 +731,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
+        upscaleScale: 2, upscaleRefine: 5, upscaling: false,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
@@ -1042,6 +1068,23 @@ document.addEventListener('alpine:init', () => {
             try { const d = await this.api('/studio/stylist/cluster', { type: id }); this.stylistQuestions = (d && d.questions) || []; }
             catch (e) { Alpine.store('toast').show(e.message || 'Lỗi tải cụm câu hỏi.', 'error'); }
             finally { this.stylistLoading = false; }
+        },
+        get upscaleSrc() { return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
+        get upscaleName() { return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
+        async runUpscale() {
+            const src = this.upscaleSrc;
+            if (!src || this.upscaling) return;
+            this.upscaling = true;
+            const tmpId = 'up-' + Date.now();
+            this.addGen({ id: tmpId, type: 'image', status: 'processing', model: 'upscale', provider: 'upscale', media_url: null, error: null, credits_cost: 0, created_at: 'Đang nâng cấp' });
+            try {
+                const d = await this.api('/studio/upscale', { image: src, scale: Number(this.upscaleScale) || 2, refine: Number(this.upscaleRefine) || 0 });
+                this.generations = this.generations.filter(g => g.id !== tmpId);
+                this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'upscale', provider: 'upscale', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa nâng cấp' });
+                this.previewId = d.generation_id; this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' });
+                Alpine.store('toast').show('Đã nâng cấp ảnh (' + this.upscaleScale + 'x).');
+            } catch (e) { this.generations = this.generations.filter(g => g.id !== tmpId); Alpine.store('toast').show(e.message || 'Lỗi nâng cấp ảnh.', 'error'); }
+            finally { this.upscaling = false; }
         },
         toggleStylistAnswer(key, val) {
             if (!val) return;

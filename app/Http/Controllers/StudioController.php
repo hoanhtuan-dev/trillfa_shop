@@ -516,6 +516,62 @@ class StudioController extends Controller
     }
 
     /**
+     * Nâng cấp & tinh chỉnh ảnh — upscale (GD) + optional AI refine (edit model).
+     */
+    public function upscale(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],
+            'scale' => ['nullable', 'integer', 'min:1', 'max:4'],
+            'refine' => ['nullable', 'integer', 'min:0', 'max:10'],
+        ]);
+        $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
+        $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
+        $srcUrl = (string) $data['image'];
+
+        if ($refine > 0) {
+            try {
+                $out = app(\App\Services\ImageAIService::class)->generate(
+                    'Enhance this image: increase sharpness, clarity and fine detail, keep the exact subject, garment and composition unchanged, high resolution, photorealistic.',
+                    $srcUrl
+                );
+                if ($out) { $srcUrl = $out; }
+            } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
+        }
+
+        $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
+
+        $src = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
+        $w = (int) (imagesx($src) * $scale);
+        $h = (int) (imagesy($src) * $scale);
+        $dst = imagecreatetruecolor($w, $h);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, imagesx($src), imagesy($src));
+        $name = 'studio/upscale-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
+        imagedestroy($src); imagedestroy($dst);
+
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'completed',
+            'media_url' => '/storage/'.$name,
+            'prompt' => 'Nâng cấp ảnh ('.$scale.'x'.($refine ? ', refine '.$refine : '').')',
+            'model' => 'upscale', 'provider' => 'upscale', 'credits_cost' => 0,
+        ]);
+
+        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+    }
+
+    protected function pngBytes(\GdImage $img): string
+    {
+        ob_start(); imagepng($img); return (string) ob_get_clean();
+    }
+
+    /**
      * ✨ Thuật sỹ ảo — guided fashion-stylist wizard.
      */
     public function stylistTypes(): \Illuminate\Http\JsonResponse
