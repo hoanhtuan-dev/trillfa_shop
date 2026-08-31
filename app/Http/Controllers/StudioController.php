@@ -528,12 +528,14 @@ class StudioController extends Controller
             'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
             'skin_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
             'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'fabric_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
         $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
         $skinDetail = max(0, min(10, (int) ($data['skin_detail'] ?? 0)));
         $lightShadow = max(0, min(10, (int) ($data['light_shadow'] ?? 0)));
+        $fabricDetail = max(0, min(10, (int) ($data['fabric_detail'] ?? 0)));
         $srcUrl = (string) $data['image'];
 
         // COMBINED upscale: (old) AI-edit refine for photoreal human detail, then (new) Real-ESRGAN
@@ -563,6 +565,7 @@ class StudioController extends Controller
         $dst = $this->smartUpscale($src, $scale);
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
         if ($skinDetail > 0) { $this->skinTexturePass($dst, $skinDetail); }
+        if ($fabricDetail > 0) { $this->fabricTexturePass($dst, $fabricDetail); }
         if ($lightShadow > 0) { $this->lightShadowPass($dst, $lightShadow); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
@@ -609,13 +612,13 @@ class StudioController extends Controller
             @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(7 * $k));
             @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
         }
-        // 2) SUBTLE FILM GRAIN — small amplitude, only on shadows/midtones (reads as film, not noise).
-        for ($y = 0; $y < $h; $y += 4) {
-            for ($x = 0; $x < $w; $x += 4) {
+        // 2) SUBTLE FILM GRAIN — a touch more presence (photographic), still low amplitude, on shadows/midtones.
+        for ($y = 0; $y < $h; $y += 3) {
+            for ($x = 0; $x < $w; $x += 3) {
                 $c = imagecolorat($img, $x, $y);
                 $lum = (($c >> 16) & 0xFF) * 0.3 + (($c >> 8) & 0xFF) * 0.6 + ($c & 0xFF) * 0.1;
-                if ($lum < 200) {
-                    $n = (int) ((mt_rand(-400, 400) / 1000.0) * 5 * $k);
+                if ($lum < 215) {
+                    $n = (int) ((mt_rand(-450, 450) / 1000.0) * 6 * $k);
                     $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
                     $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
                     $b = max(0, min(255, ($c & 0xFF) + $n));
@@ -707,6 +710,33 @@ class StudioController extends Controller
         }
         if (function_exists('imagefilter')) {
             @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(6 * $k));
+        }
+    }
+
+    /**
+     * Fabric roughness / weave: adds a fine diagonal weave pattern + subtle grain on non-skin
+     * mid-tone regions (the garment), leaving skin smooth and bright background untouched.
+     */
+    protected function fabricTexturePass(\GdImage $img, int $level): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $lum = $r * 0.3 + $g * 0.6 + $b * 0.1;
+                $isSkin = ($r > 85 && $r > $g && $g > $b && ($r - $b) > 14 && $r < 246 && $g > 55);
+                // garment/fabric: not skin, mid-tone (excludes very dark & bright background)
+                if (! $isSkin && $lum > 70 && $lum < 205) {
+                    $weave = ((($x + $y) % 4) < 2) ? 1 : -1;
+                    $n = (int) (($weave * (2 + 2.5 * $k)) + ((mt_rand(-140, 140) / 1000.0) * 6 * $k));
+                    $nr = max(0, min(255, $r + $n));
+                    $ng = max(0, min(255, $g + $n));
+                    $nb = max(0, min(255, $b + (int) ($n * 0.9)));
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                }
+            }
         }
     }
 
