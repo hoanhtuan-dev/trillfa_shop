@@ -89,7 +89,8 @@
                             </template>
                         </div>
                     </div>
-                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand col-span-2 whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
+                    <button @click="generateImage()" :disabled="generating || !output.image_prompt_en" class="btn-brand whitespace-nowrap"><span x-show="!generating">Tạo Ảnh 2D</span><span x-show="generating">Đang gửi…</span></button>
+                    <button @click="openStylist()" class="btn-outline col-span-2 whitespace-nowrap">✨ Thuật sỹ</button>
                 </div>
             </div>
 
@@ -221,6 +222,69 @@
                         <input x-ref="swapPoseInput" type="file" accept="image/*" @change="addSwapAsset('pose', $event)" class="hidden">
                         <button @click="swapOpen=false" class="btn-outline btn-sm">Huỷ</button>
                         <button @click="runSwap()" :disabled="swapLoading" class="btn-brand btn-sm"><span x-show="!swapLoading">Áp Dụng</span><span x-show="swapLoading">Đang ghép…</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✨ Thuật sỹ ảo -->
+            <div x-show="stylistOpen" x-cloak @click="stylistOpen=false" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
+                    <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
+                        <h3 class="font-display text-base font-semibold text-cream-50">✨ Thuật sỹ ảo</h3>
+                        <button @click="closeStylist()" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
+                    </div>
+                    <div class="max-h-[76vh] overflow-y-auto p-5">
+                        <!-- Bước 1: chọn loại trang phục -->
+                        <template x-if="!stylistType">
+                            <div>
+                                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-200">Chọn loại trang phục</p>
+                                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    <template x-for="t in stylistTypes" :key="t.id">
+                                        <button @click="pickStylistType(t.id)" class="group flex flex-col items-center gap-1.5 rounded-2xl border border-ink-700 bg-ink-700/30 p-4 transition-all hover:border-brand-500/60 hover:bg-ink-700">
+                                            <span class="text-3xl" x-text="t.emoji"></span>
+                                            <span class="text-xs font-medium text-cream-100" x-text="t.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                                <p class="mt-3 text-xs text-cream-300/60" x-show="!stylistTypes.length">Đang nạp các loại trang phục…</p>
+                            </div>
+                        </template>
+                        <!-- Bước 2: hỏi từng bước -->
+                        <template x-if="stylistType">
+                            <div>
+                                <div class="mb-3 flex flex-wrap gap-1.5" x-show="stylistHistory.length">
+                                    <template x-for="(h,i) in stylistHistory" :key="i">
+                                        <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200" x-text="h.label + ': ' + h.answer"></span>
+                                    </template>
+                                </div>
+                                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-200" x-text="(stylistTypes.find(t=>t.id===stylistType)||{}).name"></p>
+                                <template x-if="stylistStep && stylistStep.done">
+                                    <div>
+                                        <div class="rounded-xl border border-brand-500/40 bg-brand-600/10 p-3">
+                                            <p class="text-xs font-semibold text-brand-300">Prompt thiết kế (tiếng Anh)</p>
+                                            <p class="mt-1 text-sm text-cream-100" x-text="stylistStep.prompt"></p>
+                                            <template x-if="stylistStep.summary"><p class="mt-2 text-xs text-cream-300" x-text="'Tóm tắt: ' + stylistStep.summary"></p></template>
+                                        </div>
+                                        <button @click="applyStylistPrompt()" class="btn-brand mt-3 w-full">Dùng prompt này → Tạo ảnh 2D</button>
+                                    </div>
+                                </template>
+                                <template x-if="stylistStep && !stylistStep.done">
+                                    <div>
+                                        <p class="mb-2 flex items-center gap-2 text-sm font-semibold text-cream-100">
+                                            <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-brand-500"></span>
+                                            <span x-text="stylistStep.question"></span>
+                                        </p>
+                                        <div class="grid gap-1.5">
+                                            <template x-for="(opt,i) in stylistStep.options" :key="i">
+                                                <button @click="pickStylistOption(opt)" class="rounded-xl border border-ink-700 bg-ink-700/40 px-3 py-2 text-left text-sm text-cream-200 transition-colors hover:border-brand-500/60 hover:bg-ink-700" x-text="opt"></button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                                <p class="mt-3 text-xs text-cream-300" x-show="stylistLoading">Thuật sỹ đang suy nghĩ…</p>
+                                <p class="mt-2 text-xs text-cream-300/60" x-show="!stylistLoading && !stylistStep">Chờ thuật sỹ gợi ý…</p>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -628,6 +692,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
+        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false,
 
         previewId: null,
         viewGen: null,
@@ -1021,6 +1086,34 @@ document.addEventListener('alpine:init', () => {
                 this.generations.unshift({ id: item.id, type: 'image', status: 'completed', model: 'swap', provider: 'swap', media_url: item.url, credits_cost: 1, created_at: 'Phiên bản' });
             }
             this.previewId = item.id;
+        },
+        openStylist() {
+            this.stylistOpen = true; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; this.stylistDone = false;
+            if (!this.stylistTypes.length) {
+                this.api('/studio/stylist/types').then(d => { this.stylistTypes = d.types || []; }).catch(() => {});
+            }
+        },
+        closeStylist() { this.stylistOpen = false; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; },
+        async pickStylistType(id) { this.stylistType = id; this.stylistHistory = []; await this.stylistNext([]); },
+        async stylistNext(history) {
+            this.stylistLoading = true;
+            try {
+                const d = await this.api('/studio/stylist', { type: this.stylistType, history });
+                this.stylistStep = d;
+            } catch (e) { Alpine.store('toast').show(e.message || 'Lỗi thuật sỹ.', 'error'); }
+            finally { this.stylistLoading = false; }
+        },
+        async pickStylistOption(answer) {
+            if (!answer) return;
+            this.stylistHistory = this.stylistHistory.concat([{ label: this.stylistStep && this.stylistStep.question, answer }]);
+            await this.stylistNext(this.stylistHistory);
+        },
+        applyStylistPrompt() {
+            const p = this.stylistStep && this.stylistStep.prompt;
+            if (!p) { Alpine.store('toast').show('Chưa có prompt hoàn chỉnh.', 'error'); return; }
+            this.output.image_prompt_en = p;
+            Alpine.store('toast').show('Đã áp dụng prompt từ thuật sỹ vào Bước 1.');
+            this.closeStylist();
         },
         clearSwap() { this.swapModelIds = []; this.swapPoseIds = []; this.swapDesign = ''; this.lookbook = []; this.lookbookOpen = false; Alpine.store('toast').show('Đã xoá lựa chọn khuôn mặt & dáng.', 'info'); },
         toggleSwapModel(id) { const i = this.swapModelIds.indexOf(id); if (i >= 0) this.swapModelIds.splice(i, 1); else this.swapModelIds.push(id); },

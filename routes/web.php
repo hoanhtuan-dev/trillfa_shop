@@ -120,6 +120,8 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/swap-model', [StudioController::class, 'swapModel'])->name('swapModel');
+    Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
+    Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');
     Route::get('/assets', [StudioController::class, 'assetIndex'])->name('assets');
     Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
     Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');

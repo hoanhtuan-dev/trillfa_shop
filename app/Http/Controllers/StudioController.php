@@ -519,6 +519,27 @@ class StudioController extends Controller
     }
 
     /**
+     * ✨ Thuật sỹ ảo — guided fashion-stylist wizard.
+     */
+    public function stylistTypes(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json(['types' => app(\App\Services\StylistService::class)->garmentTypes()]);
+    }
+
+    public function stylist(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'type' => ['required', 'string', 'max:40'],
+            'history' => ['nullable', 'array'],
+            'history.*.label' => ['nullable', 'string', 'max:80'],
+            'history.*.answer' => ['nullable', 'string', 'max:255'],
+        ]);
+        $svc = app(\App\Services\StylistService::class);
+        $step = $svc->next((string) $data['type'], $data['history'] ?? []);
+        return response()->json($step);
+    }
+
+    /**
      * "Thay Đổi Người Mẫu" (Click-to-Swap) — virtual try-on with a chosen model + pose.
      */
     public function swapModel(Request $request)
