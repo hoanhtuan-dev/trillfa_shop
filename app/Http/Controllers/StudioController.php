@@ -577,14 +577,6 @@ class StudioController extends Controller
         return $this->processAndStore($data['image'], function (\GdImage $img) use ($ratio) { return $this->cropReframe($img, $ratio); }, 'Reframe '.$ratio, 'reframe');
     }
 
-    public function background(Request $request): \Illuminate\Http\JsonResponse
-    {
-        $data = $request->validate(['image' => ['required', 'string', 'max:2048'], 'target' => ['nullable', 'string', 'max:40'], 'level' => ['nullable', 'integer', 'min:0', 'max:10']]);
-        $level = max(1, min(10, (int) ($data['level'] ?? 6)));
-        $target = (string) ($data['target'] ?? '#b8b0a4');
-        return $this->processAndStore($data['image'], function (\GdImage $img) use ($target, $level) { $this->bgReplace($img, $target, $level); return $img; }, 'Nền '.($target === 'transparent' ? 'trong suốt' : $target), 'background');
-    }
-
     protected function processAndStore(string $srcUrl, callable $cb, string $prompt, string $model): \Illuminate\Http\JsonResponse
     {
         $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
