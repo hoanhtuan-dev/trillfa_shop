@@ -551,8 +551,29 @@ class StudioController extends Controller
 
     public function reframe(Request $request): \Illuminate\Http\JsonResponse
     {
-        $data = $request->validate(['image' => ['required', 'string', 'max:2048'], 'ratio' => ['required', 'string', 'max:12']]);
-        $ratio = in_array($data['ratio'], ['1:1', '3:4', '4:5', '9:16', '16:9', '2:3', '3:2', '4:3'], true) ? $data['ratio'] : '3:4';
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],
+            'ratio' => ['nullable', 'string', 'max:12'],
+            'x' => ['nullable', 'integer', 'min:0'],
+            'y' => ['nullable', 'integer', 'min:0'],
+            'w' => ['nullable', 'integer', 'min:1'],
+            'h' => ['nullable', 'integer', 'min:1'],
+        ]);
+        // If an explicit pixel crop rectangle is given (canvas crop), crop exactly that.
+        if (! empty($data['w']) && ! empty($data['h'])) {
+            return $this->processAndStore($data['image'], function (\GdImage $img) use ($data) {
+                $w = imagesx($img); $h = imagesy($img);
+                $x = max(0, min($w - 1, (int) ($data['x'] ?? 0)));
+                $y = max(0, min($h - 1, (int) ($data['y'] ?? 0)));
+                $cw = max(1, min($w - $x, (int) $data['w']));
+                $ch = max(1, min($h - $y, (int) $data['h']));
+                $out = imagecreatetruecolor($cw, $ch);
+                imagecopy($out, $img, 0, 0, $x, $y, $cw, $ch);
+                imagedestroy($img);
+                return $out;
+            }, 'Crop canvas', 'reframe');
+        }
+        $ratio = in_array($data['ratio'] ?? '', ['1:1', '3:4', '4:5', '9:16', '16:9', '2:3', '3:2', '4:3'], true) ? $data['ratio'] : '3:4';
         return $this->processAndStore($data['image'], function (\GdImage $img) use ($ratio) { return $this->cropReframe($img, $ratio); }, 'Reframe '.$ratio, 'reframe');
     }
 

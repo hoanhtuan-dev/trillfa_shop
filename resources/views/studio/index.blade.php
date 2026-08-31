@@ -463,7 +463,11 @@
                         <button type="button" @click="reframeRatio = r" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="reframeRatio === r ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"><span x-text="r"></span></button>
                     </template>
                 </div>
-                <button @click="runReframe()" :disabled="reframing || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!reframing">📐 Cắt khung</span><span x-show="reframing">Đang cắt…</span></button>
+                <button @click="runReframe()" :disabled="reframing || !upscaleSrc" class="btn-outline btn-sm mt-3 w-full whitespace-nowrap" title="Cắt giữa theo tỷ lệ đã chọn">📐 Cắt giữa</button>
+                <button @click="toggleCrop()" :disabled="reframing || !upscaleSrc" class="mt-1.5 w-full whitespace-nowrap rounded-2xl border py-2 text-sm font-semibold transition-colors" :class="cropMode ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'" title="Chọn vùng cắt ngay trên canvas"><span x-show="!cropMode">✂️ Chọn vùng trên canvas</span><span x-show="cropMode">✂️ Đang chọn vùng… (Hủy)</span></button>
+                <template x-if="cropMode">
+                    <button @click="confirmCrop()" :disabled="reframing || !upscaleSrc" class="btn-brand mt-1.5 w-full whitespace-nowrap"><span x-show="!reframing">✅ Áp dụng vùng đã chọn</span><span x-show="reframing">Đang cắt…</span></button>
+                </template>
             </div>
 
             <!-- Card: Retouch da -->
@@ -561,10 +565,21 @@
                         <span class="h-px w-5 bg-white/10"></span>
                         <button @click="resetZoom()" class="grid h-7 w-7 place-items-center rounded-lg text-[10px] text-cream-200 hover:bg-ink-700" title="Vừa khung">⤢</button>
                     </div>
-                    <div class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
+                    <div x-ref="canvasZoom" class="absolute inset-0 grid place-items-center p-4 transition-transform duration-150"
                          :style="{ transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')', transformOrigin: 'center' }">
                         <template x-if="canvasImg || (preview && preview.status === 'completed' && preview.type === 'image' && preview.media_url)">
-                            <img :src="canvasImg || preview.media_url" class="max-h-full max-w-full cursor-zoom-in object-contain" onerror="this.src='/images/placeholder.svg'" @click="openLightbox()">
+                            <img x-ref="cvImg" :src="canvasImg || preview.media_url" class="max-h-full max-w-full cursor-zoom-in object-contain" onerror="this.src='/images/placeholder.svg'" @click="openLightbox()">
+                        </template>
+                        <template x-if="cropMode && (canvasImg || preview?.media_url)">
+                            <div class="pointer-events-none absolute inset-0" style="z-index: 30">
+                                <div class="absolute" :style="cropStyle()" @pointerdown.stop="cropStart($event,'move')" @pointermove="cropMove($event)" @pointerup="cropEnd" @pointerleave="cropEnd">
+                                    <div class="absolute inset-0 border-2 border-white/85" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
+                                    <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                        <span class="rounded bg-white/70 px-1 py-0.5 text-[10px] font-semibold text-ink-900" x-text="reframeRatio"></span>
+                                    </div>
+                                    <div class="absolute -bottom-3 -right-3 h-6 w-6 cursor-nwse-resize rounded-sm bg-white shadow" @pointerdown.stop="cropStart($event,'resize')" @pointermove="cropMove($event)" @pointerup="cropEnd" @pointerleave="cropEnd"></div>
+                                </div>
+                            </div>
                         </template>
                         <template x-if="preview && preview.status === 'completed' && preview.type === 'video' && preview.media_url">
                             <video :src="preview.media_url" class="max-h-full max-w-full object-contain" controls loop muted playsinline></video>
@@ -825,7 +840,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
-        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, skinDetail: 4, lightShadow: 5, fabricDetail: 5, upscaling: false, lookPreset: 'studio', lookLevel: 5, looking: false, reframeRatio: '3:4', reframing: false, retouchLevel: 5, retouching: false, bgTarget: '#b8b0a4', bgLevel: 6, bgDoing: false,
+        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, skinDetail: 4, lightShadow: 5, fabricDetail: 5, upscaling: false, lookPreset: 'studio', lookLevel: 5, looking: false, reframeRatio: '3:4', reframing: false, cropMode: false, cropBox: { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }, _cropDrag: null, retouchLevel: 5, retouching: false, bgTarget: '#b8b0a4', bgLevel: 6, bgDoing: false,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
@@ -1165,6 +1180,59 @@ document.addEventListener('alpine:init', () => {
         },
         get upscaleSrc() { return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
         get upscaleName() { return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
+        toggleCrop() {
+            this.cropMode = !this.cropMode;
+            if (this.cropMode) {
+                const r = Number(this.reframeRatio.split(':')[0]) / Number(this.reframeRatio.split(':')[1]);
+                const img = this.$refs.cvImg; const iw = img ? img.naturalWidth : 1000; const ih = img ? img.naturalHeight : 1250;
+                const ia = iw / ih; let w, h;
+                if (ia > r) { w = 0.7; h = Math.min(0.9, w / r); } else { h = 0.7; w = Math.min(0.9, h * r); }
+                this.cropBox = { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+            }
+        },
+        cropStart(e, key) { this._cropDrag = { key, sx: e.clientX, sy: e.clientY, box: { ...this.cropBox } }; },
+        cropMove(e) {
+            if (!this._cropDrag || !this.cropMode) return;
+            const dx = (e.clientX - this._cropDrag.sx), dy = (e.clientY - this._cropDrag.sy);
+            const img = this.$refs.cvImg; if (!img) return;
+            const rect = img.getBoundingClientRect(); const fw = rect.width / img.naturalWidth, fh = rect.height / img.naturalHeight;
+            const bx = dx / rect.width, by = dy / rect.height;
+            const b = { ...this._cropDrag.box };
+            if (this._cropDrag.key === 'move') {
+                b.x = Math.max(0, Math.min(1 - b.w, b.x + bx));
+                b.y = Math.max(0, Math.min(1 - b.h, b.y + by));
+            } else {
+                const r = b.w / b.h;
+                const step = Math.max(bx, by);
+                let nw = Math.max(0.05, b.w + step), nh = nw / r;
+                if (b.x + nw > 1 || b.y + nh > 1) { nh = Math.min(1 - b.y, 1 - b.x * r); nw = nh * r; }
+                b.w = nw; b.h = nh;
+            }
+            this.cropBox = b;
+        },
+        cropEnd() { this._cropDrag = null; },
+        cropStyle() {
+            if (!this.cropMode || !this.$refs.cvImg || !this.$refs.canvasZoom) return {};
+            const img = this.$refs.cvImg, cont = this.$refs.canvasZoom;
+            const ir = img.getBoundingClientRect(), cr = cont.getBoundingClientRect();
+            const iw = img.naturalWidth || 1, ih = img.naturalHeight || 1;
+            const ia = iw / ih, box = ir.width / ir.height;
+            let vw, vh;
+            if (ia > box) { vw = ir.width; vh = ir.width / ia; } else { vh = ir.height; vw = ir.height * ia; }
+            const vx = (ir.left - cr.left + (ir.width - vw) / 2) / cr.width;
+            const vy = (ir.top - cr.top + (ir.height - vh) / 2) / cr.height;
+            return { left: ((vx + this.cropBox.x * (vw / cr.width)) * 100) + '%', top: ((vy + this.cropBox.y * (vh / cr.height)) * 100) + '%', width: ((this.cropBox.w * vw / cr.width) * 100) + '%', height: ((this.cropBox.h * vh / cr.height) * 100) + '%' };
+        },
+        async confirmCrop() {
+            if (!this.cropMode) return;
+            const img = this.$refs.cvImg; if (!img) return;
+            const iw = img.naturalWidth, ih = img.naturalHeight;
+            const x = Math.round(this.cropBox.x * iw), y = Math.round(this.cropBox.y * ih), w = Math.max(1, Math.round(this.cropBox.w * iw)), h = Math.max(1, Math.round(this.cropBox.h * ih));
+            this.reframing = true;
+            try { const d = await this.api('/studio/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, x, y, w, h }); this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' }); this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' }); this.cropMode = false; Alpine.store('toast').show('Đã cắt vùng đã chọn.'); }
+            catch (err) { Alpine.store('toast').show(err.message || 'Lỗi cắt.', 'error'); }
+            finally { this.reframing = false; }
+        },
         async runReframe() {
             const src = this.upscaleSrc; if (!src || this.reframing) return;
             this.reframing = true;
