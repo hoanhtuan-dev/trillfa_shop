@@ -621,6 +621,12 @@
                 <button @click="vgZoomAt(0,0,1.5)" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700" title="Phóng to">+</button>
                 <span class="px-1 text-xs text-cream-200">Zoom <b x-text="vgZoom.toFixed(2)"></b>x</span>
             </div>
+            <!-- actions -->
+            <div class="absolute bottom-4 right-4 z-20 flex items-center gap-1.5">
+                <button @click="openInStudio(viewGen)" class="rounded-full bg-ink-900/80 px-3 py-1.5 text-xs font-semibold text-cream-100 shadow backdrop-blur hover:bg-brand-600" title="Mở trong canvas để chỉnh sửa">✏️ Chỉnh sửa</button>
+                <a :href="'/studio/generations/' + viewGen.id + '/download'" class="rounded-full bg-ink-900/80 px-3 py-1.5 text-xs font-semibold text-cream-100 shadow backdrop-blur hover:bg-ink-700" title="Tải xuống">⬇️ Download</a>
+                <button @click="removeGeneration(viewGen); closeGenView()" class="rounded-full bg-ink-900/80 px-3 py-1.5 text-xs font-semibold text-red-300 shadow backdrop-blur hover:bg-red-600 hover:text-white" title="Xóa nhiệm vụ này">🗑️ Xóa</button>
+            </div>
             <!-- info panel -->
             <template x-if="viewGenInfo">
                 <div class="absolute inset-x-0 bottom-0 z-20 border-t border-ink-700 bg-ink-900/95 p-4 backdrop-blur">
