@@ -319,7 +319,7 @@
             </div>
 
             <!-- Texture (Bước 2) -->
-            <div class="card p-5" x-data="{ texture: 5 }" x-show="step===2">
+            <div class="card p-5" x-show="step===2">
                 <h2 class="mb-2 font-display text-sm font-semibold text-ink-900">🧵 Texture</h2>
                 <input type="range" min="0" max="10" x-model="texture" class="w-full accent-brand-500">
                 <div class="mt-2 flex items-center justify-between text-xs">
@@ -327,6 +327,7 @@
                     <span class="font-semibold text-cream-50" x-text="texture"></span>
                     <span class="text-cream-300">10 · Chi tiết bề mặt</span>
                 </div>
+                <p class="mt-2 text-[10px] text-ink-500" x-text="'Tự thêm vào prompt: ' + (textureHint(texture))"></p>
             </div>
 
             <!-- Bước 3 · Ghế Đạo Diễn -->
@@ -630,7 +631,7 @@ document.addEventListener('alpine:init', () => {
 
         previewId: null,
         viewGen: null,
-        zoom: 1, pan: { x: 0, y: 0 }, palette: [], _drag: null, lightbox: false, opening: false, step: 1,
+        zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
@@ -978,6 +979,13 @@ document.addEventListener('alpine:init', () => {
             return grp.items.filter((it) => this.editPresetIds.includes(it.id)).map((it) => it.key || it.label).join(', ');
         },
         // ===== Fitting Room: Phẫu thuật ảnh =====
+        textureHint(v) {
+            if (v <= 1) return 'smooth silk fabric, sleek';
+            if (v <= 3) return 'soft matte fabric';
+            if (v <= 5) return 'natural subtle fabric texture';
+            if (v <= 7) return 'lightly woven textured fabric';
+            return 'heavy knit, coarse weave, visible thread detail';
+        },
         async surgery() {
             if (!this.editSource || !this.editSource.url || this.editSurging) { Alpine.store('toast').show('Chọn ảnh để chỉnh sửa trước.', 'error'); return; }
             this.editSurging = true;
@@ -989,6 +997,8 @@ document.addEventListener('alpine:init', () => {
                 const infl = [];
                 if (bg) infl.push('change the background to ' + bg);
                 if (pose) infl.push('change the pose to ' + pose);
+                const tex = this.textureHint(this.texture);
+                if (tex) infl.push('make the outfit fabric ' + tex);
                 if (infl.length) prompt = prompt.replace(/[. ]+$/, '') + '. ' + infl.join(', ') + '.';
                 const data = await this.api('/studio/generate', { prompt, base_image: this.editSource.url, edit: '1', history_id: this.output.history_id, project_id: this.currentProjectId || null });
                 const items = Array.isArray(data.items) ? data.items : [data];
