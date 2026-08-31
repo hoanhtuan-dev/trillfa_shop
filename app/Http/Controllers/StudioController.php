@@ -531,8 +531,8 @@ class StudioController extends Controller
         $data = $request->validate([
             'type' => ['required', 'string', 'max:40'],
             'history' => ['nullable', 'array'],
-            'history.*.label' => ['nullable', 'string', 'max:80'],
-            'history.*.answer' => ['nullable', 'string', 'max:255'],
+            'history.*.label' => ['nullable', 'string', 'max:500'],
+            'history.*.answer' => ['nullable', 'string', 'max:300'],
         ]);
         $svc = app(\App\Services\StylistService::class);
         $step = $svc->next((string) $data['type'], $data['history'] ?? []);
@@ -992,6 +992,7 @@ class StudioController extends Controller
             'prompt_model' => setting('studio_prompt_model', config('studio.prompt_model')),
             'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
             'swap_model' => setting('studio_swap_model', config('studio.swap_model')),
+            'stylist_model' => setting('studio_stylist_model', config('studio.stylist_model')),
             'image_model' => setting('studio_image_model', config('studio.image_model')),
             'wan_model' => setting('studio_wan_model', config('studio.wan_model')),
             'qwen_model' => setting('studio_qwen_model', config('studio.qwen_model')),
@@ -1129,6 +1130,7 @@ class StudioController extends Controller
             'prompt_model' => ['required', 'string', 'max:255'],
             'translate_model' => ['nullable', 'string', 'max:255'],
             'swap_model' => ['nullable', 'string', 'max:255'],
+            'stylist_model' => ['nullable', 'string', 'max:255'],
             'image_model' => ['nullable', 'string', 'max:255'],
             'wan_model' => ['required', 'string', 'max:255'],
             'qwen_model' => ['required', 'string', 'max:255'],
@@ -1154,6 +1156,7 @@ class StudioController extends Controller
         set_setting('studio_prompt_model', $data['prompt_model']);
         if (isset($data['translate_model'])) set_setting('studio_translate_model', $data['translate_model']);
         if (isset($data['swap_model'])) set_setting('studio_swap_model', $data['swap_model']);
+        if (isset($data['stylist_model'])) set_setting('studio_stylist_model', $data['stylist_model']);
         set_setting('studio_image_model', $data['image_model'] ?? '');
         set_setting('studio_wan_model', $data['wan_model']);
         set_setting('studio_qwen_model', $data['qwen_model']);

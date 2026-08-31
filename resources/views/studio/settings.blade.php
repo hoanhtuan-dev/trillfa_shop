@@ -101,6 +101,7 @@
                 <div><label class="label">Prompt model</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-1.5-flash / qwen3.8-flash"></div>
                 <div><label class="label">Model dịch prompt (tiếng Việt)</label><input type="text" name="translate_model" value="{{ old('translate_model', $translate_model) }}" class="input !py-2" placeholder="gemini-3.6-flash-image"></div>
                 <div><label class="label">Model Thay Đổi Người Mẫu</label><input type="text" name="swap_model" value="{{ old('swap_model', $swap_model) }}" class="input !py-2" placeholder="qwen-image-edit-plus-2025-12-15"></div>
+                <div><label class="label">Model Thuật sỹ ảo</label><input type="text" name="stylist_model" value="{{ old('stylist_model', $stylist_model) }}" class="input !py-2" placeholder="qwen3.8-flash"></div>
                 <div><label class="label">Ảnh Flux</label><input type="text" name="image_model" value="{{ old('image_model', $image_model) }}" class="input !py-2" placeholder="flux-1.1-schnell"></div>
                 <div><label class="label">Ảnh Wan</label><input type="text" name="wan_model" value="{{ old('wan_model', $wan_model) }}" class="input !py-2" placeholder="wan2.7-image-pro"></div>
                 <div><label class="label">Ảnh Qwen</label><input type="text" name="qwen_model" value="{{ old('qwen_model', $qwen_model) }}" class="input !py-2" placeholder="qwen-image-3.0-pro"></div>

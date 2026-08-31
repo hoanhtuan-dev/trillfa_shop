@@ -1150,7 +1150,7 @@ document.addEventListener('alpine:init', () => {
         async pickStylistOption(answer) {
             if (!answer) return;
             this.stylistFlash = answer; setTimeout(() => { this.stylistFlash = ''; }, 450);
-            this.stylistHistory = this.stylistHistory.concat([{ label: this.stylistStep && this.stylistStep.question, answer }]);
+            this.stylistHistory = this.stylistHistory.concat([{ label: String((this.stylistStep && this.stylistStep.question) || '').slice(0, 90), answer }]);
             await this.stylistNext(this.stylistHistory);
         },
         applyStylistPrompt() {

@@ -112,12 +112,38 @@ PROMPT;
      */
     protected function chat(string $instruction): ?array
     {
-        $geminiKey = studio_api_key('gemini');
-        $models = array_values(array_unique(array_filter([(string) studio_config('translate_model', 'gemini-3.5-flash'), 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'])));
-        if ($geminiKey) {
-            foreach ($models as $gm) {
+        // Ưu tiên Qwen (qwen3.8-flash) -> Gemini dự phòng -> model khác.
+        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        $qwenModels = array_values(array_unique(array_filter([
+            (string) studio_config('stylist_model', 'qwen3.8-flash'), 'qwen3.8-flash', (string) studio_config('prompt_model', 'qwen-plus'), 'qwen-plus', 'qwen-max',
+        ])));
+        if ($qwenKey) {
+            foreach ($qwenModels as $qm) {
                 try {
-                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(60)
+                    $resp = Http::withToken($qwenKey)->timeout(50)
+                        ->post(dashscope_base_url($qwenKey).'/api/v1/services/aigc/text-generation/generation', [
+                            'model' => $qm,
+                            'input' => ['messages' => [['role' => 'user', 'content' => $instruction]]],
+                            'parameters' => ['result_format' => 'message'],
+                        ]);
+                    if ($resp->successful()) {
+                        $out = trim((string) data_get($resp->json(), 'output.choices.0.message.content'));
+                        $decoded = $this->decodeJson($out);
+                        if ($decoded) { return $decoded; }
+                    }
+                } catch (\Throwable $e) { logger()->warning('Stylist Qwen('.$qm.') failed: '.$e->getMessage()); }
+            }
+        }
+
+        // Gemini dự phòng.
+        $geminiKey = studio_api_key('gemini');
+        $gemModels = array_values(array_unique(array_filter([
+            (string) studio_config('translate_model', 'gemini-3.5-flash'), 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash',
+        ])));
+        if ($geminiKey) {
+            foreach ($gemModels as $gm) {
+                try {
+                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(50)
                         ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$gm.':generateContent', [
                             'contents' => [['parts' => [['text' => $instruction]]]],
                             'generationConfig' => ['responseMimeType' => 'application/json'],
@@ -127,27 +153,8 @@ PROMPT;
                         $decoded = $this->decodeJson($out);
                         if ($decoded) { return $decoded; }
                     }
-                } catch (\Throwable $e) { logger()->warning('Stylist Gemini failed: '.$e->getMessage()); }
+                } catch (\Throwable $e) { logger()->warning('Stylist Gemini('. $gm.') failed: '.$e->getMessage()); }
             }
-        }
-
-        // Qwen fallback (DashScope text-generation).
-        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        $model = (string) studio_config('prompt_model', 'qwen-plus');
-        if ($key) {
-            try {
-                $resp = Http::withToken($key)->timeout(60)
-                    ->post(dashscope_base_url($key).'/api/v1/services/aigc/text-generation/generation', [
-                        'model' => $model,
-                        'input' => ['messages' => [['role' => 'user', 'content' => $instruction]]],
-                        'parameters' => ['result_format' => 'message'],
-                    ]);
-                if ($resp->successful()) {
-                    $out = trim((string) data_get($resp->json(), 'output.choices.0.message.content'));
-                    $decoded = $this->decodeJson($out);
-                    if ($decoded) { return $decoded; }
-                }
-            } catch (\Throwable $e) { logger()->warning('Stylist Qwen failed: '.$e->getMessage()); }
         }
 
         return null;

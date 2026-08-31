@@ -24,6 +24,7 @@ return [
     'prompt_provider' => env('STUDIO_PROMPT_PROVIDER', 'gemini'), // gemini | qwen
     'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-1.5-flash'),
     'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-3.6-flash-image'),
+    'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen trước)
     'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtualmodel'), // Virtual Try-On (Thay đổi người mẫu) — Beijing-only, free-trial
     'swap_model' => env('STUDIO_SWAP_MODEL', 'qwen-image-edit-plus-2025-12-15'), // Model Thay Đổi Người Mẫu (qwen-image-edit)
     'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
