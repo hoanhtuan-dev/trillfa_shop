@@ -88,10 +88,10 @@ PROMPT;
         if (! empty($answers['silhouette'])) { $seg[] = 'phom '.$answers['silhouette']; }
         if (! empty($answers['color'])) { $seg[] = 'màu '.$answers['color']; }
         if (! empty($answers['details'])) { $seg[] = 'chi tiết '.$answers['details']; }
-        $model = ! empty($answers['model']) ? $answers['model'] : 'người mẫu Việt thanh lịch';
+        $model = ! empty($answers['model']) ? $answers['model'] : 'phụ nữ Việt trẻ trung, thanh mảnh, da sáng, tóc dài';
         $occ = ! empty($answers['occasion']) ? $answers['occasion'] : 'dịp sang trọng';
         $desc = $seg ? implode(', ', $seg) : 'thiết kế hiện đại thanh lịch';
-        return 'Ảnh thời trang cao cấp của '.$g.', '.$desc.', mặc bởi '.$model.', phong cách '.$occ.', chụp full-body, ánh sáng studio dịu, nền tối giản, chi tiết sắc nét, 4k';
+        return 'Ảnh thời trang cao cấp của '.$g.' nữ, '.$desc.', mặc bởi '.$model.', phong cách '.$occ.', chụp full-body, ánh sáng studio dịu, nền tối giản, chi tiết sắc nét, 4k';
     }
 
     public function buildPrompt(string $type, array $answers): string
@@ -105,12 +105,12 @@ PROMPT;
         if (! empty($answers['silhouette'])) { $seg[] = 'with a '.$answers['silhouette'].' silhouette'; }
         if (! empty($answers['color'])) { $seg[] = 'in '.$answers['color']; }
         if (! empty($answers['details'])) { $seg[] = 'featuring '.$answers['details'].' construction'; }
-        $model = ! empty($answers['model']) ? $answers['model'] : 'a stylish Vietnamese model';
+        $model = ! empty($answers['model']) ? $answers['model'] : 'a young Vietnamese woman, slim, fair skin, long black hair';
         $occ = ! empty($answers['occasion']) ? $answers['occasion'] : 'an elegant occasion';
         $set = ! empty($answers['setting']) ? $answers['setting'] : 'a clean minimal studio';
         $style = ! empty($answers['style']) ? $answers['style'] : 'refined editorial';
         $desc = $seg ? implode(', ', $seg) : 'an elegant contemporary design';
-        return 'A high-fashion editorial photo of a '.$g.', '.$desc.', worn by '.$model.', styled for '.$occ.', '.$style.' aesthetic, set in '.$set.', premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, ultra detailed, 4k';
+        return 'A high-fashion editorial photo of a women\'s '.$g.', '.$desc.', worn by a young Vietnamese woman ('.$model.'), styled for '.$occ.', '.$style.' aesthetic, set in '.$set.', premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, ultra detailed, 4k';
     }
 
 

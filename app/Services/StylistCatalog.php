@@ -13,23 +13,23 @@ class StylistCatalog
     {
         return [
             ['id' => 'dress',        'name' => 'Đầm',              'emoji' => '👗', 'color' => '#e8577d', 'img' => '/samples/garment-dress.png'],
-            ['id' => 'top',          'name' => 'Áo sơ mi / Blouse','emoji' => '👚', 'color' => '#7aa7e0', 'img' => '/samples/garment-top.png'],
-            ['id' => 'pants',        'name' => 'Quần',             'emoji' => '👖', 'color' => '#6a8f6a', 'img' => '/samples/garment-pants.png'],
+            ['id' => 'top',          'name' => 'Áo sơ mi nữ / Blouse','emoji' => '👚', 'color' => '#7aa7e0', 'img' => '/samples/garment-top.png'],
+            ['id' => 'pants',        'name' => 'Quần nữ',          'emoji' => '👖', 'color' => '#6a8f6a', 'img' => '/samples/garment-pants.png'],
             ['id' => 'skirt',        'name' => 'Chân váy',         'emoji' => '🩰', 'color' => '#b57bd0', 'img' => '/samples/garment-skirt.png'],
-            ['id' => 'shorts',       'name' => 'Quần short',       'emoji' => '🩳', 'color' => '#e0a95a', 'img' => '/samples/garment-shorts.png'],
-            ['id' => 'jacket',       'name' => 'Áo khoác',         'emoji' => '🧥', 'color' => '#8a6a4a', 'img' => '/samples/garment-jacket.png'],
-            ['id' => 'aodai',        'name' => 'Áo dài',           'emoji' => '👘', 'color' => '#d04a4a', 'img' => '/samples/garment-aodai.png'],
-            ['id' => 'set',          'name' => 'Set đồ',           'emoji' => '🧥', 'color' => '#4a7a90', 'img' => '/samples/garment-set.png'],
-            ['id' => 'tshirt',       'name' => 'Áo thun',          'emoji' => '👕', 'color' => '#5aa0c8', 'img' => '/samples/garment-tshirt.png'],
-            ['id' => 'hoodie',       'name' => 'Áo hoodie',        'emoji' => '🧶', 'color' => '#9a7ad0', 'img' => '/samples/garment-hoodie.png'],
-            ['id' => 'denimjacket',  'name' => 'Áo khoác denim',   'emoji' => '🧥', 'color' => '#5a8a9a', 'img' => '/samples/garment-denimjacket.png'],
-            ['id' => 'blazer',       'name' => 'Áo blazer',        'emoji' => '🕴️', 'color' => '#6a7a8a', 'img' => '/samples/garment-blazer.png'],
+            ['id' => 'shorts',       'name' => 'Quần short nữ',    'emoji' => '🩳', 'color' => '#e0a95a', 'img' => '/samples/garment-shorts.png'],
+            ['id' => 'jacket',       'name' => 'Áo khoác nữ',      'emoji' => '🧥', 'color' => '#8a6a4a', 'img' => '/samples/garment-jacket.png'],
+            ['id' => 'aodai',        'name' => 'Áo dài (nữ)',      'emoji' => '👘', 'color' => '#d04a4a', 'img' => '/samples/garment-aodai.png'],
+            ['id' => 'set',          'name' => 'Set đồ nữ',        'emoji' => '🧥', 'color' => '#4a7a90', 'img' => '/samples/garment-set.png'],
+            ['id' => 'tshirt',       'name' => 'Áo thun nữ',       'emoji' => '👕', 'color' => '#5aa0c8', 'img' => '/samples/garment-tshirt.png'],
+            ['id' => 'hoodie',       'name' => 'Áo hoodie nữ',     'emoji' => '🧶', 'color' => '#9a7ad0', 'img' => '/samples/garment-hoodie.png'],
+            ['id' => 'denimjacket',  'name' => 'Áo denim nữ',      'emoji' => '🧥', 'color' => '#5a8a9a', 'img' => '/samples/garment-denimjacket.png'],
+            ['id' => 'blazer',       'name' => 'Áo blazer nữ',     'emoji' => '🕴️', 'color' => '#6a7a8a', 'img' => '/samples/garment-blazer.png'],
             ['id' => 'weddingdress', 'name' => 'Đầm cưới',         'emoji' => '💍', 'color' => '#e8e0d8', 'img' => '/samples/garment-weddingdress.png'],
-            ['id' => 'bodysuit',     'name' => 'Áo bodysuit',      'emoji' => '🩱', 'color' => '#c88aa0', 'img' => '/samples/garment-bodysuit.png'],
-            ['id' => 'jogger',       'name' => 'Quần jogger',      'emoji' => '👖', 'color' => '#8aa06a', 'img' => '/samples/garment-jogger.png'],
-            ['id' => 'windbreaker',  'name' => 'Áo gió',           'emoji' => '🧥', 'color' => '#6aa0b0', 'img' => '/samples/garment-windbreaker.png'],
-            ['id' => 'tanktop',      'name' => 'Áo ba lỗ',         'emoji' => '🎽', 'color' => '#e0b06a', 'img' => '/samples/garment-tanktop.png'],
-            ['id' => 'bomber',       'name' => 'Áo khoác bomber',  'emoji' => '🧥', 'color' => '#7a6a5a', 'img' => '/samples/garment-bomber.png'],
+            ['id' => 'bodysuit',     'name' => 'Bodysuit nữ',      'emoji' => '🩱', 'color' => '#c88aa0', 'img' => '/samples/garment-bodysuit.png'],
+            ['id' => 'jogger',       'name' => 'Quần jogger nữ',   'emoji' => '👖', 'color' => '#8aa06a', 'img' => '/samples/garment-jogger.png'],
+            ['id' => 'windbreaker',  'name' => 'Áo gió nữ',        'emoji' => '🧥', 'color' => '#6aa0b0', 'img' => '/samples/garment-windbreaker.png'],
+            ['id' => 'tanktop',      'name' => 'Áo ba lỗ nữ',      'emoji' => '🎽', 'color' => '#e0b06a', 'img' => '/samples/garment-tanktop.png'],
+            ['id' => 'bomber',       'name' => 'Áo bomber nữ',     'emoji' => '🧥', 'color' => '#7a6a5a', 'img' => '/samples/garment-bomber.png'],
         ];
     }
 
@@ -46,7 +46,7 @@ class StylistCatalog
     {
         $g = $this->nameOf($type);
         return [
-            ['key' => 'model', 'q' => 'Người mẫu (Việt):', 'opts' => [
+            ['key' => 'model', 'q' => 'Người mẫu nữ (Việt):', 'opts' => [
                 'Trẻ trung 18-25, thanh mảnh, tóc dài đen, da sáng',
                 'Thanh xuân 25-32, cao 1m68+, tóc xoăn, da nâu vàng',
                 'Trưởng thành 32-40, đầy đặn, tóc ngắn cá tính, da ngăm',
