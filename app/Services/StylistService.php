@@ -5,13 +5,21 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 
 /**
- * "Thuật sỹ ảo" — an AI fashion stylist that guides the user ONE STEP AT A TIME.
- * Given a garment type + the choices already made, it asks the single most important
- * next question (with concrete options); once it has enough, it produces the final
- * image-generation prompt. It never dumps a big preset list — it interviews, as a stylist.
+ * "Thuật sỹ ảo" — an AI fashion stylist that walks a SKELETON question matrix then
+ * gives deep, specific advice per step. Never dumps a preset list; it interviews.
  */
 class StylistService
 {
+    /** Skeleton "backbone" the stylist always walks through (deep layer comes from the LLM). */
+    protected $skeleton = [
+        ['en' => 'silhouette and fit',            'vi' => 'Phom dáng / sự vừa vặn',   'opts' => ['Ôm / fitted', 'Suông / straight', 'Rộng / oversized', 'Bồng / volume']],
+        ['en' => 'fabric and texture',            'vi' => 'Chất liệu / bề mặt',       'opts' => ['Lụa mềm', 'Cotton', 'Dệt kim', 'Da', 'Thô / linen']],
+        ['en' => 'color and print',               'vi' => 'Màu sắc / họa tiết',       'opts' => ['Pastel nhẹ', 'Tối / trầm', 'Tươi sáng', 'Đen - trắng', 'Trung tính (be/cream)']],
+        ['en' => 'design details and trims',      'vi' => 'Chi tiết thiết kế',         'opts' => ['Không hoạ tiết', 'Kẻ sọc', 'Chấm bi', 'Hoa văn', 'Thêu / logo']],
+        ['en' => 'style and mood',                'vi' => 'Phong cách / cảm hứng',     'opts' => ['Sang trọng', 'Tối giản', 'Boho', 'Streetwear', 'Cổ điển']],
+        ['en' => 'occasion and setting',          'vi' => 'Dịp / bối cảnh',            'opts' => ['Tiệc tối', 'Công sở', 'Dạo phố', 'Bãi biển', 'Sự kiện']],
+    ];
+
     public function garmentTypes(): array
     {
         return [
@@ -33,86 +41,80 @@ class StylistService
     }
 
     /**
-     * Ask the stylist for the next step given the accumulated choices.
-     * @param string $type   garment type id
-     * @param array  $history [['label'=>'Phom dáng','answer'=>'Ôm'], ...]
-     * @return array {done:bool, question, options[], prompt, summary}
+     * Next step of the stylist conversation. Walks the skeleton matrix; the LLM adds depth.
+     * @param string $type
+     * @param array  $history [['label'=>..., 'answer'=>...], ...]
+     * @return array {done, question, options[], prompt, summary, category}
      */
     public function next(string $type, array $history): array
     {
+        $stepNum = count($history);
         $typeName = $this->nameOf($type);
+        $skeleton = $this->skeleton;
+
+        if ($stepNum >= count($skeleton)) {
+            // Skeleton done -> finalize a rich prompt.
+            return ['done' => true, 'question' => '', 'options' => [], 'prompt' => $this->buildPrompt($type, $history), 'summary' => $this->buildSummary($history), 'category' => ''];
+        }
+
+        $cat = $skeleton[$stepNum];
         $historyText = '';
         if ($history) {
-            $historyText = implode("\n", array_map(fn ($h) => '- '.($h['label'] ?? 'Bước').': '.($h['answer'] ?? ''), $history));
+            $historyText = implode("
+", array_map(fn ($h) => '- '.($h['label'] ?? 'Bước').': '.($h['answer'] ?? ''), $history));
         }
 
         $instruction = <<<PROMPT
-You are a Vietnamese high-fashion creative director and AI stylist (thuật sỹ). Guide the user ONE STEP AT A TIME to craft a design prompt for: {$typeName}.
+You are a premium Vietnamese high-fashion creative director and AI stylist (thuật sỹ). You are helping design: {$typeName}.
+
+This is step {$stepNum} of 6 — the topic is: {$cat['vi']} ({$cat['en']}).
 
 Choices so far:
 {$historyText}
 
 Rules:
-- Until you have enough (aim 3-6 steps), ask the SINGLE most important next question in Vietnamese (short) and give 3-5 concrete, distinct options.
-- Once enough, return the FINAL image-generation prompt in ENGLISH (precise: fabric, silhouette, color, fit, details, occasion, model pose, lighting, background) plus a short Vietnamese summary.
-- NEVER list all future questions; only the next one.
-- Reply ONLY with JSON, no extra text.
-
+- Ask ONE deep, specific, fashion-expert question in Vietnamese about the current topic for this {$typeName}. Make it feel like a stylist advising a client (not a form).
+- Give 3-5 concrete, distinct options that are rich fashion descriptors (not generic).
+- Do NOT move to other topics; only the current one.
+- Reply ONLY with JSON:
 {"done":false,"question":"...","options":["a","b","c"]}
-or
-{"done":true,"prompt":"...","summary":"..."}
 PROMPT;
 
         $json = $this->chat($instruction);
         if ($json === null || ! is_array($json)) {
-            // LLM unavailable -> deterministic step sequence so the wizard NEVER gets stuck.
-            return $this->fallbackStep($type, $history);
+            return ['done' => false, 'question' => $cat['vi'].' như thế nào cho '.$typeName.'?', 'options' => array_values($cat['opts']), 'prompt' => '', 'summary' => '', 'category' => $cat['en']];
         }
 
-        $done = (bool) ($json['done'] ?? false);
         return [
-            'done' => $done,
-            'question' => (string) ($json['question'] ?? ''),
-            'options' => array_values((array) ($json['options'] ?? [])),
-            'prompt' => (string) ($json['prompt'] ?? ''),
-            'summary' => (string) ($json['summary'] ?? ''),
+            'done' => false,
+            'question' => (string) ($json['question'] ?? ($cat['vi'].' như thế nào?')),
+            'options' => array_values((array) ($json['options'] ?? $cat['opts'])),
+            'prompt' => '',
+            'summary' => '',
+            'category' => $cat['en'],
         ];
     }
 
-    /**
-     * Deterministic fallback so the wizard always progresses (even without the LLM).
-     */
-    protected function fallbackStep(string $type, array $history): array
-    {
-        $steps = [
-            ['label' => 'Phom dáng bạn muốn', 'options' => ['Ôm / fitted', 'Suông / straight', 'Rộng / oversized', 'Bồng / volume']],
-            ['label' => 'Chất liệu nào', 'options' => ['Lụa mềm', 'Cotton', 'Dệt kim', 'Da', 'Thô / linen']],
-            ['label' => 'Màu sắc chủ đạo', 'options' => ['Pastel nhẹ', 'Tối / trầm', 'Tươi sáng', 'Đen - trắng', 'Trung tính (be/cream)']],
-            ['label' => 'Chi tiết / hoạ tiết', 'options' => ['Không hoạ tiết', 'Kẻ sọc', 'Chấm bi', 'Hoa văn', 'Thêu / logo']],
-            ['label' => 'Phong cách tổng thể', 'options' => ['Sang trọng', 'Tối giản', 'Boho', 'Streetwear', 'Cổ điển']],
-        ];
-        $n = count($history);
-        if ($n < count($steps)) {
-            $s = $steps[$n];
-            return ['done' => false, 'question' => $s['label'].'?', 'options' => $s['options'], 'prompt' => '', 'summary' => ''];
-        }
-        return ['done' => true, 'prompt' => $this->buildPrompt($type, $history), 'summary' => 'Đã đủ thông tin — xem prompt bên dưới.'];
-    }
-
+    /** Build a rich EN image prompt from the accumulated answers. */
     protected function buildPrompt(string $type, array $history): string
     {
         $typeName = $this->nameOf($type);
-        $parts = ['a high-fashion '.$typeName];
-        foreach ($history as $h) { if (! empty($h['answer'])) { $parts[] = strtolower((string) $h['answer']); } }
-        return implode(', ', $parts).', photorealistic, full-body fashion editorial, soft studio lighting, plain background';
+        $parts = [];
+        foreach ($history as $h) { if (! empty($h['answer'])) { $parts[] = strtolower(trim((string) $h['answer'])); } }
+        $desc = $parts ? implode(', ', $parts) : 'elegant contemporary design';
+        return 'A high-fashion editorial photo of a '.$typeName.', '.$desc.', premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, clean minimal background, ultra detailed, 4k';
     }
 
-    /**
-     * Text chat that returns parsed JSON. Tries Gemini (JSON-ready) then Qwen (DashScope).
-     */
+    protected function buildSummary(array $history): string
+    {
+        if (! $history) { return 'Bạn đã hoàn thành mô tả thiết kế.'; }
+        $lines = array_map(fn ($h) => ucfirst((string) ($h['answer'] ?? '')), $history);
+        return 'Thiết kế với: '.implode(' · ', $lines).'.';
+    }
+
+    /** Text chat that returns parsed JSON. Tries Qwen (qwen3.8-flash) -> Gemini -> others. */
     protected function chat(string $instruction): ?array
     {
-        // Ưu tiên Qwen (qwen3.8-flash) -> Gemini dự phòng -> model khác.
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
         $qwenModels = array_values(array_unique(array_filter([
             (string) studio_config('stylist_model', 'qwen3.8-flash'), 'qwen3.8-flash', (string) studio_config('prompt_model', 'qwen-plus'), 'qwen-plus', 'qwen-max',
@@ -120,12 +122,11 @@ PROMPT;
         if ($qwenKey) {
             foreach ($qwenModels as $qm) {
                 try {
-                    $resp = Http::withToken($qwenKey)->timeout(50)
-                        ->post(dashscope_base_url($qwenKey).'/api/v1/services/aigc/text-generation/generation', [
-                            'model' => $qm,
-                            'input' => ['messages' => [['role' => 'user', 'content' => $instruction]]],
-                            'parameters' => ['result_format' => 'message'],
-                        ]);
+                    $resp = Http::withToken($qwenKey)->timeout(50)->post(dashscope_base_url($qwenKey).'/api/v1/services/aigc/text-generation/generation', [
+                        'model' => $qm,
+                        'input' => ['messages' => [['role' => 'user', 'content' => $instruction]]],
+                        'parameters' => ['result_format' => 'message'],
+                    ]);
                     if ($resp->successful()) {
                         $out = trim((string) data_get($resp->json(), 'output.choices.0.message.content'));
                         $decoded = $this->decodeJson($out);
@@ -135,7 +136,6 @@ PROMPT;
             }
         }
 
-        // Gemini dự phòng.
         $geminiKey = studio_api_key('gemini');
         $gemModels = array_values(array_unique(array_filter([
             (string) studio_config('translate_model', 'gemini-3.5-flash'), 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash',
@@ -143,11 +143,10 @@ PROMPT;
         if ($geminiKey) {
             foreach ($gemModels as $gm) {
                 try {
-                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(50)
-                        ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$gm.':generateContent', [
-                            'contents' => [['parts' => [['text' => $instruction]]]],
-                            'generationConfig' => ['responseMimeType' => 'application/json'],
-                        ]);
+                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(50)->post('https://generativelanguage.googleapis.com/v1beta/models/'.$gm.':generateContent', [
+                        'contents' => [['parts' => [['text' => $instruction]]]],
+                        'generationConfig' => ['responseMimeType' => 'application/json'],
+                    ]);
                     if ($resp->successful()) {
                         $out = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
                         $decoded = $this->decodeJson($out);
@@ -166,7 +165,6 @@ PROMPT;
         $out = trim($out);
         $decoded = json_decode($out, true);
         if (is_array($decoded)) { return $decoded; }
-        // Some models wrap JSON in fences or prose: extract the first { ... } object.
         $start = strpos($out, '{');
         $end = strrpos($out, '}');
         if ($start !== false && $end !== false && $end > $start) {

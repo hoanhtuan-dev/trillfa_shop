@@ -76,7 +76,7 @@
                 </div>
                 <div class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
                     <template x-for="t in stylistTypes" :key="t.id">
-                        <button @click="openStylist(); pickStylistType(t.id)" class="group relative aspect-[3/4] overflow-hidden rounded-xl border bg-ink-900 transition-all duration-150 hover:scale-[1.03] hover:border-brand-500 hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.97]" :class="stylistFlash === t.id ? 'stylist-pick border-brand-500 ring-2 ring-brand-500' : 'border-ink-700'">
+                        <button @click="openStylist(); startStylist(t.id)" class="group relative aspect-[3/4] overflow-hidden rounded-xl border bg-ink-900 transition-all duration-150 hover:scale-[1.03] hover:border-brand-500 hover:shadow-lg hover:shadow-brand-500/20 active:scale-[0.97]" :class="stylistFlash === t.id ? 'stylist-pick border-brand-500 ring-2 ring-brand-500' : 'border-ink-700'">
                             <img x-show="t.img" :src="t.img" class="h-full w-full object-cover opacity-90 transition-transform group-hover:scale-105" onerror="this.style.display='none'" alt="Trang phục">
                             <span class="absolute inset-0 flex-col items-center justify-center gap-1 bg-ink-900/80 text-center" x-show="!t.img"><span class="text-2xl" x-text="t.emoji"></span><span class="px-1 text-[10px] text-cream-100" x-text="t.name"></span></span>
                             <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1 pb-1 pt-4 text-center text-[10px] font-medium text-white" x-text="t.name"></span>
@@ -250,77 +250,82 @@
 
             <!-- ✨ Thuật sỹ ảo -->
             <div x-show="stylistOpen" x-cloak @click="stylistOpen=false" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-ink-700 bg-ink-800 shadow-2xl" @click.stop>
-                    <div class="flex items-center justify-between border-b border-ink-700 px-5 py-3">
-                        <h3 class="font-display text-base font-semibold text-cream-50">✨ Thuật sỹ ảo</h3>
-                        <button @click="closeStylist()" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
+                <div class="w-full max-w-2xl overflow-hidden rounded-3xl border border-brand-500/20 shadow-2xl shadow-brand-500/10 backdrop-blur-xl" @click.stop style="background: linear-gradient(160deg, #1a1230 0%, #2a1a4a 40%, #1a2340 100%);">
+                    <div class="flex items-center justify-between border-b border-white/10 bg-white/5 px-5 py-3.5">
+                        <div class="flex items-center gap-2">
+                            <span class="grid h-9 w-9 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-violet-600 text-lg shadow-lg shadow-brand-500/40">✨</span>
+                            <div>
+                                <h3 class="font-display text-base font-semibold text-white">Thuật sỹ ảo</h3>
+                                <p class="text-[10px] text-white/50">Trực tuyến · tư vấn thiết kế thời trang</p>
+                            </div>
+                        </div>
+                        <button @click="closeStylist()" class="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/80 hover:bg-white/20">✕</button>
                     </div>
-                    <div class="max-h-[76vh] overflow-y-auto p-5">
+                    <div class="flex h-[72vh] flex-col">
                         <!-- Bước 1: chọn loại trang phục -->
                         <template x-if="!stylistType">
-                            <div>
+                            <div class="flex-1 overflow-y-auto p-5">
                                 <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-200">Chọn loại trang phục</p>
                                 <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                     <template x-for="t in stylistTypes" :key="t.id">
-                                        <button @click="pickStylistType(t.id)" class="group flex flex-col items-center gap-1.5 rounded-2xl border border-ink-700 bg-ink-700/30 p-4 transition-all hover:border-brand-500/60 hover:bg-ink-700">
+                                        <button @click="startStylist(t.id)" class="group flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-4 transition-all hover:scale-[1.03] hover:border-brand-400 hover:bg-brand-500/15 active:scale-[0.97]" :class="stylistFlash === t.id ? 'stylist-pick border-brand-400' : ''">
                                             <span class="text-3xl" x-text="t.emoji"></span>
-                                            <span class="text-xs font-medium text-cream-100" x-text="t.name"></span>
+                                            <span class="text-xs font-medium text-white" x-text="t.name"></span>
                                         </button>
                                     </template>
                                 </div>
-                                <p class="mt-3 text-xs text-cream-300/60" x-show="!stylistTypes.length">Đang nạp các loại trang phục…</p>
+                                <p class="mt-3 text-xs text-white/40" x-show="!stylistTypes.length">Đang nạp các loại trang phục…</p>
                             </div>
                         </template>
-                        <!-- Bước 2: hỏi từng bước -->
+                        <!-- Bước 2: phiên chat -->
                         <template x-if="stylistType">
-                            <div>
-                                <div class="mb-3 flex flex-wrap gap-1.5" x-show="stylistHistory.length">
-                                    <template x-for="(h,i) in stylistHistory" :key="i">
-                                        <span class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200" x-text="h.label + ': ' + h.answer"></span>
+                            <div class="flex flex-1 flex-col overflow-hidden">
+                                <!-- khung chat (cuộn) -->
+                                <div class="flex-1 space-y-3 overflow-y-auto p-5" x-ref="stylistChat">
+                                    <template x-for="(msg,i) in stylistMessages" :key="i">
+                                        <div class="flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                                            <div class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed" :class="msg.role === 'user' ? 'rounded-br-md bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-lg shadow-brand-500/20' : 'rounded-bl-md border border-white/10 bg-white/8 text-white/90'">
+                                                <span x-text="msg.text"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <!-- typing (loading) -->
+                                    <div class="flex justify-start" x-show="stylistLoading">
+                                        <div class="flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-white/10 bg-white/8 px-4 py-3">
+                                            <span class="h-2 w-2 animate-bounce rounded-full bg-brand-400"></span>
+                                            <span class="h-2 w-2 animate-bounce rounded-full bg-brand-400" style="animation-delay:.15s"></span>
+                                            <span class="h-2 w-2 animate-bounce rounded-full bg-brand-400" style="animation-delay:.3s"></span>
+                                        </div>
+                                    </div>
+                                    <!-- câu hỏi hiện tại (chờ trả lời) -->
+                                    <template x-if="stylistStep && !stylistStep.done && !stylistLoading">
+                                        <div class="stylist-anim space-y-3">
+                                            <div class="flex justify-start">
+                                                <div class="max-w-[85%] rounded-2xl rounded-bl-md border border-brand-500/40 bg-gradient-to-br from-brand-500/20 to-white/8 px-4 py-2.5 text-sm font-medium text-white">
+                                                    <span x-text="stylistStep.question"></span>
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                <template x-for="(opt,i) in stylistStep.options" :key="i">
+                                                    <button @click="pickStylistOption(opt)" class="group relative flex min-h-[54px] items-center overflow-hidden rounded-2xl border px-4 py-3.5 text-left text-[15px] font-semibold text-white shadow-lg transition-all duration-150 hover:scale-[1.02] hover:border-brand-400 hover:bg-gradient-to-r hover:from-brand-500/25 hover:to-white/10 hover:shadow-brand-500/20 active:scale-[0.98]" :class="stylistFlash === opt ? 'stylist-pick border-brand-400 bg-gradient-to-r from-brand-500/40 to-white/12' : 'border-white/12 bg-white/8'" x-text="opt"><span class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-brand-500/0 transition-all group-hover:bg-brand-500/70"></span></button>
+                                                </template>
+                                            </div>
+                                            <button @click="skipStylist()" class="inline-flex items-center gap-1 text-xs text-white/50 transition-colors hover:text-white/80">⏭ Bỏ qua câu này</button>
+                                        </div>
                                     </template>
                                 </div>
-                                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-200" x-text="(stylistTypes.find(t=>t.id===stylistType)||{}).name"></p>
-                                <template x-if="stylistStep && stylistStep.done">
-                                    <div>
-                                        <div class="rounded-xl border border-brand-500/40 bg-brand-600/10 p-3">
-                                            <p class="text-xs font-semibold text-brand-300">Prompt thiết kế (tiếng Anh)</p>
-                                            <p class="mt-1 text-sm text-cream-100" x-text="stylistStep.prompt"></p>
-                                            <template x-if="stylistStep.summary"><p class="mt-2 text-xs text-cream-300" x-text="'Tóm tắt: ' + stylistStep.summary"></p></template>
+                                <!-- Tóm tắt cuối (tách riêng) -->
+                                <div class="border-t border-white/10 bg-white/5 p-4" x-show="stylistStep && stylistStep.done">
+                                    <div class="rounded-2xl border border-brand-500/40 p-4" style="background: linear-gradient(150deg, rgba(232,87,125,.15), rgba(124,58,237,.12));">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-300">✨ Tóm tắt thiết kế</p>
+                                        <p class="mt-1 text-sm font-medium text-white" x-text="stylistStep.summary"></p>
+                                        <div class="mt-3 rounded-xl bg-black/30 p-3">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-white/50">Prompt (tiếng Anh)</p>
+                                            <p class="mt-1 text-xs leading-relaxed text-white/90" x-text="stylistStep.prompt"></p>
                                         </div>
                                         <button @click="applyStylistPrompt()" class="btn-brand mt-3 w-full">Dùng prompt này → Tạo ảnh 2D</button>
                                     </div>
-                                </template>
-                                <template x-if="stylistStep && !stylistStep.done">
-                                    <div class="stylist-anim">
-                                        <p class="mb-2 flex items-center gap-2 text-sm font-semibold text-cream-100">
-                                            <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-brand-500"></span>
-                                            <span x-text="stylistStep.question"></span>
-                                        </p>
-                                        <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                            <template x-for="(opt,i) in stylistStep.options" :key="i">
-                                                <button @click="pickStylistOption(opt)" class="group relative flex min-h-[52px] items-center overflow-hidden rounded-2xl border px-4 py-3.5 text-left text-[15px] font-semibold text-cream-50 shadow-lg transition-all duration-150 hover:scale-[1.02] hover:border-brand-400 hover:bg-gradient-to-r hover:from-brand-500/25 hover:to-ink-700/40 hover:shadow-brand-500/20 active:scale-[0.98]" :class="stylistFlash === opt ? 'stylist-pick border-brand-400 bg-gradient-to-r from-brand-500/30 to-ink-700/40' : 'border-ink-600/70 bg-gradient-to-r from-ink-700/50 to-ink-800/50'" x-text="opt"><span class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-brand-500/0 transition-all group-hover:bg-brand-500/70"></span></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </template>
-                                <template x-if="stylistLoading">
-                                    <div class="mt-3 space-y-3">
-                                        <div class="flex items-center gap-3">
-                                            <span class="relative inline-block h-8 w-8 shrink-0 rounded-full bg-ink-700">
-                                                <span class="absolute inset-0 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></span>
-                                                <span class="absolute inset-0 grid place-items-center text-sm">✨</span>
-                                            </span>
-                                            <span class="text-sm font-medium text-brand-200">Thuật sỹ đang suy nghĩ…</span>
-                                        </div>
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40"></div>
-                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40" style="animation-delay:.1s"></div>
-                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40" style="animation-delay:.2s"></div>
-                                            <div class="h-12 animate-pulse rounded-2xl border border-ink-700 bg-ink-700/40" style="animation-delay:.3s"></div>
-                                        </div>
-                                    </div>
-                                </template>
-                                <p class="mt-2 text-xs text-cream-300/60" x-show="!stylistLoading && !stylistStep">Chờ thuật sỹ gợi ý…</p>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -730,7 +735,7 @@ document.addEventListener('alpine:init', () => {
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
         editPresetOpen: false, editPresetIds: [], editSurging: false,
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
-        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '',
+        stylistOpen: false, stylistType: '', stylistTypes: [], stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [],
 
         previewId: null,
         viewGen: null,
@@ -1132,25 +1137,38 @@ document.addEventListener('alpine:init', () => {
             try { const d = await (await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } })).json(); this.stylistTypes = (d && d.types) || []; } catch (e) {}
         },
         openStylist() {
-            this.stylistOpen = true; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; this.stylistDone = false;
+            this.stylistOpen = true; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; this.stylistMessages = [];
             if (!this.stylistTypes.length) {
                 fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }).then(r => r.json()).then(d => { this.stylistTypes = (d && d.types) || []; }).catch(() => {});
             }
         },
-        closeStylist() { this.stylistOpen = false; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; },
-        async pickStylistType(id) { this.stylistFlash = id; setTimeout(() => { this.stylistFlash = ''; }, 450); this.stylistType = id; this.stylistHistory = []; await this.stylistNext([]); },
+        closeStylist() { this.stylistOpen = false; this.stylistType = ''; this.stylistHistory = []; this.stylistStep = null; this.stylistMessages = []; },
+        async startStylist(id) {
+            this.stylistFlash = id; setTimeout(() => { this.stylistFlash = ''; }, 450);
+            this.stylistType = id; this.stylistHistory = []; this.stylistStep = null;
+            const tn = (this.stylistTypes.find(t => t.id === id) || {}).name || 'trang phục';
+            this.stylistMessages = [{ role: 'stylist', text: 'Chào bạn 👋 Tôi là thuật sỹ thời trang của bạn. Cùng nhau thiết kế «' + tn + '» nhé — tôi sẽ hỏi từng bước nhỏ để ra thiết kế ưng ý nhất.' }];
+            await this.stylistNext([]);
+        },
         async stylistNext(history) {
             this.stylistLoading = true;
             try {
                 const d = await this.api('/studio/stylist', { type: this.stylistType, history });
                 this.stylistStep = d;
+                this.$nextTick(() => { const el = this.$refs.stylistChat; if (el) { el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); } });
             } catch (e) { Alpine.store('toast').show(e.message || 'Lỗi thuật sỹ.', 'error'); }
             finally { this.stylistLoading = false; }
         },
         async pickStylistOption(answer) {
             if (!answer) return;
             this.stylistFlash = answer; setTimeout(() => { this.stylistFlash = ''; }, 450);
+            this.stylistMessages = this.stylistMessages.concat([{ role: 'stylist', text: (this.stylistStep && this.stylistStep.question) || '' }, { role: 'user', text: answer }]);
             this.stylistHistory = this.stylistHistory.concat([{ label: String((this.stylistStep && this.stylistStep.question) || '').slice(0, 90), answer }]);
+            await this.stylistNext(this.stylistHistory);
+        },
+        async skipStylist() {
+            const q = (this.stylistStep && this.stylistStep.question) || '';
+            this.stylistMessages = this.stylistMessages.concat([{ role: 'stylist', text: q }, { role: 'user', text: 'Bỏ qua ⏭' }]);
             await this.stylistNext(this.stylistHistory);
         },
         applyStylistPrompt() {
