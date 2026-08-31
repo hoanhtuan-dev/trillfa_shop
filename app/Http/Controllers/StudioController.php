@@ -533,11 +533,17 @@ class StudioController extends Controller
         if ($refine > 0) {
             try {
                 $out = app(\App\Services\ImageAIService::class)->generate(
-                    'Enhance this image: increase sharpness, clarity and fine detail, keep the exact subject, garment and composition unchanged, high resolution, photorealistic.',
+                    'Enhance this fashion photograph at high resolution (photo-realistic): rebuild realistic fabric weave and material texture, reconstruct visible seam/stitching/button details, natural skin texture and pores, crisp sharp edges, rich color, keep the exact garment, model, pose and composition unchanged. Ultra-detailed, 4K.',
                     $srcUrl
                 );
                 if ($out) { $srcUrl = $out; }
             } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
+        }
+
+        // Real-ESRGAN super-resolution (best-effort) — reconstruct real fabric/stitching/skin detail.
+        if ($scale >= 2 && function_exists('replicate_upscale_image')) {
+            $er = eplicate_upscale_image($srcUrl, $scale);
+            if ($er) { $srcUrl = $er; }
         }
 
         $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
@@ -553,6 +559,7 @@ class StudioController extends Controller
         $h = (int) (imagesy($src) * $scale);
         $dst = imagecreatetruecolor($w, $h);
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, imagesx($src), imagesy($src));
+        if ($scale > 1 && function_exists('imageconvolution')) { @imageconvolution($dst, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
         imagedestroy($src); imagedestroy($dst);

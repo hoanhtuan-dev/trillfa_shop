@@ -316,6 +316,38 @@ if (! function_exists('deepseek_chat')) {
     }
 }
 
+if (! function_exists('replicate_upscale_image')) {
+    /**
+     * Real-ESRGAN super-resolution via Replicate (best-effort). Returns an image URL or null.
+     */
+    function replicate_upscale_image(string $imageUrl, int $scale = 2): ?string
+    {
+        $token = studio_api_key('replicate');
+        if (! $token) { return null; }
+        try {
+            $pred = \Illuminate\Support\Facades\Http::withToken($token)->timeout(30)->post('https://api.replicate.com/v1/predictions', [
+                'model' => 'ai-forever/real-esrgan',
+                'input' => ['image' => $imageUrl, 'scale' => max(2, min(4, $scale))],
+            ]);
+            if (! $pred->successful()) { logger()->warning('Replicate pred start failed: '.$pred->status().' '.substr((string) $pred->body(), 0, 160)); return null; }
+            $id = data_get($pred->json(), 'id');
+            if (! $id) { return null; }
+            for ($i = 0; $i < 30; $i++) {
+                usleep(900000);
+                $r = \Illuminate\Support\Facades\Http::withToken($token)->timeout(20)->get('https://api.replicate.com/v1/predictions/'.$id);
+                $st = (string) data_get($r->json(), 'status');
+                $out = data_get($r->json(), 'output');
+                if ($st === 'succeeded' && $out) {
+                    $u = is_array($out) ? ($out[0] ?? null) : $out;
+                    return is_string($u) && str_starts_with($u, 'http') ? $u : null;
+                }
+                if (in_array($st, ['failed', 'canceled'], true)) { return null; }
+            }
+            return null;
+        } catch (\Throwable $e) { logger()->warning('Replicate upscale failed: '.$e->getMessage()); return null; }
+    }
+}
+
 function studio_qwen_credentials(string $task = 'image', ?string $model_id = null): array
     {
         // Registered keys (multi per provider, scope-aware) — fall back to env/config slots.
