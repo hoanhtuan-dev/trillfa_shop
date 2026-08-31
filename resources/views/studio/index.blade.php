@@ -559,12 +559,12 @@
                         </template>
                         <template x-if="cropMode && (canvasImg || preview?.media_url)">
                             <div class="pointer-events-none absolute inset-0" style="z-index: 30">
-                                <div class="absolute" :style="cropStyle()" @pointerdown.stop="cropStart($event,'move')" @pointermove="cropMove($event)" @pointerup="cropEnd" @pointercancel="cropEnd">
-                                    <div class="absolute inset-0 border-2 border-white/85" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
+                                <div class="absolute" :style="cropStyle()" @mousedown.stop="cropStart($event,'move')" @touchstart.stop="cropStart($event,'move')">
+                                    <div class="pointer-events-none absolute inset-0 border-2 border-white/85" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
                                     <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
                                         <span class="rounded bg-white/70 px-1 py-0.5 text-[10px] font-semibold text-ink-900" x-text="reframeRatio"></span>
                                     </div>
-                                    <div class="absolute -bottom-3 -right-3 h-6 w-6 cursor-nwse-resize rounded-sm bg-white shadow" @pointerdown.stop="cropStart($event,'resize')" @pointermove="cropMove($event)" @pointerup="cropEnd" @pointercancel="cropEnd"></div>
+                                    <div class="absolute -bottom-3 -right-3 h-6 w-6 cursor-nwse-resize rounded-sm bg-white shadow" @mousedown.stop="cropStart($event,'resize')" @touchstart.stop="cropStart($event,'resize')"></div>
                                 </div>
                             </div>
                         </template>
@@ -1189,9 +1189,19 @@ document.addEventListener('alpine:init', () => {
                 this.cropBox = { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
             }
         },
+        _cropListeners() {
+            const move = (ev) => this.cropMove(ev);
+            const up = (ev) => { this.cropEnd(ev); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up); };
+            window.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', up);
+            window.addEventListener('touchmove', move, { passive: false });
+            window.addEventListener('touchend', up);
+        },
         cropStart(e, key) {
+            e.preventDefault();
+            e.stopPropagation();
             this._cropDrag = { key, sx: e.clientX, sy: e.clientY, box: { ...this.cropBox } };
-            if (e.currentTarget.setPointerCapture) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} }
+            this._cropListeners();
         },
         cropMove(e) {
             if (!this._cropDrag || !this.cropMode) return;
