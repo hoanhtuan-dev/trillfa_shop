@@ -401,6 +401,12 @@
                     <input type="range" min="0" max="10" step="1" x-model="upscaleRefine" class="h-2 w-full cursor-pointer accent-brand-500">
                     <span class="shrink-0 font-semibold text-cream-50" x-text="upscaleRefine + '/10'"></span>
                 </div>
+                <label class="label mt-3">🎞 Studio Chân thực (như ảnh chụp chuyên nghiệp)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Chân thực</span>
+                    <input type="range" min="0" max="10" step="1" x-model="studioPhotoreal" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="studioPhotoreal + '/10'"></span>
+                </div>
                 <button @click="runUpscale()" :disabled="upscaling || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap" title="Phóng to + tinh chỉnh ảnh đang chọn"><span x-show="!upscaling">🔍 Nâng cấp Ảnh</span><span x-show="upscaling">Đang nâng cấp…</span></button>
             </div>
 
@@ -731,7 +737,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
-        upscaleScale: 2, upscaleRefine: 5, upscaling: false,
+        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, upscaling: false,
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
@@ -1076,7 +1082,7 @@ document.addEventListener('alpine:init', () => {
             if (!src || this.upscaling) return;
             this.upscaling = true;
             try {
-                const d = await this.api('/studio/upscale', { image: src, scale: Number(this.upscaleScale) || 2, refine: Number(this.upscaleRefine) || 0 });
+                const d = await this.api('/studio/upscale', { image: src, scale: Number(this.upscaleScale) || 2, refine: Number(this.upscaleRefine) || 0, photoreal: Number(this.studioPhotoreal) || 0 });
                 this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'upscale', provider: 'upscale', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa nâng cấp' });
                 this.previewId = d.generation_id; this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' });
                 Alpine.store('toast').show('Đã nâng cấp ảnh (' + this.upscaleScale + 'x).');

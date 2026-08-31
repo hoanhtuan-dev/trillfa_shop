@@ -525,17 +525,20 @@ class StudioController extends Controller
             'image' => ['required', 'string', 'max:2048'],
             'scale' => ['nullable', 'integer', 'min:1', 'max:4'],
             'refine' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
+        $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
         $srcUrl = (string) $data['image'];
 
         if ($refine > 0) {
             try {
-                $out = app(\App\Services\ImageAIService::class)->generate(
-                    'Enhance this fashion photograph at high resolution (photo-realistic): rebuild realistic fabric weave and material texture, reconstruct visible seam/stitching/button details, natural skin texture and pores, detailed flowing hair with individual strands and natural shine, sharp detailed eyes with iris texture, eyelashes and catchlight, crisp sharp edges, rich color, keep the exact garment, model, pose and composition unchanged. Ultra-detailed, 4K.',
-                    $srcUrl
-                );
+                $keep = 'keep the exact garment, model, pose and composition unchanged. Ultra-detailed, 4K.';
+                $detail = 'Enhance this fashion photograph at high resolution (photo-realistic): rebuild realistic fabric weave and material texture, reconstruct visible seam/stitching/button details, natural skin texture and pores, detailed flowing hair with individual strands and natural shine, sharp detailed eyes with iris texture, eyelashes and catchlight, crisp sharp edges, rich color, '.$keep;
+                $studio = 'Render a high-end professional studio photograph of this fashion garment: softbox key light, gentle rim light, neutral white balance, subtle film color grading (rich skin tones, clean highlights, deep shadows), shallow depth of field (sharp subject, softly blurred background), fine film grain, ultra-sharp micro-detail, premium catalog/product photography. '.$keep;
+                $prompt = $photoreal > 0 ? $studio : $detail;
+                $out = app(\App\Services\ImageAIService::class)->generate($prompt, $srcUrl);
                 if ($out) { $srcUrl = $out; }
             } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
         }
@@ -560,6 +563,7 @@ class StudioController extends Controller
         $dst = imagecreatetruecolor($w, $h);
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, imagesx($src), imagesy($src));
         if ($scale > 1 && function_exists('imageconvolution')) { @imageconvolution($dst, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
+        if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
         imagedestroy($src); imagedestroy($dst);
@@ -572,6 +576,43 @@ class StudioController extends Controller
         ]);
 
         return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+    }
+
+    /**
+     * Professional studio photo finish: contrast, subtle film color grade, film grain, vignette, extra sharpen.
+     */
+    protected function studioPhotoFinish(\GdImage $img, int $level): void
+    {
+        $k = $level / 10.0; // 0..1
+        if (function_exists('imagefilter')) {
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(20 * $k));
+            @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-8 * $k), (int) round(-5 * $k), (int) round(8 * $k));
+            @imagefilter($img, IMG_FILTER_SMOOTH, (int) round(-4 * $k));
+        }
+        if (function_exists('imageconvolution')) { @imageconvolution($img, [[0,-1,0],[-1,5,-1],[0,-1,0]], 1, 0); }
+        // subtle film grain
+        $w = imagesx($img); $h = imagesy($img);
+        for ($y = 0; $y < $h; $y += 3) {
+            for ($x = 0; $x < $w; $x += 3) {
+                $n = (int) ((mt_rand(-1000, 1000) / 1000) * 6 * $k);
+                $c = imagecolorat($img, $x, $y);
+                $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
+                $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
+                $b = max(0, min(255, ($c & 0xFF) + $n));
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
+            }
+        }
+        // gentle vignette (darken corners)
+        $cx = $w / 2; $cy = $h / 2; $maxd = (float) max($w, $h);
+        for ($y = 0; $y < $h; $y += 4) {
+            for ($x = 0; $x < $w; $x += 4) {
+                $d = sqrt(($x - $cx) ** 2 + ($y - $cy) ** 2) / $maxd;
+                $v = 1 - (0.20 * $k * max(0, $d - 0.35));
+                $c = imagecolorat($img, $x, $y);
+                $r = (int) (($c >> 16) & 0xFF) * $v; $g = (int) (($c >> 8) & 0xFF) * $v; $b = (int) ($c & 0xFF) * $v;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, (int) $r, (int) $g, (int) $b));
+            }
+        }
     }
 
     protected function pngBytes(\GdImage $img): string
