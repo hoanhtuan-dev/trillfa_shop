@@ -347,7 +347,6 @@ export const useStudioStore = defineStore('studio', {
       const poses = [...this.swapPoseIds];
       // P0: keep explicit 0 values (slider minimums) — never coerce 0 back into a default.
       const toInt = (v, dflt) => (v != null && Number.isFinite(Number(v)) ? Number(v) : dflt);
-      const build = toInt(opts.build, 6);
 
       // Progress + cancel: each pose is one request; user can abort mid-run.
       const abort = new AbortController();
@@ -360,7 +359,7 @@ export const useStudioStore = defineStore('studio', {
       for (const poseId of poses) {
         if (abort.signal.aborted) { lastErr = 'Đã hủy.'; break; }
         try {
-          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', build, tone: opts.tone ?? 'none' }, abort.signal);
+          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', tone: opts.tone ?? 'none' }, abort.signal);
           // Swap now runs in the background queue (SwapModelJob) — the response is async (pending).
           if (d.generation_id) {
             createdIds.push(d.generation_id);

@@ -912,7 +912,6 @@ class StudioController extends Controller
             'model_id' => ['required', 'string', 'max:80'],
             'pose_id' => ['required', 'string', 'max:80'],
             'background' => ['nullable', 'string', 'max:400'],
-            'build' => ['nullable', 'integer', 'min:0', 'max:10'], // Tỷ lệ dáng (0 lùn-nở -> 10 cao-thon chuẩn mẫu)
             'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
             'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL (picker thumbnail; not sent to the model)
         ]);
@@ -949,7 +948,6 @@ class StudioController extends Controller
                 'face_ref' => (bool) ($model['image'] ?? null),
                 'pose_ref' => $poseRefUrl,
                 'background' => (string) ($data['background'] ?? ''),
-                'build' => (int) ($data['build'] ?? 6),
                 'tone' => (string) ($data['tone'] ?? 'none'),
             ],
         ]);
@@ -981,7 +979,6 @@ class StudioController extends Controller
             $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
             (string) ($meta['background'] ?? ''),
             $model['image'] ?? null, // face reference image (custom/catalog)
-            (int) ($meta['build'] ?? 6),
             (string) ($meta['tone'] ?? 'none'),
             (string) ($meta['pose_ref'] ?? ''),
         );

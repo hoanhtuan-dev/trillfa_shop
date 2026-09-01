@@ -221,44 +221,31 @@ class VirtualTryOnService
      * labels. Deep-evaluation finding: sending full-body reference photos confuses the qwen edit
      * models (several human bodies in one request) and makes them IGNORE the pose; the earlier
      * text-driven version demonstrably produced the correct pose, and it broke exactly when the
-     * reference images were introduced. $build (0-10) controls proportions; $tone is prompt-level.
+     * reference images were introduced. $tone is prompt-level.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, int $build = 6, string $tone = 'none', ?string $poseRefUrl = null): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null): ?string
     {
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $this->calls = 1;
         $this->lastModel = null;
 
-        $proportion = $this->buildEnglish($build);
         $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
             ? 'Replace the ENTIRE background of the scene with: '.$background.'. ' : '';
         $toneS = $this->toneInstruction($tone, $background);
 
         // Garment = PRODUCT to preserve EXACTLY (dominant directive), then replace the person with
         // the text-described model in the text-described pose. Single image + clear text = reliable.
+        // NOTE: no body-proportion instruction — a "tall/slim build" clause contradicted the chosen
+        // pose (e.g. "squat pose") and made the model ignore the pose entirely.
         $instr = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '.$bg
             .'Replace the person in the image with a full-body '.$modelDesc.' in the pose: '.$pose.', keeping the EXACT garment unchanged. '
-            .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
+            .'Keep natural, anatomically-correct body proportions — do NOT distort, stretch, deform or warp the body, limbs or face. '
             .$toneS.' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
 
         $imageSvc = app(ImageAIService::class);
         $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, null, null);
         if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
         return $url;
-    }
-
-    /**
-     * Body-proportion descriptor for the "Tỷ lệ dáng" build slider (0 = short/fuller, 10 = tall/runway).
-     */
-    protected function buildEnglish(int $v): string
-    {
-        return match (true) {
-            $v >= 9 => 'tall, slender runway-model build with long legs and an ~1:8 head-to-body ratio',
-            $v >= 7 => 'tall, slim fashion-model build with long legs and an ~1:7.5 head-to-body ratio',
-            $v >= 5 => 'average height, slim fitness-model build with an ~1:7 head-to-body ratio',
-            $v >= 3 => 'slightly shorter, curvy/athletic build with an ~1:6.5 head-to-body ratio',
-            default => 'shorter, fuller curvy build with an ~1:6 head-to-body ratio',
-        };
     }
 
     /**

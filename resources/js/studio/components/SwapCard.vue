@@ -8,7 +8,6 @@ const models = ref([]), poses = ref([]), bgs = ref([]), assets = ref([]);
 const addType = ref('model'); const addName = ref(''); const addFile = ref(null); const addFileEl = ref(null);
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 const swapBg = ref('');
-const swapBuild = ref(6); // Tỷ lệ dáng mặc định: 6 (cân đối) — 0 lùn-nở -> 10 cao-thon chuẩn người mẫu
 const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
 
 const toneOptions = [
@@ -26,17 +25,16 @@ const SWAP_KEY = 'trillfa.swap';
 function loadSwapMemory() {
   try {
     const m = JSON.parse(localStorage.getItem(SWAP_KEY) || '{}');
-    if (m.build != null) swapBuild.value = Number(m.build);
     if (m.tone) swapTone.value = m.tone;
     if (typeof m.bg === 'string') swapBg.value = m.bg;
   } catch (e) {}
 }
 function saveSwapMemory() {
   try {
-    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, bg: swapBg.value }));
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value }));
   } catch (e) {}
 }
-watch([swapBg, swapBuild, swapTone], saveSwapMemory);
+watch([swapBg, swapTone], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; } catch(e){}
@@ -71,7 +69,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img v-if="selPoseImgs[0]?.image" :src="selPoseImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">🧍</span><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, tone: swapTone })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
     <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
         <!-- Khuôn mặt -->
@@ -88,15 +86,6 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🖼 Bối cảnh</p>
         <div class="flex flex-wrap gap-1.5">
           <button v-for="b in bgs" :key="b.value" @click="swapBg = swapBg === b.value ? '' : b.value" class="rounded-full border px-3 py-1.5 text-xs" :class="swapBg === b.value ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ b.label }}</button>
-        </div>
-        <!-- Tỷ lệ dáng (chiều cao / thân hình) -->
-        <div class="mt-4">
-          <p class="mb-1 text-xs font-semibold text-cream-200">📏 Tỷ lệ dáng <span class="text-cream-300/60">(0 lùn-nở → 10 cao-thon chuẩn mẫu)</span></p>
-          <div class="flex items-center gap-3">
-            <input type="range" min="0" max="10" v-model.number="swapBuild" class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-600">
-            <span class="w-6 text-right text-xs text-cream-200">{{ swapBuild }}</span>
-          </div>
-          <p class="mt-1 text-[10px] text-cream-300/50">▲ 8-10: cao, thon, chân dài chuẩn người mẫu · 5-7: cân đối · 0-4: thấp/nở hơn (chống dáng bị ép lùn).</p>
         </div>
         <!-- Hiệu ứng tông màu -->
         <div class="mt-4">
