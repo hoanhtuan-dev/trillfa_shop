@@ -11,7 +11,7 @@ function onFile(e) { const f = e.target.files?.[0]; if (f) store.uploadRef(f); i
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(90,140,170,.14), rgba(74,122,144,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🖼 Nguồn ảnh</h2>
-    <p class="text-[11px] text-ink-500">Nhập ảnh để xử lý (upscale/swap/film-look/reframe/inpaint).</p>
+    <p class="text-[11px] text-ink-500">Nhập ảnh để xử lý (swap/film-look/reframe/inpaint).</p>
     <div v-if="store.editSource" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
       <img :src="store.editSource.url" class="h-16 w-16 rounded-xl bg-ink-900 object-cover">
       <div class="min-w-0 text-xs text-cream-200"><p class="truncate font-semibold">{{ store.editSource.name }}</p><button @click="store.editSource = null" class="text-red-300 hover:text-red-200">Bỏ chọn</button></div>

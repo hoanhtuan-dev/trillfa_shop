@@ -13,18 +13,9 @@ export const useStudioStore = defineStore('studio', {
     generations: [],
     creditsLeft: 0,
     canvasImg: '',
-    // upscale / film / reframe share the source image (editSource || preview)
+    // film / reframe / swap share the source image (editSource || preview)
     editSource: null,
     texture: 5,
-    // upscale params
-    upscaleScale: 2,
-    upscaleRefine: 0,
-    studioPhotoreal: 5,
-    skinDetail: 4,
-    lightShadow: 5,
-    // Vải (độ sần sùi) — mặc định nhẹ: pass đã an toàn với mặt & đường biên (skin/edge-aware).
-    fabricDetail: 3,
-    upscaling: false,
     // film look
     lookPreset: 'studio',
     lookLevel: 5,
@@ -79,7 +70,6 @@ export const useStudioStore = defineStore('studio', {
     flashMsg: '',
     flashType: 'info',
     _flashTimer: null,
-    upscalePresets: [],
     lastBatch: [],
     showBatch: false,
     canvasLayers: [],
@@ -115,7 +105,6 @@ export const useStudioStore = defineStore('studio', {
       if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type);
     },
     async load() {
-      this.loadUpscaleMemory();
       try {
         const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
         const d = await res.json();
@@ -305,14 +294,6 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi cắt.', 'error'); }
       finally { this.reframing = false; }
     },
-    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, skin: this.skinDetail, light: this.lightShadow, fabric: this.fabricDetail }; },
-    loadUpscaleMemory() {
-      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, skinDetail: m.settings.skin ?? 4, lightShadow: m.settings.light ?? 5, fabricDetail: m.settings.fabric ?? 3 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
-    },
-    saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg(), presets: this.upscalePresets })); } catch (e) {} },
-    savePreset(name) { const n = (name || 'Preset ' + (this.upscalePresets.length + 1)).trim(); const existing = this.upscalePresets.find(p => p.name === n); const cfg = this.upscaleCfg(); if (existing) Object.assign(existing, cfg); else this.upscalePresets.push({ name: n, ...cfg }); this.saveUpscaleMemory(); this.toast('Đã lưu preset "' + n + '".'); },
-    applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, skinDetail: p.skin ?? 4, lightShadow: p.light ?? 5, fabricDetail: p.fabric ?? 5 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
-    deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
     zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25)); },
     zoomOut() { this.zoom = Math.max(0.25, +(this.zoom - 0.25)); },
     zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
@@ -367,7 +348,6 @@ export const useStudioStore = defineStore('studio', {
       // P0: keep explicit 0 values (slider minimums) — never coerce 0 back into a default.
       const toInt = (v, dflt) => (v != null && Number.isFinite(Number(v)) ? Number(v) : dflt);
       const build = toInt(opts.build, 6);
-      const toneLevel = toInt(opts.tone_level, 5);
 
       // Progress + cancel: each pose is one request; user can abort mid-run.
       const abort = new AbortController();
@@ -380,7 +360,7 @@ export const useStudioStore = defineStore('studio', {
       for (const poseId of poses) {
         if (abort.signal.aborted) { lastErr = 'Đã hủy.'; break; }
         try {
-          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', build, tone: opts.tone ?? 'none', tone_level: toneLevel }, abort.signal);
+          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', build, tone: opts.tone ?? 'none' }, abort.signal);
           // Swap now runs in the background queue (SwapModelJob) — the response is async (pending).
           if (d.generation_id) {
             createdIds.push(d.generation_id);

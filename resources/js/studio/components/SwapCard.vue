@@ -10,7 +10,6 @@ const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).con
 const swapBg = ref('');
 const swapBuild = ref(6); // Tỷ lệ dáng mặc định: 6 (cân đối) — 0 lùn-nở -> 10 cao-thon chuẩn người mẫu
 const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
-const swapToneLevel = ref(5); // Mức độ ảnh hưởng mặc định: 5 — 0-10
 
 const toneOptions = [
   { v: 'auto', label: '🎨 Tự động (theo bối cảnh)' },
@@ -22,23 +21,22 @@ const toneOptions = [
   { v: 'mono', label: '⚪ Trắng đen' },
   { v: 'none', label: '🚫 Không' },
 ];
-// Persist swap settings across sessions (like upscale memory).
+// Persist swap settings across sessions.
 const SWAP_KEY = 'trillfa.swap';
 function loadSwapMemory() {
   try {
     const m = JSON.parse(localStorage.getItem(SWAP_KEY) || '{}');
     if (m.build != null) swapBuild.value = Number(m.build);
     if (m.tone) swapTone.value = m.tone;
-    if (m.toneLevel != null) swapToneLevel.value = Number(m.toneLevel);
     if (typeof m.bg === 'string') swapBg.value = m.bg;
   } catch (e) {}
 }
 function saveSwapMemory() {
   try {
-    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, toneLevel: swapToneLevel.value, bg: swapBg.value }));
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, bg: swapBg.value }));
   } catch (e) {}
 }
-watch([swapBg, swapBuild, swapTone, swapToneLevel], saveSwapMemory);
+watch([swapBg, swapBuild, swapTone], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; } catch(e){}
@@ -73,7 +71,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img v-if="selPoseImgs[0]?.image" :src="selPoseImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">🧍</span><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
     <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
         <!-- Khuôn mặt -->
@@ -106,12 +104,6 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
           <div class="flex flex-wrap gap-1.5">
             <button v-for="t in toneOptions" :key="t.v" @click="swapTone = t.v" class="rounded-full border px-3 py-1.5 text-xs" :class="swapTone === t.v ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ t.label }}</button>
           </div>
-          <div class="mt-2 flex items-center gap-3">
-            <span class="shrink-0 text-[10px] text-cream-300/60">Mức độ</span>
-            <input type="range" min="0" max="10" v-model.number="swapToneLevel" class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-600">
-            <span class="w-6 text-right text-xs text-cream-200">{{ swapToneLevel }}</span>
-          </div>
-          <p class="mt-1 text-[10px] text-cream-300/50">0 = không áp dụng · 5 = vừa phải (mặc định) · 10 = đậm nhất. Film/Cinematic nhẹ để tránh cháy sáng.</p>
         </div>
         <!-- Thêm / xóa -->
         <div class="mt-5 rounded-2xl border border-dashed border-cream-300/40 p-3">
