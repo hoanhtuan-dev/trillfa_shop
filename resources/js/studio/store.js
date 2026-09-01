@@ -67,6 +67,9 @@ export const useStudioStore = defineStore('studio', {
     suggestResult: null,
     promptOpen: false,
     viewer: null,
+    flashMsg: '',
+    flashType: 'info',
+    _flashTimer: null,
     upscalePresets: [],
     lastBatch: [],
     showBatch: false,
@@ -95,7 +98,13 @@ export const useStudioStore = defineStore('studio', {
       if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); }
     },
     setPreview(g) { if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } },
-    toast(msg, type = 'info') { if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type); },
+    toast(msg, type = 'info') {
+      // Use the Vue studio's own toast (works standalone); fall back to Alpine if present.
+      this.flashMsg = msg; this.flashType = type;
+      if (this._flashTimer) clearTimeout(this._flashTimer);
+      this._flashTimer = setTimeout(() => { this.flashMsg = ''; }, 2600);
+      if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type);
+    },
     async load() {
       this.loadUpscaleMemory();
       try {

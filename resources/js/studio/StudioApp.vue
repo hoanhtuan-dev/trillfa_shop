@@ -51,6 +51,8 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
+    <!-- toast (copy/status) -->
+    <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 top-4 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
     <!-- Mobile top bar -->
     <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-cream-200">☰</button>
@@ -109,7 +111,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             </div>
             <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
               <div class="mb-1 text-[10px] font-semibold text-cream-300/60">🎨 Palette</div>
-              <div class="grid grid-cols-4 gap-1.5">
+              <div class="grid grid-cols-3 gap-1.5">
                 <button v-for="c in store.palette.slice(0, 8)" :key="c" @click="copyColor(c)" class="h-7 w-full rounded-md border border-ink-700 transition hover:scale-105" :style="{ background: c }" :title="'Nhấn để copy ' + c"></button>
               </div>
             </div>
