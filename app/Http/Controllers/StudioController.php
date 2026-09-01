@@ -16,6 +16,14 @@ use Illuminate\Support\Str;
 
 class StudioController extends Controller
 {
+    /**
+     * Vue-style studio (migration preview): mounts the Vue 3 + Pinia studio app.
+     */
+    public function studioVue()
+    {
+        return view('studio.vue');
+    }
+
     public function index()
     {
         $user = auth()->user();

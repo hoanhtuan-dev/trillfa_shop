@@ -68,7 +68,7 @@
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-D5UZ9DQb.css",
+    "file": "assets/app-DQ9gjISz.css",
     "name": "app",
     "names": [
       "app.css"
@@ -80,6 +80,12 @@
     "file": "assets/app-CW4d4nVr.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/studio/app.js": {
+    "file": "assets/app-D9op1jJV.js",
+    "name": "app",
+    "src": "resources/js/studio/app.js",
     "isEntry": true
   }
 }
