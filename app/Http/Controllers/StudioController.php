@@ -287,13 +287,19 @@ class StudioController extends Controller
         $ty = max(0, $py - 1); $by = min($h - 1, $py + $ph);
 
         // 1+2) Reconstruction tuyến tính: trộn nền ngang (trái↔phải) và dọc (trên↔dưới) theo vị trí.
+        //      Guard đen: nếu một cạnh gần đen (thanh đen/letterbox) thì dùng màu cạnh đối diện.
+        $dark = function (int $c): bool { return ((($c >> 16) & 0xFF) + (($c >> 8) & 0xFF) + ($c & 0xFF)) < 72; };
         $spanX = max(1, $x1 - $x0); $spanY = max(1, $y1 - $y0);
         for ($y = $y0; $y <= $y1; $y++) {
             $lc = imagecolorat($img, $lx, $y); $rc = imagecolorat($img, $rx, $y);
+            if ($dark($lc) && ! $dark($rc)) { $lc = $rc; }
+            elseif ($dark($rc) && ! $dark($lc)) { $rc = $lc; }
             $lr = ($lc >> 16) & 0xFF; $lg = ($lc >> 8) & 0xFF; $lb = $lc & 0xFF;
             $rr = ($rc >> 16) & 0xFF; $rg = ($rc >> 8) & 0xFF; $rb = $rc & 0xFF;
             for ($x = $x0; $x <= $x1; $x++) {
                 $tc = imagecolorat($img, $x, $ty); $bc = imagecolorat($img, $x, $by);
+                if ($dark($tc) && ! $dark($bc)) { $tc = $bc; }
+                elseif ($dark($bc) && ! $dark($tc)) { $bc = $tc; }
                 $fy = ($y - $y0) / $spanY;
                 $tr = ($tc >> 16) & 0xFF; $tg = ($tc >> 8) & 0xFF; $tb = $tc & 0xFF;
                 $br = ($bc >> 16) & 0xFF; $bg = ($bc >> 8) & 0xFF; $bb = $bc & 0xFF;
@@ -1376,17 +1382,23 @@ class StudioController extends Controller
         imagecopyresampled($back, $img, 0, 0, 0, 0, $cw, $ch, $w, $h);
         for ($i = 0; $i < 3; $i++) { @imagefilter($back, IMG_FILTER_GAUSSIAN_BLUR); }
 
-        // 2) depth-of-field person layer: original with the background blurred, subject sharp.
+        // 2) depth-of-field person layer: original with the BACKGROUND blurred, subject sharp.
+        // ELLIPTICAL sharp mask centered on the subject — guarantees the person is never blurred
+        // (the subject fits inside a generous central ellipse); only the outer background/corners
+        // fall off into the bokeh blur, so the effect lands on the background, not the model.
         $blur2 = imagecreatetruecolor($w, $h);
         imagecopy($blur2, $img, 0, 0, 0, 0, $w, $h);
         for ($i = 0; $i < 3; $i++) { @imagefilter($blur2, IMG_FILTER_GAUSSIAN_BLUR); }
-        $cx = $w / 2; $x0 = (int) ($w * 0.28); $x1 = (int) ($w * 0.72);
-        for ($y = 0; $y < $h; $y++) {
-            for ($x = 0; $x < $w; $x++) {
-                $t = $x < $cx ? ($x / max(1, $x0)) : (($w - $x) / max(1, $w - $x1));
-                $t = max(0.0, min(1.0, $t));
-                if ($t >= 1.0) { continue; }            // fully sharp inside the subject band
-                $wg = $t * $t * (3 - 2 * $t);           // smoothstep falloff -> soft transition
+        $cx = $w / 2; $cy = $h / 2;
+        $rx = $w * 0.46; $ry = $h * 0.50;   // sharp ellipse (generous: subject + margin stays sharp)
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $dx = ($x - $cx) / $rx; $dy = ($y - $cy) / $ry;
+                $d = sqrt($dx * $dx + $dy * $dy);
+                if ($d <= 0.72) { continue; }            // fully sharp inside the ellipse
+                $wgt = (1 - $d) / 0.28;                  // 1 at d=0.72 -> 0 at d=1.0
+                $wgt = max(0.0, min(1.0, $wgt));
+                $wg = $wgt * $wgt * (3 - 2 * $wgt);      // smoothstep -> soft bokeh transition
                 $c = imagecolorat($img, $x, $y);
                 $b = imagecolorat($blur2, $x, $y);
                 $r = (int) round((($c >> 16) & 255) * $wg + (($b >> 16) & 255) * (1 - $wg));
