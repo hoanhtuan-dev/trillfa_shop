@@ -482,7 +482,10 @@ export const useStudioStore = defineStore('studio', {
     async applyRegion() {
       const op = this.regionOp || this.regionMode;
       if (!op || !this.regionOps[op]) { this.toast('Chọn thao tác vùng trước.', 'error'); return; }
-      if (!this.previewId || !this.preview?.media_url) { this.toast('Chọn ảnh kết quả để chỉnh vùng.', 'error'); return; }
+      // Vùng chọn được tính theo ẢNH ĐANG HIỂN THỊ (upscaleSrc) — gửi chính URL đó làm source_url
+      // để backend sửa đúng ảnh này, vị trí tái tạo khớp vùng đã chọn trên canvas.
+      const src = this.upscaleSrc;
+      if (!this.previewId || !src) { this.toast('Chọn ảnh kết quả để chỉnh vùng.', 'error'); return; }
       if (this.regionOps[op].needsPrompt && !this.regionPrompt.trim()) { this.toast('Nhập mô tả nội dung thay thế cho vùng.', 'error'); return; }
       const b = this.regionBox || {}; const w = b.w || 0, h = b.h || 0;
       if (w < 0.02 || h < 0.02) { this.toast('Vùng chọn quá nhỏ — kéo chọn lại trên canvas.', 'error'); return; }
@@ -491,7 +494,7 @@ export const useStudioStore = defineStore('studio', {
       this.regionError = '';
       this.regionStartTs = Date.now();
       try {
-        const d = await this.api('/studio/generations/' + this.previewId + '/region', { op, region: { x: b.x, y: b.y, w, h }, prompt: this.regionPrompt });
+        const d = await this.api('/studio/generations/' + this.previewId + '/region', { op, region: { x: b.x, y: b.y, w, h }, prompt: this.regionPrompt, source_url: src });
         if (!d.generation_id) { throw new Error(d.message || 'Không tạo được yêu cầu.'); }
         this.regionGenId = d.generation_id;
         if (d.status === 'completed') {

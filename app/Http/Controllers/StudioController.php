@@ -194,6 +194,9 @@ class StudioController extends Controller
             'region.w' => ['required', 'numeric', 'min:0.005', 'max:1'],
             'region.h' => ['required', 'numeric', 'min:0.005', 'max:1'],
             'prompt' => ['nullable', 'string', 'max:2000'],
+            // Ảnh ĐANG HIỂN THỊ trên canvas (upscaleSrc) — backend sửa đúng ảnh này để vùng
+            // chọn khớp vị trí tái tạo (tránh lệch do layer/scale/aspect khác preview.media_url).
+            'source_url' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $op = (string) $data['op'];
@@ -201,12 +204,15 @@ class StudioController extends Controller
             return response()->json(['message' => 'Nhập mô tả nội dung thay thế cho vùng chọn.'], 422);
         }
 
-        if (! $generation->media_url) {
+        // Ưu tiên ảnh đang hiển thị (source_url) để vùng chọn khớp vị trí tái tạo; fallback media_url.
+        $sourceUrl = trim((string) ($data['source_url'] ?? ''));
+        if ($sourceUrl === '') { $sourceUrl = (string) $generation->media_url; }
+        if ($sourceUrl === '') {
             return response()->json(['message' => 'Ảnh nguồn chưa có kết quả.'], 422);
         }
 
         $file = null;
-        foreach ([public_path(ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/')))] as $cand) {
+        foreach ([public_path(ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')))] as $cand) {
             if (is_file($cand)) { $file = $cand; break; }
         }
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
@@ -238,7 +244,7 @@ class StudioController extends Controller
         if ($hasAi) {
             return $this->queueGeneration('image', [
                 'prompt' => $this->regionPrompt($op, (string) ($data['prompt'] ?? '')),
-                'base_image' => $generation->media_url,
+                'base_image' => $sourceUrl,
                 'mask_image' => $maskUrl,
                 'edit' => true,
             ], $cost, $generation);

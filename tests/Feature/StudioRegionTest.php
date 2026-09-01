@@ -6,11 +6,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/**
- * 🧹 Region Tools ("xóa theo vùng chọn trên canvas"):
- * endpoint /studio/generations/{id}/region — mask builder + AI/local + validation,
- * fit-to-source-size + composite-mask-merge.
- */
 class StudioRegionTest extends TestCase
 {
     use RefreshDatabase;
@@ -100,7 +95,7 @@ class StudioRegionTest extends TestCase
         for ($y = 0; $y < 80; $y++) { for ($x = 0; $x < 60; $x++) { imagesetpixel($src, $x, $y, imagecolorallocate($src, ($x * 4) % 256, ($y * 3) % 256, 128)); } }
         imagepng($src, storage_path('app/public/fit-src.png')); imagedestroy($src);
 
-        $edited = imagecreatetruecolor(80, 80); // tỷ lệ khác (vuông)
+        $edited = imagecreatetruecolor(80, 80);
         for ($y = 0; $y < 80; $y++) { for ($x = 0; $x < 80; $x++) { imagesetpixel($edited, $x, $y, imagecolorallocate($edited, ($x * 3) % 256, 128, ($y * 3) % 256)); } }
         imagepng($edited, storage_path('app/public/fit-edited.png')); imagedestroy($edited);
 
@@ -122,18 +117,15 @@ class StudioRegionTest extends TestCase
 
     public function test_composite_masked_edit_keeps_outside_identical(): void
     {
-        // source: xanh dương đồng nhất 40x40
         $src = imagecreatetruecolor(40, 40);
         imagefilledrectangle($src, 0, 0, 39, 39, imagecolorallocate($src, 20, 60, 200));
         imagepng($src, storage_path('app/public/c-src.png')); imagedestroy($src);
 
-        // edited: giống source nhưng vùng (10,10)-(29,29) màu đỏ
         $edited = imagecreatetruecolor(40, 40);
         imagefilledrectangle($edited, 0, 0, 39, 39, imagecolorallocate($edited, 20, 60, 200));
         imagefilledrectangle($edited, 10, 10, 29, 29, imagecolorallocate($edited, 220, 40, 40));
         imagepng($edited, storage_path('app/public/c-edited.png')); imagedestroy($edited);
 
-        // mask: trắng + đen vùng (10,10)-(29,29)
         $mask = imagecreatetruecolor(40, 40);
         imagefilledrectangle($mask, 0, 0, 39, 39, imagecolorallocate($mask, 255, 255, 255));
         imagefilledrectangle($mask, 10, 10, 29, 29, imagecolorallocate($mask, 0, 0, 0));
@@ -156,5 +148,39 @@ class StudioRegionTest extends TestCase
 
         foreach (['c-src.png', 'c-edited.png', 'c-mask.png'] as $f) { @unlink(storage_path('app/public/'.$f)); }
         @unlink(public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/')));
+    }
+
+    public function test_region_uses_source_url_as_displayed_image(): void
+    {
+        $a = imagecreatetruecolor(80, 80);
+        for ($y = 0; $y < 80; $y++) { for ($x = 0; $x < 80; $x++) { imagesetpixel($a, $x, $y, imagecolorallocate($a, 40, 160, 60)); } }
+        imagepng($a, storage_path('app/public/ra.png'));
+
+        $b = imagecreatetruecolor(60, 40);
+        for ($y = 0; $y < 40; $y++) { for ($x = 0; $x < 60; $x++) { imagesetpixel($b, $x, $y, imagecolorallocate($b, ($x * 4) % 256, 128, ($y * 6) % 256)); } }
+        imagepng($b, storage_path('app/public/rb.png'));
+
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'completed', 'prompt' => 'nguồn',
+            'model' => 'flux', 'provider' => 'flux', 'media_url' => '/storage/ra.png', 'credits_cost' => 1,
+        ]);
+
+        $res = $this->postJson('/studio/generations/'.$gen->id.'/region', [
+            'op' => 'erase', 'region' => ['x' => 0.2, 'y' => 0.2, 'w' => 0.4, 'h' => 0.4],
+            'source_url' => '/storage/rb.png',
+        ]);
+        $res->assertStatus(200);
+        $this->assertEquals('completed', $res->json('status'));
+
+        $outPath = public_path(ltrim((string) parse_url($res->json('media_url'), PHP_URL_PATH), '/'));
+        $out = @imagecreatefrompng($outPath);
+        $this->assertNotFalse($out);
+        $this->assertSame(60, imagesx($out), 'phải dùng ảnh hiển thị source_url (60)');
+        $this->assertSame(40, imagesy($out), 'phải dùng ảnh hiển thị source_url (40)');
+        imagedestroy($out);
+
+        @unlink($outPath);
+        @unlink(storage_path('app/public/ra.png'));
+        @unlink(storage_path('app/public/rb.png'));
     }
 }
