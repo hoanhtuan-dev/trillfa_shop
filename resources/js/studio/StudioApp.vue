@@ -99,12 +99,12 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             <span class="px-1 text-xs text-cream-200">{{ Math.round(store.zoom * 100) }}%</span>
           </div>
           <!-- right column: layers (top) + floating palette (below, same width) -->
-          <div class="absolute right-3 top-3 z-20 flex w-52 flex-col gap-1.5">
+          <div class="absolute right-3 top-3 z-20 flex w-40 flex-col gap-1.5">
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1.5 rounded-2xl bg-ink-900/85 p-2 shadow-lg">
               <p class="px-0.5 text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
               <div class="scrollbar-hide flex max-h-40 flex-col gap-1.5 overflow-y-auto">
                 <div v-for="l in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1.5 rounded-lg border p-1" :class="store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60'">
-                  <button @click="store.selectLayer(l)" class="flex min-w-0 items-center gap-1.5"><img :src="l.image" class="h-8 w-8 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-[11px] text-cream-100">{{ l.name }}</span></button>
+                  <button @click="store.selectLayer(l)" class="flex min-w-0 items-center gap-1.5"><img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-[10px] text-cream-100">{{ l.name }}</span></button>
                   <button @click="store.deleteLayer(l)" class="ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-full bg-red-600/25 text-red-200 opacity-0 hover:bg-red-600 group-hover:opacity-100">🗑</button>
                 </div>
               </div>
