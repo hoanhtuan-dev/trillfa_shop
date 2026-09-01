@@ -1,7 +1,7 @@
 <script setup>
 import { useStudioStore } from '../store.js';
 const store = useStudioStore();
-const looks = [['studio','Studio'],['warm','Ấm'],['cool','Lạnh'],['dramatic','Dramatic'],['retro','Retro'],['mono','Mono']];
+const looks = [['studio','Studio'],['warm','Ấm'],['cool','Lạnh'],['cinematic','Điện ảnh'],['dramatic','Dramatic'],['retro','Retro'],['mono','Mono']];
 async function applyLook() {
   if (!store.upscaleSrc || store.looking) return;
   store.looking = true;
@@ -13,7 +13,7 @@ async function applyLook() {
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(180,120,180,.13), rgba(74,122,144,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🎨 Film Look</h2>
-    <p class="text-[11px] text-ink-500">Gán tone màu phim cho ảnh đang chọn (1 chạm).</p>
+    <p class="text-[11px] text-ink-500">Gán tone màu phim cho ảnh đang chọn. Mức 1–4 nhẹ · 5–7 vừa · 8–10 đậm.</p>
     <div class="mt-3 flex flex-wrap gap-1.5">
       <button v-for="p in looks" :key="p[0]" type="button" @click="store.lookPreset = p[0]" class="rounded-full border px-3 py-1.5 text-xs transition-colors" :class="store.lookPreset === p[0] ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ p[1] }}</button>
     </div>

@@ -568,7 +568,7 @@ class StudioController extends Controller
     {
         $data = $request->validate([
             'image' => ['required', 'string', 'max:2048'],
-            'look' => ['required', 'string', 'in:studio,warm,cool,dramatic,retro,mono'],
+            'look' => ['required', 'string', 'in:studio,warm,cool,cinematic,dramatic,retro,mono'],
             'level' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $level = max(1, min(10, (int) ($data['level'] ?? 5)));
@@ -888,34 +888,47 @@ class StudioController extends Controller
     }
 
     /**
-     * Film-look color grading: applies a per-pixel tone curve + split-tinting for a chosen look.
-     * Simple, dependency-free (GD), strength-scaled.
+     * Film-look color grading: per-pixel tone curve + split-tint for a chosen look.
+     * Dependency-free (GD). 'level' (1-10) now scales EVERY component - contrast, lift,
+     * saturation and tint - so low levels are genuinely subtle. Previously only the tint
+     * was scaled while contrast/lift/saturation ran at full strength, so even level 1
+     * looked punchy and the slider barely did anything.
      */
     protected function applyLook(\GdImage $img, string $look, int $level): void
     {
         if ($level <= 0) { return; }
         $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
         $tintR = 0; $tintG = 0; $tintB = 0; $contrast = 0.0; $lift = 0.0; $sat = 1.0;
+        $split = false; // cinematic split-tone: teal shadows + warm highlights
         switch ($look) {
-            case 'warm':    $tintR = 12; $tintB = -8; $contrast = 0.18; $lift = 0.02; break;
-            case 'cool':    $tintR = -8; $tintB = 12; $contrast = 0.10; $lift = 0.04; break;
-            case 'dramatic':$contrast = 0.42; $tintR = -4; $tintB = 4; $lift = -0.03; break;
-            // Film: softened so it no longer burns out highlights (was lift 0.14 / tint 15 / -14).
-            case 'retro':   $contrast = 0.08; $lift = 0.06; $tintR = 9; $tintG = 3; $tintB = -6; break;
-            // Cinematic (điện ảnh): warm highlights + teal shadows, gentle contrast, slight sat boost.
-            case 'cinematic': $contrast = 0.22; $lift = 0.02; $sat = 1.06; $tintR = 8; $tintG = -1; $tintB = 6; break;
-            case 'mono':    $sat = 0.0; $contrast = 0.22; $lift = 0.02; break;
-            default:        $contrast = 0.06; $tintR = 4; $tintB = -2; break; // studio neutral
+            case 'warm':    $tintR = 8; $tintB = -5; $contrast = 0.10; $lift = 0.015; break;
+            case 'cool':    $tintR = -5; $tintB = 8; $contrast = 0.06; $lift = 0.030; break;
+            case 'dramatic':$contrast = 0.26; $tintR = -3; $tintB = 3; $lift = -0.020; break;
+            // Film/retro: gentle fade + warm paper tint (softened so it never burns out).
+            case 'retro':   $contrast = 0.06; $lift = 0.040; $tintR = 7; $tintG = 2; $tintB = -5; break;
+            // Cinematic (điện ảnh): teal shadows + warm highlights, gentle contrast, subtle sat lift.
+            case 'cinematic': $contrast = 0.16; $lift = 0.010; $sat = 1.05; $split = true; break;
+            case 'mono':    $sat = 0.0; $contrast = 0.16; $lift = 0.015; break;
+            default:        $contrast = 0.04; $tintR = 3; $tintB = -1; break; // studio neutral
         }
+        // Strength interpolation - everything is scaled by k (level / 10).
+        $c = $contrast * $k; $l = $lift * $k; $sm = 1.0 + ($sat - 1.0) * $k;
+        $tr = $tintR * $k; $tg = $tintG * $k; $tb = $tintB * $k;
         for ($y = 0; $y < $h; $y++) {
             for ($x = 0; $x < $w; $x++) {
-                $c = imagecolorat($img, $x, $y);
-                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $px = imagecolorat($img, $x, $y);
+                $r = ($px >> 16) & 0xFF; $g = ($px >> 8) & 0xFF; $b = $px & 0xFF;
                 $lum = $r * 0.299 + $g * 0.587 + $b * 0.114;
-                // contrast around mid + black lift
-                $nr = $lum + ($r - $lum) * $sat + $contrast * ($r - 128) + $lift * 255 + $tintR * $k;
-                $ng = $lum + ($g - $lum) * $sat + $contrast * ($g - 128) + $lift * 255 + $tintG * $k;
-                $nb = $lum + ($b - $lum) * $sat + $contrast * ($b - 128) + $lift * 255 + $tintB * $k;
+                $dr = $tr; $dg = $tg; $db = $tb;
+                if ($split) {
+                    // Split-tone by luminance: warm orange in highlights, teal in shadows.
+                    $t = $lum / 255.0;
+                    $dr = ($t > 0.5 ? 9 : -7) * $k;
+                    $db = ($t > 0.5 ? -4 : 8) * $k;
+                }
+                $nr = $lum + ($r - $lum) * $sm + $c * ($r - 128) + $l * 255 + $dr;
+                $ng = $lum + ($g - $lum) * $sm + $c * ($g - 128) + $l * 255 + $dg;
+                $nb = $lum + ($b - $lum) * $sm + $c * ($b - 128) + $l * 255 + $db;
                 imagesetpixel($img, $x, $y, imagecolorallocate($img,
                     max(0, min(255, (int) round($nr))), max(0, min(255, (int) round($ng))), max(0, min(255, (int) round($nb)))));
             }
@@ -1278,7 +1291,7 @@ class StudioController extends Controller
                 'model_name' => $model['name'] ?? null,
                 'pose_name' => $pose['name'] ?? null,
                 'face_ref' => (bool) ($model['image'] ?? null),
-                'face_pass' => (bool) ($data['face_pass'] ?? (($model['image'] ?? null) ? true : false)),
+                'face_pass' => (bool) ($data['face_pass'] ?? false),
                 'pose_ref' => $poseRefUrl,
                 'background' => (string) ($data['background'] ?? ''),
                 'build' => (int) ($data['build'] ?? 6),
@@ -1318,7 +1331,7 @@ class StudioController extends Controller
             (int) ($meta['build'] ?? 6),
             (string) ($meta['tone'] ?? 'none'),
             (string) ($meta['pose_ref'] ?? ''),
-            (bool) ($meta['face_pass'] ?? true),
+            (bool) ($meta['face_pass'] ?? false),
         );
         if (! $fallback) {
             $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).']);

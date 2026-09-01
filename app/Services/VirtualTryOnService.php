@@ -219,7 +219,7 @@ class VirtualTryOnService
      * $build (0-10) controls body proportions (height vs slimness): high = tall runway-model build,
      * low = shorter/fuller. $tone adds a color-grade hint (warm/cool/film/neutral/auto) to the prompt.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, int $build = 6, string $tone = 'none', ?string $poseRefUrl = null, bool $facePass = true): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, int $build = 6, string $tone = 'none', ?string $poseRefUrl = null, bool $facePass = false): ?string
     {
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $this->calls = 1;

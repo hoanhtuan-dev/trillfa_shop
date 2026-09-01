@@ -12,7 +12,7 @@ const swapBuild = ref(6); // Tỷ lệ dáng mặc định: 6 (cân đối) — 
 const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
 const swapToneLevel = ref(5); // Mức độ ảnh hưởng mặc định: 5 — 0-10
 const swapFabric = ref(0); // Vân vải hậu kỳ: 0 = tắt (mặc định, bảo vệ khuôn mặt) — 1-10 cường độ
-const swapFacePass = ref(true); // 2-pass ghép khuôn mặt theo ảnh (mặc định bật)
+const swapFacePass = ref(false); // 2-pass ghép khuôn mặt theo ảnh (mặc định TẮT — với qwen-edit-max pass 2 có thể làm giảm độ chính xác dáng)
 const toneOptions = [
   { v: 'auto', label: '🎨 Tự động (theo bối cảnh)' },
   { v: 'warm', label: '☀️ Ấm' },
@@ -130,7 +130,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
         <div class="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
           <div>
             <p class="text-xs font-semibold text-cream-200">👤 Ghép khuôn mặt theo ảnh</p>
-            <p class="text-[10px] text-cream-300/50">Bước 2: thay mặt bằng đúng khuôn mặt đã chọn (chậm hơn ~30s). Tắt nếu muốn kết quả nhanh.</p>
+            <p class="text-[10px] text-cream-300/50">Thử bước 2 thay mặt theo ảnh đã chọn. Mặc định TẮT vì qwen-edit-max có thể làm giảm độ chính xác dáng/trang phục. Để mặt chuẩn nhất, hãy mở model qwen-image-3.0-pro trong QwenCloud (bỏ chế độ "free tier only").</p>
           </div>
           <label class="relative inline-flex cursor-pointer items-center">
             <input type="checkbox" v-model="swapFacePass" class="peer sr-only">
