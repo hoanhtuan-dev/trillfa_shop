@@ -1,10 +1,10 @@
 <?php
 
-namespace TestsFeature;
+namespace Tests\Feature;
 
-use AppModelsUser;
-use IlluminateFoundationTestingRefreshDatabase;
-use TestsTestCase;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class StudioLookTest extends TestCase
 {
@@ -57,10 +57,10 @@ class StudioLookTest extends TestCase
      */
     public function test_look_strength_scales_with_level(): void
     {
-        $ctrl = app(AppHttpControllersStudioController::class);
-        $method = new ReflectionMethod($ctrl, 'applyLook');
+        $ctrl = app(\App\Http\Controllers\StudioController::class);
+        $method = new \ReflectionMethod($ctrl, 'applyLook');
 
-        $make = function (): GdImage {
+        $make = function (): \GdImage {
             $img = imagecreatetruecolor(32, 32);
             for ($y = 0; $y < 32; $y++) {
                 for ($x = 0; $x < 32; $x++) {
@@ -69,7 +69,7 @@ class StudioLookTest extends TestCase
             }
             return $img;
         };
-        $delta = function (GdImage $a, GdImage $b): float {
+        $delta = function (\GdImage $a, \GdImage $b): float {
             $sum = 0.0; $n = 0;
             for ($y = 0; $y < 32; $y++) {
                 for ($x = 0; $x < 32; $x++) {

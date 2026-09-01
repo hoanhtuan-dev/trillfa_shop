@@ -11,7 +11,6 @@ const swapBg = ref('');
 const swapBuild = ref(6); // Tỷ lệ dáng mặc định: 6 (cân đối) — 0 lùn-nở -> 10 cao-thon chuẩn người mẫu
 const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
 const swapToneLevel = ref(5); // Mức độ ảnh hưởng mặc định: 5 — 0-10
-const swapFabric = ref(0); // Vân vải hậu kỳ: 0 = tắt (mặc định, bảo vệ khuôn mặt) — 1-10 cường độ
 const swapFacePass = ref(false); // 2-pass ghép khuôn mặt theo ảnh (mặc định TẮT — với qwen-edit-max pass 2 có thể làm giảm độ chính xác dáng)
 const toneOptions = [
   { v: 'auto', label: '🎨 Tự động (theo bối cảnh)' },
@@ -31,17 +30,16 @@ function loadSwapMemory() {
     if (m.build != null) swapBuild.value = Number(m.build);
     if (m.tone) swapTone.value = m.tone;
     if (m.toneLevel != null) swapToneLevel.value = Number(m.toneLevel);
-    if (m.fabric != null) swapFabric.value = Number(m.fabric);
     if (typeof m.bg === 'string') swapBg.value = m.bg;
     if (m.facePass != null) swapFacePass.value = !!m.facePass;
   } catch (e) {}
 }
 function saveSwapMemory() {
   try {
-    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, toneLevel: swapToneLevel.value, fabric: swapFabric.value, bg: swapBg.value, facePass: swapFacePass.value }));
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, toneLevel: swapToneLevel.value, bg: swapBg.value, facePass: swapFacePass.value }));
   } catch (e) {}
 }
-watch([swapBg, swapBuild, swapTone, swapToneLevel, swapFabric, swapFacePass], saveSwapMemory);
+watch([swapBg, swapBuild, swapTone, swapToneLevel, swapFacePass], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; } catch(e){}
@@ -75,9 +73,8 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="store.swapModelIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><img v-if="selFaceImgs[0]?.image" :src="selFaceImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">👩</span><span class="truncate text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') }}</span></div>
       <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img v-if="selPoseImgs[0]?.image" :src="selPoseImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">🧍</span><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
-      <div v-if="swapFabric > 0" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Vân vải hậu kỳ:</span><span class="truncate text-cream-100">{{ swapFabric }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel, fabric_detail: swapFabric, face_pass: swapFacePass })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel, face_pass: swapFacePass })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
     <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
         <!-- Khuôn mặt -->
@@ -116,15 +113,6 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
             <span class="w-6 text-right text-xs text-cream-200">{{ swapToneLevel }}</span>
           </div>
           <p class="mt-1 text-[10px] text-cream-300/50">0 = không áp dụng · 5 = vừa phải (mặc định) · 10 = đậm nhất. Film/Cinematic nhẹ để tránh cháy sáng.</p>
-        </div>
-        <!-- Vân vải hậu kỳ (mặc định TẮT — bảo vệ khuôn mặt) -->
-        <div class="mt-4">
-          <p class="mb-1 text-xs font-semibold text-cream-200">🪡 Vân vải hậu kỳ <span class="text-cream-300/60">(0 tắt · thêm vân sợi lên ảnh sau khi tạo — chỉ nên bật khi cần, có thể ảnh hưởng vùng da)</span></p>
-          <div class="flex items-center gap-3">
-            <input type="range" min="0" max="10" v-model.number="swapFabric" class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-600">
-            <span class="w-6 text-right text-xs text-cream-200">{{ swapFabric === 0 ? 'Tắt' : swapFabric }}</span>
-          </div>
-          <p class="mt-1 text-[10px] text-cream-300/50">Mặc định 0 (tắt) để khuôn mặt luôn sạch. Bật 1-10 nếu muốn vải rõ vân hơn; không áp dụng lên vùng da.</p>
         </div>
         <!-- Ghép khuôn mặt theo ảnh (2-pass) -->
         <div class="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">

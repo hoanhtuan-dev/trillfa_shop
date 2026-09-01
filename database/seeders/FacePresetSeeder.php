@@ -1,9 +1,9 @@
 <?php
 
-namespace DatabaseSeeders;
+namespace Database\Seeders;
 
-use AppModelsFacePreset;
-use IlluminateDatabaseSeeder;
+use App\Models\FacePreset;
+use Illuminate\Database\Seeder;
 
 class FacePresetSeeder extends Seeder
 {

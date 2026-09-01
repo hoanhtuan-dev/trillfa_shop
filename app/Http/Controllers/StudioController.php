@@ -647,7 +647,6 @@ class StudioController extends Controller
             'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
             'skin_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
             'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'fabric_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
@@ -1257,7 +1256,6 @@ class StudioController extends Controller
             'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
             'tone_level' => ['nullable', 'integer', 'min:0', 'max:10'], // Mức độ ảnh hưởng của hiệu ứng
             'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL — sent to the edit model so the pose is actually applied
-            'fabric_detail' => ['nullable', 'integer', 'min:0', 'max:10'], // Vân vải hậu kỳ: 0 = tắt (mặc định), 1-10 = cường độ
             'face_pass' => ['nullable', 'boolean'], // 2-pass ghép khuôn mặt: mặc định bật khi có ảnh mặt
         ]);
 
@@ -1297,7 +1295,6 @@ class StudioController extends Controller
                 'build' => (int) ($data['build'] ?? 6),
                 'tone' => (string) ($data['tone'] ?? 'none'),
                 'tone_level' => (int) ($data['tone_level'] ?? 5),
-                'fabric_detail' => (int) ($data['fabric_detail'] ?? 0),
             ],
         ]);
 
@@ -1338,19 +1335,9 @@ class StudioController extends Controller
             return;
         }
 
-        // Post-process fabric texture ("Vân vải hậu kỳ") — OFF by default; only when the user enables it.
-        $fabricDetail = (int) ($meta['fabric_detail'] ?? 0);
-        if ($fabricDetail > 0) {
-            $det = $this->enhanceStoredImage($fallback, min(10, max(0, $fabricDetail)), 0);
-            if ($det) { $fallback = $det; }
-        }
-
-        // Color-tone effect: deterministic grade matching the chosen tone / background.
-        $tone = (string) ($meta['tone'] ?? 'none');
-        $toneLevel = (int) ($meta['tone_level'] ?? 5);
-        $toned = $this->applyToneToStoredImage($fallback, $tone, (string) ($meta['background'] ?? ''), $toneLevel);
-        if ($toned) { $fallback = $toned; }
-
+        // NO post-process passes: the raw edit-model result is stored as-is. Fabric texture,
+        // skin and tone re-grading passes all recode the image and degrade quality (swapdetail /
+        // swaptone files) — the user explicitly asked to remove every post-process effect.
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $actualModel = $svc->lastModel() ?: $swapModel;
         $credits = max(1, $svc->calls()); // 2 for the try-on + face-swap passes, 1 otherwise
