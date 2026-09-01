@@ -1,26 +1,22 @@
 <?php
-namespace AppModulesStudio;
+namespace App\Modules\Studio;
 
-use IlluminateSupportServiceProvider;
+use Illuminate\Support\ServiceProvider;
 
 /**
- * Studio module — wires the Studio feature as a self-contained, reusable unit
- * (config + views + the Vue frontend bundle). Routes stay in web.php but the module
- * owns its config/views/namespace so it can be shared or extracted later.
+ * Studio module — wires the Studio feature as a self-contained, reusable unit.
  */
 class StudioModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/config.php', 'studio_module');
-        // Reusable studio services as module listeners (accessed via app('studio.*')).
-        $this->app->singleton('studio.stylist_catalog', fn () => new AppServicesStylistCatalog());
+        $this->app->singleton('studio.stylist_catalog', fn () => new \App\Services\StylistCatalog());
     }
 
     public function boot(): void
     {
-        $this->loadViewsFrom(__DIR__.'/../views', 'studio');
-        // Register the module's JSON endpoints namespace (routes live in web.php studio group).
+        // Studio views live in resources/views/studio (default app namespace).
         $this->app->bind('studio.bridge', fn () => new StudioBridge());
     }
 }
