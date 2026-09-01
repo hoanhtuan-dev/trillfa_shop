@@ -320,14 +320,11 @@ class StudioController extends Controller
         $knownVideo = ['wan2.5-t2v', 'wan2.2-i2v', 'wan2.5-i2v', 'wan2.1-i2v-turbo', 'happyhorse-1.1-i2v', 'wanx2.1-t2v-turbo', 'wanx2.1-i2v-turbo'];
         $group = $model->group;
 
-        // Same unified, priority-driven candidate list that generation uses. This is the single source
-        // of truth, so the check can never disagree with what "Tạo Ảnh 2D" will actually call.
+        // The checked model itself is the subject — report ITS key (generation uses the same
+        // candidate-key resolver). The priority list is shown for context only.
         $candidates = studio_model_candidates($group);
         $names = array_map(fn ($c) => ($c['provider'] ?? '').':'.($c['model'] ?? ''), $candidates);
-        $first = $candidates[0] ?? ['provider' => $model->provider, 'model' => $model->model_id];
-
-        // The key is chosen the same way generation chooses it: by registered priority (never key type).
-        $candidateKeys = studio_candidate_key($first, $group);
+        $candidateKeys = studio_candidate_key(['provider' => $model->provider, 'model' => $model->model_id], $group);
         $keyVal = $candidateKeys[0] ?? null;
         $keyPrefix = $keyVal ? substr($keyVal, 0, 8).'…' : null;
         $baseUrl = $keyVal ? dashscope_base_url($keyVal) : '';
@@ -338,24 +335,26 @@ class StudioController extends Controller
             $note .= '⚠️ Model_id này KHÔNG nằm trong nhóm model video phổ biến của DashScope/Wan — dễ gặp lỗi "Model not exist". ';
         }
         if (! $keyVal) {
-            $note .= 'Chưa có KEY dùng được cho "'.$first['provider'].'" — thêm key trong API Keys Registry (hoặc env).';
+            $note .= 'Chưa có KEY dùng được cho "'.$model->provider.'" — thêm key Pay-As-You-Go trong API Keys Registry (hoặc env).';
         } elseif (str_starts_with($keyVal, 'sk-sp-')) {
-            $note .= '⚠️ Key đang dùng (theo độ ưu tiên) là Token/Coding Plan (sk-sp-…). Host plan KHÔNG phục vụ model '.$first['model'].' → dễ báo "Model not exist". Đăng ký/ưu tiên key Pay-As-You-Go (sk-… hoặc sk-ws-…).';
+            $note .= '⚠️ Key đang dùng (theo độ ưu tiên) là Token/Coding Plan (sk-sp-…). Host plan KHÔNG phục vụ model '.$model->model_id.' → dễ báo "Model not exist". Đăng ký/ưu tiên key Pay-As-You-Go (sk-… hoặc sk-ws-…).';
         } elseif (str_contains($baseUrl, 'token-plan')) {
             $note .= '⚠️ Base URL đang trỏ tới host Token/Coding Plan — không phục vụ model tạo ảnh. Đặt "DashScope Base" về host Pay-As-You-Go (dashscope-intl.aliyuncs.com).';
+        } elseif (count($candidateKeys) > 1) {
+            $note .= 'OK — gọi '.$keyPrefix.' trước ('.count($candidateKeys).' key theo độ ưu tiên) cho '.$model->provider.':'.$model->model_id.'.';
         } else {
-            $note .= 'OK — gọi key '.$keyPrefix.' cho '.$first['provider'].':'.$first['model'].' trước.';
+            $note .= 'OK — gọi key '.$keyPrefix.' cho '.$model->provider.':'.$model->model_id.'.';
         }
         if ($names) {
-            $note .= ' | Thứ tự ưu tiên: '.implode(' → ', $names);
+            $note .= ' | Thứ tự ưu tiên model: '.implode(' → ', $names);
         }
 
         return response()->json([
-            'provider' => $first['provider'],
-            'model_id' => $first['model'],
+            'provider' => $model->provider,
+            'model_id' => $model->model_id,
             'model_name' => $model->name,
             'group' => $group,
-            'api_key_ref' => $first['provider'],
+            'api_key_ref' => $model->provider,
             'key_exists' => (bool) $keyVal,
             'key_prefix' => $keyPrefix,
             'base_url' => $baseUrl,

@@ -573,6 +573,11 @@ if (! function_exists('studio_candidate_key')) {
             return [];
         }
 
+        // Image/Video/Edit models ONLY exist on the Pay-As-You-Go host. A Token/Coding-Plan key
+        // (sk-sp-…) routes to the plan host, which has no generation model -> it can NEVER serve
+        // these groups. So we exclude plan keys here; priority still orders the valid (pay-go) keys.
+        $genGroups = in_array($group, ['image', 'video', 'edit'], true);
+
         $families = in_array($provider, ['qwen', 'wan', 'dashscope'], true)
             ? ['qwen', 'dashscope', 'wan', 'qwen_edit']
             : [$provider];
@@ -602,6 +607,10 @@ if (! function_exists('studio_candidate_key')) {
         $out = [];
         foreach ($keys as $k) {
             if (isset($seen[$k['value']])) {
+                continue;
+            }
+            // Never use a Token/Coding-Plan key for generation groups (it can't serve image/video/edit).
+            if ($genGroups && str_starts_with($k['value'], 'sk-sp-')) {
                 continue;
             }
             $seen[$k['value']] = true;

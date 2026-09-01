@@ -67,20 +67,20 @@ class ImageFallbackTest extends TestCase
         $service->generate('photo of a red silk dress', null, null, null, null);
     }
 
-    public function test_model_check_reports_the_key_generation_actually_uses(): void
+    public function test_model_check_uses_paygo_key_even_when_plan_has_higher_priority(): void
     {
-        // Default settings (Cài đặt) choose the top candidate; here pounce on qwen.
         config(['studio.image_provider' => 'qwen']);
         \App\Models\StudioModel::create([
             'group' => 'image', 'name' => 'Qwen Image 3.0 Pro', 'provider' => 'qwen',
             'model_id' => 'qwen-image-3.0-pro', 'api_key_ref' => 'qwen', 'priority' => 8, 'enabled' => true,
         ]);
-        // Pay-As-You-Go key has HIGHER priority -> the unified rule picks it for the image group.
+        // The Token/Coding-Plan key has the HIGHER priority, but it is FORBIDDEN for image generation
+        // (plan host has no image model), so the check must still pick the Pay-As-You-Go key.
         \App\Models\StudioApiKey::create([
-            'provider' => 'qwen', 'label' => 'paygo', 'value' => 'sk-ws-TESTPAYGO', 'priority' => 10, 'enabled' => true, 'scopes' => ['*'],
+            'provider' => 'qwen', 'label' => 'plan', 'value' => 'sk-sp-TESTPLANKEY', 'priority' => 10, 'enabled' => true, 'scopes' => ['*'],
         ]);
         \App\Models\StudioApiKey::create([
-            'provider' => 'qwen', 'label' => 'plan', 'value' => 'sk-sp-TESTPLANKEY', 'priority' => 5, 'enabled' => true, 'scopes' => ['*'],
+            'provider' => 'qwen', 'label' => 'paygo', 'value' => 'sk-ws-TESTPAYGO', 'priority' => 5, 'enabled' => true, 'scopes' => ['*'],
         ]);
 
         $admin = \App\Models\User::where('email', 'admin@trillfa.com')->first();
@@ -89,23 +89,22 @@ class ImageFallbackTest extends TestCase
         $model = \App\Models\StudioModel::first();
         $res = $this->getJson('/studio/models/'.$model->id.'/test')->assertOk()->json();
 
-        // Unified priority: default-settings model is the top candidate; top-priority key is reported.
+        // The checked model's key must be the Pay-As-You-Go one, NOT the higher-priority plan key.
         $this->assertSame('qwen', $res['provider']);
         $this->assertSame('qwen-image-3.0-pro', $res['model_id']);
         $this->assertStringStartsWith('sk-ws', (string) $res['key_prefix']);
         $this->assertStringContainsString('dashscope-intl', (string) $res['base_url']);
-        $this->assertContains('qwen:qwen-image-3.0-pro', $res['candidates']);
         $this->assertStringStartsWith('sk-ws', (string) $res['keys'][0]);
     }
 
-    public function test_model_check_warns_when_top_priority_key_is_plan(): void
+    public function test_model_check_reports_no_usable_key_when_only_plan_registered(): void
     {
         config(['studio.image_provider' => 'qwen']);
         \App\Models\StudioModel::create([
             'group' => 'image', 'name' => 'Qwen Image 3.0 Pro', 'provider' => 'qwen',
             'model_id' => 'qwen-image-3.0-pro', 'api_key_ref' => 'qwen', 'priority' => 8, 'enabled' => true,
         ]);
-        // Only a Token/Coding Plan key registered -> it wins by priority and cannot serve the image model.
+        // Only a Token/Coding Plan key exists -> not usable for image, so no key is selected.
         \App\Models\StudioApiKey::create([
             'provider' => 'qwen', 'label' => 'plan', 'value' => 'sk-sp-TESTPLANKEY', 'priority' => 10, 'enabled' => true, 'scopes' => ['*'],
         ]);
@@ -116,8 +115,8 @@ class ImageFallbackTest extends TestCase
         $model = \App\Models\StudioModel::first();
         $res = $this->getJson('/studio/models/'.$model->id.'/test')->assertOk()->json();
 
-        $this->assertStringStartsWith('sk-sp', (string) $res['key_prefix']);
-        $this->assertStringContainsString('token-plan', (string) $res['base_url']);
-        $this->assertStringContainsString('Token/Coding Plan', (string) $res['note']);
+        $this->assertNull($res['key_prefix']);
+        $this->assertSame('', (string) $res['base_url']);
+        $this->assertStringContainsString('Chưa có KEY', (string) $res['note']);
     }
 }
