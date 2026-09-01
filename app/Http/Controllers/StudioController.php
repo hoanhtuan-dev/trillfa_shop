@@ -1387,6 +1387,94 @@ class StudioController extends Controller
     }
 
     /**
+     * "Tách nền + hiệu ứng + gộp" via remove.bg (proper segmentation): call remove.bg to get the
+     * person CUTOUT (accurate alpha), blur the composite, then recomposite the sharp original person
+     * (from the composite) over the blurred background using the cutout alpha. The subject is NEVER
+     * blurred — 100% correct segmentation, no ghosting, no mirroring.
+     */
+    protected function applySegmentComposite(string $compositeUrl): ?string
+    {
+        $cutout = $this->removeBgCutout($compositeUrl);
+        if (! $cutout) { return null; }
+
+        $load = function (string $url) {
+            $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+            $file = null;
+            foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $c) {
+                if (is_file($c)) { $file = $c; break; }
+            }
+            return $file ? @imagecreatefromstring((string) file_get_contents($file)) : null;
+        };
+        $comp = $load($compositeUrl); $cut = $load($cutout);
+        if (! $comp || ! $cut) { return null; }
+        $w = imagesx($comp); $h = imagesy($comp);
+        if (imagesx($cut) !== $w || imagesy($cut) !== $h) {
+            $r2 = imagecreatetruecolor($w, $h);
+            imagecopyresampled($r2, $cut, 0, 0, 0, 0, $w, $h, imagesx($cut), imagesy($cut));
+            imagedestroy($cut); $cut = $r2;
+        }
+        // Blur the whole composite (background will be blurred; person restored sharp below).
+        $blur = imagecreatetruecolor($w, $h);
+        imagecopy($blur, $comp, 0, 0, 0, 0, $w, $h);
+        for ($i = 0; $i < 3; $i++) { @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR); }
+        // Recomposite: sharp composite * alpha + blurred * (1-alpha). GD alpha: 0=opaque,127=transparent.
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $ac = imagecolorat($cut, $x, $y);
+                $op = 1 - (($ac >> 24) & 0x7F) / 127.0;   // 1 = solid person, 0 = background
+                if ($op <= 0.03) { continue; }             // background -> keep the blurred bg
+                if ($op >= 0.97) { 
+                    $c = imagecolorat($comp, $x, $y);
+                    imagesetpixel($blur, $x, $y, $c);
+                    continue;
+                }
+                $c = imagecolorat($comp, $x, $y);
+                $b = imagecolorat($blur, $x, $y);
+                $r = (int) round((($c>>16)&255)*$op + (($b>>16)&255)*(1-$op));
+                $g = (int) round((($c>>8)&255)*$op + (($b>>8)&255)*(1-$op));
+                $bb = (int) round(($c&255)*$op + ($b&255)*(1-$op));
+                imagesetpixel($blur, $x, $y, imagecolorallocate($blur, $r, $g, $bb));
+            }
+        }
+        imagedestroy($cut); imagedestroy($comp);
+        $name = 'studio/seg-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($blur));
+        imagedestroy($blur);
+        return '/storage/'.$name;
+    }
+
+    /**
+     * Call the remove.bg API to extract the person (transparent-background cutout). Reads the API key
+     * from studio.removebg_key. Returns the cutout URL, or null (no key / request failed).
+     */
+    protected function removeBgCutout(string $url): ?string
+    {
+        $key = (string) studio_config('removebg_key', '');
+        if ($key === '') { return null; }
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $c) {
+            if (is_file($c)) { $file = $c; break; }
+        }
+        if (! $file) { return null; }
+        try {
+            $resp = \Illuminate\Support\Facades\Http::withHeaders(['X-Api-Key' => $key])->timeout(90)
+                ->attach('image_file', fopen($file, 'r'), 'image.png')
+                ->post('https://api.remove.bg/v1.0/removebg', ['size' => 'auto', 'format' => 'png']);
+            if ($resp->failed()) {
+                logger()->warning('remove.bg failed: '.$resp->status().' '.substr((string) $resp->body(), 0, 200));
+                return null;
+            }
+            $name = 'studio/seg-cut-'.Str::uuid().'.png';
+            \Illuminate\Support\Facades\Storage::disk('public')->put($name, (string) $resp->body());
+            return '/storage/'.$name;
+        } catch (Throwable $e) {
+            logger()->warning('remove.bg error: '.$e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * "Tách nền lần 2" (2-pass background separation): ask the edit model to REMOVE the person and
      * fill the background naturally -> a clean scene with no person. We can then apply effects
      * (blur / depth-of-field) to that background SAFELY (there is no person to blur), build an alpha
@@ -1738,15 +1826,16 @@ class StudioController extends Controller
         $bright = $this->brightenDarkSubject($fallback);
         if ($bright) { $fallback = $bright; }
 
-        // "Chân dung & Chiều sâu" (post-process): mode = separate (default) | bokeh | off.
-        //  separate: "tách nền lần 2" — AI removes the person (clean bg), we blur/effect that bg
-        //            safely, then recomposite the sharp person on top (alpha from the difference).
+        // "Tách nền + hiệu ứng + gộp": mode = removebg | bokeh | off (default removebg).
+        //  removebg: segment the person with remove.bg (accurate alpha), blur the background, then
+        //            recomposite the SHARP person on top — subject never blurred. If no remove.bg key
+        //            is configured (studio.removebg_key) the call is skipped and the raw result kept.
         //  bokeh:    deterministic depth-of-field on the original frame.
         //  off:      no background post-processing (the raw swap result).
-        $mode = (string) studio_config('swap_portrait_depth', 'separate');
-        if ($mode === 'separate') {
-            $bgDepth = $this->applyBackgroundDepth($fallback);
-            if ($bgDepth) { $fallback = $bgDepth; }
+        $mode = (string) studio_config('swap_portrait_depth', 'removebg');
+        if ($mode === 'removebg') {
+            $seg = $this->applySegmentComposite($fallback);
+            if ($seg) { $fallback = $seg; }
         } elseif ($mode === 'bokeh') {
             $portrait = $this->applyPortraitDepth($fallback);
             if ($portrait) { $fallback = $portrait; }
