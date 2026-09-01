@@ -573,9 +573,14 @@ if (! function_exists('studio_candidate_key')) {
             return [];
         }
 
-        // Image/Video/Edit models ONLY exist on the Pay-As-You-Go host. A Token/Coding-Plan key
-        // (sk-sp-…) routes to the plan host, which has no generation model -> it can NEVER serve
-        // these groups. So we exclude plan keys here; priority still orders the valid (pay-go) keys.
+        // KEY PRIORITY IS INTENTIONALLY IGNORED. The model priority within the group
+        // (studio_model_candidates) is the ONLY driver of which model/key is used, per the admin's
+        // rule: "bỏ qua mức độ ưu tiên keys, tập trung mức độ ưu tiên model cùng nhóm". We merely
+        // collect the valid keys for this model (any registration order) and dedup them.
+        //
+        // The one hard rule that remains: Image/Video/Edit models ONLY exist on the Pay-As-You-Go
+        // host, so a Token/Coding-Plan key (sk-sp-…) is dropped for those groups (its host has no
+        // generation model); it is kept for text/vision/inference groups.
         $genGroups = in_array($group, ['image', 'video', 'edit'], true);
 
         $families = in_array($provider, ['qwen', 'wan', 'dashscope'], true)
@@ -587,37 +592,24 @@ if (! function_exists('studio_candidate_key')) {
             foreach (studio_api_keys_for($fam, $model, $group) as $k) {
                 $v = studio_api_key_value($k);
                 if ($v) {
-                    $keys[] = ['value' => $v, 'priority' => (int) ($k->priority ?? 0)];
+                    $keys[] = $v;
                 }
             }
         }
-        // env/config slots (lowest priority, deduped against registered values).
+        // env/config fallback slots.
         foreach ($families as $fam) {
             $v = studio_api_key($fam);
             if ($v) {
-                $keys[] = ['value' => $v, 'priority' => -1000];
+                $keys[] = $v;
             }
         }
 
-        usort($keys, function ($a, $b) {
-            return $b['priority'] <=> $a['priority'];
-        });
-
-        $seen = [];
-        $out = [];
-        foreach ($keys as $k) {
-            if (isset($seen[$k['value']])) {
-                continue;
-            }
-            // Never use a Token/Coding-Plan key for generation groups (it can't serve image/video/edit).
-            if ($genGroups && str_starts_with($k['value'], 'sk-sp-')) {
-                continue;
-            }
-            $seen[$k['value']] = true;
-            $out[] = $k['value'];
+        $keys = array_values(array_unique($keys));
+        if ($genGroups) {
+            $keys = array_values(array_filter($keys, fn ($k) => ! str_starts_with((string) $k, 'sk-sp-')));
         }
 
-        return $out;
+        return $keys;
     }
 }
 
