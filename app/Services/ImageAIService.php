@@ -476,7 +476,7 @@ class ImageAIService
         return 'data:'.$mime.';base64,'.$b64;
     }
 
-    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
+    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null): ?string
     {
         $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
         if (! $this->isImageEditCapableModel($model)) {
@@ -491,6 +491,7 @@ class ImageAIService
             return null;
         }
         $faceRef = $faceRefUrl ? $this->imageDataUri($faceRefUrl) : null;
+        $poseRef = $poseRefUrl ? $this->imageDataUri($poseRefUrl) : null;
 
         // Edit (Inpaint) prioritises the Pay-As-You-Go credential (edit models usually live on the pay-go
         // host), then falls back to Token Plan — via studio_qwen_credentials('edit').
@@ -499,11 +500,13 @@ class ImageAIService
         $last = null;
         foreach ($keys as $key) {
             $base = dashscope_base_url($key).'/api/v1';
-            logger()->info('Edit attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base, 'face_ref' => (bool) $faceRef]);
+            logger()->info('Edit attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base, 'face_ref' => (bool) $faceRef, 'pose_ref' => (bool) $poseRef]);
 
-            // Content: optional face reference FIRST, then the design image to edit, then the instruction.
+            // Content: optional reference images FIRST (face, then pose), then the design image to edit,
+            // then the instruction. The prompt names which image is which.
             $content = [];
             if ($faceRef) { $content[] = ['image' => $faceRef]; }
+            if ($poseRef) { $content[] = ['image' => $poseRef]; }
             $content[] = ['image' => $source];
             $content[] = ['text' => $prompt];
 
@@ -514,15 +517,27 @@ class ImageAIService
                 return $this->storeRemoteImage($editUrl);
             }
 
-            // The image-edit model may not accept a second reference image -> retry with just the design
-            // image (the prompt still describes the model, so the swap still works).
-            if ($faceRef && $this->editModelRejectsMultiImage()) {
-                logger()->info('Edit retry without face ref', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
-                $editUrl = $this->postMultimodalEdit($model, $base, $key, [['image' => $source], ['text' => $prompt]]);
-                if ($editUrl) {
-                    $this->lastModel = $model;
-                    logger()->info('Edit succeeded (no face ref)', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
-                    return $this->storeRemoteImage($editUrl);
+            // The image-edit model may not accept multiple reference images -> retry with fewer
+            // references (first keep the face only, then drop all refs) so the swap still works.
+            if (($faceRef || $poseRef) && $this->editModelRejectsMultiImage()) {
+                if ($faceRef) {
+                    logger()->info('Edit retry without pose ref', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                    $retry = [['image' => $faceRef], ['image' => $source], ['text' => $prompt]];
+                    $editUrl = $this->postMultimodalEdit($model, $base, $key, $retry);
+                    if ($editUrl) {
+                        $this->lastModel = $model;
+                        logger()->info('Edit succeeded (no pose ref)', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                        return $this->storeRemoteImage($editUrl);
+                    }
+                }
+                if ($this->editModelRejectsMultiImage()) {
+                    logger()->info('Edit retry without refs', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                    $editUrl = $this->postMultimodalEdit($model, $base, $key, [['image' => $source], ['text' => $prompt]]);
+                    if ($editUrl) {
+                        $this->lastModel = $model;
+                        logger()->info('Edit succeeded (no refs)', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                        return $this->storeRemoteImage($editUrl);
+                    }
                 }
             }
 
@@ -610,13 +625,13 @@ class ImageAIService
      * Edit an image with a SPECIFIC model (used by "Thay Đổi Người Mẫu" swap). Retries a couple of
      * times on a 429 rate-limit so a busy model still produces a result.
      */
-    public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
+    public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null): ?string
     {
         // For a face-reference swap, QwenCloud's recommended multi-image fusion model is qwen-image-3.0-pro
         // (subject + garment + pose). Try it first for best face fidelity, then the configured swap model,
         // then the base Qwen edit models. qwen-image-edit-max accepts the images but often ignores the
         // face reference, so a model that understands subject-driven editing is preferred.
-        $models = $faceRefUrl
+        $models = ($faceRefUrl || $poseRefUrl)
             ? array_values(array_unique(array_filter([
                 'qwen-image-3.0-pro', $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
             ])))
@@ -624,21 +639,31 @@ class ImageAIService
                 $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
             ])));
 
-        // Rate-limit on these models can take ~20-30s to clear; back off progressively (5/10/20/35s).
-        $waits = [5, 10, 20, 35];
+        // Rate-limits (429) can take ~10-30s to clear: retry the SAME model with a short bounded
+        // backoff (3s then 8s), then move to the next model on other errors (or after giving up).
+        $backoffs = [3, 8];
         foreach ($models as $model) {
-            $url = $this->editImage($prompt, $imageUrl, $model, $faceRefUrl);
-            if ($url) {
-                logger()->info('Swap edit succeeded', ['model' => $model]);
-                return $url;
+            for ($attempt = 0; $attempt <= count($backoffs); $attempt++) {
+                $url = $this->editImage($prompt, $imageUrl, $model, $faceRefUrl, $poseRefUrl);
+                if ($url) {
+                    logger()->info('Swap edit succeeded', ['model' => $model]);
+                    return $url;
+                }
+                $rateLimited = str_contains(strtolower((string) $this->dashscopeError), '429')
+                    || str_contains(strtolower((string) $this->dashscopeError), 'ratelimit');
+                if (! $rateLimited) {
+                    // Non-rate-limit error -> try the next model (e.g. model not available / not supported).
+                    logger()->warning('Swap edit model failed, trying next', ['model' => $model, 'err' => $this->dashscopeError]);
+                    break;
+                }
+                if ($attempt >= count($backoffs)) {
+                    logger()->warning('swapEdit gave up on '.$model.' after repeated rate-limits', ['err' => $this->dashscopeError]);
+                    break;
+                }
+                $wait = $backoffs[$attempt];
+                logger()->warning('swapEdit rate-limited on '.$model.', backing off '.$wait.'s (attempt '.($attempt + 1).')');
+                sleep($wait);
             }
-            if (str_contains(strtolower((string) $this->dashscopeError), '429') || str_contains(strtolower((string) $this->dashscopeError), 'ratelimit')) {
-                logger()->warning('swapEdit rate-limited on '.$model.', backing off '.$waits[0].'s');
-                sleep(array_shift($waits));
-                continue;
-            }
-            // Non-rate-limit error -> try the next model (e.g. model not available / not supported).
-            logger()->warning('Swap edit model failed, trying next', ['model' => $model, 'err' => $this->dashscopeError]);
         }
         return null;
     }

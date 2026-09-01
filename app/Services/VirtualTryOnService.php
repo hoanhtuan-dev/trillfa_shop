@@ -8,7 +8,7 @@ namespace App\Services;
  * The DashScope virtual-try-on endpoints are NOT available on this account (they always return
  * "Model not exist"), so the whole swap is driven by the Qwen image-edit model (qwen-image-edit /
  * qwen-image-edit-plus…): we re-render the person in the design image to match the chosen model
- * face, keeping the garment 100% unchanged. Optional inputs: background, texture, face reference.
+ * face, keeping the garment 100% unchanged. Optional inputs: background, pose reference.
  */
 class VirtualTryOnService
 {
@@ -191,7 +191,7 @@ class VirtualTryOnService
      * $build (0-10) controls body proportions (height vs slimness): high = tall runway-model build,
      * low = shorter/fuller. $tone adds a color-grade hint (warm/cool/film/neutral/auto) to the prompt.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', int $texture = 5, ?string $faceRefUrl = null, int $build = 7, string $tone = 'auto'): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, int $build = 6, string $tone = 'none', ?string $poseRefUrl = null): ?string
     {
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $this->calls = 1;
@@ -200,28 +200,42 @@ class VirtualTryOnService
         $proportion = $this->buildEnglish($build);
         $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
             ? 'Replace the ENTIRE background of the scene with: '.$background.'. ' : '';
-        $tex = $this->textureEnglish($texture);
-        $texS = $tex ? ' Make the outfit fabric '.$tex.'.' : '';
         $toneS = $this->toneInstruction($tone, $background);
         // Common body/garment backbone + strong anti-squash proportion instruction.
         $base = 'Keep the exact garment, outfit and all its details 100% unchanged. '.$bg
             .'Render a full-length, vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. ';
 
         if ($faceRefUrl) {
-            // Single-pass subject-driven swap: Image 1 = reference face, Image 2 = person to edit.
+            // Subject-driven swap: Image 1 = reference face, Image 2 = pose reference (optional),
+            // last image = the person to edit (wearing the garment). The pose image lets the edit
+            // model replicate the stance instead of relying on text alone.
             $instr = $base
-                .'Image 1 is the reference person: use their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. '
-                .'Image 2 is the person to edit (wearing the garment). '
-                .'Render the reference person from Image 1 in the pose: '.$pose.', wearing the exact garment from Image 2. '
-                .'Preserve the reference face precisely and keep natural, anatomically-correct, symmetrical facial proportions — do NOT distort, stretch, deform, warp or reshape the face, eyes, nose, mouth, hair, hands or body. '
+                .'Image 1 is the reference person: use their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. ';
+            if ($poseRefUrl) {
+                $instr .= 'Image 2 is the pose reference: replicate its pose, stance, body shape and camera angle EXACTLY. '
+                    .'Image 3 is the person to edit (wearing the garment). '
+                    .'Render the reference person from Image 1 in the pose shown in Image 2 ('.$pose.'), wearing the exact garment from Image 3. ';
+            } else {
+                $instr .= 'Image 2 is the person to edit (wearing the garment). '
+                    .'Render the reference person from Image 1 in the pose: '.$pose.', wearing the exact garment from Image 2. ';
+            }
+            $instr .= 'Preserve the reference face precisely and keep natural, anatomically-correct, symmetrical facial proportions — do NOT distort, stretch, deform, warp or reshape the face, eyes, nose, mouth, hair, hands or body. '
                 .'Keep the eyes sharp and natural (no double/offset eyes), the mouth symmetric, the skin smooth and lifelike. '
-                .$toneS.$texS.' Realistic skin texture, sharp detail, consistent lighting, studio quality.';
+                .$toneS.' Realistic skin texture, sharp detail, consistent lighting, studio quality.';
         } else {
-            $instr = $base.'Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.'.$toneS.$texS.' Photorealistic, full body, high fashion.';
+            $instr = $base;
+            if ($poseRefUrl) {
+                $instr .= 'Image 1 is the pose reference: replicate its pose, stance, body shape and camera angle EXACTLY. '
+                    .'Image 2 is the person to edit (wearing the garment). '
+                    .'Replace the person in Image 2 with a full-body '.$modelDesc.' in the pose shown in Image 1 ('.$pose.'), wearing the exact garment from Image 2 unchanged.';
+            } else {
+                $instr .= 'Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.';
+            }
+            $instr .= $toneS.' Photorealistic, full body, high fashion.';
         }
 
         $imageSvc = app(ImageAIService::class);
-        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl);
+        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl, $poseRefUrl);
         if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
         return $url;
     }
@@ -276,12 +290,4 @@ class VirtualTryOnService
         return 'none';
     }
 
-    protected function textureEnglish(int $v): string
-    {
-        if ($v <= 1) { return 'smooth silk fabric, sleek'; }
-        if ($v <= 3) { return 'soft matte fabric'; }
-        if ($v <= 5) { return 'natural subtle fabric texture'; }
-        if ($v <= 7) { return 'lightly woven textured fabric'; }
-        return 'heavy knit, coarse weave, visible thread detail';
-    }
 }

@@ -859,11 +859,16 @@ class StudioController extends Controller
     /**
      * Fabric roughness / weave: adds a fine diagonal weave pattern + subtle grain on non-skin
      * mid-tone regions (the garment), leaving skin smooth and bright background untouched.
+     * Amplitude ramps gently (k² curve) so low levels stay barely visible — no harsh checkerboard —
+     * and the weave always skips skin-mask pixels to protect the face.
      */
     protected function fabricTexturePass(\GdImage $img, int $level): void
     {
         if ($level <= 0) { return; }
         $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        // Gentle ramp: level 1-4 nearly invisible, level 10 clearly woven.
+        $amp = (1.2 + 2.6 * $k * $k);
+        $noise = 2.4 * $k;
         for ($y = 0; $y < $h; $y += 2) {
             for ($x = 0; $x < $w; $x += 2) {
                 $c = imagecolorat($img, $x, $y);
@@ -872,7 +877,7 @@ class StudioController extends Controller
                 // garment/fabric: NOT skin (face excluded via the mask), mid-tone (excludes dark + bright bg)
                 if (! $this->isSkinPixel($r, $g, $b) && $lum > 70 && $lum < 205) {
                     $weave = ((($x + $y) % 4) < 2) ? 1 : -1;
-                    $n = (int) (($weave * (2 + 2.5 * $k)) + ((mt_rand(-140, 140) / 1000.0) * 6 * $k));
+                    $n = (int) (($weave * $amp) + ((mt_rand(-140, 140) / 1000.0) * $noise));
                     $nr = max(0, min(255, $r + $n));
                     $ng = max(0, min(255, $g + $n));
                     $nb = max(0, min(255, $b + (int) ($n * 0.9)));
@@ -1235,10 +1240,11 @@ class StudioController extends Controller
             'model_id' => ['required', 'string', 'max:80'],
             'pose_id' => ['required', 'string', 'max:80'],
             'background' => ['nullable', 'string', 'max:400'],
-            'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
             'build' => ['nullable', 'integer', 'min:0', 'max:10'], // Tỷ lệ dáng (0 lùn-nở -> 10 cao-thon chuẩn mẫu)
             'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
             'tone_level' => ['nullable', 'integer', 'min:0', 'max:10'], // Mức độ ảnh hưởng của hiệu ứng
+            'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL — sent to the edit model so the pose is actually applied
+            'fabric_detail' => ['nullable', 'integer', 'min:0', 'max:10'], // Vân vải hậu kỳ: 0 = tắt (mặc định), 1-10 = cường độ
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -1254,29 +1260,37 @@ class StudioController extends Controller
         // P0a: DashScope virtual-try-on is NOT available on this account ("Model not exist"), so the
         // swap is a SINGLE-pass Qwen image-edit call (keeping the garment 100% unchanged). The chosen
         // model face is the subject reference (Image 1) — this is what best preserves the reference face.
+        // Pose reference image: prefer the client-sent one, fall back to the pose catalog image
+        // (custom asset / DB preset / built-in sample) so the model can actually replicate the pose.
+        $poseRefUrl = (string) ($data['pose_ref'] ?? '') ?: (string) ($pose['image'] ?? '');
         $fallback = $svc->fallbackEdit(
             $data['image'],
             $model['desc'] ?? ($model['ethnicity'] ?? 'a model'),
             $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
             (string) ($data['background'] ?? ''),
-            (int) ($data['texture'] ?? 5),
-            $model['image'] ?? null, // P3: face reference image (custom/catalog)
-            (int) ($data['build'] ?? 7),
-            (string) ($data['tone'] ?? 'auto'),
+            $model['image'] ?? null, // face reference image (custom/catalog)
+            (int) ($data['build'] ?? 6),
+            (string) ($data['tone'] ?? 'none'),
+            $poseRefUrl,             // pose reference image (skeleton/photo)
         );
         if (! $fallback) {
             return response()->json(['message' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).'], 422);
         }
 
-        // Lighter post-process: skip most skin-pore texture so the generated FACE stays clean (the skin
-        // pass adds noise that can read as deformities). Only a very subtle fabric touch + gentle sharpen.
-        $det = $this->enhanceStoredImage($fallback, 3, 1);
-        if ($det) { $fallback = $det; }
+        // Post-process fabric texture ("Vân vải hậu kỳ") is OFF by default: the weave pass + sharpening
+        // can add grain over the face/skin (the color-based skin mask is unreliable on shadows and
+        // skin-toned fabric), which ruins the swapped face. Only run it when the user explicitly
+        // enables it, at their chosen strength, and NEVER on skin pixels (skin pass = 0).
+        $fabricDetail = (int) ($data['fabric_detail'] ?? 0);
+        if ($fabricDetail > 0) {
+            $det = $this->enhanceStoredImage($fallback, min(10, max(0, $fabricDetail)), 0);
+            if ($det) { $fallback = $det; }
+        }
 
         // Color-tone effect: deterministic grade matching the chosen tone / background, at the chosen
-        // strength (tone_level 0-10; default 6 so the effect is clearly visible but not blown out).
-        $tone = (string) ($data['tone'] ?? 'auto');
-        $toneLevel = (int) ($data['tone_level'] ?? 6);
+        // strength (tone_level 0-10; default 5 so the effect is clearly visible but not blown out).
+        $tone = (string) ($data['tone'] ?? 'none');
+        $toneLevel = (int) ($data['tone_level'] ?? 5);
         $toned = $this->applyToneToStoredImage($fallback, $tone, (string) ($data['background'] ?? ''), $toneLevel);
         if ($toned) { $fallback = $toned; }
 
@@ -1287,7 +1301,7 @@ class StudioController extends Controller
             'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
             'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
             'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => $credits,
-            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'build' => (int) ($data['build'] ?? 7), 'tone' => $tone, 'tone_level' => $toneLevel, 'steps' => $credits],
+            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'pose_ref' => (bool) $poseRefUrl, 'build' => (int) ($data['build'] ?? 6), 'tone' => $tone, 'tone_level' => $toneLevel, 'fabric_detail' => $fabricDetail, 'steps' => $credits],
         ]);
         return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'model' => $actualModel, 'task_id' => null]);
     }

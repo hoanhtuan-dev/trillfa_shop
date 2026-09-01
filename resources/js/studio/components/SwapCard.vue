@@ -7,10 +7,10 @@ const models = ref([]), poses = ref([]), bgs = ref([]), assets = ref([]);
 const addType = ref('model'); const addName = ref(''); const addFile = ref(null); const addFileEl = ref(null);
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 const swapBg = ref('');
-const swapTexture = ref(5);
-const swapBuild = ref(7); // Tỷ lệ dáng: 0 lùn-nở -> 10 cao-thon chuẩn người mẫu
-const swapTone = ref('auto'); // Hiệu ứng tông màu
-const swapToneLevel = ref(6); // Mức độ ảnh hưởng 0-10
+const swapBuild = ref(6); // Tỷ lệ dáng mặc định: 6 (cân đối) — 0 lùn-nở -> 10 cao-thon chuẩn người mẫu
+const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
+const swapToneLevel = ref(5); // Mức độ ảnh hưởng mặc định: 5 — 0-10
+const swapFabric = ref(0); // Vân vải hậu kỳ: 0 = tắt (mặc định, bảo vệ khuôn mặt) — 1-10 cường độ
 const toneOptions = [
   { v: 'auto', label: '🎨 Tự động (theo bối cảnh)' },
   { v: 'warm', label: '☀️ Ấm' },
@@ -44,17 +44,18 @@ async function addAsset() {
   const r = await fetch('/studio/assets', { headers: { Accept: 'application/json' } }); assets.value = (await r.json()).items || [];
   store.toast('Đã thêm ' + (addType.value === 'model' ? 'khuôn mặt' : 'dáng') + '.');
 }
-async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); if (r.ok) { assets.value = assets.value.filter(x => x.id !== a.id); store.toast('Đã xóa.'); } }
+async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); if (r.ok) { assets.value = assets.value.filter(x => x.id !== a.id); const id = String(a.id); if (store.swapModelIds.includes(id)) { store.swapModelIds = store.swapModelIds.filter(x => x !== id); } if (store.swapPoseIds.includes(id)) { store.swapPoseIds = store.swapPoseIds.filter(x => x !== id); } store.toast('Đã xóa.'); } }
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.12), rgba(74,122,144,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
     <div v-if="store.swapModelIds.length || store.swapPoseIds.length || swapBg" class="scrollbar-hide mt-2 max-h-40 space-y-1.5 overflow-y-auto text-xs">
-      <div v-if="store.swapModelIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><img :src="selFaceImgs[0]?.image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') }}</span></div>
-      <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img :src="selPoseImgs[0]?.image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
+      <div v-if="store.swapModelIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><img v-if="selFaceImgs[0]?.image" :src="selFaceImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">👩</span><span class="truncate text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') }}</span></div>
+      <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img v-if="selPoseImgs[0]?.image" :src="selPoseImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">🧍</span><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
+      <div v-if="swapFabric > 0" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Vân vải hậu kỳ:</span><span class="truncate text-cream-100">{{ swapFabric }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button @click="store.runSwap({ background: swapBg, texture: swapTexture, build: swapBuild, tone: swapTone, tone_level: swapToneLevel })" :disabled="!canApply" class="btn-brand btn-sm">{{ store.swapLoading ? 'Đang ghép…' : 'Áp dụng' }}</button></div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel, fabric_detail: swapFabric })" :disabled="!canApply" class="btn-brand btn-sm">{{ store.swapLoading ? 'Đang ghép…' : 'Áp dụng' }}</button></div>
     <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
     <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" @click.self="open=false">
       <div class="scrollbar-hide max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-brand-500/30 bg-ink-900 p-5" @click.stop>
@@ -73,14 +74,6 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🖼 Bối cảnh</p>
         <div class="flex flex-wrap gap-1.5">
           <button v-for="b in bgs" :key="b.value" @click="swapBg = swapBg === b.value ? '' : b.value" class="rounded-full border px-3 py-1.5 text-xs" :class="swapBg === b.value ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ b.label }}</button>
-        </div>
-        <!-- Chất liệu vải (P4) -->
-        <div class="mt-4">
-          <p class="mb-1 text-xs font-semibold text-cream-200">🧵 Chất liệu vải <span class="text-cream-300/60">(0 mịn → 10 dệt kim thô)</span></p>
-          <div class="flex items-center gap-3">
-            <input type="range" min="0" max="10" v-model.number="swapTexture" class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-600">
-            <span class="w-6 text-right text-xs text-cream-200">{{ swapTexture }}</span>
-          </div>
         </div>
         <!-- Tỷ lệ dáng (chiều cao / thân hình) -->
         <div class="mt-4">
@@ -102,7 +95,16 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
             <input type="range" min="0" max="10" v-model.number="swapToneLevel" class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-600">
             <span class="w-6 text-right text-xs text-cream-200">{{ swapToneLevel }}</span>
           </div>
-          <p class="mt-1 text-[10px] text-cream-300/50">0 = không áp dụng · 6 = vừa phải (mặc định) · 10 = đậm nhất. Film/Cinematic nhẹ để tránh cháy sáng.</p>
+          <p class="mt-1 text-[10px] text-cream-300/50">0 = không áp dụng · 5 = vừa phải (mặc định) · 10 = đậm nhất. Film/Cinematic nhẹ để tránh cháy sáng.</p>
+        </div>
+        <!-- Vân vải hậu kỳ (mặc định TẮT — bảo vệ khuôn mặt) -->
+        <div class="mt-4">
+          <p class="mb-1 text-xs font-semibold text-cream-200">🪡 Vân vải hậu kỳ <span class="text-cream-300/60">(0 tắt · thêm vân sợi lên ảnh sau khi tạo — chỉ nên bật khi cần, có thể ảnh hưởng vùng da)</span></p>
+          <div class="flex items-center gap-3">
+            <input type="range" min="0" max="10" v-model.number="swapFabric" class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-600">
+            <span class="w-6 text-right text-xs text-cream-200">{{ swapFabric === 0 ? 'Tắt' : swapFabric }}</span>
+          </div>
+          <p class="mt-1 text-[10px] text-cream-300/50">Mặc định 0 (tắt) để khuôn mặt luôn sạch. Bật 1-10 nếu muốn vải rõ vân hơn; không áp dụng lên vùng da.</p>
         </div>
         <!-- Thêm / xóa -->
         <div class="mt-5 rounded-2xl border border-dashed border-cream-300/40 p-3">
