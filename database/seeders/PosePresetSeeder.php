@@ -27,7 +27,7 @@ class PosePresetSeeder extends Seeder
         foreach ($poses as $i => [$name, $desc, $file]) {
             PosePreset::updateOrCreate(
                 ['name' => $name],
-                ['description' => $desc, 'image' => '/storage/studio/'.$file.'.png', 'sort' => ($i + 1) * 10, 'enabled' => true]
+                ['description' => $desc, 'image' => '/storage/studio/dang-nguoi-mau/'.$file.'.png', 'sort' => ($i + 1) * 10, 'enabled' => true]
             );
         }
     }
