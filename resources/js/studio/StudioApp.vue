@@ -16,6 +16,7 @@ import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
 import GalleryModal from './components/GalleryModal.vue';
 const store = useStudioStore();
+function copyColor(c) { try { navigator.clipboard.writeText(c); store.toast('Đã copy ' + c); } catch (e) { store.toast('Lỗi copy.', 'error'); } }
 const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 const menuOpen = ref(false);
 const outputOpen = ref(false);
@@ -107,6 +108,11 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
           <!-- canvas bg + crop toggles -->
           <div class="absolute right-3 bottom-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
             <button v-for="b in ['grid','dark','white','cream']" :key="b" @click="store.canvasBg = b" class="h-6 w-6 rounded-full border" :class="store.canvasBg === b ? 'border-white' : 'border-ink-600'" :style="{ background: b === 'grid' ? 'repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 10px 10px' : b === 'dark' ? '#0a0a0f' : b === 'white' ? '#fff' : '#f5ead9' }" :title="b"></button>
+          </div>
+          <!-- floating Color Palette (compact, steps 1&2 when an image is on canvas) -->
+          <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="absolute bottom-14 right-3 z-20 flex items-center gap-1.5 rounded-full bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
+            <span class="text-[10px] text-cream-300/60">🎨</span>
+            <button v-for="c in store.palette" :key="c" @click="copyColor(c)" class="h-6 w-6 rounded-full border border-ink-700 transition hover:scale-110" :style="{ background: c }" :title="'Nhấn để copy ' + c"></button>
           </div>
           <!-- variant slider (bottom, only when multiple variants) -->
           <div v-if="store.showBatch && store.activeBatch.length > 1" class="absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
