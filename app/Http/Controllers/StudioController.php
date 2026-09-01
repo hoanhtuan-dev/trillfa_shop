@@ -229,26 +229,15 @@ class StudioController extends Controller
         $pw = max(8, min($w - $px, (int) round($rw * $w)));
         $ph = max(8, min($h - $py, (int) round($rh * $h)));
 
-        // Mask: TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa — có LỀ feather mềm + giãn ra ngoài
-        // (pad) để vật thể tạo ra không bị cắt xén ở mép vùng chọn và biên hòa tự nhiên.
-        // FEATHER THỦ CÔNG theo khoảng cách — KHÔNG Gaussian blur cả mask (GD pad mép = đen).
-        $featherW = (int) max(6, round(min($w, $h) * 0.03)); // bề rộng feather ~3%
-        $pad = $featherW; // giãn ra ngoài bằng bề rộng feather
-        $mx0 = max(0, $px - $pad); $my0 = max(0, $py - $pad);
-        $mx1 = min($w - 1, $px + $pw - 1 + $pad); $my1 = min($h - 1, $py + $ph - 1 + $pad);
+        // Mask: TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa — NHỊ PHÂN + GIÃN RA NGOÀI (pad)
+        // để vật thể tạo ra không bị cắt xén ở mép vùng chọn. Feather mềm làm ở composite
+        // (theo khoảng cách tới mép vùng) — không gửi mask mờ cho AI (AI edit kém tin cậy hơn).
+        $pad = (int) max(6, round(min($w, $h) * 0.02)); // giãn ra ngoài ~2%
         $mask = imagecreatetruecolor($w, $h);
         imagefilledrectangle($mask, 0, 0, $w - 1, $h - 1, imagecolorallocate($mask, 255, 255, 255));
-        $f = max(1, $featherW);
-        for ($y = $my0; $y <= $my1; $y++) {
-            for ($x = $mx0; $x <= $mx1; $x++) {
-                $dx = max($px - $x, 0, $x - ($px + $pw - 1));
-                $dy = max($py - $y, 0, $y - ($py + $ph - 1));
-                $dist = sqrt($dx * $dx + $dy * $dy);
-                $t = min(1.0, $dist / $f); // 0 trong vùng (đen) → 1 ngoài feather (trắng)
-                $lum = (int) round($t * 255);
-                imagesetpixel($mask, $x, $y, imagecolorallocate($mask, $lum, $lum, $lum));
-            }
-        }
+        imagefilledrectangle($mask, max(0, $px - $pad), max(0, $py - $pad),
+            min($w - 1, $px + $pw - 1 + $pad), min($h - 1, $py + $ph - 1 + $pad),
+            imagecolorallocate($mask, 0, 0, 0));
         $maskName = 'studio/mask-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($maskName, $this->pngBytes($mask));
         imagedestroy($mask);
@@ -256,9 +245,22 @@ class StudioController extends Controller
 
         $cost = (int) studio_config('image_credits', 1);
 
-        // Dùng AI (mask mềm + prompt) cho cả "Xóa vùng" lẫn "Thay vùng" — chân thật nhất;
-        // composite đảm bảo phần ngoài feather luôn giữ nguyên ảnh gốc. Fallback tái tạo nền
-        // cục bộ khi chưa có key / AI thất bại.
+        // "XÓA VÙNG" → tái tạo nền CỤC BỘ (tức thì, miễn phí, bám gradient — không gọi AI,
+        // tránh chậm/tốn credit và trường hợp AI không edit). CHỈ "THAY VÙNG" mới gọi AI
+        // (mask nhị phân + prompt) vì cần sinh nội dung mới; composite sẽ feather mềm.
+        if ($op === 'erase') {
+            $this->localEraseFill($src, $px, $py, $pw, $ph);
+            $name = 'studio/erase-'.Str::uuid().'.png';
+            \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
+            imagedestroy($src);
+            $gen = auth()->user()->generations()->create([
+                'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
+                'prompt' => 'Xóa vùng chọn (tái tạo nền)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
+            ]);
+            return response()->json(['generation_id' => $gen->id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
+        }
+
+        // "THAY VÙNG" → AI (cần mô tả); fallback tái tạo nền cục bộ khi chưa có key.
         $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
         if ($hasAi) {
             return $this->queueGeneration('image', [
@@ -269,7 +271,7 @@ class StudioController extends Controller
             ], $cost, $generation);
         }
 
-        // Chưa có key AI → tái tạo nền cục bộ (degrade)
+        // Chưa có key AI cho replace → tái tạo nền cục bộ (degrade)
         $this->localEraseFill($src, $px, $py, $pw, $ph);
         $name = 'studio/erase-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));

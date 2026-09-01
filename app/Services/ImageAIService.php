@@ -803,14 +803,18 @@ class ImageAIService
             $hasRegion = $bz1 >= 0 && $bt1 >= 0 && ($bz1 - $bz0) > 4 && ($bt1 - $bt0) > 4;
             $cx = (int) (($bz0 + $bz1) / 2); $cy = (int) (($bt0 + $bt1) / 2);
 
-            // Mask đã được feather mềm sẵn (gradient đen→trắng theo khoảng cách) — dùng alpha
-            // trực tiếp từ độ sáng mask, KHÔNG blur lại (GD blur pad mép ảnh = đen → sai).
+            // Feather mềm theo KHOẢNG CÁCH tới mép vùng đen (mask nhị phân): trong vùng = lấy
+            // kết quả AI, ra ngoài feather = trộn mượt về ảnh gốc → biên hòa tự nhiên, không mép
+            // cứng, không bị cắt xén (vùng đã giãn pad). KHÔNG Gaussian blur (pad mép = đen).
+            $featherW = (int) max(4, round(min($w, $h) * 0.03));
             $out = imagecreatetruecolor($w, $h);
             for ($y = 0; $y < $h; $y++) {
                 for ($x = 0; $x < $w; $x++) {
-                    $mc = imagecolorat($mask, $x, $y);
-                    $mlum = (($mc >> 16) & 0xFF) * 0.3 + (($mc >> 8) & 0xFF) * 0.6 + ($mc & 0xFF) * 0.1;
-                    $alpha = (255 - $mlum) / 255.0; // mask ĐEN = vùng sửa (lấy kết quả AI)
+                    $dx = max($bz0 - $x, 0, $x - $bz1);
+                    $dy = max($bt0 - $y, 0, $y - $bt1);
+                    $dist = sqrt($dx * $dx + $dy * $dy);
+                    // alpha: 1 trong vùng đen (lấy kết quả AI) → 0 ngoài feather (giữ ảnh gốc)
+                    $alpha = $dist >= $featherW ? 0.0 : max(0.0, min(1.0, 1.0 - $dist / $featherW));
                     $sc = imagecolorat($source, $x, $y);
                     $ec = imagecolorat($edited, $x, $y);
                     $r = (int) round((($ec >> 16) & 0xFF) * $alpha + (($sc >> 16) & 0xFF) * (1 - $alpha));
