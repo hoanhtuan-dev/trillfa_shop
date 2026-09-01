@@ -229,10 +229,26 @@ class StudioController extends Controller
         $pw = max(8, min($w - $px, (int) round($rw * $w)));
         $ph = max(8, min($h - $py, (int) round($rh * $h)));
 
-        // Mask: TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa (cùng kích thước ảnh gốc)
+        // Mask: TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa — có LỀ feather mềm + giãn ra ngoài
+        // (pad) để vật thể tạo ra không bị cắt xén ở mép vùng chọn và biên hòa tự nhiên.
+        // FEATHER THỦ CÔNG theo khoảng cách — KHÔNG Gaussian blur cả mask (GD pad mép = đen).
+        $featherW = (int) max(6, round(min($w, $h) * 0.03)); // bề rộng feather ~3%
+        $pad = $featherW; // giãn ra ngoài bằng bề rộng feather
+        $mx0 = max(0, $px - $pad); $my0 = max(0, $py - $pad);
+        $mx1 = min($w - 1, $px + $pw - 1 + $pad); $my1 = min($h - 1, $py + $ph - 1 + $pad);
         $mask = imagecreatetruecolor($w, $h);
         imagefilledrectangle($mask, 0, 0, $w - 1, $h - 1, imagecolorallocate($mask, 255, 255, 255));
-        imagefilledrectangle($mask, $px, $py, $px + $pw - 1, $py + $ph - 1, imagecolorallocate($mask, 0, 0, 0));
+        $f = max(1, $featherW);
+        for ($y = $my0; $y <= $my1; $y++) {
+            for ($x = $mx0; $x <= $mx1; $x++) {
+                $dx = max($px - $x, 0, $x - ($px + $pw - 1));
+                $dy = max($py - $y, 0, $y - ($py + $ph - 1));
+                $dist = sqrt($dx * $dx + $dy * $dy);
+                $t = min(1.0, $dist / $f); // 0 trong vùng (đen) → 1 ngoài feather (trắng)
+                $lum = (int) round($t * 255);
+                imagesetpixel($mask, $x, $y, imagecolorallocate($mask, $lum, $lum, $lum));
+            }
+        }
         $maskName = 'studio/mask-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($maskName, $this->pngBytes($mask));
         imagedestroy($mask);
@@ -240,22 +256,9 @@ class StudioController extends Controller
 
         $cost = (int) studio_config('image_credits', 1);
 
-        // "Xóa vùng" LUÔN dùng tái tạo nền cục bộ từ viền (xác định, khớp nền xung quanh) —
-        // AI mask-inpaint cho erase không ổn định: model thường điền vật liệu/nhiễu lạ (vải,
-        // họa tiết…) thay vì tái tạo nền, gây vùng sai màu. "Thay vùng" cần mô tả mới dùng AI.
-        if ($op === 'erase') {
-            $this->localEraseFill($src, $px, $py, $pw, $ph);
-            $name = 'studio/erase-'.Str::uuid().'.png';
-            \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
-            imagedestroy($src);
-            $gen = auth()->user()->generations()->create([
-                'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
-                'prompt' => 'Xóa vùng chọn (tái tạo nền)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
-            ]);
-            return response()->json(['generation_id' => $gen->id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
-        }
-
-        // "Thay vùng" (replace): cần AI (mask + prompt); fallback local khi chưa có key.
+        // Dùng AI (mask mềm + prompt) cho cả "Xóa vùng" lẫn "Thay vùng" — chân thật nhất;
+        // composite đảm bảo phần ngoài feather luôn giữ nguyên ảnh gốc. Fallback tái tạo nền
+        // cục bộ khi chưa có key / AI thất bại.
         $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
         if ($hasAi) {
             return $this->queueGeneration('image', [
@@ -266,7 +269,7 @@ class StudioController extends Controller
             ], $cost, $generation);
         }
 
-        // Không có key AI cho replace → tái tạo nền cục bộ (degrade)
+        // Chưa có key AI → tái tạo nền cục bộ (degrade)
         $this->localEraseFill($src, $px, $py, $pw, $ph);
         $name = 'studio/erase-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
@@ -283,12 +286,12 @@ class StudioController extends Controller
      */
     protected function regionPrompt(string $op, string $userPrompt): string
     {
-        $mask = ' A mask image is provided (same size as the base image): its BLACK region is the exact area to edit — change ONLY that black region and keep every pixel outside it identical to the original image.';
+        $mask = ' A feathered mask image is provided (same size as the base). Its darkest (black) core is the edit region and it fades smoothly to white at the edges — edit with a soft, natural transition across the feather.';
         if ($op === 'erase') {
-            return 'Remove the object, person or content inside the BLACK region of the mask and fill the area naturally with the surrounding background, fabric or pattern so the result looks clean, seamless and untouched. Do not leave any trace, edge artifact or blur of the removed content.'.$mask;
+            return 'Remove the object, person or content inside the black (masked) region and fill the area naturally with the surrounding background, fabric or pattern so the result looks clean, seamless and untouched. Blend smoothly at the soft feathered mask edges — do NOT create any hard rectangle edge or border. Keep every pixel beyond the feathered mask identical to the original image. Do not leave any trace, edge artifact or blur of the removed content.'.$mask;
         }
         $p = trim($userPrompt);
-        return $p.'. Apply this change ONLY inside the BLACK region of the mask; keep everything outside it identical to the original image.'.$mask;
+        return $p.'. Create this content inside the black (masked) region, extending smoothly across the soft feathered mask edges — the object may reach and lightly feather into the mask boundary but must NOT be abruptly cut off by a hard rectangle edge. Keep every pixel beyond the feathered mask identical to the original image.'.$mask;
     }
 
     /**

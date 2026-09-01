@@ -80,7 +80,7 @@ export const useStudioStore = defineStore('studio', {
     // ── Region Tools (xóa/thay vùng chọn trên canvas) — MỞ RỘNG: thêm op mới vào đây +
     //    backend StudioController::REGION_OPS (và regionPrompt) là đủ. ──
     regionOps: {
-      erase: { icon: '🧹', label: 'Xóa vùng', hint: 'Kéo chọn vùng cần xóa — tái tạo nền từ viền xung quanh, khớp màu nền', needsPrompt: false },
+      erase: { icon: '🧹', label: 'Xóa vùng', hint: 'Kéo chọn vùng — AI xóa vật thể & điền nền tự nhiên, biên feather mềm', needsPrompt: false },
       replace: { icon: '🪄', label: 'Thay vùng', hint: 'Kéo chọn vùng rồi mô tả nội dung thay thế', needsPrompt: true },
     },
     regionMode: '',           // '' | 'erase' | 'replace' (đang chọn vùng trên canvas)

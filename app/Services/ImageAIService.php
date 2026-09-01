@@ -803,9 +803,8 @@ class ImageAIService
             $hasRegion = $bz1 >= 0 && $bt1 >= 0 && ($bz1 - $bz0) > 4 && ($bt1 - $bt0) > 4;
             $cx = (int) (($bz0 + $bz1) / 2); $cy = (int) (($bt0 + $bt1) / 2);
 
-            // Làm mềm mask (blur) → alpha ramp ở biên vùng.
-            @imagefilter($mask, IMG_FILTER_GAUSSIAN_BLUR);
-            @imagefilter($mask, IMG_FILTER_GAUSSIAN_BLUR);
+            // Mask đã được feather mềm sẵn (gradient đen→trắng theo khoảng cách) — dùng alpha
+            // trực tiếp từ độ sáng mask, KHÔNG blur lại (GD blur pad mép ảnh = đen → sai).
             $out = imagecreatetruecolor($w, $h);
             for ($y = 0; $y < $h; $y++) {
                 for ($x = 0; $x < $w; $x++) {
