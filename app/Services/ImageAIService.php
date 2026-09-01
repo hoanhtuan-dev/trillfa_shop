@@ -479,9 +479,9 @@ class ImageAIService
     protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
     {
         $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
-        if (! str_contains(strtolower($model), 'edit')) {
-            $this->dashscopeError = 'Model “'.$model.'” có vẻ KHÔNG phải model chỉnh sửa ảnh (tên không chứa “edit”). '
-                .'Chọn model Qwen Edit chuyên dụng (vd: qwen-image-edit, qwen-image-edit-plus…) trong Cài đặt — không dùng chung model tạo ảnh (qwen-image-3.0-pro) cho Inpaint.';
+        if (! $this->isImageEditCapableModel($model)) {
+            $this->dashscopeError = 'Model “'.$model.'” có vẻ KHÔNG phải model chỉnh sửa ảnh. '
+                .'Chọn model Qwen Edit chuyên dụng (vd: qwen-image-edit, qwen-image-edit-plus, qwen-image-3.0-pro…) trong Cài đặt — không dùng model văn bản/thị giác (qwen3.8-flash, qwen-vl-…).';
             logger()->warning('Edit model không phải model edit', ['model' => $model]);
             return null;
         }
@@ -509,6 +509,7 @@ class ImageAIService
 
             $editUrl = $this->postMultimodalEdit($model, $base, $key, $content);
             if ($editUrl) {
+                $this->lastModel = $model;
                 logger()->info('Edit succeeded', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
                 return $this->storeRemoteImage($editUrl);
             }
@@ -519,6 +520,7 @@ class ImageAIService
                 logger()->info('Edit retry without face ref', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
                 $editUrl = $this->postMultimodalEdit($model, $base, $key, [['image' => $source], ['text' => $prompt]]);
                 if ($editUrl) {
+                    $this->lastModel = $model;
                     logger()->info('Edit succeeded (no face ref)', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
                     return $this->storeRemoteImage($editUrl);
                 }
@@ -594,22 +596,49 @@ class ImageAIService
     }
 
     /**
+     * Whether a model is an image-edit / image-generation model (so we don't send image content to a
+     * text/vision model). Allows Qwen image models (qwen-image-3.0-pro etc.) which also do editing.
+     */
+    protected function isImageEditCapableModel(string $model): bool
+    {
+        $m = strtolower($model);
+        return str_contains($m, 'edit') || str_contains($m, 'qwen-image') || str_contains($m, 'imagen')
+            || str_contains($m, 'wanx') || str_contains($m, 'imageedit') || str_contains($m, '-i2v');
+    }
+
+    /**
      * Edit an image with a SPECIFIC model (used by "Thay Đổi Người Mẫu" swap). Retries a couple of
      * times on a 429 rate-limit so a busy model still produces a result.
      */
     public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
     {
+        // For a face-reference swap, QwenCloud's recommended multi-image fusion model is qwen-image-3.0-pro
+        // (subject + garment + pose). Try it first for best face fidelity, then the configured swap model,
+        // then the base Qwen edit models. qwen-image-edit-max accepts the images but often ignores the
+        // face reference, so a model that understands subject-driven editing is preferred.
+        $models = $faceRefUrl
+            ? array_values(array_unique(array_filter([
+                'qwen-image-3.0-pro', $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
+            ])))
+            : array_values(array_unique(array_filter([
+                $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
+            ])));
+
         // Rate-limit on these models can take ~20-30s to clear; back off progressively (5/10/20/35s).
         $waits = [5, 10, 20, 35];
-        foreach ($waits as $i => $wait) {
-            $url = $this->editImage($prompt, $imageUrl, $modelOverride, $faceRefUrl);
-            if ($url) { return $url; }
+        foreach ($models as $model) {
+            $url = $this->editImage($prompt, $imageUrl, $model, $faceRefUrl);
+            if ($url) {
+                logger()->info('Swap edit succeeded', ['model' => $model]);
+                return $url;
+            }
             if (str_contains(strtolower((string) $this->dashscopeError), '429') || str_contains(strtolower((string) $this->dashscopeError), 'ratelimit')) {
-                logger()->warning('swapEdit rate-limited, backing off '.$wait.'s');
-                sleep($wait);
+                logger()->warning('swapEdit rate-limited on '.$model.', backing off '.$waits[0].'s');
+                sleep(array_shift($waits));
                 continue;
             }
-            break; // non-rate-limit error -> give up
+            // Non-rate-limit error -> try the next model (e.g. model not available / not supported).
+            logger()->warning('Swap edit model failed, trying next', ['model' => $model, 'err' => $this->dashscopeError]);
         }
         return null;
     }

@@ -106,14 +106,14 @@ class VirtualTryOnService
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
 
         if ($faceRefUrl) {
-            // Face-image driven swap (P3): the FIRST image is the reference person's face, the SECOND
-            // is the person to edit (wearing the garment). We explicitly preserve identity + anatomy to
-            // avoid the distortion the user reported ("dị dạng / không giữ đặc điểm ảnh gốc").
-            $instr = 'High-fidelity face-and-body swap. '
+            // Face-image driven swap (P3): Image 1 = reference person's face, Image 2 = person to edit
+            // (wearing the garment). Aligned with QwenCloud's multi-image convention (subject + garment).
+            // Explicitly preserve identity + anatomy to avoid the reported distortion / lost features.
+            $instr = 'High-fidelity face-and-body swap with two images. '
                 .'Keep the exact garment, outfit and all its details 100% unchanged. '
-                .'The FIRST image is the reference person: take their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. '
-                .'The SECOND image is the person to edit (wearing the garment). '
-                .'Render the reference person from the FIRST image in the pose: '.$pose.', wearing the exact garment from the SECOND image. '
+                .'Image 1 is the reference person: use their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. '
+                .'Image 2 is the person to edit (wearing the garment). '
+                .'Render the reference person from Image 1 in the pose: '.$pose.', wearing the exact garment from Image 2. '
                 .'Preserve the reference face precisely and keep natural, anatomically-correct proportions — do NOT distort, stretch, deform or reshape the face, eyes, nose, mouth, hair, hands or body. '
                 .'Realistic skin texture, sharp detail, consistent lighting, studio quality.';
         } else {
