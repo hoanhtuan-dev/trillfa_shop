@@ -11,7 +11,7 @@ import FilmLookCard from './components/FilmLookCard.vue';
 import ReframeCard from './components/ReframeCard.vue';
 import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
-import RegionCard from './components/RegionCard.vue';
+import RegionTools from './components/RegionTools.vue';
 import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
@@ -39,7 +39,7 @@ function onCanvasKey(e) {
   else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON') && !store.regionMode) store.confirmCrop();
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, RegionCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
+const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
@@ -65,6 +65,8 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative h-full overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
+          <!-- Floating region tools (left edge icons + panel) -->
+          <RegionTools />
           <!-- active image indicator + actions -->
           <div v-if="store.upscaleSrc" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
             <span class="text-[10px] text-cream-300/60">{{ store.editSource ? 'Nguồn:' : 'Kết quả:' }}</span>
