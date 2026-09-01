@@ -44,7 +44,7 @@ const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white
 const panel = computed(() => store.step === 1 ? [SourceCard, StylistCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, PaletteTextureCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
 </script>
 <template>
-  <div class="flex h-full flex-col bg-ink-900 text-cream-100">
+  <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
     <!-- Mobile top bar -->
     <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-cream-200">☰</button>
@@ -53,12 +53,12 @@ const panel = computed(() => store.step === 1 ? [SourceCard, StylistCard, Concep
     </div>
     <div class="flex flex-1 overflow-hidden">
       <!-- Left sidebar (desktop) -->
-      <aside class="hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 p-3 lg:flex">
+      <aside class="scrollbar-hide hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 p-3 lg:flex">
         <div class="mb-3 flex items-center justify-between"><span class="font-display text-sm font-semibold">🎨 Studio</span><span class="text-[10px] text-cream-300/50">Credit {{ store.creditsLeft }}</span></div>
         <div class="mb-3 flex gap-1 rounded-2xl bg-ink-800 p-1">
           <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0])" class="flex-1 rounded-xl px-2 py-1.5 text-xs font-semibold" :class="store.step === Number(s[0]) ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">{{ s[1] }}</button>
         </div>
-        <div class="space-y-3">
+        <div class="scrollbar-hide space-y-3">
           <component :is="c" v-for="(c,i) in panel" :key="i" />
         </div>
       </aside>
@@ -90,17 +90,23 @@ const panel = computed(() => store.step === 1 ? [SourceCard, StylistCard, Concep
         </div>
       </main>
       <!-- Right outputs (desktop) -->
-      <aside class="hidden w-72 shrink-0 flex-col overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-3 lg:flex">
+      <aside class="scrollbar-hide hidden w-72 shrink-0 flex-col overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-3 lg:flex">
         <p class="mb-2 text-xs font-semibold text-cream-200">Outputs <span class="text-cream-300/50">({{ store.generations.length }})</span></p>
         <div class="flex flex-wrap gap-2">
-          <button v-for="g in store.generations" :key="g.id" @click="store.select(g)" class="relative h-14 w-14 overflow-hidden rounded-lg border" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'"><img :src="g.media_url" class="h-full w-full bg-ink-900 object-cover" loading="lazy"><span v-if="g.status !== 'completed'" class="absolute inset-0 grid place-items-center bg-black/60 text-[10px] text-cream-200">{{ g.status }}</span></button>
+          <div v-for="g in store.generations" :key="g.id" class="group relative h-16 w-16">
+            <button @click="store.select(g)" class="relative block h-full w-full overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'"><img :src="g.media_url" class="h-full w-full bg-ink-900 object-cover" loading="lazy"><span v-if="g.status !== 'completed'" class="absolute inset-0 grid place-items-center bg-black/60 text-[10px] text-cream-200">{{ g.status }}</span></button>
+            <div class="absolute inset-0 items-center justify-center gap-1 rounded-lg bg-black/55 opacity-0 transition group-hover:flex">
+              <button @click="store.viewer = g" class="grid h-7 w-7 place-items-center rounded-full bg-white/90 text-xs text-ink-900" title="Xem nhanh">🔍</button>
+              <a :href="'/studio/generations/' + g.id + '/download'" class="grid h-7 w-7 place-items-center rounded-full bg-white/90 text-xs text-ink-900" title="Tải xuống">⬇</a>
+            </div>
+          </div>
         </div>
       </aside>
     </div>
     <!-- Mobile menu overlay -->
     <div v-if="menuOpen" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
       <div class="absolute inset-0 bg-black/60"></div>
-      <div class="absolute left-0 top-0 h-full w-80 overflow-y-auto bg-ink-900 p-3" @click.stop>
+      <div class="absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="mb-2 flex items-center justify-between"><span class="font-display text-sm font-semibold">🎨 Studio</span><button @click="menuOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200">✕</button></div>
         <div class="mb-3 flex gap-1 rounded-2xl bg-ink-800 p-1">
           <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0]); menuOpen=false" class="flex-1 rounded-xl px-2 py-1.5 text-xs font-semibold" :class="store.step === Number(s[0]) ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">{{ s[1] }}</button>
@@ -111,11 +117,25 @@ const panel = computed(() => store.step === 1 ? [SourceCard, StylistCard, Concep
     <!-- Mobile outputs overlay -->
     <div v-if="outputOpen" class="fixed inset-0 z-50 lg:hidden" @click="outputOpen=false">
       <div class="absolute inset-0 bg-black/60"></div>
-      <div class="absolute right-0 top-0 h-full w-72 overflow-y-auto bg-ink-900 p-3" @click.stop>
+      <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="mb-2 flex items-center justify-between"><p class="text-xs font-semibold">Outputs ({{ store.generations.length }})</p><button @click="outputOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200">✕</button></div>
         <div class="flex flex-wrap gap-2">
-          <button v-for="g in store.generations" :key="g.id" @click="store.select(g); outputOpen=false" class="relative h-14 w-14 overflow-hidden rounded-lg border" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'"><img :src="g.media_url" class="h-full w-full bg-ink-900 object-cover" loading="lazy"></button>
+          <div v-for="g in store.generations" :key="g.id" class="group relative h-16 w-16">
+            <button @click="store.select(g); outputOpen=false" class="relative block h-full w-full overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'"><img :src="g.media_url" class="h-full w-full bg-ink-900 object-cover" loading="lazy"></button>
+            <div class="absolute inset-0 items-center justify-center gap-1 rounded-lg bg-black/55 opacity-0 transition group-hover:flex"><button @click="store.viewer = g" class="grid h-7 w-7 place-items-center rounded-full bg-white/90 text-xs text-ink-900">🔍</button><a :href="'/studio/generations/' + g.id + '/download'" class="grid h-7 w-7 place-items-center rounded-full bg-white/90 text-xs text-ink-900">⬇</a></div>
+          </div>
         </div>
+      </div>
+    </div>
+    <!-- Quick-view lightbox -->
+    <div v-if="store.viewer" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" @click.self="store.viewer = null">
+      <button @click="store.viewer = null" class="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-ink-800 text-cream-200 hover:text-white">✕</button>
+      <div class="relative flex max-h-[92vh] max-w-[92vw] items-center justify-center">
+        <img :src="store.viewer.media_url" class="max-h-[88vh] max-w-[88vw] rounded-xl object-contain shadow-2xl">
+      </div>
+      <div class="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+        <a :href="'/studio/generations/' + store.viewer.id + '/download'" class="rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-ink-900">⬇ Tải xuống</a>
+        <span class="rounded-full bg-ink-800 px-3 py-1.5 text-xs text-cream-200">{{ store.viewer.model || 'Ảnh' }} <span v-if="store.viewer.ratio" class="text-cream-300/60">· {{ store.viewer.ratio }}</span></span>
       </div>
     </div>
   </div>

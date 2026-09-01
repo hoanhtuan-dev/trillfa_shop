@@ -14,7 +14,7 @@ async function save() {
 }
 </script>
 <template>
-  <div class="mx-auto max-w-4xl p-5">
+  <div class="studio-dark mx-auto max-w-4xl p-5">
     <div class="mb-4 flex items-center justify-between">
       <h1 class="font-display text-lg font-semibold text-cream-50">⚙️ Studio Settings (Vue)</h1>
       <div class="flex gap-1.5">

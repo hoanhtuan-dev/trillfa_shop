@@ -199,3 +199,8 @@ aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
     .text-balance { text-wrap: balance; }
 }
 /* XCLOAK_RULE */ [x-cloak] { display: none !important; }
+
+/* hide scrollbars + smooth scrolling (studio) */
+.scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.studio-dark .scrollbar-hide, .studio-dark { scroll-behavior: smooth; }

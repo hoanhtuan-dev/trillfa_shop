@@ -72,7 +72,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BAx7Jv9s.css",
+    "file": "assets/app-CAKBLMJc.css",
     "name": "app",
     "names": [
       "app.css"
@@ -87,7 +87,7 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-BoMjL5H4.js",
+    "file": "assets/app-DzqZvoyo.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -95,11 +95,11 @@
       "_pinia-DYtJnaT3.js"
     ],
     "css": [
-      "assets/app-BxUDgG9J.css"
+      "assets/app-VU32LTqu.css"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-2UzcOT8l.js",
+    "file": "assets/settings-Py9E9Pof.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,

@@ -64,6 +64,7 @@ export const useStudioStore = defineStore('studio', {
     inpainting: false,
     inpaintPrompt: '',
     suggesting: false,
+    viewer: null,
   }),
   getters: {
     upscaleSrc: (s) => (s.editSource && s.editSource.url) || (s.preview && s.preview.media_url) || '',
@@ -89,7 +90,8 @@ export const useStudioStore = defineStore('studio', {
       try {
         const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
         const d = await res.json();
-        if (Array.isArray(d.generations)) this.generations = d.generations;
+        const items = d.items || d.generations || [];
+        if (Array.isArray(items)) this.generations = items;
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         const comp = this.generations.find(g => g.status === 'completed' && (g.type === 'image' || !g.type));
         if (comp) { this.previewId = comp.id; this.preview = { id: comp.id, media_url: comp.media_url, type: comp.type || 'image', status: comp.status }; }
