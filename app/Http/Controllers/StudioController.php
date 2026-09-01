@@ -1377,45 +1377,64 @@ class StudioController extends Controller
         $w = imagesx($img); $h = imagesy($img);
         $cw = (int) round($w / $scale); $ch = (int) round($h / $scale);
 
-        // 1) blurred extended backdrop (cover-fit the scene, then soften).
-        $back = imagecreatetruecolor($cw, $ch);
-        imagecopyresampled($back, $img, 0, 0, 0, 0, $cw, $ch, $w, $h);
-        for ($i = 0; $i < 3; $i++) { @imagefilter($back, IMG_FILTER_GAUSSIAN_BLUR); }
-
-        // 2) Composite: the ENTIRE original frame is kept 100% sharp (person is never blurred —
-        // the subject fills the frame height, so any shaped blur-mask would touch head/feet). The
-        // depth-of-field look comes from the soft blurred EXTENSION border: the sharp frame is pasted
-        // centered and blended into the blurred backdrop over a small edge margin, so there is NO
-        // visible seam and NO blur on the model.
+        // 1) Seamless extended backdrop: MIRROR-pad the original scene to the bigger frame (the
+        // extension reflects the actual edge content — flowers/architecture continue naturally, so
+        // there is NO stretch-blur double-image and NO visible frame seam). The original (model)
+        // sits at ~82% of the frame, sharp.
         $ox = (int) (($cw - $w) / 2); $oy = (int) (($ch - $h) / 2);
-        $blend = (int) (min($w, $h) * 0.025); // blend margin (~2.5%) at the frame edge
+        $back = imagecreatetruecolor($cw, $ch);
         for ($y = 0; $y < $ch; $y++) {
-            $sy = $y - $oy;
+            $sy = $this->mirrorCoord($y - $oy, $h);
             for ($x = 0; $x < $cw; $x++) {
-                $sx = $x - $ox;
-                $inFrame = ($sx >= 0 && $sx < $w && $sy >= 0 && $sy < $h);
-                if ($inFrame) {
-                    // weight 1 in the interior, 0 right at the frame edge -> crossfade into backdrop
-                    $edge = min($sx, $w - 1 - $sx, $sy, $h - 1 - $sy);
-                    $wg = max(0.0, min(1.0, $edge / $blend));
-                    if ($wg >= 1.0) { continue; }         // interior -> keep the sharp original
-                    $c = imagecolorat($img, $sx, $sy);
-                    $b = imagecolorat($back, $x, $y);
-                    $r = (int) round((($c >> 16) & 255) * $wg + (($b >> 16) & 255) * (1 - $wg));
-                    $g = (int) round((($c >> 8) & 255) * $wg + (($b >> 8) & 255) * (1 - $wg));
-                    $bb = (int) round(($c & 255) * $wg + ($b & 255) * (1 - $wg));
-                    imagesetpixel($back, $x, $y, imagecolorallocate($back, $r, $g, $bb));
-                }
-                // outside the frame -> the blurred backdrop already occupies this pixel
+                $sx = $this->mirrorCoord($x - $ox, $w);
+                imagesetpixel($back, $x, $y, imagecolorat($img, $sx, $sy));
             }
         }
-        // paste the interior of the sharp original over the (now-blended) backdrop
-        imagecopy($back, $img, $ox + $blend, $oy + $blend, $blend, $blend, $w - 2 * $blend, $h - 2 * $blend);
+
+        // 2) Depth-of-field vignette: blur ONLY the OUTER extension, ramping over a margin so there
+        // is no seam, and NEVER touching the original frame (the model stays pixel-identical/sharp).
+        $blur = imagecreatetruecolor($cw, $ch);
+        imagecopy($blur, $back, 0, 0, 0, 0, $cw, $ch);
+        for ($i = 0; $i < 3; $i++) { @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR); }
+        $blend = (int) (min($w, $h) * 0.06); // ramp width in the extension
+        for ($y = 0; $y < $ch; $y++) {
+            $sy = $y - $oy;
+            $dyOut = max(0, -$sy, $sy - ($h - 1));
+            for ($x = 0; $x < $cw; $x++) {
+                $sx = $x - $ox;
+                if ($sx >= 0 && $sx < $w && $sy >= 0 && $sy < $h) { continue; } // inside frame -> sharp
+                $dxOut = max(0, -$sx, $sx - ($w - 1));
+                $dist = max($dxOut, $dyOut);
+                $wgt = max(0.0, min(1.0, $dist / $blend));
+                $wg = $wgt * $wgt * (3 - 2 * $wgt);
+                if ($wg <= 0.02) { continue; }
+                $c = imagecolorat($back, $x, $y);
+                $b = imagecolorat($blur, $x, $y);
+                $r = (int) round((($c >> 16) & 255) * (1 - $wg) + (($b >> 16) & 255) * $wg);
+                $g = (int) round((($c >> 8) & 255) * (1 - $wg) + (($b >> 8) & 255) * $wg);
+                $bb = (int) round(($c & 255) * (1 - $wg) + ($b & 255) * $wg);
+                imagesetpixel($back, $x, $y, imagecolorallocate($back, $r, $g, $bb));
+            }
+        }
+        imagedestroy($blur);
 
         $name = 'studio/portrait-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($back));
         imagedestroy($back); imagedestroy($img);
         return '/storage/'.$name;
+    }
+
+    /**
+     * Reflect a coordinate into the range [0, len) so the scene edges can be mirrored outward
+     * (seamless extension without duplication artifacts).
+     */
+    protected function mirrorCoord(int $v, int $len): int
+    {
+        if ($len <= 0) { return 0; }
+        $m = 2 * $len;
+        $v = (($v % $m) + $m) % $m;
+        if ($v >= $len) { $v = $m - 1 - $v; }
+        return $v < 0 ? 0 : min($len - 1, $v);
     }
 
     /**
