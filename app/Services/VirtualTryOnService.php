@@ -254,12 +254,14 @@ class VirtualTryOnService
         }
         $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
 
-        // PASS 2 — replace ONLY the background (person / pose / garment untouched). The tone grade is
-        // applied here so the final composite (new background + person) is graded uniformly.
+        // PASS 2 — replace ONLY the background (person / pose / garment untouched). CRITICAL: never
+        // say "consistent lighting" here — with a dark background the model darkens the person into a
+        // silhouette. Explicitly force the person to keep their original, fully-lit exposure.
         if ($wantBg) {
             $bgInstr = 'Replace the ENTIRE background of the scene with: '.$background.'. '
-                .'Keep the person, their pose, the garment, body shape and lighting 100% unchanged. '
-                .$toneS.' Photorealistic, studio quality, consistent lighting.';
+                .'Keep the person, their pose, the garment and body shape 100% unchanged. '
+                .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look and stay clearly visible; do NOT darken or shade them into a silhouette to match the new background. '
+                .$toneS.' Photorealistic.';
             $final = $imageSvc->swapEdit($bgInstr, $url, $swapModel, null, null);
             if ($final) {
                 $this->calls = 2;
