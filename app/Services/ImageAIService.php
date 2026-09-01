@@ -789,6 +789,20 @@ class ImageAIService
                 imagedestroy($edited); imagedestroy($source); imagedestroy($mask);
                 return null; // kích thước chưa khớp → bỏ composite, giữ kết quả edit
             }
+            // Bounding box vùng đen của mask (trước blur) — dùng cho fallback chống vùng đen.
+            $bz0 = $w; $bz1 = -1; $bt0 = $h; $bt1 = -1;
+            for ($y = 0; $y < $h; $y += 3) {
+                for ($x = 0; $x < $w; $x += 3) {
+                    $mc = imagecolorat($mask, $x, $y);
+                    if (((($mc >> 16) & 0xFF) + (($mc >> 8) & 0xFF) + ($mc & 0xFF)) < 96) {
+                        if ($x < $bz0) { $bz0 = $x; } if ($x > $bz1) { $bz1 = $x; }
+                        if ($y < $bt0) { $bt0 = $y; } if ($y > $bt1) { $bt1 = $y; }
+                    }
+                }
+            }
+            $hasRegion = $bz1 >= 0 && $bt1 >= 0 && ($bz1 - $bz0) > 4 && ($bt1 - $bt0) > 4;
+            $cx = (int) (($bz0 + $bz1) / 2); $cy = (int) (($bt0 + $bt1) / 2);
+
             // Làm mềm mask (blur) → alpha ramp ở biên vùng.
             @imagefilter($mask, IMG_FILTER_GAUSSIAN_BLUR);
             @imagefilter($mask, IMG_FILTER_GAUSSIAN_BLUR);
@@ -806,6 +820,25 @@ class ImageAIService
                     imagesetpixel($out, $x, $y, imagecolorallocate($out, $r, $g, $b));
                 }
             }
+            // Fallback: nếu AI trả vùng đen (kết quả vùng gần đen mà ảnh gốc sáng) →
+            // bỏ kết quả AI, tái tạo nền cục bộ từ cạnh viền (không bao giờ để vùng đen).
+            if ($hasRegion) {
+                $ec = imagecolorat($out, $cx, $cy);
+                $elum = (($ec >> 16) & 0xFF) + (($ec >> 8) & 0xFF) + ($ec & 0xFF);
+                $sc = imagecolorat($source, $cx, $cy);
+                $slum = (($sc >> 16) & 0xFF) + (($sc >> 8) & 0xFF) + ($sc & 0xFF);
+                if ($elum < 100 && $slum > 190) {
+                    imagedestroy($edited); imagedestroy($source); imagedestroy($mask); imagedestroy($out);
+                    $fb = imagecreatetruecolor($w, $h);
+                    imagecopy($fb, $source, 0, 0, 0, 0, $w, $h);
+                    $this->reconstructRegion($fb, $bz0, $bt0, $bz1 - $bz0 + 1, $bt1 - $bt0 + 1);
+                    ob_start(); imagepng($fb); $bytes = (string) ob_get_clean();
+                    imagedestroy($fb);
+                    $name = 'studio/composite-'.Str::uuid().'.png';
+                    Storage::disk('public')->put($name, $bytes);
+                    return '/storage/'.$name;
+                }
+            }
             imagedestroy($edited); imagedestroy($source); imagedestroy($mask);
             ob_start(); imagepng($out); $bytes = (string) ob_get_clean();
             imagedestroy($out);
@@ -815,6 +848,45 @@ class ImageAIService
         } catch (\Throwable $e) {
             logger()->warning('compositeMaskedEdit failed: '.$e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Tái tạo nền cục bộ (border-stretch) — dùng khi AI trả vùng đen hoặc chế độ stub:
+     * mỗi pixel trong vùng = nội suy tuyến tính nền trái↔phải và trên↔dưới (guard đen).
+     */
+    protected function reconstructRegion(\GdImage $img, int $px, int $py, int $pw, int $ph): void
+    {
+        $w = imagesx($img); $h = imagesy($img);
+        $x0 = max(0, $px); $x1 = min($w - 1, $px + max(1, $pw) - 1);
+        $y0 = max(0, $py); $y1 = min($h - 1, $py + max(1, $ph) - 1);
+        if ($x0 > $x1 || $y0 > $y1) { return; }
+        $lx = max(0, $px - 1); $rx = min($w - 1, $px + max(1, $pw));
+        $ty = max(0, $py - 1); $by = min($h - 1, $py + max(1, $ph));
+        $dark = function (int $c): bool { return ((($c >> 16) & 0xFF) + (($c >> 8) & 0xFF) + ($c & 0xFF)) < 72; };
+        $spanX = max(1, $x1 - $x0); $spanY = max(1, $y1 - $y0);
+        for ($y = $y0; $y <= $y1; $y++) {
+            $lc = imagecolorat($img, $lx, $y); $rc = imagecolorat($img, $rx, $y);
+            if ($dark($lc) && ! $dark($rc)) { $lc = $rc; }
+            elseif ($dark($rc) && ! $dark($lc)) { $rc = $lc; }
+            $lr = ($lc >> 16) & 0xFF; $lg = ($lc >> 8) & 0xFF; $lb = $lc & 0xFF;
+            $rr = ($rc >> 16) & 0xFF; $rg = ($rc >> 8) & 0xFF; $rb = $rc & 0xFF;
+            for ($x = $x0; $x <= $x1; $x++) {
+                $tc = imagecolorat($img, $x, $ty); $bc = imagecolorat($img, $x, $by);
+                if ($dark($tc) && ! $dark($bc)) { $tc = $bc; }
+                elseif ($dark($bc) && ! $dark($tc)) { $bc = $tc; }
+                $fy = ($y - $y0) / $spanY; $fx = ($x - $x0) / $spanX;
+                // nền ngang tại x
+                $hr = $lr + ($rr - $lr) * $fx; $hg = $lg + ($rg - $lg) * $fx; $hb = $lb + ($rb - $lb) * $fx;
+                // nền dọc tại y
+                $tr = ($tc >> 16) & 0xFF; $tg = ($tc >> 8) & 0xFF; $tb = $tc & 0xFF;
+                $br = ($bc >> 16) & 0xFF; $bg = ($bc >> 8) & 0xFF; $bb = $bc & 0xFF;
+                $vr = $tr + ($br - $tr) * $fy; $vg = $tg + ($bg - $tg) * $fy; $vb = $tb + ($bb - $tb) * $fy;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    (int) round(($hr + $vr) / 2),
+                    (int) round(($hg + $vg) / 2),
+                    (int) round(($hb + $vb) / 2)));
+            }
         }
     }
 

@@ -451,26 +451,31 @@ export const useStudioStore = defineStore('studio', {
       const b = this.regionBox || { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
       return { left: ((m.vx + b.x * m.vw) / m.crW * 100) + '%', top: ((m.vy + b.y * m.vh) / m.crH * 100) + '%', width: (b.w * m.vw / m.crW * 100) + '%', height: (b.h * m.vh / m.crH * 100) + '%' };
     },
+    // Map con trỏ (viewport px) -> tọa độ normalized (0..1) của ẢNH ĐANG HIỂN THỊ.
+    // Dùng trực tiếp getBoundingClientRect của <img> (đã gồm pan/zoom) → bám 100% ảnh,
+    // không phụ thuộc offset container (tránh lỗi "chọn lệch sang phải").
+    regionPointer(e) {
+      const img = this.cvImg; if (!img) return null;
+      const ir = img.getBoundingClientRect();
+      if (!ir.width || !ir.height) return null;
+      const nx = this._clamp((e.clientX - ir.left) / ir.width, 0, 1);
+      const ny = this._clamp((e.clientY - ir.top) / ir.height, 0, 1);
+      return { nx, ny };
+    },
     regionStart(e) {
       if (!this.regionMode) return;
       e.stopPropagation();
-      // Capture pointer để kéo liền mạch (không mất pointermove/up khi rê nhanh).
       const el = e.currentTarget;
       if (el && e.pointerId != null && el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
-      const m = this.canvasMetrics(); if (!m) return;
-      // clientX/Y là tọa độ viewport -> trừ offset container (crLeft/crTop) rồi vx/vy của ảnh.
-      const nx = this._clamp((e.clientX - m.crLeft - m.vx) / m.vw, 0, 1);
-      const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
-      this._regionDrag = { x: nx, y: ny };
-      this.regionBox = { x: nx, y: ny, w: 0.005, h: 0.005 };
+      const p = this.regionPointer(e); if (!p) return;
+      this._regionDrag = { x: p.nx, y: p.ny };
+      this.regionBox = { x: p.nx, y: p.ny, w: 0.005, h: 0.005 };
     },
     regionMove(e) {
       const d = this._regionDrag; if (!d || !this.regionMode) return;
-      const m = this.canvasMetrics(); if (!m) return;
-      const nx = this._clamp((e.clientX - m.crLeft - m.vx) / m.vw, 0, 1);
-      const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
-      const x = Math.min(d.x, nx), y = Math.min(d.y, ny);
-      this.regionBox = { x, y, w: Math.max(0.005, Math.abs(nx - d.x)), h: Math.max(0.005, Math.abs(ny - d.y)) };
+      const p = this.regionPointer(e); if (!p) return;
+      const x = Math.min(d.x, p.nx), y = Math.min(d.y, p.ny);
+      this.regionBox = { x, y, w: Math.max(0.005, Math.abs(p.nx - d.x)), h: Math.max(0.005, Math.abs(p.ny - d.y)) };
     },
     regionStop() { this._regionDrag = null; },
     // Gửi thao tác vùng -> backend /generations/{id}/region (mask + AI/local) -> poll.

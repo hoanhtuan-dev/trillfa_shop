@@ -92,7 +92,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
               </div>
             </div>
             <!-- Region selection overlay (xóa/thay vùng) -->
-            <div v-if="store.regionMode && store.upscaleSrc" class="absolute inset-0" style="z-index:31; cursor:crosshair" @pointerdown="store.regionStart($event)" @pointermove="store.regionMove($event)" @pointerup="store.regionStop()" @pointerleave="store.regionStop()">
+            <div v-if="store.regionMode && store.upscaleSrc" class="absolute inset-0" style="z-index:31; cursor:crosshair" @pointerdown="store.regionStart($event)" @pointermove="store.regionMove($event)" @pointerup="store.regionStop()" @pointercancel="store.regionStop()">
               <div class="pointer-events-none absolute inset-0 bg-black/45"></div>
               <div class="pointer-events-none absolute" :style="store.regionStyle()">
                 <div class="absolute -inset-px border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
