@@ -627,17 +627,15 @@ class ImageAIService
      */
     public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null): ?string
     {
-        // For a face-reference swap, QwenCloud's recommended multi-image fusion model is qwen-image-3.0-pro
-        // (subject + garment + pose). Try it first for best face fidelity, then the configured swap model,
-        // then the base Qwen edit models. qwen-image-edit-max accepts the images but often ignores the
-        // face reference, so a model that understands subject-driven editing is preferred.
-        $models = ($faceRefUrl || $poseRefUrl)
-            ? array_values(array_unique(array_filter([
-                'qwen-image-3.0-pro', $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
-            ])))
-            : array_values(array_unique(array_filter([
-                $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
-            ])));
+        // Multi-image fusion model (face + garment + pose in one call) only when explicitly configured
+        // via studio.swap_fusion_model — on this account qwen-image-3.0-pro 403s (free quota exhausted),
+        // so it must NOT be attempted blindly. The configured swap model is also filtered to only edit
+        // capable models, so a wrong swap_model config no longer wastes an attempt.
+        $fusion = (string) studio_config('swap_fusion_model', '');
+        $models = array_values(array_unique(array_filter([
+            $fusion ?: null,
+            $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
+        ], fn ($m) => $m !== null && $m !== '' && $this->isImageEditCapableModel((string) $m))));
 
         // Rate-limits (429) can take ~10-30s to clear: retry the SAME model with a short bounded
         // backoff (3s then 8s), then move to the next model on other errors (or after giving up).
@@ -677,7 +675,7 @@ class ImageAIService
     {
         $models = array_values(array_unique(array_filter([
             $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
-        ])));
+        ], fn ($m) => $m !== null && $m !== '' && $this->isImageEditCapableModel((string) $m))));
 
         $backoffs = [3, 8];
         foreach ($models as $model) {

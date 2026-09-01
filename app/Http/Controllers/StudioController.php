@@ -1257,53 +1257,97 @@ class StudioController extends Controller
             return response()->json(['message' => 'Không tìm thấy dáng.'], 422);
         }
 
-        // P0a: DashScope virtual-try-on is NOT available on this account ("Model not exist"), so the
-        // swap is a SINGLE-pass Qwen image-edit call (keeping the garment 100% unchanged). The chosen
-        // model face is the subject reference (Image 1) — this is what best preserves the reference face.
         // Pose reference image: prefer the client-sent one, fall back to the pose catalog image
         // (custom asset / DB preset / built-in sample) so the model can actually replicate the pose.
         $poseRefUrl = (string) ($data['pose_ref'] ?? '') ?: (string) ($pose['image'] ?? '');
-        $fallback = $svc->fallbackEdit(
-            $data['image'],
-            $model['desc'] ?? ($model['ethnicity'] ?? 'a model'),
-            $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
-            (string) ($data['background'] ?? ''),
-            $model['image'] ?? null, // face reference image (custom/catalog)
-            (int) ($data['build'] ?? 6),
-            (string) ($data['tone'] ?? 'none'),
-            $poseRefUrl,             // pose reference image (skeleton/photo)
-        );
-        if (! $fallback) {
-            return response()->json(['message' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).'], 422);
+        $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
+
+        // The long AI pipeline (try-on + optional face-swap, ~1-3 min per pose) runs in the background
+        // queue (SwapModelJob) so this request returns immediately — a synchronous 2-pass swap gets
+        // cut by the hosting proxy timeout ("chạy lâu không thấy kết quả").
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'pending',
+            'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
+            'model' => $swapModel, 'provider' => 'qwen', 'credits_cost' => 1,
+            'meta' => [
+                'swap' => true,
+                'image' => $data['image'],
+                'model_id' => $data['model_id'],
+                'pose_id' => $data['pose_id'],
+                'model_name' => $model['name'] ?? null,
+                'pose_name' => $pose['name'] ?? null,
+                'face_ref' => (bool) ($model['image'] ?? null),
+                'pose_ref' => $poseRefUrl,
+                'background' => (string) ($data['background'] ?? ''),
+                'build' => (int) ($data['build'] ?? 6),
+                'tone' => (string) ($data['tone'] ?? 'none'),
+                'tone_level' => (int) ($data['tone_level'] ?? 5),
+                'fabric_detail' => (int) ($data['fabric_detail'] ?? 0),
+            ],
+        ]);
+
+        AppJobsSwapModelJob::dispatch($gen->id);
+
+        return response()->json(['generation_id' => $gen->id, 'status' => 'pending', 'provider' => 'qwen', 'model' => $swapModel, 'task_id' => null]);
+    }
+
+    /**
+     * Run the swap AI pipeline for a queued generation (called by SwapModelJob in the background).
+     * Validates the references, runs try-on (+ optional face-swap), post-process, tone, then stores
+     * the finished result on the generation row.
+     */
+    public function executeSwapFromGeneration(AppModelsGeneration $gen): void
+    {
+        $meta = (array) ($gen->meta ?? []);
+        $svc = app(AppServicesVirtualTryOnService::class);
+        $model = $svc->pickModel((string) ($meta['model_id'] ?? ''));
+        $pose = $svc->pickPose((string) ($meta['pose_id'] ?? ''));
+        if (! $model || ! $pose) {
+            $gen->update(['status' => 'failed', 'error' => 'Không tìm thấy người mẫu hoặc dáng.']);
+            return;
         }
 
-        // Post-process fabric texture ("Vân vải hậu kỳ") is OFF by default: the weave pass + sharpening
-        // can add grain over the face/skin (the color-based skin mask is unreliable on shadows and
-        // skin-toned fabric), which ruins the swapped face. Only run it when the user explicitly
-        // enables it, at their chosen strength, and NEVER on skin pixels (skin pass = 0).
-        $fabricDetail = (int) ($data['fabric_detail'] ?? 0);
+        $fallback = $svc->fallbackEdit(
+            (string) ($meta['image'] ?? ''),
+            $model['desc'] ?? ($model['ethnicity'] ?? 'a model'),
+            $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
+            (string) ($meta['background'] ?? ''),
+            $model['image'] ?? null, // face reference image (custom/catalog)
+            (int) ($meta['build'] ?? 6),
+            (string) ($meta['tone'] ?? 'none'),
+            (string) ($meta['pose_ref'] ?? ''),
+        );
+        if (! $fallback) {
+            $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).']);
+            return;
+        }
+
+        // Post-process fabric texture ("Vân vải hậu kỳ") — OFF by default; only when the user enables it.
+        $fabricDetail = (int) ($meta['fabric_detail'] ?? 0);
         if ($fabricDetail > 0) {
             $det = $this->enhanceStoredImage($fallback, min(10, max(0, $fabricDetail)), 0);
             if ($det) { $fallback = $det; }
         }
 
-        // Color-tone effect: deterministic grade matching the chosen tone / background, at the chosen
-        // strength (tone_level 0-10; default 5 so the effect is clearly visible but not blown out).
-        $tone = (string) ($data['tone'] ?? 'none');
-        $toneLevel = (int) ($data['tone_level'] ?? 5);
-        $toned = $this->applyToneToStoredImage($fallback, $tone, (string) ($data['background'] ?? ''), $toneLevel);
+        // Color-tone effect: deterministic grade matching the chosen tone / background.
+        $tone = (string) ($meta['tone'] ?? 'none');
+        $toneLevel = (int) ($meta['tone_level'] ?? 5);
+        $toned = $this->applyToneToStoredImage($fallback, $tone, (string) ($meta['background'] ?? ''), $toneLevel);
         if ($toned) { $fallback = $toned; }
 
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
-        $actualModel = $svc->lastModel() ?: $swapModel;   // model actually used (e.g. qwen-image-3.0-pro)
-        $credits = max(1, $svc->calls());                 // single-pass = 1 real AI call
-        $gen = auth()->user()->generations()->create([
-            'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
-            'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
-            'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => $credits,
-            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'pose_ref' => (bool) $poseRefUrl, 'face_pass' => (bool) (($model['image'] ?? null) && studio_config('swap_face_pass', true)), 'build' => (int) ($data['build'] ?? 6), 'tone' => $tone, 'tone_level' => $toneLevel, 'fabric_detail' => $fabricDetail, 'steps' => $credits],
+        $actualModel = $svc->lastModel() ?: $swapModel;
+        $credits = max(1, $svc->calls()); // 2 for the try-on + face-swap passes, 1 otherwise
+
+        $gen->update([
+            'status' => 'completed', 'media_url' => $fallback,
+            'model' => $actualModel, 'credits_cost' => $credits,
+            'meta' => array_merge($meta, [
+                'type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel,
+                'face_pass' => (bool) (($model['image'] ?? null) && studio_config('swap_face_pass', true)),
+                'steps' => $credits,
+            ]),
         ]);
-        return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'model' => $actualModel, 'task_id' => null]);
     }
 
     public function translate(Request $request)
@@ -2225,9 +2269,12 @@ class StudioController extends Controller
      */
     public function processQueue()
     {
+        // Swap generations are handled by SwapModelJob via the queue worker, not by this sync path.
         $pending = auth()->user()->generations()
             ->whereIn('status', ['pending', 'processing'])
-            ->orderBy('id')->limit(5)->get();
+            ->orderBy('id')->limit(10)->get()
+            ->reject(fn ($g) => ($g->meta['swap'] ?? false) === true)
+            ->take(5)->values();
 
         $n = 0;
         foreach ($pending as $gen) {

@@ -228,13 +228,17 @@ export const useStudioStore = defineStore('studio', {
       this.swapDone = 0;
       this.swapLoading = true;
       let n = 0; let lastErr = '';
+      const createdIds = [];
       for (const poseId of poses) {
         if (abort.signal.aborted) { lastErr = 'Đã hủy.'; break; }
         try {
           const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', build, tone: opts.tone ?? 'none', tone_level: toneLevel, fabric_detail: fabricDetail }, abort.signal);
-          // P0a: swap is now synchronous (qwen-edit) -> media_url is returned directly.
-          if (d.generation_id) { this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.model || 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); n++; }
-          else if (d.message) { lastErr = d.message; }
+          // Swap now runs in the background queue (SwapModelJob) — the response is async (pending).
+          if (d.generation_id) {
+            createdIds.push(d.generation_id);
+            this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'processing', model: d.model || 'swap', provider: d.provider || 'swap', media_url: null, error: null, credits_cost: 1, created_at: 'Đang xử lý' });
+            n++;
+          } else if (d.message) { lastErr = d.message; }
         } catch (e) {
           if (e && e.name === 'AbortError') { lastErr = 'Đã hủy.'; break; }
           lastErr = e.message || 'Lỗi thay đổi người mẫu.';
@@ -245,8 +249,42 @@ export const useStudioStore = defineStore('studio', {
       this.swapLoading = false;
       this.swapAbort = null;
       this.swapDone = 0; this.swapTotal = 0;
-      if (n > 0) { this.toast('Đã thay đổi người mẫu cho ' + n + ' dáng.'); }
+      if (n > 0) { this.toast('Đã gửi ' + n + ' dáng vào hàng đợi xử lý…'); this.refreshSwapResults(createdIds); }
       else { this.toast(lastErr || 'Lỗi thay đổi người mẫu.', 'error'); }
+    },
+    // Poll /studio/latest until the just-submitted swap generations finish (the queue worker fills them in).
+    async refreshSwapResults(ids) {
+      const deadline = Date.now() + 300000; // wait up to 5 min
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 5000));
+        try {
+          const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
+          const d = await res.json();
+          const items = Array.isArray(d.items) ? d.items : [];
+          items.forEach((it) => {
+            const idx = this.generations.findIndex((g) => String(g.id) === String(it.id));
+            if (idx >= 0 && it.status) {
+              const g = this.generations[idx];
+              if (g.status !== it.status || (it.media_url && g.media_url !== it.media_url)) {
+                this.generations[idx] = { ...g, status: it.status, media_url: it.media_url || g.media_url, error: it.error, model: it.model || g.model };
+                if (it.status === 'completed' && it.media_url) {
+                  this.previewId = it.id;
+                  this.preview = { id: it.id, media_url: it.media_url, type: 'image', status: 'completed' };
+                  if (!this.canvasLayers.some((l) => l.id === String(it.id))) {
+                    this.pushCanvasLayer(String(it.id), 'gen', 'Ảnh #' + it.id, it.media_url, it.id);
+                    this.setActiveLayer(String(it.id));
+                  }
+                }
+              }
+            }
+          });
+        } catch (e) { /* transient — keep polling */ }
+        const done = ids.every((id) => {
+          const g = this.generations.find((x) => String(x.id) === String(id));
+          return !g || g.status === 'completed' || g.status === 'failed' || g.status === 'cancelled';
+        });
+        if (done) { this.toast('Đã xong thay đổi người mẫu.'); break; }
+      }
     },
     cancelSwap() {
       if (this.swapAbort) { this.swapAbort.abort(); }
