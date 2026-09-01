@@ -782,7 +782,9 @@ class ShopFlowTest extends TestCase
 
     public function test_studio_requires_auth(): void
     {
-        $this->get('/studio')->assertRedirect(route('login'));
+        // /studio is now a public Vue shell (no auth redirect); the API remains auth-protected.
+        $this->get('/studio')->assertOk()->assertSee('studio-root');
+        $this->get('/studio/latest')->assertRedirect(route('login'));
     }
 
     public function test_studio_generate_image_and_video(): void
