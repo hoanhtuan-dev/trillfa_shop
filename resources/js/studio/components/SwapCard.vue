@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useStudioStore } from '../store.js';
+import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
 const open = ref(false);
 const models = ref([]), poses = ref([]), bgs = ref([]), assets = ref([]);
@@ -21,7 +22,26 @@ const toneOptions = [
   { v: 'mono', label: '⚪ Trắng đen' },
   { v: 'none', label: '🚫 Không' },
 ];
+// Persist swap settings across sessions (like upscale memory).
+const SWAP_KEY = 'trillfa.swap';
+function loadSwapMemory() {
+  try {
+    const m = JSON.parse(localStorage.getItem(SWAP_KEY) || '{}');
+    if (m.build != null) swapBuild.value = Number(m.build);
+    if (m.tone) swapTone.value = m.tone;
+    if (m.toneLevel != null) swapToneLevel.value = Number(m.toneLevel);
+    if (m.fabric != null) swapFabric.value = Number(m.fabric);
+    if (typeof m.bg === 'string') swapBg.value = m.bg;
+  } catch (e) {}
+}
+function saveSwapMemory() {
+  try {
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, toneLevel: swapToneLevel.value, fabric: swapFabric.value, bg: swapBg.value }));
+  } catch (e) {}
+}
+watch([swapBg, swapBuild, swapTone, swapToneLevel, swapFabric], saveSwapMemory);
 onMounted(async () => {
+  loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; } catch(e){}
   try { const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } }); const d = await r.json(); poses.value = d.items || []; } catch(e){}
   try { const r = await fetch('/studio/swap-backgrounds', { headers: { Accept: 'application/json' } }); const d = await r.json(); bgs.value = d.items || []; } catch(e){}
@@ -55,11 +75,9 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
       <div v-if="swapFabric > 0" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Vân vải hậu kỳ:</span><span class="truncate text-cream-100">{{ swapFabric }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel, fabric_detail: swapFabric })" :disabled="!canApply" class="btn-brand btn-sm">{{ store.swapLoading ? 'Đang ghép…' : 'Áp dụng' }}</button></div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ '⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel, fabric_detail: swapFabric })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
     <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
-    <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" @click.self="open=false">
-      <div class="scrollbar-hide max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-brand-500/30 bg-ink-900 p-5" @click.stop>
-        <div class="mb-3 flex items-center justify-between"><span class="text-sm font-semibold text-brand-300">🪄 Chọn người mẫu / dáng / bối cảnh</span><button @click="open=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200">✕</button></div>
+    <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
         <!-- Khuôn mặt -->
         <p class="mb-2 text-xs font-semibold text-cream-200">👩 Khuôn mặt</p>
         <div class="flex flex-wrap gap-2">
@@ -117,7 +135,6 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
           </div>
         </div>
         <button @click="open=false" class="btn-brand mt-4 w-full">✅ Chọn xong</button>
-      </div>
-    </div>
+    </BaseModal>
   </div>
 </template>

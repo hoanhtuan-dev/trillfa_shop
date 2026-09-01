@@ -668,6 +668,41 @@ class ImageAIService
         return null;
     }
 
+    /**
+     * Dedicated face-swap pass: replace ONLY the face of the person in $imageUrl with the face from
+     * $faceRefUrl. Kept separate from the try-on pass because a single combined call makes the edit
+     * model ignore the face reference — with face-only as the sole instruction it actually applies.
+     */
+    public function swapFace(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
+    {
+        $models = array_values(array_unique(array_filter([
+            $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
+        ])));
+
+        $backoffs = [3, 8];
+        foreach ($models as $model) {
+            for ($attempt = 0; $attempt <= count($backoffs); $attempt++) {
+                $url = $this->editImage($prompt, $imageUrl, $model, $faceRefUrl);
+                if ($url) {
+                    logger()->info('Face-swap succeeded', ['model' => $model]);
+                    return $url;
+                }
+                $rateLimited = str_contains(strtolower((string) $this->dashscopeError), '429')
+                    || str_contains(strtolower((string) $this->dashscopeError), 'ratelimit');
+                if (! $rateLimited) {
+                    logger()->warning('Face-swap model failed, trying next', ['model' => $model, 'err' => $this->dashscopeError]);
+                    break;
+                }
+                if ($attempt >= count($backoffs)) {
+                    logger()->warning('Face-swap gave up after repeated rate-limits', ['model' => $model]);
+                    break;
+                }
+                sleep($backoffs[$attempt]);
+            }
+        }
+        return null;
+    }
+
     protected function storeRemoteImage(string $url): ?string
     {
         $contents = @file_get_contents($url);

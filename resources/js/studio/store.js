@@ -61,6 +61,9 @@ export const useStudioStore = defineStore('studio', {
     swapModelIds: [],
     swapPoseIds: [],
     swapLoading: false,
+    swapDone: 0,      // poses completed (for progress UI)
+    swapTotal: 0,     // total poses in the current run
+    swapAbort: null,  // AbortController for cancel
     inpainting: false,
     inpaintPrompt: '',
     suggesting: false,
@@ -83,8 +86,8 @@ export const useStudioStore = defineStore('studio', {
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
   },
   actions: {
-    async api(url, body = {}) {
-      const res = await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+    async api(url, body = {}, signal = null) {
+      const res = await fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body), signal });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra.');
       return data;
@@ -217,19 +220,38 @@ export const useStudioStore = defineStore('studio', {
       const toInt = (v, dflt) => (v != null && Number.isFinite(Number(v)) ? Number(v) : dflt);
       const build = toInt(opts.build, 6);
       const toneLevel = toInt(opts.tone_level, 5);
+      const fabricDetail = toInt(opts.fabric_detail, 0);
+      // Progress + cancel: each pose is one request; user can abort mid-run.
+      const abort = new AbortController();
+      this.swapAbort = abort;
+      this.swapTotal = poses.length;
+      this.swapDone = 0;
       this.swapLoading = true;
       let n = 0; let lastErr = '';
       for (const poseId of poses) {
+        if (abort.signal.aborted) { lastErr = 'Đã hủy.'; break; }
         try {
-          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', build, tone: opts.tone ?? 'none', tone_level: toneLevel, fabric_detail: toInt(opts.fabric_detail, 0) });
+          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', build, tone: opts.tone ?? 'none', tone_level: toneLevel, fabric_detail: fabricDetail }, abort.signal);
           // P0a: swap is now synchronous (qwen-edit) -> media_url is returned directly.
           if (d.generation_id) { this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.model || 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); n++; }
           else if (d.message) { lastErr = d.message; }
-        } catch (e) { lastErr = e.message || 'Lỗi thay đổi người mẫu.'; }
+        } catch (e) {
+          if (e && e.name === 'AbortError') { lastErr = 'Đã hủy.'; break; }
+          lastErr = e.message || 'Lỗi thay đổi người mẫu.';
+        } finally {
+          this.swapDone++;
+        }
       }
       this.swapLoading = false;
+      this.swapAbort = null;
+      this.swapDone = 0; this.swapTotal = 0;
       if (n > 0) { this.toast('Đã thay đổi người mẫu cho ' + n + ' dáng.'); }
       else { this.toast(lastErr || 'Lỗi thay đổi người mẫu.', 'error'); }
+    },
+    cancelSwap() {
+      if (this.swapAbort) { this.swapAbort.abort(); }
+      this.swapLoading = false;
+      this.toast('Đang hủy…');
     },
   },
 });

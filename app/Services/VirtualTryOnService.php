@@ -263,6 +263,41 @@ class VirtualTryOnService
         }
 
         $imageSvc = app(ImageAIService::class);
+
+        // 2-PASS PIPELINE (face actually applied): pass 1 renders the model + pose + EXACT garment
+        // (face described by text only, so the edit model focuses on the garment), then pass 2 does
+        // a DEDICATED face-swap onto that result. A single combined call makes edit models ignore
+        // the face reference — this split is what gets the reference face onto the final image.
+        if ($faceRefUrl && (bool) studio_config('swap_face_pass', true)) {
+            // PASS 1 — try-on: garment + pose, no face image.
+            $pass1 = $base;
+            if ($poseRefUrl) {
+                $pass1 .= 'Image 1 is the pose reference: replicate its pose, stance, body shape and camera angle EXACTLY. '
+                    .'Image 2 is the person to edit, wearing the garment to preserve. '
+                    .'Put the EXACT garment from Image 2 onto a full-body '.$modelDesc.' posed exactly like Image 1 ('.$pose.'). ';
+            } else {
+                $pass1 .= 'Put the EXACT garment from the image onto a full-body '.$modelDesc.' standing '.$pose.', keeping the garment unchanged. ';
+            }
+            $pass1 .= $toneS.' Photorealistic, full body, studio quality, consistent lighting.';
+            $url = $imageSvc->swapEdit($pass1, $designImage, $swapModel, null, $poseRefUrl);
+            if ($url) {
+                // PASS 2 — replace ONLY the face with the reference face.
+                $faceInstr = 'Image 1 is the reference person. Replace ONLY the face of the person in the main image with the EXACT face from Image 1 — same facial identity, eyes, nose, mouth, skin tone and hair. '
+                    .'Keep the garment, pose, body, background and lighting 100% unchanged. Do not change anything else. Photorealistic, seamless composite.';
+                $final = $imageSvc->swapFace($faceInstr, $url, $swapModel, $faceRefUrl);
+                if ($final) {
+                    $this->calls = 2;
+                    $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+                    logger()->info('Swap 2-pass done (try-on + face-swap)');
+                    return $final;
+                }
+                logger()->warning('Swap face pass failed; keeping the try-on result');
+                $this->calls = 1;
+                return $url;
+            }
+            logger()->warning('Swap pass-1 failed; falling back to combined single-pass');
+        }
+
         $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl, $poseRefUrl);
         if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
         return $url;

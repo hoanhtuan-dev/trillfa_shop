@@ -1301,7 +1301,7 @@ class StudioController extends Controller
             'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
             'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
             'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => $credits,
-            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'pose_ref' => (bool) $poseRefUrl, 'build' => (int) ($data['build'] ?? 6), 'tone' => $tone, 'tone_level' => $toneLevel, 'fabric_detail' => $fabricDetail, 'steps' => $credits],
+            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'pose_ref' => (bool) $poseRefUrl, 'face_pass' => (bool) (($model['image'] ?? null) && studio_config('swap_face_pass', true)), 'build' => (int) ($data['build'] ?? 6), 'tone' => $tone, 'tone_level' => $toneLevel, 'fabric_detail' => $fabricDetail, 'steps' => $credits],
         ]);
         return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'model' => $actualModel, 'task_id' => null]);
     }
