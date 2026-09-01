@@ -155,6 +155,9 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
     Route::post('/translate', [StudioController::class, 'translate'])->name('translate');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
+    Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');
+    Route::post('/settings/save', [StudioController::class, 'settingsSave'])->name('settings.save');
+    Route::get('/settings/vue', [StudioController::class, 'settingsVue'])->name('settings.vue');
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');

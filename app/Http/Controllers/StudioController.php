@@ -24,6 +24,8 @@ class StudioController extends Controller
         return view('studio.vue');
     }
 
+    public function settingsVue() { return view('studio.settings-vue'); }
+
     public function index()
     {
         $user = auth()->user();
@@ -1566,6 +1568,69 @@ class StudioController extends Controller
         }
 
         return $colors;
+    }
+
+    /**
+     * JSON settings data for the Vue Settings page (API keys, models, providers, config).
+     */
+    /**
+     * JSON save for the Vue Settings page (add/update API key + model + config).
+     */
+    public function settingsSave(Request $request): IlluminateHttpJsonResponse
+    {
+        $d = $request->all();
+        if (! empty($d['key_value'])) {
+            $k = new AppModelsStudioApiKey();
+            $k->provider = (string) ($d['key_provider'] ?? '');
+            $k->label = (string) ($d['key_label'] ?? $k->provider);
+            $k->value = IlluminateSupportFacadesCrypt::encryptString((string) $d['key_value']);
+            $k->kind = (string) ($d['key_kind'] ?? '');
+            $k->scopes = ['*'];
+            $k->priority = (int) ($d['key_priority'] ?? 5);
+            $k->enabled = true;
+            $k->save();
+        }
+        if (! empty($d['model_name'])) {
+            AppModelsStudioModel::create([
+                'group' => (string) ($d['model_group'] ?? 'image'),
+                'name' => (string) $d['model_name'],
+                'provider' => (string) ($d['model_provider'] ?? ''),
+                'model_id' => (string) ($d['model_id'] ?? ''),
+                'api_key_ref' => (string) ($d['model_key_ref'] ?? ''),
+                'priority' => (int) ($d['model_priority'] ?? 5),
+                'enabled' => true,
+            ]);
+        }
+        if (! empty($d['config']) && is_array($d['config'])) {
+            foreach ($d['config'] as $ck => $cv) { if (is_string($ck)) setting([$ck => $cv]); }
+        }
+        return response()->json(['ok' => true]);
+    }
+
+    public function settingsData(): IlluminateHttpJsonResponse
+    {
+        $providers = [
+            'gemini' => ['label' => 'Gemini', 'configured' => (bool) studio_api_key('gemini')],
+            'fal' => ['label' => 'Fal.ai — Flux', 'configured' => (bool) studio_api_key('fal')],
+            'replicate' => ['label' => 'Replicate — Flux', 'configured' => (bool) studio_api_key('replicate')],
+            'wan' => ['label' => 'Wan AI — video', 'configured' => (bool) (studio_api_key('wan') ?: studio_api_key('dashscope'))],
+            'veo' => ['label' => 'Google Veo — video', 'configured' => (bool) studio_api_key('veo')],
+            'qwen' => ['label' => 'Qwen — ảnh', 'configured' => (bool) studio_api_key('qwen')],
+            'qwen_edit' => ['label' => 'Qwen Edit — inpaint', 'configured' => (bool) studio_api_key('qwen_edit')],
+            'dashscope' => ['label' => 'DashScope', 'configured' => (bool) studio_api_key('dashscope')],
+            'deepseek' => ['label' => 'DeepSeek', 'configured' => (bool) studio_api_key('deepseek')],
+        ];
+        return response()->json([
+            'providers' => $providers,
+            'api_keys' => AppModelsStudioApiKey::orderBy('provider')->orderBy('priority','desc')->get(),
+            'models' => AppModelsStudioModel::orderBy('priority','desc')->orderBy('id')->get(),
+            'config' => [
+                'image_provider' => setting('studio_image_provider', 'flux'),
+                'qwen_model' => setting('studio_qwen_model', ''),
+                'vision_provider' => setting('studio_vision_provider', 'gemini'),
+                'prompt_provider' => setting('studio_prompt_provider', 'gemini'),
+            ],
+        ]);
     }
 
     public function settings()
