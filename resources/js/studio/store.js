@@ -124,12 +124,19 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
       finally { this.videoBusy = false; }
     },
+    wheelZoom(delta) { const f = delta > 0 ? 0.9 : 1.1; const nz = Math.max(0.25, Math.min(4, +(this.zoom * f).toFixed(2))); this.zoom = nz; },
     zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25)); },
     zoomOut() { this.zoom = Math.max(0.25, +(this.zoom - 0.25)); },
     zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
     panStart(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
     panMove(e) { if (this._drag) { this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); } },
     panEnd() { this._drag = null; },
+    async deleteGen(g) {
+      try { const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || 'Lỗi xóa.'); this.generations = this.generations.filter(x => x.id !== g.id); if (this.previewId === g.id) { this.previewId = null; this.preview = null; } this.toast('Đã xóa.'); }
+      catch(e){ this.toast(e.message || 'Lỗi xóa.', 'error'); }
+    },
+    goEdit(g) { this.select(g); this.step = 2; },
+    goVideo(g) { this.select(g); this.step = 3; },
     setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.toast('Đã chọn ảnh nguồn.'); },
     async uploadRef(file) {
       if (!file) { this.toast('Chọn file ảnh.', 'error'); return; }
