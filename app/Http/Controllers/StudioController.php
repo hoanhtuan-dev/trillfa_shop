@@ -1094,7 +1094,7 @@ class StudioController extends Controller
     public function swapCatalog(string $kind): \Illuminate\Http\JsonResponse
     {
         $svc = app(\App\Services\VirtualTryOnService::class);
-        $items = $kind === 'poses' ? $svc->poses() : $svc->models();
+        $items = $kind === 'poses' ? $svc->poseCatalog() : $svc->modelCatalog();
         return response()->json(['items' => $items]);
     }
 

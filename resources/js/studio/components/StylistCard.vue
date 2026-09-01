@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 const store = useStudioStore();
+const open = ref(false);
 const types = ref([]);
 const step = ref('type'); // type | survey | result
 const type = ref('');
@@ -39,39 +40,44 @@ const shownPrompt = computed(() => promptLang.value === 'vi' ? promptVi.value : 
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
-    <h2 class="mb-1 font-display text-base font-semibold text-brand-300">✨ Trợ lý thiết kế</h2>
-    <!-- step: type -->
-    <template v-if="step === 'type'">
-      <p class="text-[11px] text-ink-500">Chọn loại trang phục.</p>
-      <div class="mt-3 grid grid-cols-2 gap-1.5">
-        <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)" class="rounded-xl border p-2 text-left text-xs transition-colors hover:border-brand-400"><span class="font-semibold text-cream-100">{{ t.name }}</span></button>
-      </div>
-    </template>
-    <!-- step: survey -->
-    <template v-else-if="step === 'survey'">
-      <div class="mb-2 flex items-center justify-between"><p class="text-xs font-semibold text-cream-100">{{ type }}</p><button @click="step='type'" class="btn-outline btn-sm">↩ Đổi loại</button></div>
-      <p v-if="loading" class="text-xs text-brand-200">Đang tải cụm câu hỏi…</p>
-      <div v-else class="space-y-3">
-        <div v-for="q in questions" :key="q.key" class="rounded-2xl border border-white/10 bg-white/5 p-3">
-          <p class="mb-2 text-xs font-semibold text-brand-200">{{ q.q }}</p>
-          <div class="flex flex-wrap gap-1.5">
-            <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-all" :class="answers[q.key]?.includes(opt) ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-white/80 hover:border-brand-400'">{{ opt }}</button>
+    <button @click="open=true; step='type'" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400"><span class="flex-1"><span class="text-sm font-semibold text-brand-300">✨ Trợ lý thiết kế</span><br><span class="text-[11px] text-ink-500">AI viết prompt thiết kế theo loại trang phục</span></span><span class="text-lg text-cream-200">›</span></button>
+    <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" @click.self="open=false">
+      <div class="scrollbar-hide max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-brand-500/30 bg-ink-900 p-5" @click.stop style="background: linear-gradient(160deg, rgba(74,122,144,.12), rgba(124,58,237,.06)), #17203a;">
+        <div class="mb-3 flex items-center justify-between"><span class="text-sm font-semibold text-brand-300">✨ Trợ lý thiết kế</span><button @click="open=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200">✕</button></div>
+        <!-- step: type -->
+        <template v-if="step === 'type'">
+          <p class="text-[11px] text-ink-500">Chọn loại trang phục.</p>
+          <div class="mt-3 grid grid-cols-2 gap-1.5">
+            <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)" class="rounded-xl border p-2 text-left text-xs transition-colors hover:border-brand-400"><span class="font-semibold text-cream-100">{{ t.name }}</span></button>
           </div>
-          <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-white/12 bg-white/8 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400">
-          <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-white/40">Đã chọn {{ selectedCount(q.key) }} mục</p>
-        </div>
+        </template>
+        <!-- step: survey -->
+        <template v-else-if="step === 'survey'">
+          <div class="mb-2 flex items-center justify-between"><p class="text-xs font-semibold text-cream-100">{{ type }}</p><button @click="step='type'" class="btn-outline btn-sm">↩ Đổi loại</button></div>
+          <p v-if="loading" class="text-xs text-brand-200">Đang tải cụm câu hỏi…</p>
+          <div v-else class="space-y-3">
+            <div v-for="q in questions" :key="q.key" class="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <p class="mb-2 text-xs font-semibold text-brand-200">{{ q.q }}</p>
+              <div class="flex flex-wrap gap-1.5">
+                <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-all" :class="answers[q.key]?.includes(opt) ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-white/80 hover:border-brand-400'">{{ opt }}</button>
+              </div>
+              <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-white/12 bg-white/8 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400">
+              <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-white/40">Đã chọn {{ selectedCount(q.key) }} mục</p>
+            </div>
+          </div>
+          <button @click="submitPrompt" :disabled="loading" class="btn-brand mt-3 w-full">{{ loading ? 'Đang tạo…' : '✨ Tạo prompt thiết kế' }}</button>
+        </template>
+        <!-- step: result -->
+        <template v-else>
+          <div class="mb-2 flex items-center justify-between">
+            <div class="flex gap-1.5"><button @click="promptLang='en'" :class="promptLang==='en' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">EN</button><button @click="promptLang='vi'" :class="promptLang==='vi' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">VI</button></div>
+            <button @click="backToSurvey" class="btn-outline btn-sm">↩ Chỉnh lại</button>
+          </div>
+          <textarea v-model="shownPrompt" rows="5" class="input !text-xs"></textarea>
+          <button @click="refine" :disabled="loading" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : '✨ Tinh chỉnh & nâng cấp' }}</button>
+          <button @click="store.imagePromptEn = promptEn; store.toast('Đã đưa prompt vào ô Tạo Ảnh.')" class="btn-brand mt-2 w-full">➡ Đưa vào Tạo Ảnh</button>
+        </template>
       </div>
-      <button @click="submitPrompt" :disabled="loading" class="btn-brand mt-3 w-full">{{ loading ? 'Đang tạo…' : '✨ Tạo prompt thiết kế' }}</button>
-    </template>
-    <!-- step: result -->
-    <template v-else>
-      <div class="mb-2 flex items-center justify-between">
-        <div class="flex gap-1.5"><button @click="promptLang='en'" :class="promptLang==='en' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">EN</button><button @click="promptLang='vi'" :class="promptLang==='vi' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">VI</button></div>
-        <button @click="backToSurvey" class="btn-outline btn-sm">↩ Chỉnh lại</button>
-      </div>
-      <textarea v-model="shownPrompt" rows="5" class="input !text-xs"></textarea>
-      <button @click="refine" :disabled="loading" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : '✨ Tinh chỉnh & nâng cấp' }}</button>
-      <button @click="store.imagePromptEn = promptEn; store.toast('Đã đưa prompt vào ô Tạo Ảnh.')" class="btn-brand mt-2 w-full">➡ Đưa vào Tạo Ảnh</button>
-    </template>
+    </div>
   </div>
 </template>
