@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useStudioStore } from './store.js';
 import SourceCard from './components/SourceCard.vue';
+import SuggestCard from './components/SuggestCard.vue';
 import ConceptCard from './components/ConceptCard.vue';
 import StylistCard from './components/StylistCard.vue';
 import PaletteTextureCard from './components/PaletteTextureCard.vue';
@@ -44,7 +45,7 @@ function cropMove(e) {
   store.cropBox = b;
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, PaletteTextureCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
+const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, PaletteTextureCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">

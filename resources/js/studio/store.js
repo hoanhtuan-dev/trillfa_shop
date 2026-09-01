@@ -64,6 +64,7 @@ export const useStudioStore = defineStore('studio', {
     inpainting: false,
     inpaintPrompt: '',
     suggesting: false,
+    suggestResult: null,
     viewer: null,
     upscalePresets: [],
     lastBatch: [],
@@ -176,7 +177,7 @@ export const useStudioStore = defineStore('studio', {
     async suggestStyle(image) {
       if (!image) { this.toast('Chọn ảnh nguồn để gợi ý.', 'error'); return; }
       this.suggesting = true;
-      try { const d = await this.api('/studio/suggest', { image }); const styles = (d.styles || []).join(', '); this.toast(styles ? 'Phong cách: ' + styles + (d.background ? ' · ' + d.background : '') : 'Đã gợi ý.'); }
+      try { const d = await this.api('/studio/suggest', { reference_url: image, creative_level: this.creativeLevel }); this.suggestResult = d; const styles = (d.styles || []).join(', '); this.toast(styles ? 'Phong cách: ' + styles + (d.background ? ' · ' + d.background : '') : 'Đã gợi ý.'); }
       catch(e){ this.toast(e.message || 'Lỗi gợi ý.', 'error'); }
       finally { this.suggesting = false; }
     },
