@@ -67,12 +67,12 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "_pinia-Cdz8FkxP.js": {
-    "file": "assets/pinia-Cdz8FkxP.js",
+  "_pinia-BYbE_VZO.js": {
+    "file": "assets/pinia-BYbE_VZO.js",
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DrGcn4cA.css",
+    "file": "assets/app-Dk7Mra2_.css",
     "name": "app",
     "names": [
       "app.css"
@@ -87,21 +87,21 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-C6arLCz1.js",
+    "file": "assets/app-BHYRkPxL.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
-      "_pinia-Cdz8FkxP.js"
+      "_pinia-BYbE_VZO.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-26gixpVT.js",
+    "file": "assets/settings-CmF1Z2C2.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
-      "_pinia-Cdz8FkxP.js"
+      "_pinia-BYbE_VZO.js"
     ]
   }
 }

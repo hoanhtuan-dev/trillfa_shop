@@ -120,6 +120,8 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/swap-model', [StudioController::class, 'swapModel'])->name('swapModel');
+    Route::get('/swap-models', [StudioController::class, 'swapCatalog'])->defaults('kind', 'models')->name('swap-models');
+    Route::get('/swap-poses', [StudioController::class, 'swapCatalog'])->defaults('kind', 'poses')->name('swap-poses');
     Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
     Route::get('/studiosample/{file}', [StudioController::class, 'assetSample'])->name('studio.asset');
     Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');

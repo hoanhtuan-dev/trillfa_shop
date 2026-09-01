@@ -1,28 +1,77 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 const store = useStudioStore();
 const types = ref([]);
+const step = ref('type'); // type | survey | result
+const type = ref('');
+const questions = ref([]);
+const answers = ref({});   // { key: [selected opts] }
+const customNotes = ref({});
 const loading = ref(false);
-const selectedType = ref('');
-onMounted(async () => {
-  try { const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }); const d = await r.json(); types.value = d.items || d || []; } catch(e){}
-});
-async function generatePrompt() {
-  if (!selectedType.value || loading.value) return;
+const promptLang = ref('en');
+const promptEn = ref(''), promptVi = ref('');
+onMounted(async () => { try { const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }); const d = await r.json(); types.value = d.items || d || []; } catch(e){} });
+function pickType(t) { type.value = t.id; step.value = 'survey'; answers.value = {}; customNotes.value = {}; loadCluster(); }
+async function loadCluster() {
   loading.value = true;
-  try { const d = await store.api('/studio/stylist/prompt', { type: selectedType.value }); store.imagePromptEn = d.prompt_en; store.toast('Trợ lý thiết kế đã tạo prompt.'); }
+  try { const d = await store.api('/studio/stylist/cluster', { type: type.value }); questions.value = d.questions || []; questions.value.forEach(q => { if (!answers.value[q.key]) answers.value[q.key] = []; }); }
+  catch(e){ store.toast(e.message || 'Lỗi tải câu hỏi.', 'error'); }
+  finally { loading.value = false; }
+}
+function toggleOpt(key, opt) { const a = answers.value[key]; const i = a.indexOf(opt); if (i>=0) a.splice(i,1); else a.push(opt); }
+function selectedCount(key) { return answers.value[key]?.length || 0; }
+function buildAnswers() { const flat = {}; Object.keys(answers.value).forEach(k => { const arr = (answers.value[k]||[]).slice(); if (customNotes.value[k] && customNotes.value[k].trim()) arr.push(customNotes.value[k].trim()); if (arr.length) flat[k] = arr.join(', '); }); return flat; }
+async function submitPrompt() {
+  loading.value = true;
+  try { const d = await store.api('/studio/stylist/prompt', { type: type.value, answers: buildAnswers() }); promptEn.value = d.prompt_en; promptVi.value = d.prompt_vi; promptLang.value = 'en'; step.value = 'result'; store.imagePromptEn = d.prompt_en; }
   catch(e){ store.toast(e.message || 'Lỗi tạo prompt.', 'error'); }
   finally { loading.value = false; }
 }
+async function refine() {
+  loading.value = true;
+  try { const d = await store.api('/studio/stylist/refine', { type: type.value, prompt_en: promptEn.value, answers: buildAnswers() }); if (d.refined_en) promptEn.value = d.refined_en; if (d.refined_vi) promptVi.value = d.refined_vi; store.toast('Đã tinh chỉnh prompt.'); }
+  catch(e){ store.toast(e.message || 'Lỗi tinh chỉnh.', 'error'); }
+  finally { loading.value = false; }
+}
+function backToSurvey() { step.value = 'survey'; }
+const shownPrompt = computed(() => promptLang.value === 'vi' ? promptVi.value : promptEn.value);
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">✨ Trợ lý thiết kế</h2>
-    <p class="text-[11px] text-ink-500">Chọn loại trang phục → AI viết prompt thiết kế.</p>
-    <div class="mt-3 grid grid-cols-2 gap-1.5">
-      <button v-for="t in types" :key="t.id" type="button" @click="selectedType = t.id" class="rounded-xl border p-2 text-left text-xs transition-colors" :class="selectedType === t.id ? 'border-brand-500 bg-brand-600/25 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ t.name }}</button>
-    </div>
-    <button @click="generatePrompt" :disabled="loading || !selectedType" class="btn-brand mt-3 w-full whitespace-nowrap">{{ loading ? 'Đang tạo…' : '✨ Tạo prompt thiết kế' }}</button>
+    <!-- step: type -->
+    <template v-if="step === 'type'">
+      <p class="text-[11px] text-ink-500">Chọn loại trang phục.</p>
+      <div class="mt-3 grid grid-cols-2 gap-1.5">
+        <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)" class="rounded-xl border p-2 text-left text-xs transition-colors hover:border-brand-400"><span class="font-semibold text-cream-100">{{ t.name }}</span></button>
+      </div>
+    </template>
+    <!-- step: survey -->
+    <template v-else-if="step === 'survey'">
+      <div class="mb-2 flex items-center justify-between"><p class="text-xs font-semibold text-cream-100">{{ type }}</p><button @click="step='type'" class="btn-outline btn-sm">↩ Đổi loại</button></div>
+      <p v-if="loading" class="text-xs text-brand-200">Đang tải cụm câu hỏi…</p>
+      <div v-else class="space-y-3">
+        <div v-for="q in questions" :key="q.key" class="rounded-2xl border border-white/10 bg-white/5 p-3">
+          <p class="mb-2 text-xs font-semibold text-brand-200">{{ q.q }}</p>
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="opt in q.opts" :key="opt" type="button" @click="toggleOpt(q.key, opt)" class="rounded-full border px-3 py-1.5 text-xs transition-all" :class="answers[q.key]?.includes(opt) ? 'border-brand-400 bg-brand-500/25 text-white' : 'border-white/15 bg-white/5 text-white/80 hover:border-brand-400'">{{ opt }}</button>
+          </div>
+          <input v-model="customNotes[q.key]" placeholder="Hoặc nhập tùy chỉnh…" class="mt-2 w-full rounded-lg border border-white/12 bg-white/8 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:border-brand-400">
+          <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-white/40">Đã chọn {{ selectedCount(q.key) }} mục</p>
+        </div>
+      </div>
+      <button @click="submitPrompt" :disabled="loading" class="btn-brand mt-3 w-full">{{ loading ? 'Đang tạo…' : '✨ Tạo prompt thiết kế' }}</button>
+    </template>
+    <!-- step: result -->
+    <template v-else>
+      <div class="mb-2 flex items-center justify-between">
+        <div class="flex gap-1.5"><button @click="promptLang='en'" :class="promptLang==='en' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">EN</button><button @click="promptLang='vi'" :class="promptLang==='vi' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">VI</button></div>
+        <button @click="backToSurvey" class="btn-outline btn-sm">↩ Chỉnh lại</button>
+      </div>
+      <textarea v-model="shownPrompt" rows="5" class="input !text-xs"></textarea>
+      <button @click="refine" :disabled="loading" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : '✨ Tinh chỉnh & nâng cấp' }}</button>
+      <button @click="store.imagePromptEn = promptEn; store.toast('Đã đưa prompt vào ô Tạo Ảnh.')" class="btn-brand mt-2 w-full">➡ Đưa vào Tạo Ảnh</button>
+    </template>
   </div>
 </template>

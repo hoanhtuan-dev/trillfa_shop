@@ -1088,6 +1088,16 @@ class StudioController extends Controller
     /**
      * ✨ Thuật sỹ — cluster (xương sườn) + build prompt.
      */
+    /**
+     * Swap model/pose catalog (with images) for the Vue studio picker.
+     */
+    public function swapCatalog(string $kind): \Illuminate\Http\JsonResponse
+    {
+        $svc = app(\App\Services\VirtualTryOnService::class);
+        $items = $kind === 'poses' ? $svc->poses() : $svc->models();
+        return response()->json(['items' => $items]);
+    }
+
     public function stylistCluster(Request $request): \Illuminate\Http\JsonResponse
     {
         $data = $request->validate(['type' => ['required', 'string', 'max:40']]);

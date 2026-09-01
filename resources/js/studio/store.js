@@ -56,6 +56,8 @@ export const useStudioStore = defineStore('studio', {
     swapModelIds: [],
     swapPoseIds: [],
     swapLoading: false,
+    inpainting: false,
+    inpaintPrompt: '',
   }),
   getters: {
     upscaleSrc: (s) => (s.editSource && s.editSource.url) || (s.preview && s.preview.media_url) || '',
@@ -113,6 +115,13 @@ export const useStudioStore = defineStore('studio', {
         this.addGen({ id: d.generation_id, type: 'video', status: d.status || 'processing', model: d.model || this.videoModel, provider: d.provider || 'video', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' });
       } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
       finally { this.videoBusy = false; }
+    },
+    async inpaint(prompt) {
+      if (!this.previewId || this.inpainting) { this.toast('Chọn ảnh để sửa.', 'error'); return; }
+      this.inpainting = true;
+      try { const d = await this.api('/studio/generations/' + this.previewId + '/inpaint', { prompt, preserve_background: true, preserve_face: true, image: this.preview?.media_url || '' }); if (d.media_url) { this.addGen({ id: d.generation_id || ('ip-' + Date.now()), type: 'image', status: 'completed', model: 'inpaint', provider: d.provider || 'qwen', media_url: d.media_url, error: null, credits_cost: 1, created_at: 'Vừa sửa' }); this.toast('Đã sửa ảnh.'); } }
+      catch (e) { this.toast(e.message || 'Lỗi inpaint.', 'error'); }
+      finally { this.inpainting = false; }
     },
     async runSwap() {
       const src = this.upscaleSrc; if (!src || this.swapLoading || !this.swapModelIds.length) { this.toast('Chọn người mẫu + dáng trước.', 'error'); return; }

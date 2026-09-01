@@ -847,7 +847,7 @@ class ShopFlowTest extends TestCase
 
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin)->get('/studio/library')->assertOk()->assertSee('Thư viện');
-        $this->actingAs($admin)->get('/studio')->assertOk()->assertSee('workflowSteps')->assertSee('previewId');
+        $this->actingAs($admin)->get('/studio')->assertOk()->assertSee('studio-root');
     }
 
     public function test_studio_generation_resolution_ratio_duration(): void

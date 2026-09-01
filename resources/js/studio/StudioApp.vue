@@ -8,6 +8,7 @@ import UpscaleCard from './components/UpscaleCard.vue';
 import FilmLookCard from './components/FilmLookCard.vue';
 import ReframeCard from './components/ReframeCard.vue';
 import SwapCard from './components/SwapCard.vue';
+import InpaintCard from './components/InpaintCard.vue';
 import DirectorCard from './components/DirectorCard.vue';
 const store = useStudioStore();
 const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
@@ -82,7 +83,7 @@ function cropMove(e) {
       </div>
       <!-- cards per step -->
       <template v-if="store.step === 1"><StylistCard /><ConceptCard /></template>
-      <template v-else-if="store.step === 2"><SwapCard /><PaletteTextureCard /><UpscaleCard /><FilmLookCard /><ReframeCard /></template>
+      <template v-else-if="store.step === 2"><SwapCard /><InpaintCard /><PaletteTextureCard /><UpscaleCard /><FilmLookCard /><ReframeCard /></template>
       <template v-else-if="store.step === 3"><DirectorCard /></template>
     </div>
   </div>
