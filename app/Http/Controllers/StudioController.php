@@ -469,7 +469,7 @@ class StudioController extends Controller
         $dir = public_path('studio/images/assets');
         $files = is_dir($dir) ? glob($dir.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) : [];
         $items = [];
-        $current = $this->request()->get('current', '');
+        $current = request()->get('current', '');
         foreach ($files as $f) {
             $name = basename($f);
             // usage check: referenced by any generation or the current editSource.
