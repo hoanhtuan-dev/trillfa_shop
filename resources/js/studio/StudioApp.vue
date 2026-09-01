@@ -2,6 +2,7 @@
 import { onMounted, computed } from 'vue';
 import { useStudioStore } from './store.js';
 import ConceptCard from './components/ConceptCard.vue';
+import StylistCard from './components/StylistCard.vue';
 import PaletteTextureCard from './components/PaletteTextureCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import FilmLookCard from './components/FilmLookCard.vue';
@@ -80,7 +81,7 @@ function cropMove(e) {
         </div>
       </div>
       <!-- cards per step -->
-      <template v-if="store.step === 1"><ConceptCard /></template>
+      <template v-if="store.step === 1"><StylistCard /><ConceptCard /></template>
       <template v-else-if="store.step === 2"><SwapCard /><PaletteTextureCard /><UpscaleCard /><FilmLookCard /><ReframeCard /></template>
       <template v-else-if="store.step === 3"><DirectorCard /></template>
     </div>
