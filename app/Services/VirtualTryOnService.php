@@ -2,23 +2,20 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
-
 /**
- * "Thay Đổi Người Mẫu" (Click-to-Swap) — Qwen / DashScope Virtual Try-On.
- * Endpoint: POST {base}/api/v1/services/aigc/virtual-try-on/generation (async -> task_id)
- * Input: model_image_url + garment_image_url + parameters.category. Poll /api/v1/tasks/{taskId};
- * on SUCCEEDED the image is in output.image_url.
+ * "Thay Đổi Người Mẫu" (Click-to-Swap).
+ *
+ * The DashScope virtual-try-on endpoints are NOT available on this account (they always return
+ * "Model not exist"), so the whole swap is driven by the Qwen image-edit model (qwen-image-edit /
+ * qwen-image-edit-plus…): we re-render the person in the design image to match the chosen model
+ * face, keeping the garment 100% unchanged. Optional inputs: background, texture, face reference.
  */
 class VirtualTryOnService
 {
-    protected string $taskBase = 'https://dashscope.aliyuncs.com/api/v1'; // overridden to dashscope_base_url($key) per key
-
     public function modelCatalog(): array
     {
-        // 6 model faces (headshots) from the uploaded Face library. In VTON (Bước 2) the model_image_url
-        // is the POSE image (full-body mannequin), while these faces drive the Step-1 text prompt
-        // and identify the model to the user.
+        // 6 model faces (headshots). We pass the selected face as a reference image to qwen-edit so
+        // the swap adopts that person's look; the face's desc text is a secondary descriptor.
         return [
             ['id' => 'model01', 'name' => 'Mẫu 1', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-01.png', 'desc' => 'East Asian female, shoulder-length reddish-brown hair, fair skin'],
             ['id' => 'model02', 'name' => 'Mẫu 2', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-02.png', 'desc' => 'East Asian female, long black wavy hair, white shirt'],
@@ -31,8 +28,7 @@ class VirtualTryOnService
 
     public function poseCatalog(): array
     {
-        // 12 pose presets — each with its OWN image (a model in that pose) + a text skeleton for
-        // Step-1 text-to-image. VTON uses the image as model_image_url.
+        // 12 pose presets. Only the text skeleton is used (qwen-edit re-renders the pose from text).
         return [
             ['id' => 'pose01', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body', 'image' => '/samples/pose-01.png'],
             ['id' => 'pose02', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, one leg crossed', 'image' => '/samples/pose-02.png'],
@@ -49,66 +45,86 @@ class VirtualTryOnService
         ];
     }
 
-    // Try-on needs a DashScope MODEL key (sk-.../sk-ws-...), NOT a QwenCloud Token-Plan (sk-sp-...).
-    protected function key(): ?string
+    /**
+     * Resolve a model by id. Custom faces added in /studio/assets (type=model) are looked up first,
+     * so a personally-added face actually works (not silently replaced by catalog[0]).
+     */
+    public function pickModel(string $id): ?array
     {
-        foreach (studio_qwen_credentials('image') as $k) {
-            if ($k && ! str_starts_with($k, 'sk-sp-')) { return $k; }
-        }
-        return studio_api_key('dashscope');
-    }
-
-    public function submit(string $modelImageUrl, string $garmentImageUrl, string $category = 'dress'): array
-    {
-        $key = $this->key();
-        if (! $key) { return ['error' => 'Chưa có key DashScope (Pay-As-You-Go) để gọi virtual try-on.']; }
-        $models = array_values(array_unique(array_filter([
-            (string) studio_config('tryon_model', 'wanx-virtualmodel'),
-            'wanx-virtualmodel', 'virtualmodel-v2', 'wanx-virtual-try-on',
-        ])));
-        foreach ($models as $model) {
-            $resp = Http::withToken($key)->withHeaders(['X-DashScope-Async' => 'enable'])->timeout(60)
-                ->post(dashscope_base_url($key).'/api/v1/services/aigc/virtual-try-on/generation', [
-                    'model' => $model,
-                    'input' => [
-                        'model_image_url' => $modelImageUrl,
-                        'garment_image_url' => $garmentImageUrl,
-                    ],
-                    'parameters' => ['category' => $category],
-                ]);
-            if ($resp->successful()) {
-                $taskId = data_get($resp->json(), 'output.task_id');
-                if ($taskId) { return ['task_id' => $taskId]; }
-            }
-            $body = (string) $resp->body();
-            logger()->warning('Try-on submit ('.$model.'): HTTP '.$resp->status().' '.substr($body, 0, 200));
-            // Model not exist / not supported -> try the next try-on model; other errors -> give up.
-            if (! (str_contains(strtolower($body), 'model not exist') || $resp->status() === 400 || $resp->status() === 404)) {
-                break;
+        if ($id !== '') {
+            $asset = \App\Models\StudioAsset::where('type', 'model')->where('id', $id)->first();
+            if ($asset) {
+                return [
+                    'id' => (string) $asset->id,
+                    'name' => $asset->name ?: 'model',
+                    'image' => $asset->path,
+                    'ethnicity' => '',
+                    'desc' => 'a person matching the provided reference photo',
+                ];
             }
         }
-        return ['error' => 'Không model try-on nào khả dụng trên tài khoản ('.($models[0] ?? '?').'). '.substr($body ?? '', 0, 160)];
+        foreach ($this->modelCatalog() as $m) {
+            if (($m['id'] ?? '') === $id) {
+                return $m;
+            }
+        }
+        return null;
     }
 
-    // Fallback khi try-on không khả dụng (region/intl hoặc free-trial hết): dùng qwen-image-edit để
-    // đổi người mẫu/dáng trên ảnh thiết kế, GIỮ NGUYÊN 100% trang phục.
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', int $texture = 5): ?string
+    /**
+     * Resolve a pose by id. Custom poses added in /studio/assets (type=pose) are looked up first.
+     */
+    public function pickPose(string $id): ?array
     {
-        // Dùng model được quản lý cho "Thay Đổi Người Mẫu" (studio.swap_model) qua swapEdit (có retry 429).
+        if ($id !== '') {
+            $asset = \App\Models\StudioAsset::where('type', 'pose')->where('id', $id)->first();
+            if ($asset) {
+                return [
+                    'id' => (string) $asset->id,
+                    'name' => $asset->name ?: 'pose',
+                    'image' => $asset->path,
+                    'skeleton' => ($asset->name ?: 'in a confident pose'),
+                ];
+            }
+        }
+        foreach ($this->poseCatalog() as $p) {
+            if (($p['id'] ?? '') === $id) {
+                return $p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * qwen-image-edit swap: re-render the person in the design image to match the chosen model,
+     * keeping the garment 100% unchanged. $faceRefUrl (the model's face photo) is passed as an extra
+     * reference image so the result adopts that face; if the edit model rejects a second image it
+     * retries with just the design image (the prompt still carries the model description).
+     */
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', int $texture = 5, ?string $faceRefUrl = null): ?string
+    {
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
-        $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.';
-        // Hậu cảnh: đưa lên đầu + dùng "replace the ENTIRE background" để model thực sự thay nền (không bỏ qua).
+
+        if ($faceRefUrl) {
+            // Face-image driven: the FIRST reference image is the model's face, the SECOND is the
+            // design image (person wearing the garment).
+            $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person wearing it in the SECOND image with the person from the FIRST reference image (matching face, hair, skin tone and body build), standing '.$pose.'.';
+        } else {
+            $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.';
+        }
+        // Hậu cảnh: đưa lên đầu + dùng "replace the ENTIRE background" để model thực sự thay nền.
         if ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original') {
             $instr = 'Replace the ENTIRE background of the scene with: '.$background.'. '.$instr;
         }
-        // Texture: tái dùng cùng textureHint (0 mịn -> 10 dệt kim thô).
+        // Texture: 0 mịn -> 10 dệt kim thô.
         $tex = $this->textureEnglish($texture);
         if ($tex) {
             $instr .= ' Make the outfit fabric '.$tex.'.';
         }
         $instr .= ' Photorealistic, full body, high fashion.';
+
         $svc = app(ImageAIService::class);
-        return $svc->swapEdit($instr, $designImage, $swapModel);
+        return $svc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl);
     }
 
     protected function textureEnglish(int $v): string
@@ -119,28 +135,4 @@ class VirtualTryOnService
         if ($v <= 7) { return 'lightly woven textured fabric'; }
         return 'heavy knit, coarse weave, visible thread detail';
     }
-
-    public function status(string $taskId): array
-    {
-        $key = $this->key();
-        if (! $key) { return ['status' => 'failed', 'error' => 'no key']; }
-        $q = Http::withToken($key)->timeout(30)->get(dashscope_base_url($key).'/api/v1/tasks/'.$taskId);
-        if (! $q->successful()) { return ['status' => 'failed', 'error' => 'HTTP '.$q->status()]; }
-        $status = (string) data_get($q->json(), 'output.task_status');
-        $url = data_get($q->json(), 'output.image_url') ?: data_get($q->json(), 'output.results.0.url');
-        return ['status' => strtolower($status), 'url' => $url, 'error' => (string) data_get($q->json(), 'output.message', '')];
-    }
-
-    public function pickModel(string $id): ?array
-    {
-        foreach ($this->modelCatalog() as $m) { if (($m['id'] ?? '') === $id) { return $m; } }
-        return $this->modelCatalog()[0] ?? null;
-    }
-
-    public function pickPose(string $id): ?array
-    {
-        foreach ($this->poseCatalog() as $p) { if (($p['id'] ?? '') === $id) { return $p; } }
-        return $this->poseCatalog()[0] ?? null;
-    }
-
 }

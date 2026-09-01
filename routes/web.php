@@ -134,7 +134,6 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/assets', [StudioController::class, 'assetIndex'])->name('assets');
     Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
     Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
-    Route::get('/swap-status/{taskId}', [StudioController::class, 'swapStatus'])->name('swapStatus');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
     Route::get('/pattern', [StudioController::class, 'patternPage'])->name('pattern');

@@ -17,6 +17,8 @@ use Illuminate\Support\Str;
 class ImageAIService
 {
     protected ?string $dashscopeError = null;
+    /** Last HTTP status from an edit attempt (0 = exception). */
+    protected int $dashscopeStatus = 0;
 
     /** Which provider/model actually produced the last successful image (may differ from the requested one). */
     protected ?string $lastProvider = null;
@@ -474,7 +476,7 @@ class ImageAIService
         return 'data:'.$mime.';base64,'.$b64;
     }
 
-    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null): ?string
+    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
     {
         $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
         if (! str_contains(strtolower($model), 'edit')) {
@@ -488,6 +490,7 @@ class ImageAIService
             logger()->warning('Edit: cannot read source image', ['url' => $imageUrl]);
             return null;
         }
+        $faceRef = $faceRefUrl ? $this->imageDataUri($faceRefUrl) : null;
 
         // Edit (Inpaint) prioritises the Pay-As-You-Go credential (edit models usually live on the pay-go
         // host), then falls back to Token Plan — via studio_qwen_credentials('edit').
@@ -496,53 +499,50 @@ class ImageAIService
         $last = null;
         foreach ($keys as $key) {
             $base = dashscope_base_url($key).'/api/v1';
-            logger()->info('Edit attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base]);
-            try {
-                $resp = Http::withToken($key)->timeout(240)
-                    ->post($base.'/services/aigc/multimodal-generation/generation', [
-                        'model' => $model,
-                        'input' => ['messages' => [['role' => 'user', 'content' => [
-                            ['image' => $source],
-                            ['text' => $prompt],
-                        ]]]],
-                        'parameters' => ['watermark' => false],
-                    ]);
+            logger()->info('Edit attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base, 'face_ref' => (bool) $faceRef]);
 
-                if ($resp->successful()) {
-                    $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
-                        ->pluck('image')->first();
-                    if ($editUrl) {
-                        logger()->info('Edit succeeded', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
-                        return $this->storeRemoteImage($editUrl);
-                    }
-                    $last = 'model returned no image in content';
-                    continue;
-                }
+            // Content: optional face reference FIRST, then the design image to edit, then the instruction.
+            $content = [];
+            if ($faceRef) { $content[] = ['image' => $faceRef]; }
+            $content[] = ['image' => $source];
+            $content[] = ['text' => $prompt];
 
-                $body = Str::limit((string) $resp->body(), 240);
-                logger()->warning('Edit model failed', ['model' => $model, 'status' => $resp->status(), 'body' => $body, 'key_prefix' => substr($key, 0, 8)]);
-                $last = 'HTTP '.$resp->status().': '.$body;
-                if ($resp->status() === 404) {
-                    $this->dashscopeError = 'Model “'.$model.'” không tồn tại trên host '.$base.' (404). '
-                        .'Model Qwen-Edit thường CHỈ khả dụng trên host Pay-As-You-Go (key sk-…/sk-ws-…); host '
-                        .'Token/Coding Plan (key sk-sp-…) thường không có model chỉnh sửa ảnh (chỉ có model tạo ảnh/văn bản). '
-                        .'Dùng key Pay-As-You-Go cho Inpaint (Quản lý API → “Qwen Edit”), hoặc chọn model edit có trên gói.';
-                    break;
-                }
-                if ($resp->status() === 403) {
-                    $this->dashscopeError = 'Model “'.$model.'” chưa được mua/kích hoạt trên tài khoản (403 AccessDenied.Unpurchased). '
-                        .'Bật/mua model Qwen-Image-Edit (vd qwen-image-edit, qwen-image-edit-plus) trong QwenCloud Model Center, '
-                        .'hoặc dùng Gemini. Sau khi bật, chọn lại “Qwen Edit” trong Cài đặt.';
-                    break;
-                }
-                if ($resp->status() === 401) {
-                    continue; // invalid key -> try the next one
-                }
-                break; // 429/… are host/model-level -> don't hammer other keys
-            } catch (\Throwable $e) {
-                $last = $e->getMessage();
-                logger()->warning('Edit model threw', ['model' => $model, 'error' => $last, 'key_prefix' => substr($key, 0, 8)]);
+            $editUrl = $this->postMultimodalEdit($model, $base, $key, $content);
+            if ($editUrl) {
+                logger()->info('Edit succeeded', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                return $this->storeRemoteImage($editUrl);
             }
+
+            // The image-edit model may not accept a second reference image -> retry with just the design
+            // image (the prompt still describes the model, so the swap still works).
+            if ($faceRef && $this->editModelRejectsMultiImage()) {
+                logger()->info('Edit retry without face ref', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                $editUrl = $this->postMultimodalEdit($model, $base, $key, [['image' => $source], ['text' => $prompt]]);
+                if ($editUrl) {
+                    logger()->info('Edit succeeded (no face ref)', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                    return $this->storeRemoteImage($editUrl);
+                }
+            }
+
+            $last = $this->dashscopeError;
+            $status = $this->dashscopeStatus;
+            if ($status === 404) {
+                $this->dashscopeError = 'Model “'.$model.'” không tồn tại trên host '.$base.' (404). '
+                    .'Model Qwen-Edit thường CHỈ khả dụng trên host Pay-As-You-Go (key sk-…/sk-ws-…); host '
+                    .'Token/Coding Plan (key sk-sp-…) thường không có model chỉnh sửa ảnh (chỉ có model tạo ảnh/văn bản). '
+                    .'Dùng key Pay-As-You-Go cho Inpaint (Quản lý API → “Qwen Edit”), hoặc chọn model edit có trên gói.';
+                break;
+            }
+            if ($status === 403) {
+                $this->dashscopeError = 'Model “'.$model.'” chưa được mua/kích hoạt trên tài khoản (403 AccessDenied.Unpurchased). '
+                    .'Bật/mua model Qwen-Image-Edit (vd qwen-image-edit, qwen-image-edit-plus) trong QwenCloud Model Center, '
+                    .'hoặc dùng Gemini. Sau khi bật, chọn lại “Qwen Edit” trong Cài đặt.';
+                break;
+            }
+            if ($status === 401) {
+                continue; // invalid key -> try the next one
+            }
+            break; // 429/… are host/model-level -> don't hammer other keys
         }
 
         logger()->warning('Edit model ultimately failed', ['model' => $model, 'err' => $last]);
@@ -550,16 +550,59 @@ class ImageAIService
         return null;
     }
 
+    /** POST a multimodal image-edit request. Returns the image URL or null (status/error kept). */
+    protected function postMultimodalEdit(string $model, string $base, string $key, array $content): ?string
+    {
+        try {
+            $resp = Http::withToken($key)->timeout(240)
+                ->post($base.'/services/aigc/multimodal-generation/generation', [
+                    'model' => $model,
+                    'input' => ['messages' => [['role' => 'user', 'content' => $content]]],
+                    'parameters' => ['watermark' => false],
+                ]);
+
+            $this->dashscopeStatus = $resp->status();
+            if ($resp->successful()) {
+                $editUrl = collect(data_get($resp->json(), 'output.choices.0.message.content', []))
+                    ->pluck('image')->first();
+                if ($editUrl) {
+                    return $editUrl;
+                }
+                $this->dashscopeError = 'model returned no image in content';
+                return null;
+            }
+            $body = Str::limit((string) $resp->body(), 240);
+            $this->dashscopeError = 'HTTP '.$resp->status().': '.$body;
+            logger()->warning('Edit model failed', ['model' => $model, 'status' => $resp->status(), 'body' => $body, 'key_prefix' => substr($key, 0, 8)]);
+            return null;
+        } catch (\Throwable $e) {
+            $this->dashscopeStatus = 0;
+            $this->dashscopeError = $e->getMessage();
+            logger()->warning('Edit model threw', ['model' => $model, 'error' => $this->dashscopeError, 'key_prefix' => substr($key, 0, 8)]);
+            return null;
+        }
+    }
+
+    /** Whether the last edit failure looks like "too many / unsupported reference images". */
+    protected function editModelRejectsMultiImage(): bool
+    {
+        $lower = strtolower((string) $this->dashscopeError);
+        return $this->dashscopeStatus === 400
+            || str_contains($lower, 'not support') || str_contains($lower, 'unsupported')
+            || str_contains($lower, 'invalidparameter') || str_contains($lower, 'only one')
+            || str_contains($lower, 'number of image') || str_contains($lower, 'too many');
+    }
+
     /**
      * Edit an image with a SPECIFIC model (used by "Thay Đổi Người Mẫu" swap). Retries a couple of
      * times on a 429 rate-limit so a busy model still produces a result.
      */
-    public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null): ?string
+    public function swapEdit(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
     {
         // Rate-limit on these models can take ~20-30s to clear; back off progressively (5/10/20/35s).
         $waits = [5, 10, 20, 35];
         foreach ($waits as $i => $wait) {
-            $url = $this->editImage($prompt, $imageUrl, $modelOverride);
+            $url = $this->editImage($prompt, $imageUrl, $modelOverride, $faceRefUrl);
             if ($url) { return $url; }
             if (str_contains(strtolower((string) $this->dashscopeError), '429') || str_contains(strtolower((string) $this->dashscopeError), 'ratelimit')) {
                 logger()->warning('swapEdit rate-limited, backing off '.$wait.'s');

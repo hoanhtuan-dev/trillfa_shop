@@ -1183,8 +1183,8 @@ class StudioController extends Controller
     {
         $data = $request->validate([
             'image' => ['required', 'string', 'max:2048'],   // design image URL (generation media_url or /storage)
-            'model_id' => ['required', 'string', 'max:40'],
-            'pose_id' => ['required', 'string', 'max:40'],
+            'model_id' => ['required', 'string', 'max:80'],
+            'pose_id' => ['required', 'string', 'max:80'],
             'background' => ['nullable', 'string', 'max:400'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
@@ -1195,82 +1195,37 @@ class StudioController extends Controller
         if (! $model) {
             return response()->json(['message' => 'Không tìm thấy người mẫu.'], 422);
         }
-
-        // garment_image_url: the design image (person in the outfit) — for best results use a clean
-        // flat-lay / background-removed garment, but the design image is a working default.
-        $garmentUrl = url($data['image']);
-        // VTON bắt buộc POSE dạng ẢNH -> model_image_url = ảnh ma-nơ-canh đang ở dáng đã chọn (pose.image).
-        $poseImage = $pose['image'] ?? null;
-        if (! $poseImage) {
-            return response()->json(['message' => 'Pose "'.($pose['name'] ?? '?').'" chưa có ảnh (model_image_url). Thêm ảnh dáng trong catalog.'], 422);
-        }
-        $modelUrl = url($poseImage);
-
-        $category = (string) studio_config('tryon_category', 'dress');
-        $res = $svc->submit($modelUrl, $garmentUrl, $category);
-        if (! empty($res['error'])) {
-            // Try-on không khả dụng (vùng/intl hoặc free-trial hết) -> fallback qwen-image-edit
-            // đổi người mẫu/dáng, giữ nguyên 100% trang phục.
-            logger()->warning('Try-on khả dụng, fallback qwen-edit: '.($res['error'] ?? ''));
-            $fallback = $svc->fallbackEdit($data['image'], $model['desc'] ?? ($model['ethnicity'] ?? 'a model'), $pose['skeleton'] ?? ($pose['name'] ?? 'standing'), (string) ($data['background'] ?? ''), (int) ($data['texture'] ?? 5));
-            if ($fallback) {
-                $det = $this->enhanceStoredImage($fallback, 6, 3);
-                if ($det) { $fallback = $det; }
-                $gen = auth()->user()->generations()->create([
-                    'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
-                    'prompt' => 'Thay đổi người mẫu (qwen-edit) · '.($model['name'] ?? 'model'),
-                    'model' => (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'), 'provider' => 'qwen', 'credits_cost' => 1,
-                    'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'), 'fallback' => true],
-                ]);
-                return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'task_id' => null]);
-            }
-            return response()->json(['message' => $res['error']], 422);
+        if (! $pose) {
+            return response()->json(['message' => 'Không tìm thấy dáng.'], 422);
         }
 
-        // Record a pending Generation so it appears in Outputs + the frontend can poll by task_id.
+        // P0a: DashScope virtual-try-on is NOT available on this account ("Model not exist"), so the
+        // swap is driven by the Qwen image-edit model directly (synchronous), keeping the garment 100%
+        // unchanged and passing the chosen model face as a reference image.
+        $fallback = $svc->fallbackEdit(
+            $data['image'],
+            $model['desc'] ?? ($model['ethnicity'] ?? 'a model'),
+            $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
+            (string) ($data['background'] ?? ''),
+            (int) ($data['texture'] ?? 5),
+            $model['image'] ?? null, // P3: face reference image (custom/catalog)
+        );
+        if (! $fallback) {
+            return response()->json(['message' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).'], 422);
+        }
+
+        // P5: gentler enhance (was fabric=6, skin=3) to avoid over-sharpening/texturing the swap result.
+        $det = $this->enhanceStoredImage($fallback, 4, 2);
+        if ($det) { $fallback = $det; }
+
+        $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $gen = auth()->user()->generations()->create([
-            'type' => 'image',
-            'status' => 'pending',
-            'prompt' => 'Thay đổi người mẫu (virtual try-on) · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
-            'model' => (string) studio_config('tryon_model', 'wanx-virtualmodel'),
-            'provider' => 'tryon',
-            'base_image' => $data['image'],
-            'job_id' => $res['task_id'],
-            'credits_cost' => 1,
-            'meta' => ['type' => 'image', 'provider' => 'tryon', 'model' => (string) studio_config('tryon_model', 'wanx-virtual-try-on'), 'tryon' => true, 'task_id' => $res['task_id'], 'model_id' => $data['model_id'], 'pose_id' => $data['pose_id']],
+            'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
+            'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
+            'model' => $swapModel, 'provider' => 'qwen', 'credits_cost' => 1, // 1 generation (enhance is local, no extra AI cost)
+            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null)],
         ]);
-
-        return response()->json(['task_id' => $res['task_id'], 'generation_id' => $gen->id]);
-    }
-
-    /**
-     * Poll a virtual try-on task and complete the matching Generation when the image is ready.
-     */
-    public function swapStatus(Request $request, string $taskId)
-    {
-        $svc = app(\App\Services\VirtualTryOnService::class);
-        $res = $svc->status($taskId);
-
-        $gen = auth()->user()->generations()->where('job_id', $taskId)->latest()->first();
-
-        if (($res['status'] ?? '') === 'succeeded' && ! empty($res['url'])) {
-            $stored = $svc->storeRemoteImage($res['url']);
-            if ($stored) {
-                $det = $this->enhanceStoredImage($stored, 6, 3);
-                if ($det) { $stored = $det; }
-                if ($gen) {
-                    $gen->update(['status' => 'completed', 'media_url' => $stored]);
-                }
-                return response()->json(['status' => 'completed', 'media_url' => $stored, 'generation_id' => $gen?->id]);
-            }
-        }
-
-        if (($res['status'] ?? '') === 'failed') {
-            if ($gen) { $gen->update(['status' => 'failed', 'error' => $res['error'] ?? 'Thay đổi người mẫu thất bại.']); }
-            return response()->json(['status' => 'failed', 'message' => $res['error'] ?? 'Thất bại.']);
-        }
-
-        return response()->json(['status' => $res['status'] ?? 'pending']);
+        return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'task_id' => null]);
     }
 
     public function translate(Request $request)
