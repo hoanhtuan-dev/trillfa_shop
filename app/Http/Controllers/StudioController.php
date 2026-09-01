@@ -1286,7 +1286,7 @@ class StudioController extends Controller
             ],
         ]);
 
-        AppJobsSwapModelJob::dispatch($gen->id);
+        \App\Jobs\SwapModelJob::dispatch($gen->id);
 
         return response()->json(['generation_id' => $gen->id, 'status' => 'pending', 'provider' => 'qwen', 'model' => $swapModel, 'task_id' => null]);
     }
@@ -1296,10 +1296,10 @@ class StudioController extends Controller
      * Validates the references, runs try-on (+ optional face-swap), post-process, tone, then stores
      * the finished result on the generation row.
      */
-    public function executeSwapFromGeneration(AppModelsGeneration $gen): void
+    public function executeSwapFromGeneration(\App\Models\Generation $gen): void
     {
         $meta = (array) ($gen->meta ?? []);
-        $svc = app(AppServicesVirtualTryOnService::class);
+        $svc = app(\App\Services\VirtualTryOnService::class);
         $model = $svc->pickModel((string) ($meta['model_id'] ?? ''));
         $pose = $svc->pickPose((string) ($meta['pose_id'] ?? ''));
         if (! $model || ! $pose) {
@@ -1721,7 +1721,7 @@ class StudioController extends Controller
     {
         $d = $request->all();
         if (! empty($d['key_value'])) {
-            $k = new AppModelsStudioApiKey();
+            $k = new \App\Models\StudioApiKey();
             $k->provider = (string) ($d['key_provider'] ?? '');
             $k->label = (string) ($d['key_label'] ?? $k->provider);
             $k->value = IlluminateSupportFacadesCrypt::encryptString((string) $d['key_value']);
@@ -1732,7 +1732,7 @@ class StudioController extends Controller
             $k->save();
         }
         if (! empty($d['model_name'])) {
-            AppModelsStudioModel::create([
+            \App\Models\StudioModel::create([
                 'group' => (string) ($d['model_group'] ?? 'image'),
                 'name' => (string) $d['model_name'],
                 'provider' => (string) ($d['model_provider'] ?? ''),
@@ -1763,8 +1763,8 @@ class StudioController extends Controller
         ];
         return response()->json([
             'providers' => $providers,
-            'api_keys' => AppModelsStudioApiKey::orderBy('provider')->orderBy('priority','desc')->get(),
-            'models' => AppModelsStudioModel::orderBy('priority','desc')->orderBy('id')->get(),
+            'api_keys' => \App\Models\StudioApiKey::orderBy('provider')->orderBy('priority','desc')->get(),
+            'models' => \App\Models\StudioModel::orderBy('priority','desc')->orderBy('id')->get(),
             'config' => [
                 'image_provider' => setting('studio_image_provider', 'flux'),
                 'qwen_model' => setting('studio_qwen_model', ''),
