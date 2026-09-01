@@ -312,32 +312,47 @@ class StudioController extends Controller
         $orig = imagecreatetruecolor($w, $h);
         imagecopy($orig, $img, 0, 0, 0, 0, $w, $h);
 
-        // 1+2) Reconstruction tuyến tính: trộn nền ngang (trái↔phải) và dọc (trên↔dưới) theo vị trí.
+        // 1+2) Reconstruction theo khoảng cách nghịch đảo + nhiễu nền (chân thật hơn):
+        //      mỗi pixel trong vùng = trộn màu nền 4 cạnh theo trọng số 1/khoảng-cách tới cạnh →
+        //      bám gradient/bóng nền từ cạnh GẦN NHẤT (tự nhiên hơn trộn tuyến tính đều), rồi
+        //      cộng nhiễu nhẹ khớp độ mịn nền → hết cảm giác "miếng vá phẳng".
         //      Guard đen: nếu một cạnh gần đen (thanh đen/letterbox) thì dùng màu cạnh đối diện.
         $dark = function (int $c): bool { return ((($c >> 16) & 0xFF) + (($c >> 8) & 0xFF) + ($c & 0xFF)) < 72; };
-        $spanX = max(1, $x1 - $x0); $spanY = max(1, $y1 - $y0);
+        // Đo độ mịn nền (std per-channel) quanh viền vùng → biên độ nhiễu nhẹ.
+        $ring = [];
+        $step = max(2, (int) round(max($x1 - $x0, $y1 - $y0) / 24));
+        for ($x = $x0; $x <= $x1; $x += $step) {
+            $ring[] = imagecolorat($img, $x, $ty);
+            $ring[] = imagecolorat($img, $x, $by);
+        }
+        for ($y = $y0; $y <= $y1; $y += $step) {
+            $ring[] = imagecolorat($img, $lx, $y);
+            $ring[] = imagecolorat($img, $rx, $y);
+        }
+        $std = function (array $v): float { $n = max(1, count($v)); $m = array_sum($v) / $n; $s = 0.0; foreach ($v as $x) { $s += ($x - $m) ** 2; } return sqrt($s / $n); };
+        $rf = []; $gf = []; $bf = [];
+        foreach ($ring as $c) { $rf[] = ($c >> 16) & 0xFF; $gf[] = ($c >> 8) & 0xFF; $bf[] = $c & 0xFF; }
+        $noise = (($std($rf) + $std($gf) + $std($bf)) / 3.0) * 0.55;
+
         for ($y = $y0; $y <= $y1; $y++) {
             $lc = imagecolorat($img, $lx, $y); $rc = imagecolorat($img, $rx, $y);
             if ($dark($lc) && ! $dark($rc)) { $lc = $rc; }
             elseif ($dark($rc) && ! $dark($lc)) { $rc = $lc; }
-            $lr = ($lc >> 16) & 0xFF; $lg = ($lc >> 8) & 0xFF; $lb = $lc & 0xFF;
-            $rr = ($rc >> 16) & 0xFF; $rg = ($rc >> 8) & 0xFF; $rb = $rc & 0xFF;
             for ($x = $x0; $x <= $x1; $x++) {
                 $tc = imagecolorat($img, $x, $ty); $bc = imagecolorat($img, $x, $by);
                 if ($dark($tc) && ! $dark($bc)) { $tc = $bc; }
                 elseif ($dark($bc) && ! $dark($tc)) { $bc = $tc; }
-                $fy = ($y - $y0) / $spanY;
-                $tr = ($tc >> 16) & 0xFF; $tg = ($tc >> 8) & 0xFF; $tb = $tc & 0xFF;
-                $br = ($bc >> 16) & 0xFF; $bg = ($bc >> 8) & 0xFF; $bb = $bc & 0xFF;
-                $fx = ($x - $x0) / $spanX;
-                // nền ngang tại x
-                $hr = $lr + ($rr - $lr) * $fx; $hg = $lg + ($rg - $lg) * $fx; $hb = $lb + ($rb - $lb) * $fx;
-                // nền dọc tại y
-                $vr = $tr + ($br - $tr) * $fy; $vg = $tg + ($bg - $tg) * $fy; $vb = $tb + ($bb - $tb) * $fy;
+                $wl = 1.0 / (($x - $x0) + 1); $wr = 1.0 / (($x1 - $x) + 1);
+                $wt = 1.0 / (($y - $y0) + 1); $wb = 1.0 / (($y1 - $y) + 1);
+                $ws = $wl + $wr + $wt + $wb;
+                $r = (($lc >> 16) & 0xFF) * $wl + (($rc >> 16) & 0xFF) * $wr + (($tc >> 16) & 0xFF) * $wt + (($bc >> 16) & 0xFF) * $wb;
+                $g = (($lc >> 8) & 0xFF) * $wl + (($rc >> 8) & 0xFF) * $wr + (($tc >> 8) & 0xFF) * $wt + (($bc >> 8) & 0xFF) * $wb;
+                $b = ($lc & 0xFF) * $wl + ($rc & 0xFF) * $wr + ($tc & 0xFF) * $wt + ($bc & 0xFF) * $wb;
+                $n = (int) round((mt_rand(-1000, 1000) / 1000.0) * $noise);
                 imagesetpixel($img, $x, $y, imagecolorallocate($img,
-                    (int) round(($hr + $vr) / 2),
-                    (int) round(($hg + $vg) / 2),
-                    (int) round(($hb + $vb) / 2)));
+                    max(0, min(255, (int) round($r / $ws) + $n)),
+                    max(0, min(255, (int) round($g / $ws) + $n)),
+                    max(0, min(255, (int) round($b / $ws) + $n))));
             }
         }
 
