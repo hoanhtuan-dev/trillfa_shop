@@ -229,23 +229,40 @@ class VirtualTryOnService
         $this->calls = 1;
         $this->lastModel = null;
 
+        // Fixed body-proportion descriptor at the default build=6 (the slider was removed; this is the
+        // EXACT clause from the confirmed-good version where the pose was applied correctly).
+        $proportion = $this->buildEnglish(6);
         $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
             ? 'Replace the ENTIRE background of the scene with: '.$background.'. ' : '';
         $toneS = $this->toneInstruction($tone, $background);
 
         // Garment = PRODUCT to preserve EXACTLY (dominant directive), then replace the person with
         // the text-described model in the text-described pose. Single image + clear text = reliable.
-        // NOTE: no body-proportion instruction — a "tall/slim build" clause contradicted the chosen
-        // pose (e.g. "squat pose") and made the model ignore the pose entirely.
+        // Proportion clause is the EXACT one from the confirmed-good version (build=6 default).
         $instr = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '.$bg
             .'Replace the person in the image with a full-body '.$modelDesc.' in the pose: '.$pose.', keeping the EXACT garment unchanged. '
-            .'Keep natural, anatomically-correct body proportions — do NOT distort, stretch, deform or warp the body, limbs or face. '
+            .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
             .$toneS.' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
 
         $imageSvc = app(ImageAIService::class);
         $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, null, null);
         if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
         return $url;
+    }
+
+    /**
+     * Body-proportion descriptor (fixed at the default build=6 — the UI slider was removed, the
+     * clause stays because it was part of the confirmed-good prompt).
+     */
+    protected function buildEnglish(int $v): string
+    {
+        return match (true) {
+            $v >= 9 => 'tall, slender runway-model build with long legs and an ~1:8 head-to-body ratio',
+            $v >= 7 => 'tall, slim fashion-model build with long legs and an ~1:7.5 head-to-body ratio',
+            $v >= 5 => 'average height, slim fitness-model build with an ~1:7 head-to-body ratio',
+            $v >= 3 => 'slightly shorter, curvy/athletic build with an ~1:6.5 head-to-body ratio',
+            default => 'shorter, fuller curvy build with an ~1:6 head-to-body ratio',
+        };
     }
 
     /**

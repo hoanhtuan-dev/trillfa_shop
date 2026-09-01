@@ -20,7 +20,7 @@ const toneOptions = [
   { v: 'mono', label: '⚪ Trắng đen' },
   { v: 'none', label: '🚫 Không' },
 ];
-// Persist swap settings across sessions.
+// Persist swap settings across sessions (like upscale memory).
 const SWAP_KEY = 'trillfa.swap';
 function loadSwapMemory() {
   try {

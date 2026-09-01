@@ -379,6 +379,49 @@
 
             </div>
 
+            <!-- Card: Tinh chỉnh & Nâng cấp ảnh -->
+            <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,150,120,.13), rgba(74,122,144,.06));">
+                <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🔍 Tinh chỉnh & Nâng cấp ảnh</h2>
+                <p class="text-[11px] text-ink-500">Phóng to độ phân giải + làm nét/chi tiết ảnh đang chọn (kết quả / ảnh chỉnh sửa).</p>
+                <template x-if="upscaleSrc">
+                    <div class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
+                        <img :src="upscaleSrc" class="h-16 w-16 rounded-xl bg-ink-900 object-cover" alt="Nguồn">
+                        <div class="min-w-0 text-xs text-cream-200"><p class="truncate font-semibold" x-text="upscaleName"></p><p class="text-cream-300/60">Ảnh nguồn · nâng cấp x<button @click="upscaleScale=1" class="ml-1 underline" :class="upscaleScale===1 ? 'text-brand-300' : ''">1</button>/<button @click="upscaleScale=2" class="underline" :class="upscaleScale===2 ? 'text-brand-300' : ''">2</button>/<button @click="upscaleScale=4" class="underline" :class="upscaleScale===4 ? 'text-brand-300' : ''">4</button></p></div>
+                    </div>
+                </template>
+                <label class="label mt-3">Độ phóng to (Upscale)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Độ phóng</span>
+                    <input type="range" min="1" max="4" step="1" x-model="upscaleScale" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="upscaleScale + 'x'"></span>
+                </div>
+                <label class="label mt-3">Tinh chỉnh AI (nét & chi tiết)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Tinh chỉnh</span>
+                    <input type="range" min="0" max="10" step="1" x-model="upscaleRefine" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="upscaleRefine + '/10'"></span>
+                </div>
+                <label class="label mt-3">🎞 Studio Chân thực (như ảnh chụp chuyên nghiệp)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Chân thực</span>
+                    <input type="range" min="0" max="10" step="1" x-model="studioPhotoreal" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="studioPhotoreal + '/10'"></span>
+                </div>
+                <label class="label mt-3">👩 Da: lỗ chân lông · vết nám (có kiểm soát)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Da</span>
+                    <input type="range" min="0" max="10" step="1" x-model="skinDetail" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="skinDetail + '/10'"></span>
+                </div>
+                <label class="label mt-3">💡 Ánh sáng & Bóng đổ (chiều sáng + sâu bóng)</label>
+                <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+                    <span class="shrink-0 font-medium text-cream-200">Ánh sáng</span>
+                    <input type="range" min="0" max="10" step="1" x-model="lightShadow" class="h-2 w-full cursor-pointer accent-brand-500">
+                    <span class="shrink-0 font-semibold text-cream-50" x-text="lightShadow + '/10'"></span>
+                </div>
+                <button @click="runUpscale()" :disabled="upscaling || !upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap" title="Phóng to + tinh chỉnh ảnh đang chọn"><span x-show="!upscaling">🔍 Nâng cấp Ảnh</span><span x-show="upscaling">Đang nâng cấp…</span></button>
+            </div>
+
             <!-- Card: Film Look (color grading) -->
             <div class="card p-5" x-show="step===2" style="border: 1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(180,120,180,.13), rgba(74,122,144,.06));">
                 <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🎨 Film Look</h2>
@@ -759,7 +802,7 @@ document.addEventListener('alpine:init', () => {
         previewId: null,
         viewGen: null, vgZoom: 1, vgPan: { x: 0, y: 0 }, _vgDrag: null, viewGenInfo: false,
         zoom: 1, pan: { x: 0, y: 0 }, palette: [], texture: 5, _drag: null, lightbox: false, opening: false, step: 1,
-        lookPreset: 'studio', lookLevel: 5, looking: false, reframeRatio: '3:4', reframing: false, cropMode: false, cropBox: { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }, _cropDrag: null, 
+        upscaleScale: 2, upscaleRefine: 5, studioPhotoreal: 5, skinDetail: 4, lightShadow: 5, upscaling: false, lookPreset: 'studio', lookLevel: 5, looking: false, reframeRatio: '3:4', reframing: false, cropMode: false, cropBox: { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }, _cropDrag: null, 
         lbZoom: 1, lbPan: { x: 0, y: 0 }, _lbDrag: null,
         _timers: {}, now: Date.now(), isMobile: window.innerWidth < 1024,
 
@@ -1191,6 +1234,18 @@ document.addEventListener('alpine:init', () => {
                 Alpine.store('toast').show('Đã áp dụng Look ' + this.lookPreset + '.');
             } catch (e) { Alpine.store('toast').show(e.message || 'Lỗi áp dụng Look.', 'error'); }
             finally { this.looking = false; }
+        },
+        async runUpscale() {
+            const src = this.upscaleSrc;
+            if (!src || this.upscaling) return;
+            this.upscaling = true;
+            try {
+                const d = await this.api('/studio/upscale', { image: src, scale: Number(this.upscaleScale) || 2, refine: Number(this.upscaleRefine) || 0, photoreal: Number(this.studioPhotoreal) || 0, skin_detail: Number(this.skinDetail) || 0, light_shadow: Number(this.lightShadow) || 0 });
+                this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'upscale', provider: 'upscale', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa nâng cấp' });
+                this.previewId = d.generation_id; this.setPreview({ id: d.generation_id, media_url: d.media_url, type: 'image', status: 'completed' });
+                Alpine.store('toast').show('Đã nâng cấp ảnh (' + this.upscaleScale + 'x).');
+            } catch (e) { Alpine.store('toast').show(e.message || 'Lỗi nâng cấp ảnh.', 'error'); }
+            finally { this.upscaling = false; }
         },
         toggleStylistAnswer(key, val) {
             if (!val) return;

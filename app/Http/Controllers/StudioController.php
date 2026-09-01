@@ -559,6 +559,75 @@ class StudioController extends Controller
     }
 
     /**
+     * Tinh chỉnh & Nâng cấp ảnh: AI-edit refine (optional) + GD upscale with studio photo
+     * finish, skin detail and light/shadow passes. Fabric-weave/roughness pass was REMOVED —
+     * the per-pixel skin heuristic misclassified dark skin (r <= 70) and painted weave onto
+     * faces and detail boundaries.
+     */
+    public function upscale(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],
+            'scale' => ['nullable', 'integer', 'min:1', 'max:4'],
+            'refine' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'skin_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
+        ]);
+        $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
+        $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
+        $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
+        $skinDetail = max(0, min(10, (int) ($data['skin_detail'] ?? 0)));
+        $lightShadow = max(0, min(10, (int) ($data['light_shadow'] ?? 0)));
+        $srcUrl = (string) $data['image'];
+
+        // Optional AI-edit refine for photoreal human detail. The prompt never asks for fabric
+        // weave (it bleeds onto faces/dark skin) and must keep the frame unchanged.
+        if ($refine > 0) {
+            try {
+                $keep = 'Keep the exact aspect ratio and framing of the input image — do NOT crop or change the frame. Keep the exact garment, model, pose, composition unchanged. Ultra-detailed, 4K.';
+                $guard = 'IMPORTANT: Do NOT add fabric weave, texture, grain or any pattern to the skin, face, hair or jewellery — keep them smooth, clean and natural. Keep all detail edges (face, hair, garment seams, outlines) crisp, sharp and completely free of aliasing, halos, moiré or blur.';
+                $detail = 'Enhance this fashion photograph at high resolution (hyper-realistic, like a professional fashion editorial): hyper-realistic human skin with natural pores and soft sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, crisp sharp edges, rich natural color, '.$guard.' '.$keep;
+                $studio = 'Render a high-end professional studio photograph of this fashion garment with hyper-realistic human detail (softbox light, subtle film color grading, shallow depth of field): photorealistic skin with pores, individual hair strands, realistic eyelashes and eye catchlight, ultra-sharp micro-detail, premium catalog quality, '.$guard.' '.$keep;
+                $prompt = $photoreal > 0 ? $studio : $detail;
+                $out = app(\App\Services\ImageAIService::class)->generate($prompt, $srcUrl);
+                if ($out) { $srcUrl = $out; }
+            } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
+        }
+
+
+        $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
+
+        $src = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
+        $sw = imagesx($src); $sh = imagesy($src);
+        $dst = $this->smartUpscale($src, $scale);
+        // One coarse skin mask, shared by every texture pass, so the face AND a dilated band
+        // around it are always protected (no weave/grain ever bleeds onto skin or its boundary).
+        $skinMask = $this->buildSkinMask($dst);
+        if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal, $skinMask); }
+        if ($skinDetail > 0) { $this->skinTexturePass($dst, $skinDetail); }
+        if ($lightShadow > 0) { $this->lightShadowPass($dst, $lightShadow); }
+        $name = 'studio/upscale-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
+        imagedestroy($src); imagedestroy($dst);
+
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'completed',
+            'media_url' => '/storage/'.$name,
+            'prompt' => 'Nâng cấp ảnh ('.$scale.'x'.($refine ? ', refine '.$refine : '').')',
+            'model' => 'upscale', 'provider' => 'upscale', 'credits_cost' => 0,
+        ]);
+
+        return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+    }
+
+    /**
      * Apply a film-look color grade to an image (1-click presets).
      */
     public function look(Request $request): \Illuminate\Http\JsonResponse
@@ -633,6 +702,222 @@ class StudioController extends Controller
             'prompt' => $prompt, 'model' => $model, 'provider' => $model, 'credits_cost' => 0,
         ]);
         return response()->json(['media_url' => '/storage/'.$name, 'generation_id' => $gen->id]);
+    }
+
+    /**
+     * Professional studio photo finish: contrast, subtle film color grade, film grain, vignette, and a
+     * SINGLE gentle unsharp mask. The grain and the final sharpening are skin-aware (they skip the
+     * dilated skin band) so the face and its boundary stay clean, and only ONE USM runs in the whole
+     * upscale pipeline (no double sharpening -> no halos/ringing on detail edges).
+     */
+    protected function studioPhotoFinish(\GdImage $img, int $level, ?array $skinMask = null): void
+    {
+        $k = $level / 10.0; // 0..1
+        $w = imagesx($img); $h = imagesy($img);
+        if ($skinMask === null) { $skinMask = $this->buildSkinMask($img); }
+        $cols = (int) ceil($w / 2);
+        // 1) SOFT LIGHT BLEND — blur + lift a copy and blend it in gently for soft, natural ambient light.
+        if (function_exists('imagefilter')) {
+            $soft = imagecreatetruecolor($w, $h);
+            imagecopy($soft, $img, 0, 0, 0, 0, $w, $h);
+            @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
+            @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
+            @imagefilter($soft, IMG_FILTER_BRIGHTNESS, (int) round(9 * $k));
+            $alpha = 0.04 + 0.08 * $k;
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $c = imagecolorat($img, $x, $y); $s = imagecolorat($soft, $x, $y);
+                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                    $sr = ($s >> 16) & 0xFF; $sg = ($s >> 8) & 0xFF; $sb = $s & 0xFF;
+                    $nr = (int) round($cr * (1 - $alpha) + $sr * $alpha);
+                    $ng = (int) round($cg * (1 - $alpha) + $sg * $alpha);
+                    $nb = (int) round($cb * (1 - $alpha) + $sb * $alpha);
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                }
+            }
+            imagedestroy($soft);
+            // smart tone: soft contrast + subtle warm/cool grade + gentle denoise
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(7 * $k));
+            @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
+        }
+        // 2) SUBTLE FILM GRAIN — on shadows/midtones, but SKIPS the dilated skin band (the face
+        //    plus a small rim around it) so the face and its boundary never get a grainy edge.
+        for ($y = 0; $y < $h; $y += 3) {
+            for ($x = 0; $x < $w; $x += 3) {
+                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
+                $c = imagecolorat($img, $x, $y);
+                $r3 = ($c >> 16) & 0xFF; $g3 = ($c >> 8) & 0xFF; $b3 = $c & 0xFF;
+                $lum = $r3 * 0.3 + $g3 * 0.6 + $b3 * 0.1;
+                if ($lum < 215) {
+                    $n = (int) ((mt_rand(-450, 450) / 1000.0) * 6 * $k);
+                    $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
+                    $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
+                    $b = max(0, min(255, ($c & 0xFF) + $n));
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
+                }
+            }
+        }
+        // 3) gentle vignette (darken corners slightly, keeps depth)
+        $cx = $w / 2; $cy = $h / 2; $maxd = (float) max($w, $h);
+        for ($y = 0; $y < $h; $y += 4) {
+            for ($x = 0; $x < $w; $x += 4) {
+                $d = sqrt(($x - $cx) ** 2 + ($y - $cy) ** 2) / $maxd;
+                $v = 1 - (0.20 * $k * max(0, $d - 0.35));
+                $c = imagecolorat($img, $x, $y);
+                $r = (int) (($c >> 16) & 0xFF) * $v; $g = (int) (($c >> 8) & 0xFF) * $v; $b = (int) ($c & 0xFF) * $v;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, (int) $r, (int) $g, (int) $b));
+            }
+        }
+        // 4) FINAL UN-SHARP MASK — ONE crisp pass; skipped on skin so pores stay natural and the
+        //    weave/grain are never amplified into halos on detail boundaries.
+        if (function_exists('imagefilter') && $w * $h <= 20000000) {
+            $blur = imagecreatetruecolor($w, $h);
+            imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+            @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+            $amount = 0.30 + 0.35 * $k;
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
+                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                    if ($this->isSkinPixel($cr, $cg, $cb)) { continue; }
+                    $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
+                    $nr = max(0, min(255, (int) round($cr + $amount * ($cr - $br))));
+                    $ng = max(0, min(255, (int) round($cg + $amount * ($cg - $bg))));
+                    $nb = max(0, min(255, (int) round($cb + $amount * ($cb - $bb))));
+                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
+                }
+            }
+            imagedestroy($blur);
+        }
+    }
+
+
+    /**
+     * Skin mask: a robust warm-skin detector shared by the skin and grain passes so each operates on the right region (face/body skin vs
+     * background) and they don't cross.
+     */
+    protected function isSkinPixel(int $r, int $g, int $b): bool
+    {
+        return $r > 70 && $r > $g && $g > $b && ($r - $b) > 12 && $r < 250 && $g > 45 && $g < 235 && $b > 30;
+    }
+
+    /**
+     * Coarse skin mask (stride 2, one byte per coarse cell, one string per row).
+     * Shared by the grain / USM passes so the face AND a dilated band around it are
+     * always protected — no texture ever bleeds onto the face or its boundary.
+     * @return array<int, string>
+     */
+    protected function buildSkinMask(\GdImage $img): array
+    {
+        $w = imagesx($img); $h = imagesy($img);
+        $mask = [];
+        for ($y = 0; $y < $h; $y += 2) {
+            $row = '';
+            for ($x = 0; $x < $w; $x += 2) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $row .= $this->isSkinPixel($r, $g, $b) ? "\x01" : "\x00";
+            }
+            $mask[$y >> 1] = $row;
+        }
+        return $mask;
+    }
+
+    /**
+     * Whether the coarse skin-mask cell at (cx, cy) — or any cell within radius $rad — is skin.
+     */
+    protected function maskNearSkin(array $mask, int $cols, int $cx, int $cy, int $rad): bool
+    {
+        $r0 = max(0, $cy - $rad);
+        $r1 = min(count($mask) - 1, $cy + $rad);
+        $c0 = max(0, $cx - $rad);
+        $c1 = min($cols - 1, $cx + $rad);
+        for ($ry = $r0; $ry <= $r1; $ry++) {
+            $row = $mask[$ry] ?? '';
+            for ($rx = $c0; $rx <= $c1; $rx++) {
+                if (isset($row[$rx]) && $row[$rx] === "\x01") { return true; }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Skin (face/body) detail: natural pores + subtle freckles/nam, ONLY on skin mask pixels.
+     */
+    protected function skinTexturePass(\GdImage $img, int $level): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        // Random soft pores that are DENSER but blended: fewer on bright skin (so highlights stay clean),
+        // each pore is a soft 2x2 radial dot (center stronger, edge fades) so it melts into the skin.
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                if ($this->isSkinPixel($r, $g, $b)) {
+                    $bright = $r > 185 ? 0.09 : ($r > 165 ? 0.19 : ($r > 148 ? 0.33 : 1.0));   // face (bright) 50% fewer again
+                    if (mt_rand(0, 1000) < (14 + 70 * $k) * $bright) {
+                        $amp = (int) ((mt_rand(-120, 120) / 1000.0) * 2.2 * $k * (0.4 + 0.6 * $bright));
+                        for ($dy = 0; $dy < 2; $dy++) {
+                            for ($dx = 0; $dx < 2; $dx++) {
+                                $px = $x + $dx; $py = $y + $dy;
+                                if ($px >= $w || $py >= $h) { continue; }
+                                $cc = imagecolorat($img, $px, $py);
+                                $rr = ($cc >> 16) & 0xFF; $gg = ($cc >> 8) & 0xFF; $bb = $cc & 0xFF;
+                                $fade = ($dx + $dy === 0) ? 1.0 : 0.65;
+                                imagesetpixel($img, $px, $py, imagecolorallocate($img,
+                                    max(0, min(255, $rr + (int) ($amp * $fade))),
+                                    max(0, min(255, $gg + (int) ($amp * $fade))),
+                                    max(0, min(255, $bb + (int) ($amp * $fade * 0.8)))));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Controlled light & shadow: a soft directional light from the upper-left (brightens that
+     * side, deepens the opposite) plus a gentle contrast so shadows gain depth.
+     */
+    protected function lightShadowPass(\GdImage $img, int $level): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $nx = ($w / 2 - $x) / max(1, $w); $ny = ($h / 2 - $y) / max(1, $h);
+                $d = ($nx + $ny) / 2.0; // -0.5..0.5; positive = upper-left side
+                $lift = (int) round($d * 28 * $k);
+                $c = imagecolorat($img, $x, $y);
+                $r = max(0, min(255, (($c >> 16) & 0xFF) + $lift));
+                $g = max(0, min(255, (($c >> 8) & 0xFF) + $lift));
+                $b = max(0, min(255, ($c & 0xFF) + $lift));
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
+            }
+        }
+        if (function_exists('imagefilter')) {
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(6 * $k));
+        }
+    }
+
+    protected function smartUpscale(\GdImage $src, int $scale): \GdImage
+    {
+        if ($scale <= 1) { return $src; }
+        $img = $src; $isCopy = false;
+        $steps = $scale >= 4 ? [2, (int) round($scale / 2)] : [$scale];
+        foreach ($steps as $s) {
+            $nw = (int) max(1, round(imagesx($img) * $s));
+            $nh = (int) max(1, round(imagesy($img) * $s));
+            $next = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($next, $img, 0, 0, 0, 0, $nw, $nh, imagesx($img), imagesy($img));
+            if ($isCopy) { imagedestroy($img); }
+            $img = $next; $isCopy = true;
+        }
+        // NOTE: no unsharp mask here. A single, skin-aware USM runs once in studioPhotoFinish,
+        // so edges are never double-sharpened (no halos / ringing on detail boundaries).
+        return $img;
     }
 
     /**
