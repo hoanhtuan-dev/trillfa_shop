@@ -97,6 +97,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
               <div class="pointer-events-none absolute" :style="store.regionStyle()">
                 <div class="absolute -inset-px border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
                 <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">Kéo để chọn vùng · Esc để hủy</div>
+                <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-100">{{ Math.round((store.regionBox.w || 0) * 100) }}% × {{ Math.round((store.regionBox.h || 0) * 100) }}%</div>
               </div>
             </div>
           </div>

@@ -64,6 +64,15 @@ class ImageAIService
         if ($baseImage && (studio_api_key('qwen_edit') || $this->providerKey() || $dashscopeKey)) {
             $edited = $this->editImage($prompt, $baseImage, null, null, null, $maskImage);
             if ($edited) {
+                // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
+                // về ĐÚNG kích thước ảnh nguồn để kết quả khớp khung hình ban đầu.
+                $edited = $this->fitToSourceSize($edited, $baseImage) ?: $edited;
+                // "Gộp lại": edit theo vùng (có mask) → composite để phần NGOÀI mask lấy 100%
+                // ảnh gốc, chỉ vùng TRONG mask lấy kết quả AI (biên hòa mượt) — phần còn lại
+                // của ảnh không bao giờ bị model đổi nhẹ.
+                if ($maskImage) {
+                    $edited = $this->compositeMaskedEdit($edited, $baseImage, $maskImage) ?: $edited;
+                }
                 return $edited;
             }
             // Inpaint must NOT silently fall through to text2image — that produces a brand-new image
@@ -720,6 +729,107 @@ class ImageAIService
         Storage::disk('public')->put('studio/'.$name, $contents);
 
         return '/storage/studio/'.$name;
+    }
+
+    /**
+     * Đảm bảo ảnh kết quả edit có ĐÚNG kích thước (w×h) của ảnh nguồn — model edit đôi khi
+     * trả tỷ lệ khác nhẹ. Resample về đúng kích thước nguồn; trả về URL mới hoặc URL cũ nếu
+     * kích thước đã khớp / thất bại.
+     */
+    protected function fitToSourceSize(string $editedUrl, string $sourceUrl): ?string
+    {
+        try {
+            $edited = @imagecreatefromstring((string) $this->resolveImageBinary($editedUrl));
+            $source = @imagecreatefromstring((string) $this->resolveImageBinary($sourceUrl));
+            if (! $edited || ! $source) {
+                if ($edited) { imagedestroy($edited); }
+                if ($source) { imagedestroy($source); }
+                return null;
+            }
+            $sw = imagesx($source); $sh = imagesy($source);
+            $ew = imagesx($edited); $eh = imagesy($edited);
+            if ($ew === $sw && $eh === $sh) {
+                imagedestroy($edited); imagedestroy($source);
+                return $editedUrl;
+            }
+            $out = imagecreatetruecolor($sw, $sh);
+            imagecopyresampled($out, $edited, 0, 0, 0, 0, $sw, $sh, $ew, $eh);
+            imagedestroy($edited); imagedestroy($source);
+            ob_start(); imagepng($out); $bytes = (string) ob_get_clean();
+            imagedestroy($out);
+            $name = 'studio/fit-'.Str::uuid().'.png';
+            Storage::disk('public')->put($name, $bytes);
+            return '/storage/'.$name;
+        } catch (\Throwable $e) {
+            logger()->warning('fitToSourceSize failed: '.$e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * "Gộp lại" (merge) — composite theo mask: kết quả cuối = ẢNH GỐC ở mọi pixel NGOÀI vùng
+     * mask, chỉ lấy kết quả AI TRONG vùng mask. Mask được blur để biên hòa trộn mượt.
+     * Đây là bước khép kín chuỗi "tách nền → xóa vật thể → gộp lại": phần ngoài vùng chọn
+     * luôn giữ nguyên 100%, không bị model edit làm đổi nhẹ.
+     */
+    protected function compositeMaskedEdit(string $editedUrl, string $sourceUrl, string $maskUrl): ?string
+    {
+        try {
+            $edited = @imagecreatefromstring((string) $this->resolveImageBinary($editedUrl));
+            $source = @imagecreatefromstring((string) $this->resolveImageBinary($sourceUrl));
+            $mask = @imagecreatefromstring((string) $this->resolveImageBinary($maskUrl));
+            if (! $edited || ! $source || ! $mask) {
+                if ($edited) { imagedestroy($edited); }
+                if ($source) { imagedestroy($source); }
+                if ($mask) { imagedestroy($mask); }
+                return null;
+            }
+            $w = imagesx($source); $h = imagesy($source);
+            if (imagesx($edited) !== $w || imagesy($edited) !== $h) {
+                imagedestroy($edited); imagedestroy($source); imagedestroy($mask);
+                return null; // kích thước chưa khớp → bỏ composite, giữ kết quả edit
+            }
+            // Làm mềm mask (blur) → alpha ramp ở biên vùng.
+            @imagefilter($mask, IMG_FILTER_GAUSSIAN_BLUR);
+            @imagefilter($mask, IMG_FILTER_GAUSSIAN_BLUR);
+            $out = imagecreatetruecolor($w, $h);
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $mc = imagecolorat($mask, $x, $y);
+                    $mlum = (($mc >> 16) & 0xFF) * 0.3 + (($mc >> 8) & 0xFF) * 0.6 + ($mc & 0xFF) * 0.1;
+                    $alpha = (255 - $mlum) / 255.0; // mask ĐEN = vùng sửa (lấy kết quả AI)
+                    $sc = imagecolorat($source, $x, $y);
+                    $ec = imagecolorat($edited, $x, $y);
+                    $r = (int) round((($ec >> 16) & 0xFF) * $alpha + (($sc >> 16) & 0xFF) * (1 - $alpha));
+                    $g = (int) round((($ec >> 8) & 0xFF) * $alpha + (($sc >> 8) & 0xFF) * (1 - $alpha));
+                    $b = (int) round(($ec & 0xFF) * $alpha + ($sc & 0xFF) * (1 - $alpha));
+                    imagesetpixel($out, $x, $y, imagecolorallocate($out, $r, $g, $b));
+                }
+            }
+            imagedestroy($edited); imagedestroy($source); imagedestroy($mask);
+            ob_start(); imagepng($out); $bytes = (string) ob_get_clean();
+            imagedestroy($out);
+            $name = 'studio/composite-'.Str::uuid().'.png';
+            Storage::disk('public')->put($name, $bytes);
+            return '/storage/'.$name;
+        } catch (\Throwable $e) {
+            logger()->warning('compositeMaskedEdit failed: '.$e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Đọc binary ảnh cục bộ từ URL /storage/... (giống cách imageDataUri resolve file).
+     */
+    protected function resolveImageBinary(string $url): ?string
+    {
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        foreach ([public_path($path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
+            if (is_file($c)) {
+                return (string) file_get_contents($c);
+            }
+        }
+        return null;
     }
 
     protected function sizeFor(?string $resolution, ?string $ratio): string

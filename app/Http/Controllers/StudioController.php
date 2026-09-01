@@ -270,32 +270,46 @@ class StudioController extends Controller
     }
 
     /**
-     * GD fallback khi chưa cấu hình key AI: lấp vùng chọn bằng màu trung bình viền xung quanh
-     * + làm mờ patch để hòa vào ảnh (chất lượng tạm — dùng khi chưa có key / chế độ stub).
+     * GD fallback khi chưa cấu hình key AI — "tách nền → xóa vật thể → gộp lại" thuần GD:
+     *  1) TÁCH NỀN: suy nền từ 4 cạnh viền ngay sát vùng chọn (cùng hàng/cột);
+     *  2) XÓA VẬT THỂ: mỗi pixel trong vùng = nội suy tuyến tính giữa nền TRÁI–PHẢI và TRÊN–DƯỚI
+     *     (tái tạo nền studio/backdrop trơn, tốt hơn nhiều so với đổ 1 màu);
+     *  3) GỘP LẠI: làm mờ patch (lề feather) rồi dán lại → biên hòa mượt vào ảnh gốc.
      */
     protected function localEraseFill(\GdImage $img, int $px, int $py, int $pw, int $ph): void
     {
         $w = imagesx($img); $h = imagesy($img);
-        $samples = [];
-        for ($i = 0; $i < $ph; $i += 4) {
-            $yy = min($h - 1, $py + $i);
-            $samples[] = imagecolorat($img, max(0, $px - 1), $yy);
-            $samples[] = imagecolorat($img, min($w - 1, $px + $pw), $yy);
-        }
-        for ($i = 0; $i < $pw; $i += 4) {
-            $xx = min($w - 1, $px + $i);
-            $samples[] = imagecolorat($img, $xx, max(0, $py - 1));
-            $samples[] = imagecolorat($img, $xx, min($h - 1, $py + $ph));
-        }
-        $sr = 0; $sg = 0; $sb = 0; $n = 0;
-        foreach ($samples as $s) {
-            $sr += ($s >> 16) & 0xFF; $sg += ($s >> 8) & 0xFF; $sb += $s & 0xFF; $n++;
-        }
-        if (! $n) { return; }
-        $fill = imagecolorallocate($img, (int) ($sr / $n), (int) ($sg / $n), (int) ($sb / $n));
-        imagefilledrectangle($img, $px, $py, $px + $pw - 1, $py + $ph - 1, $fill);
+        $x0 = max(0, $px); $x1 = min($w - 1, $px + $pw - 1);
+        $y0 = max(0, $py); $y1 = min($h - 1, $py + $ph - 1);
+        if ($x0 > $x1 || $y0 > $y1) { return; }
+        // Các cạnh nền ngay sát vùng (đã clamp)
+        $lx = max(0, $px - 1); $rx = min($w - 1, $px + $pw);
+        $ty = max(0, $py - 1); $by = min($h - 1, $py + $ph);
 
-        // Làm mờ patch (có lề feather) rồi dán lại cho hòa biên.
+        // 1+2) Reconstruction tuyến tính: trộn nền ngang (trái↔phải) và dọc (trên↔dưới) theo vị trí.
+        $spanX = max(1, $x1 - $x0); $spanY = max(1, $y1 - $y0);
+        for ($y = $y0; $y <= $y1; $y++) {
+            $lc = imagecolorat($img, $lx, $y); $rc = imagecolorat($img, $rx, $y);
+            $lr = ($lc >> 16) & 0xFF; $lg = ($lc >> 8) & 0xFF; $lb = $lc & 0xFF;
+            $rr = ($rc >> 16) & 0xFF; $rg = ($rc >> 8) & 0xFF; $rb = $rc & 0xFF;
+            for ($x = $x0; $x <= $x1; $x++) {
+                $tc = imagecolorat($img, $x, $ty); $bc = imagecolorat($img, $x, $by);
+                $fy = ($y - $y0) / $spanY;
+                $tr = ($tc >> 16) & 0xFF; $tg = ($tc >> 8) & 0xFF; $tb = $tc & 0xFF;
+                $br = ($bc >> 16) & 0xFF; $bg = ($bc >> 8) & 0xFF; $bb = $bc & 0xFF;
+                $fx = ($x - $x0) / $spanX;
+                // nền ngang tại x
+                $hr = $lr + ($rr - $lr) * $fx; $hg = $lg + ($rg - $lg) * $fx; $hb = $lb + ($rb - $lb) * $fx;
+                // nền dọc tại y
+                $vr = $tr + ($br - $tr) * $fy; $vg = $tg + ($bg - $tg) * $fy; $vb = $tb + ($bb - $tb) * $fy;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    (int) round(($hr + $vr) / 2),
+                    (int) round(($hg + $vg) / 2),
+                    (int) round(($hb + $vb) / 2)));
+            }
+        }
+
+        // 3) Làm mờ patch (có lề feather) rồi dán lại cho hòa biên.
         if (function_exists('imagefilter') && $w * $h <= 8000000) {
             $feather = (int) max(3, min(24, round(min($pw, $ph) * 0.1)));
             $pw2 = $pw + $feather * 2; $ph2 = $ph + $feather * 2;

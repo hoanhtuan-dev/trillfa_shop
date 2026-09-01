@@ -199,7 +199,7 @@ export const useStudioStore = defineStore('studio', {
       const ia = iw / ih, box = ir.width / ir.height;
       let vw, vh;
       if (ia > box) { vw = ir.width; vh = ir.width / ia; } else { vh = ir.height; vw = ir.height * ia; }
-      return { vw, vh, vx: ir.left - cr.left + (ir.width - vw) / 2, vy: ir.top - cr.top + (ir.height - vh) / 2, crW: cr.width, crH: cr.height, ia, iw, ih };
+      return { vw, vh, vx: ir.left - cr.left + (ir.width - vw) / 2, vy: ir.top - cr.top + (ir.height - vh) / 2, crW: cr.width, crH: cr.height, crLeft: cr.left, crTop: cr.top, ia, iw, ih };
     },
     cropStyle() {
       const m = this.canvasMetrics(); if (!m) return { display: 'none' };
@@ -454,17 +454,21 @@ export const useStudioStore = defineStore('studio', {
     regionStart(e) {
       if (!this.regionMode) return;
       e.stopPropagation();
+      // Capture pointer để kéo liền mạch (không mất pointermove/up khi rê nhanh).
+      const el = e.currentTarget;
+      if (el && e.pointerId != null && el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
       const m = this.canvasMetrics(); if (!m) return;
-      const nx = this._clamp((e.clientX - m.vx) / m.vw, 0, 1);
-      const ny = this._clamp((e.clientY - m.vy) / m.vh, 0, 1);
+      // clientX/Y là tọa độ viewport -> trừ offset container (crLeft/crTop) rồi vx/vy của ảnh.
+      const nx = this._clamp((e.clientX - m.crLeft - m.vx) / m.vw, 0, 1);
+      const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
       this._regionDrag = { x: nx, y: ny };
       this.regionBox = { x: nx, y: ny, w: 0.005, h: 0.005 };
     },
     regionMove(e) {
       const d = this._regionDrag; if (!d || !this.regionMode) return;
       const m = this.canvasMetrics(); if (!m) return;
-      const nx = this._clamp((e.clientX - m.vx) / m.vw, 0, 1);
-      const ny = this._clamp((e.clientY - m.vy) / m.vh, 0, 1);
+      const nx = this._clamp((e.clientX - m.crLeft - m.vx) / m.vw, 0, 1);
+      const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
       const x = Math.min(d.x, nx), y = Math.min(d.y, ny);
       this.regionBox = { x, y, w: Math.max(0.005, Math.abs(nx - d.x)), h: Math.max(0.005, Math.abs(ny - d.y)) };
     },

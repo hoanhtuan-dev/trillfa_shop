@@ -8,7 +8,8 @@ use Tests\TestCase;
 
 /**
  * 🧹 Region Tools ("xóa theo vùng chọn trên canvas"):
- * endpoint /studio/generations/{id}/region — mask builder + AI/local + validation.
+ * endpoint /studio/generations/{id}/region — mask builder + AI/local + validation,
+ * fit-to-source-size + composite-mask-merge.
  */
 class StudioRegionTest extends TestCase
 {
@@ -53,7 +54,6 @@ class StudioRegionTest extends TestCase
         $out = public_path(ltrim((string) parse_url($res->json('media_url'), PHP_URL_PATH), '/'));
         $this->assertFileExists($out);
         $this->assertNotEquals(md5_file(storage_path('app/public/region-src.png')), md5_file($out));
-        // output phải là ảnh hợp lệ cùng kích thước
         $outImg = @imagecreatefrompng($out);
         $this->assertNotFalse($outImg);
         $this->assertSame(80, imagesx($outImg));
@@ -93,5 +93,68 @@ class StudioRegionTest extends TestCase
         ]);
         $this->postJson('/studio/generations/'.$gen->id.'/region', ['op' => 'erase', 'region' => ['x' => 0.1, 'y' => 0.1, 'w' => 0.3, 'h' => 0.3]])->assertStatus(403);
     }
-}
 
+    public function test_fit_to_source_size_normalizes_edited_image(): void
+    {
+        $src = imagecreatetruecolor(60, 80);
+        for ($y = 0; $y < 80; $y++) { for ($x = 0; $x < 60; $x++) { imagesetpixel($src, $x, $y, imagecolorallocate($src, ($x * 4) % 256, ($y * 3) % 256, 128)); } }
+        imagepng($src, storage_path('app/public/fit-src.png')); imagedestroy($src);
+
+        $edited = imagecreatetruecolor(80, 80); // tỷ lệ khác (vuông)
+        for ($y = 0; $y < 80; $y++) { for ($x = 0; $x < 80; $x++) { imagesetpixel($edited, $x, $y, imagecolorallocate($edited, ($x * 3) % 256, 128, ($y * 3) % 256)); } }
+        imagepng($edited, storage_path('app/public/fit-edited.png')); imagedestroy($edited);
+
+        $svc = app(\App\Services\ImageAIService::class);
+        $url = (new \ReflectionMethod($svc, 'fitToSourceSize'))->invoke($svc, '/storage/fit-edited.png', '/storage/fit-src.png');
+        $this->assertNotNull($url);
+
+        $outPath = public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/'));
+        $out = @imagecreatefrompng($outPath);
+        $this->assertNotFalse($out);
+        $this->assertSame(60, imagesx($out), 'width phải khớp ảnh gốc');
+        $this->assertSame(80, imagesy($out), 'height phải khớp ảnh gốc');
+        imagedestroy($out);
+
+        @unlink($outPath);
+        @unlink(storage_path('app/public/fit-src.png'));
+        @unlink(storage_path('app/public/fit-edited.png'));
+    }
+
+    public function test_composite_masked_edit_keeps_outside_identical(): void
+    {
+        // source: xanh dương đồng nhất 40x40
+        $src = imagecreatetruecolor(40, 40);
+        imagefilledrectangle($src, 0, 0, 39, 39, imagecolorallocate($src, 20, 60, 200));
+        imagepng($src, storage_path('app/public/c-src.png')); imagedestroy($src);
+
+        // edited: giống source nhưng vùng (10,10)-(29,29) màu đỏ
+        $edited = imagecreatetruecolor(40, 40);
+        imagefilledrectangle($edited, 0, 0, 39, 39, imagecolorallocate($edited, 20, 60, 200));
+        imagefilledrectangle($edited, 10, 10, 29, 29, imagecolorallocate($edited, 220, 40, 40));
+        imagepng($edited, storage_path('app/public/c-edited.png')); imagedestroy($edited);
+
+        // mask: trắng + đen vùng (10,10)-(29,29)
+        $mask = imagecreatetruecolor(40, 40);
+        imagefilledrectangle($mask, 0, 0, 39, 39, imagecolorallocate($mask, 255, 255, 255));
+        imagefilledrectangle($mask, 10, 10, 29, 29, imagecolorallocate($mask, 0, 0, 0));
+        imagepng($mask, storage_path('app/public/c-mask.png')); imagedestroy($mask);
+
+        $svc = app(\App\Services\ImageAIService::class);
+        $url = (new \ReflectionMethod($svc, 'compositeMaskedEdit'))->invoke($svc, '/storage/c-edited.png', '/storage/c-src.png', '/storage/c-mask.png');
+        $this->assertNotNull($url);
+
+        $out = imagecreatefrompng(public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/')));
+        $px = function (int $x, int $y) use ($out): array {
+            $c = imagecolorat($out, $x, $y);
+            return [($c >> 16) & 255, ($c >> 8) & 255, $c & 255];
+        };
+        $this->assertSame([20, 60, 200], $px(2, 2), 'ngoài vùng phải giữ nguyên ảnh gốc');
+        $this->assertSame([20, 60, 200], $px(2, 37), 'ngoài vùng phải giữ nguyên ảnh gốc');
+        $this->assertSame([220, 40, 40], $px(20, 20), 'trong vùng phải lấy kết quả edit');
+        $this->assertSame([220, 40, 40], $px(15, 25), 'trong vùng phải lấy kết quả edit');
+        imagedestroy($out);
+
+        foreach (['c-src.png', 'c-edited.png', 'c-mask.png'] as $f) { @unlink(storage_path('app/public/'.$f)); }
+        @unlink(public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/')));
+    }
+}
