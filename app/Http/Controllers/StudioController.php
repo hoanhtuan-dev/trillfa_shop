@@ -1382,39 +1382,39 @@ class StudioController extends Controller
         imagecopyresampled($back, $img, 0, 0, 0, 0, $cw, $ch, $w, $h);
         for ($i = 0; $i < 3; $i++) { @imagefilter($back, IMG_FILTER_GAUSSIAN_BLUR); }
 
-        // 2) depth-of-field person layer: original with the BACKGROUND blurred, subject sharp.
-        // ELLIPTICAL sharp mask centered on the subject — guarantees the person is never blurred
-        // (the subject fits inside a generous central ellipse); only the outer background/corners
-        // fall off into the bokeh blur, so the effect lands on the background, not the model.
-        $blur2 = imagecreatetruecolor($w, $h);
-        imagecopy($blur2, $img, 0, 0, 0, 0, $w, $h);
-        for ($i = 0; $i < 3; $i++) { @imagefilter($blur2, IMG_FILTER_GAUSSIAN_BLUR); }
-        $cx = $w / 2; $cy = $h / 2;
-        $rx = $w * 0.46; $ry = $h * 0.50;   // sharp ellipse (generous: subject + margin stays sharp)
-        for ($y = 0; $y < $h; $y += 2) {
-            for ($x = 0; $x < $w; $x += 2) {
-                $dx = ($x - $cx) / $rx; $dy = ($y - $cy) / $ry;
-                $d = sqrt($dx * $dx + $dy * $dy);
-                if ($d <= 0.72) { continue; }            // fully sharp inside the ellipse
-                $wgt = (1 - $d) / 0.28;                  // 1 at d=0.72 -> 0 at d=1.0
-                $wgt = max(0.0, min(1.0, $wgt));
-                $wg = $wgt * $wgt * (3 - 2 * $wgt);      // smoothstep -> soft bokeh transition
-                $c = imagecolorat($img, $x, $y);
-                $b = imagecolorat($blur2, $x, $y);
-                $r = (int) round((($c >> 16) & 255) * $wg + (($b >> 16) & 255) * (1 - $wg));
-                $g = (int) round((($c >> 8) & 255) * $wg + (($b >> 8) & 255) * (1 - $wg));
-                $bb = (int) round(($c & 255) * $wg + ($b & 255) * (1 - $wg));
-                imagesetpixel($blur2, $x, $y, imagecolorallocate($blur2, $r, $g, $bb));
+        // 2) Composite: the ENTIRE original frame is kept 100% sharp (person is never blurred —
+        // the subject fills the frame height, so any shaped blur-mask would touch head/feet). The
+        // depth-of-field look comes from the soft blurred EXTENSION border: the sharp frame is pasted
+        // centered and blended into the blurred backdrop over a small edge margin, so there is NO
+        // visible seam and NO blur on the model.
+        $ox = (int) (($cw - $w) / 2); $oy = (int) (($ch - $h) / 2);
+        $blend = (int) (min($w, $h) * 0.025); // blend margin (~2.5%) at the frame edge
+        for ($y = 0; $y < $ch; $y++) {
+            $sy = $y - $oy;
+            for ($x = 0; $x < $cw; $x++) {
+                $sx = $x - $ox;
+                $inFrame = ($sx >= 0 && $sx < $w && $sy >= 0 && $sy < $h);
+                if ($inFrame) {
+                    // weight 1 in the interior, 0 right at the frame edge -> crossfade into backdrop
+                    $edge = min($sx, $w - 1 - $sx, $sy, $h - 1 - $sy);
+                    $wg = max(0.0, min(1.0, $edge / $blend));
+                    if ($wg >= 1.0) { continue; }         // interior -> keep the sharp original
+                    $c = imagecolorat($img, $sx, $sy);
+                    $b = imagecolorat($back, $x, $y);
+                    $r = (int) round((($c >> 16) & 255) * $wg + (($b >> 16) & 255) * (1 - $wg));
+                    $g = (int) round((($c >> 8) & 255) * $wg + (($b >> 8) & 255) * (1 - $wg));
+                    $bb = (int) round(($c & 255) * $wg + ($b & 255) * (1 - $wg));
+                    imagesetpixel($back, $x, $y, imagecolorallocate($back, $r, $g, $bb));
+                }
+                // outside the frame -> the blurred backdrop already occupies this pixel
             }
         }
-
-        // 3) composite the (depth-of-field) original centered on the extended blurred backdrop.
-        $ox = (int) (($cw - $w) / 2); $oy = (int) (($ch - $h) / 2);
-        imagecopy($back, $blur2, $ox, $oy, 0, 0, $w, $h);
+        // paste the interior of the sharp original over the (now-blended) backdrop
+        imagecopy($back, $img, $ox + $blend, $oy + $blend, $blend, $blend, $w - 2 * $blend, $h - 2 * $blend);
 
         $name = 'studio/portrait-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($back));
-        imagedestroy($back); imagedestroy($blur2); imagedestroy($img);
+        imagedestroy($back); imagedestroy($img);
         return '/storage/'.$name;
     }
 
