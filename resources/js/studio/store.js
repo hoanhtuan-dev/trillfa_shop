@@ -226,6 +226,8 @@ export const useStudioStore = defineStore('studio', {
       // compatibility dblclick used for "double-click to cancel". touch-action:none (CSS)
       // already blocks scroll/zoom and select-none blocks text selection.
       e.stopPropagation();
+      // A previous drag may still be armed (e.g. a fast second press before the first release) — close it first so its window listeners are removed.
+      if (this._cropDrag) this._cropStop(this._cropDrag.handlers);
       const handlers = { move: (ev) => this._cropQueue(ev), up: () => this._cropStop(handlers) };
       this._cropDrag = { key, sx: e.clientX, sy: e.clientY, box: { ...(this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }) }, handlers };
       window.addEventListener('pointermove', handlers.move);
