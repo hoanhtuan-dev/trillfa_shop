@@ -47,7 +47,7 @@ function cropMove(e) {
   store.cropBox = b;
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, PaletteTextureCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
+const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
@@ -107,9 +107,11 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
                 </div>
               </div>
             </div>
-            <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="flex items-center gap-1.5 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
-              <span class="text-[10px] text-cream-300/60">🎨</span>
-              <button v-for="c in store.palette" :key="c" @click="copyColor(c)" class="h-6 w-6 rounded-full border border-ink-700 transition hover:scale-110" :style="{ background: c }" :title="'Nhấn để copy ' + c"></button>
+            <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
+              <div class="mb-1 text-[10px] font-semibold text-cream-300/60">🎨 Palette</div>
+              <div class="grid grid-cols-4 gap-1.5">
+                <button v-for="c in store.palette.slice(0, 8)" :key="c" @click="copyColor(c)" class="h-7 w-full rounded-md border border-ink-700 transition hover:scale-105" :style="{ background: c }" :title="'Nhấn để copy ' + c"></button>
+              </div>
             </div>
           </div>
           <!-- canvas bg + crop toggles -->

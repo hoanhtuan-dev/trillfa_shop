@@ -113,7 +113,8 @@ export const useStudioStore = defineStore('studio', {
       if (!this.imagePromptEn || this.generating) return;
       this.generating = true;
       try {
-        const d = await this.api('/studio/generate', { prompt: this.imagePromptEn, resolution: this.imageRes, ratio: this.imageRatio, variants: Number(this.variantCount) || 1 });
+        const finalPrompt = (this.imagePromptEn || '') + (this.texture > 0 ? ', fabric/knit texture detail ' + this.texture + '/10' : '');
+        const d = await this.api('/studio/generate', { prompt: finalPrompt, resolution: this.imageRes, ratio: this.imageRatio, variants: Number(this.variantCount) || 1 });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
         this.setBatch(items.map(it => it.generation_id));

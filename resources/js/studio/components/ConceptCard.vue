@@ -23,6 +23,8 @@ const promptPreview = computed(() => { const t = store.imagePromptEn || ''; retu
         </div>
         <label class="label mt-2">Số biến thể / lần tạo</label>
         <div class="flex items-center gap-3 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs"><span class="shrink-0 font-medium text-cream-200">Biến thể</span><input type="range" min="1" max="4" step="1" v-model.number="store.variantCount" class="h-2 w-full cursor-pointer accent-brand-500"><span class="shrink-0 font-semibold text-cream-50">{{ store.variantCount }}</span></div>
+        <label class="label mt-2">🧵 Texture (nhúng vào prompt)</label>
+        <div class="flex items-center gap-3 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs"><span class="shrink-0 font-medium text-cream-200">Texture</span><input type="range" min="0" max="10" step="1" v-model.number="store.texture" class="h-2 w-full cursor-pointer accent-brand-500"><span class="shrink-0 font-semibold text-cream-50">{{ store.texture }}</span></div>
         <button @click="store.promptOpen = false; store.generateImage()" :disabled="store.generating || !store.imagePromptEn" class="btn-brand mt-3 w-full whitespace-nowrap">{{ store.generating ? 'Đang gửi…' : '🎨 Tạo Ảnh 2D' }}</button>
     </BaseModal>
   </div>
