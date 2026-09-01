@@ -239,8 +239,24 @@ class StudioController extends Controller
         $maskUrl = '/storage/'.$maskName;
 
         $cost = (int) studio_config('image_credits', 1);
-        $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
 
+        // "Xóa vùng" LUÔN dùng tái tạo nền cục bộ từ viền (xác định, khớp nền xung quanh) —
+        // AI mask-inpaint cho erase không ổn định: model thường điền vật liệu/nhiễu lạ (vải,
+        // họa tiết…) thay vì tái tạo nền, gây vùng sai màu. "Thay vùng" cần mô tả mới dùng AI.
+        if ($op === 'erase') {
+            $this->localEraseFill($src, $px, $py, $pw, $ph);
+            $name = 'studio/erase-'.Str::uuid().'.png';
+            \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
+            imagedestroy($src);
+            $gen = auth()->user()->generations()->create([
+                'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
+                'prompt' => 'Xóa vùng chọn (tái tạo nền)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
+            ]);
+            return response()->json(['generation_id' => $gen->id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
+        }
+
+        // "Thay vùng" (replace): cần AI (mask + prompt); fallback local khi chưa có key.
+        $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
         if ($hasAi) {
             return $this->queueGeneration('image', [
                 'prompt' => $this->regionPrompt($op, (string) ($data['prompt'] ?? '')),
@@ -250,14 +266,14 @@ class StudioController extends Controller
             ], $cost, $generation);
         }
 
-        // Không có key AI → lấp cục bộ bằng GD (chế độ stub / offline vẫn dùng được)
+        // Không có key AI cho replace → tái tạo nền cục bộ (degrade)
         $this->localEraseFill($src, $px, $py, $pw, $ph);
         $name = 'studio/erase-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
         imagedestroy($src);
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
-            'prompt' => 'Xóa vùng chọn (local)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
+            'prompt' => 'Xóa vùng chọn (tái tạo nền)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
         ]);
         return response()->json(['generation_id' => $gen->id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
     }
@@ -1361,6 +1377,57 @@ class StudioController extends Controller
     }
 
     /**
+     * AI Outpainting for "Chân dung & Chiều sâu": extend the frame to ~1.22x (subject ~82%) and let
+     * the Qwen edit model GENERATE a natural continuation of the scene (architecture, flowers, ground)
+     * into the border — no mirroring, no copy-flip. The center (person) is pasted sharp and hidden
+     * behind the instruction to keep it unchanged, so the subject stays pixel-identical. Returns the
+     * outpainted URL, or null on failure (caller falls back to the raw result).
+     */
+    protected function outpaintBackground(string $url): ?string
+    {
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return null; }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return null; }
+        $w = imagesx($img); $h = imagesy($img);
+        $scale = 0.82;   // subject target ~82% of frame height
+        $cw = (int) round($w / $scale); $ch = (int) round($h / $scale);
+
+        // Seed the larger canvas: a stretched cover-fit of the scene fills the border (rough
+        // continuation for the model to refine), then the sharp original is pasted centered.
+        $canvas = imagecreatetruecolor($cw, $ch);
+        imagecopyresampled($canvas, $img, 0, 0, 0, 0, $cw, $ch, $w, $h);
+        $ox = (int) (($cw - $w) / 2); $oy = (int) (($ch - $h) / 2);
+        imagecopy($canvas, $img, $ox, $oy, 0, 0, $w, $h);
+        $tmp = 'studio/outpaint-src-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($tmp, $this->pngBytes($canvas));
+        imagedestroy($canvas); imagedestroy($img);
+
+        $prompt = 'This is a photograph. Extend the scene to fill the whole image naturally: continue the architecture, flowering bougainvillea, lanterns, plants and the paved ground seamlessly into the border regions around the central frame. '
+            .'The CENTER of the image (containing the person) is FINAL and must remain EXACTLY unchanged — do NOT alter, re-render, re-light or crop the center. '
+            .'The extended border must look like the same real, continuous photograph — no mirroring, no repetition, no stretching artifacts. Photorealistic, studio quality.';
+
+        try {
+            $out = app(\App\Services\ImageAIService::class)->swapEdit(
+                $prompt,
+                '/storage/'.$tmp,
+                (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'),
+                null,
+                null
+            );
+        } finally {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($tmp);
+        }
+
+        if ($out) { logger()->info('Swap outpainting done'); }
+        return $out;
+    }
+
+    /**
      * "Chân dung & Chiều sâu" (Portrait & Depth) post-process.
      * CLEAN depth-of-field bokeh on the ORIGINAL frame (no canvas extension, no mirror-pad — those
      * produced a visible "copy-flipped" background). A soft radial mask keeps the centered subject
@@ -1565,10 +1632,15 @@ class StudioController extends Controller
         $bright = $this->brightenDarkSubject($fallback);
         if ($bright) { $fallback = $bright; }
 
-        // "Chân dung & Chiều sâu": scale the subject to ~82% of the frame and soften the background
-        // (depth of field) so the scene looks natural and dimensional. Deterministic, keeps the
-        // subject pixels identical. Opt-out via studio.swap_portrait_depth = false.
-        if ((bool) studio_config('swap_portrait_depth', true)) {
+        // "Chân dung & Chiều sâu": mode = outpaint (default) | bokeh | off.
+        //  outpaint: frame ~1.22x, the Qwen edit model GENERATES a natural wider scene (no mirroring)
+        //           and the subject stays sharp at ~82%; if outpainting fails, the raw result is kept.
+        //  bokeh:    clean depth-of-field blur on the original frame (no extension).
+        $mode = (string) studio_config('swap_portrait_depth', 'outpaint');
+        if ($mode === 'outpaint') {
+            $outpaint = $this->outpaintBackground($fallback);
+            if ($outpaint) { $fallback = $outpaint; }
+        } elseif ($mode === 'bokeh') {
             $portrait = $this->applyPortraitDepth($fallback);
             if ($portrait) { $fallback = $portrait; }
         }
@@ -1961,7 +2033,7 @@ class StudioController extends Controller
             $k = new \App\Models\StudioApiKey();
             $k->provider = (string) ($d['key_provider'] ?? '');
             $k->label = (string) ($d['key_label'] ?? $k->provider);
-            $k->value = IlluminateSupportFacadesCrypt::encryptString((string) $d['key_value']);
+            $k->value = \Illuminate\Support\Facades\Crypt::encryptString((string) $d['key_value']);
             $k->kind = (string) ($d['key_kind'] ?? '');
             $k->scopes = ['*'];
             $k->priority = (int) ($d['key_priority'] ?? 5);
