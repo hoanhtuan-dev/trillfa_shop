@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useStudioStore } from './store.js';
 import SourceCard from './components/SourceCard.vue';
 import SuggestCard from './components/SuggestCard.vue';
@@ -20,7 +20,8 @@ function copyColor(c) { try { navigator.clipboard.writeText(c); store.toast('ÄÃ
 const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 const menuOpen = ref(false);
 const outputOpen = ref(false);
-onMounted(async () => { store.load(); });
+onMounted(async () => { store.load(); store.loadPalette(store.previewId); });
+watch(() => store.previewId, (id) => { store.loadPalette(id); });
 function cropMetrics() {
   const img = store.cvImg, cont = store.canvasZoom;
   if (!img || !cont) return null;
