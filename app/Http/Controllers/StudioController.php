@@ -1361,12 +1361,12 @@ class StudioController extends Controller
     }
 
     /**
-     * "Chân dung & Chiều sâu" (Portrait & Depth) post-process. Deterministic, preserves the subject:
-     *  1) frame is extended (canvas *~1.22) so the person occupies ~82% of the height (smaller,
-     *     background visible around them);
-     *  2) a blurred, stretched copy of the scene fills the extended frame as a soft backdrop;
-     *  3) the original image is composited centered with a depth-of-field mask — the subject stays
-     *     sharp and pixel-identical, the surrounding background is softly blurred (bokeh / depth).
+     * "Chân dung & Chiều sâu" (Portrait & Depth) post-process.
+     * CLEAN depth-of-field bokeh on the ORIGINAL frame (no canvas extension, no mirror-pad — those
+     * produced a visible "copy-flipped" background). A soft radial mask keeps the centered subject
+     * sharp and blurred only the outer background toward the corners; a wide smooth falloff means no
+     * banding/seam. This is artifact-free. (To also make the subject smaller needs real background
+     * content generation — see outpainting / segmentation, separate from this deterministic pass.)
      */
     protected function applyPortraitDepth(string $url): ?string
     {
@@ -1379,54 +1379,35 @@ class StudioController extends Controller
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
 
-        $scale = 0.82;          // person target = ~82% of frame height
         $w = imagesx($img); $h = imagesy($img);
-        $cw = (int) round($w / $scale); $ch = (int) round($h / $scale);
-
-        // 1) Seamless extended backdrop: MIRROR-pad the original scene to the bigger frame (the
-        // extension reflects the actual edge content — flowers/architecture continue naturally, so
-        // there is NO stretch-blur double-image and NO visible frame seam). The original (model)
-        // sits at ~82% of the frame, sharp.
-        $ox = (int) (($cw - $w) / 2); $oy = (int) (($ch - $h) / 2);
-        $back = imagecreatetruecolor($cw, $ch);
-        for ($y = 0; $y < $ch; $y++) {
-            $sy = $this->mirrorCoord($y - $oy, $h);
-            for ($x = 0; $x < $cw; $x++) {
-                $sx = $this->mirrorCoord($x - $ox, $w);
-                imagesetpixel($back, $x, $y, imagecolorat($img, $sx, $sy));
-            }
-        }
-
-        // 2) Depth-of-field vignette: blur ONLY the OUTER extension, ramping over a margin so there
-        // is no seam, and NEVER touching the original frame (the model stays pixel-identical/sharp).
-        $blur = imagecreatetruecolor($cw, $ch);
-        imagecopy($blur, $back, 0, 0, 0, 0, $cw, $ch);
+        // Soft bokeh: keep a generous central ellipse sharp, blur outward with a WIDE smooth falloff.
+        $blur = imagecreatetruecolor($w, $h);
+        imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
         for ($i = 0; $i < 3; $i++) { @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR); }
-        $blend = (int) (min($w, $h) * 0.06); // ramp width in the extension
-        for ($y = 0; $y < $ch; $y++) {
-            $sy = $y - $oy;
-            $dyOut = max(0, -$sy, $sy - ($h - 1));
-            for ($x = 0; $x < $cw; $x++) {
-                $sx = $x - $ox;
-                if ($sx >= 0 && $sx < $w && $sy >= 0 && $sy < $h) { continue; } // inside frame -> sharp
-                $dxOut = max(0, -$sx, $sx - ($w - 1));
-                $dist = max($dxOut, $dyOut);
-                $wgt = max(0.0, min(1.0, $dist / $blend));
+        $cx = $w / 2; $cy = $h / 2;
+        $rx = $w * 0.62; $ry = $h * 0.66;   // generous sharp ellipse (subject stays inside)
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $dx = ($x - $cx) / $rx; $dy = ($y - $cy) / $ry;
+                $d = sqrt($dx * $dx + $dy * $dy);
+                if ($d <= 0.72) { continue; }          // sharpen core
+                $wgt = (1 - $d) / 0.28;                // 1 at d=0.72 -> 0 at d=1.0 (wide smooth ramp)
+                $wgt = max(0.0, min(1.0, $wgt));
                 $wg = $wgt * $wgt * (3 - 2 * $wgt);
-                if ($wg <= 0.02) { continue; }
-                $c = imagecolorat($back, $x, $y);
+                if ($wg >= 0.999) { continue; }
+                $c = imagecolorat($img, $x, $y);
                 $b = imagecolorat($blur, $x, $y);
-                $r = (int) round((($c >> 16) & 255) * (1 - $wg) + (($b >> 16) & 255) * $wg);
-                $g = (int) round((($c >> 8) & 255) * (1 - $wg) + (($b >> 8) & 255) * $wg);
-                $bb = (int) round(($c & 255) * (1 - $wg) + ($b & 255) * $wg);
-                imagesetpixel($back, $x, $y, imagecolorallocate($back, $r, $g, $bb));
+                $r = (int) round((($c >> 16) & 255) * $wg + (($b >> 16) & 255) * (1 - $wg));
+                $g = (int) round((($c >> 8) & 255) * $wg + (($b >> 8) & 255) * (1 - $wg));
+                $bb = (int) round(($c & 255) * $wg + ($b & 255) * (1 - $wg));
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $bb));
             }
         }
         imagedestroy($blur);
 
         $name = 'studio/portrait-'.Str::uuid().'.png';
-        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($back));
-        imagedestroy($back); imagedestroy($img);
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
+        imagedestroy($img);
         return '/storage/'.$name;
     }
 
