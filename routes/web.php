@@ -116,6 +116,9 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/keys', [StudioController::class, 'storeApiKey'])->name('keys.store');
     Route::put('/keys/{key}', [StudioController::class, 'updateApiKey'])->name('keys.update');
     Route::delete('/keys/{key}', [StudioController::class, 'deleteApiKey'])->name('keys.delete');
+    Route::post('/face-presets', [StudioController::class, 'facePresetStore'])->name('face-presets.store');
+    Route::put('/face-presets/{preset}', [StudioController::class, 'facePresetUpdate'])->name('face-presets.update');
+    Route::delete('/face-presets/{preset}', [StudioController::class, 'facePresetDestroy'])->name('face-presets.destroy');
     Route::post('/generate', [StudioController::class, 'generate'])->name('generate');
     Route::post('/video', [StudioController::class, 'renderVideo'])->name('video');
     Route::post('/swap-model', [StudioController::class, 'swapModel'])->name('swapModel');

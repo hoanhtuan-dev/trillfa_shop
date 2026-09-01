@@ -895,7 +895,10 @@ class StudioController extends Controller
             case 'warm':    $tintR = 12; $tintB = -8; $contrast = 0.18; $lift = 0.02; break;
             case 'cool':    $tintR = -8; $tintB = 12; $contrast = 0.10; $lift = 0.04; break;
             case 'dramatic':$contrast = 0.42; $tintR = -4; $tintB = 4; $lift = -0.03; break;
-            case 'retro':   $contrast = 0.10; $lift = 0.14; $tintR = 15; $tintG = 6; $tintB = -14; break;
+            // Film: softened so it no longer burns out highlights (was lift 0.14 / tint 15 / -14).
+            case 'retro':   $contrast = 0.08; $lift = 0.06; $tintR = 9; $tintG = 3; $tintB = -6; break;
+            // Cinematic (điện ảnh): warm highlights + teal shadows, gentle contrast, slight sat boost.
+            case 'cinematic': $contrast = 0.22; $lift = 0.02; $sat = 1.06; $tintR = 8; $tintG = -1; $tintB = 6; break;
             case 'mono':    $sat = 0.0; $contrast = 0.22; $lift = 0.02; break;
             default:        $contrast = 0.06; $tintR = 4; $tintB = -2; break; // studio neutral
         }
@@ -1100,19 +1103,20 @@ class StudioController extends Controller
      * Deterministic color-tone effect for the swap result: picks a grade (auto = by the chosen
      * background) and applies applyLook(). Returns the new /storage URL or null when no grade applies.
      */
-    protected function applyToneToStoredImage(string $url, string $tone, string $background = ''): ?string
+    protected function applyToneToStoredImage(string $url, string $tone, string $background = '', int $level = 6): ?string
     {
         $tone = strtolower(trim((string) $tone));
         $look = match ($tone) {
             'warm' => 'warm',
             'cool' => 'cool',
             'film' => 'retro',
+            'cinematic' => 'cinematic',
             'dramatic' => 'dramatic',
             'mono' => 'mono',
             'auto' => $this->autoLookForBackground($background),
             default => null,
         };
-        if (! $look || $look === 'none') {
+        if (! $look || $look === 'none' || $level <= 0) {
             return null;
         }
         $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
@@ -1123,7 +1127,7 @@ class StudioController extends Controller
         if (! $file) { return null; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
-        $this->applyLook($img, $look, 7);
+        $this->applyLook($img, $look, max(1, min(10, $level)));
         $name = 'studio/swaptone-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
         imagedestroy($img);
@@ -1233,7 +1237,8 @@ class StudioController extends Controller
             'background' => ['nullable', 'string', 'max:400'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
             'build' => ['nullable', 'integer', 'min:0', 'max:10'], // Tỷ lệ dáng (0 lùn-nở -> 10 cao-thon chuẩn mẫu)
-            'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/dramatic/mono/none)
+            'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
+            'tone_level' => ['nullable', 'integer', 'min:0', 'max:10'], // Mức độ ảnh hưởng của hiệu ứng
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -1268,9 +1273,11 @@ class StudioController extends Controller
         $det = $this->enhanceStoredImage($fallback, 3, 1);
         if ($det) { $fallback = $det; }
 
-        // Color-tone effect: deterministic grade matching the chosen tone / background.
+        // Color-tone effect: deterministic grade matching the chosen tone / background, at the chosen
+        // strength (tone_level 0-10; default 6 so the effect is clearly visible but not blown out).
         $tone = (string) ($data['tone'] ?? 'auto');
-        $toned = $this->applyToneToStoredImage($fallback, $tone, (string) ($data['background'] ?? ''));
+        $toneLevel = (int) ($data['tone_level'] ?? 6);
+        $toned = $this->applyToneToStoredImage($fallback, $tone, (string) ($data['background'] ?? ''), $toneLevel);
         if ($toned) { $fallback = $toned; }
 
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
@@ -1280,7 +1287,7 @@ class StudioController extends Controller
             'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
             'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
             'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => $credits,
-            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'build' => (int) ($data['build'] ?? 7), 'tone' => $tone, 'steps' => $credits],
+            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'build' => (int) ($data['build'] ?? 7), 'tone' => $tone, 'tone_level' => $toneLevel, 'steps' => $credits],
         ]);
         return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'model' => $actualModel, 'task_id' => null]);
     }
@@ -1741,6 +1748,7 @@ class StudioController extends Controller
             'usage' => studio_usage(auth()->user()),
             'models' => studio_models(), // registry models (grouped by category)
             'api_keys' => \App\Models\StudioApiKey::orderBy('provider')->orderByDesc('priority')->orderBy('id')->get(),
+            'face_presets' => \App\Models\FacePreset::orderBy('sort')->orderBy('id')->get(),
             'providers' => $this->providerStatus(),
         ]);
     }
@@ -1800,6 +1808,68 @@ class StudioController extends Controller
         $model->delete();
         if (request()->wantsJson()) return response()->json(['ok' => true]);
         return back()->with('success', 'Đã xóa model.');
+    }
+
+    /**
+     * Face presets (khuôn mặt mẫu) — manageable from Studio Settings.
+     */
+    public function facePresetStore(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'description' => ['required', 'string', 'max:1200'],
+            'ethnicity' => ['nullable', 'string', 'max:80'],
+            'image' => ['nullable', 'image', 'max:8192'],
+            'sort' => ['nullable', 'integer', 'min:0', 'max:9999'],
+        ]);
+
+        $image = null;
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $image = '/storage/'.$request->file('image')->store('studio/faces', 'public');
+        }
+
+        \App\Models\FacePreset::create([
+            'name' => $data['name'],
+            'description' => $data['description'],
+            'ethnicity' => $data['ethnicity'] ?? null,
+            'image' => $image,
+            'sort' => (int) ($data['sort'] ?? 0),
+            'enabled' => true,
+        ]);
+
+        return back()->with('success', 'Đã thêm khuôn mặt mẫu.');
+    }
+
+    public function facePresetUpdate(Request $request, \App\Models\FacePreset $preset)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'description' => ['required', 'string', 'max:1200'],
+            'ethnicity' => ['nullable', 'string', 'max:80'],
+            'image' => ['nullable', 'image', 'max:8192'],
+            'sort' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'enabled' => ['nullable', 'boolean'],
+        ]);
+
+        $fill = [
+            'name' => $data['name'],
+            'description' => $data['description'],
+            'ethnicity' => $data['ethnicity'] ?? null,
+            'sort' => (int) ($data['sort'] ?? $preset->sort),
+            'enabled' => ! empty($data['enabled']),
+        ];
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $fill['image'] = '/storage/'.$request->file('image')->store('studio/faces', 'public');
+        }
+        $preset->update($fill);
+
+        return back()->with('success', 'Đã cập nhật khuôn mặt mẫu.');
+    }
+
+    public function facePresetDestroy(\App\Models\FacePreset $preset)
+    {
+        $preset->delete();
+        return back()->with('success', 'Đã xóa khuôn mặt mẫu.');
     }
 
     public function storeApiKey(Request $request)

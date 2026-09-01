@@ -83,6 +83,7 @@ class DatabaseSeeder extends Seeder
         $this->reviews();
         $this->orders();
         $this->presets();
+        $this->call(FacePresetSeeder::class);
 
         $this->command?->info('Seeded Trillfa Fa successfully.');
     }

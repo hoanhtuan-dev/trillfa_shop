@@ -36,8 +36,14 @@ class StudioSwapTest extends TestCase
         $this->assertSame('Dáng riêng B', $pickedPose['name']);
         $this->assertSame('/storage/custom-pose.png', $pickedPose['image']);
 
-        // Catalog ids still resolve.
-        $this->assertSame('model01', $svc->pickModel('model01')['id'] ?? null);
+        // Seeded DB preset resolves (id like "fp1").
+        $preset = \App\Models\FacePreset::first();
+        $this->assertNotNull($preset);
+        $pickedPreset = $svc->pickModel('fp'.$preset->id);
+        $this->assertSame($preset->name, $pickedPreset['name'] ?? null);
+
+        // Built-in preset + pose still resolve via fallback.
+        $this->assertSame('vp01', $svc->pickModel('vp01')['id'] ?? null);
         $this->assertSame('pose01', $svc->pickPose('pose01')['id'] ?? null);
     }
 

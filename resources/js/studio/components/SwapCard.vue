@@ -10,10 +10,12 @@ const swapBg = ref('');
 const swapTexture = ref(5);
 const swapBuild = ref(7); // Tỷ lệ dáng: 0 lùn-nở -> 10 cao-thon chuẩn người mẫu
 const swapTone = ref('auto'); // Hiệu ứng tông màu
+const swapToneLevel = ref(6); // Mức độ ảnh hưởng 0-10
 const toneOptions = [
   { v: 'auto', label: '🎨 Tự động (theo bối cảnh)' },
   { v: 'warm', label: '☀️ Ấm' },
   { v: 'cool', label: '❄️ Lạnh' },
+  { v: 'cinematic', label: '🎬 Điện ảnh' },
   { v: 'film', label: '🎞️ Film' },
   { v: 'dramatic', label: '🌑 Kịch tính' },
   { v: 'mono', label: '⚪ Trắng đen' },
@@ -52,7 +54,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img :src="selPoseImgs[0]?.image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button @click="store.runSwap({ background: swapBg, texture: swapTexture, build: swapBuild, tone: swapTone })" :disabled="!canApply" class="btn-brand btn-sm">{{ store.swapLoading ? 'Đang ghép…' : 'Áp dụng' }}</button></div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button @click="store.runSwap({ background: swapBg, texture: swapTexture, build: swapBuild, tone: swapTone, tone_level: swapToneLevel })" :disabled="!canApply" class="btn-brand btn-sm">{{ store.swapLoading ? 'Đang ghép…' : 'Áp dụng' }}</button></div>
     <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
     <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" @click.self="open=false">
       <div class="scrollbar-hide max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-brand-500/30 bg-ink-900 p-5" @click.stop>
@@ -60,7 +62,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
         <!-- Khuôn mặt -->
         <p class="mb-2 text-xs font-semibold text-cream-200">👩 Khuôn mặt</p>
         <div class="flex flex-wrap gap-2">
-          <button v-for="f in faceList" :key="f.id" @click="selectOne(store.swapModelIds, f.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-xl border-2" :class="store.swapModelIds.includes(f.id) ? 'border-brand-500' : 'border-ink-700'"><img :src="f.image || '/images/placeholder.svg'" class="h-full w-full bg-ink-900 object-cover"><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ f.name }}</span><button v-if="f.custom" @click.stop="delAsset({id:f.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
+          <button v-for="f in faceList" :key="f.id" @click="selectOne(store.swapModelIds, f.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-xl border-2" :class="store.swapModelIds.includes(f.id) ? 'border-brand-500' : 'border-ink-700'"><img v-if="f.image" :src="f.image" class="h-full w-full bg-ink-900 object-cover"><span v-else class="grid h-full w-full place-items-center bg-ink-800 text-xl">👩</span><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ f.name }}</span><button v-if="f.custom" @click.stop="delAsset({id:f.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
         </div>
         <!-- Dáng -->
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🧍 Dáng</p>
@@ -95,6 +97,12 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
           <div class="flex flex-wrap gap-1.5">
             <button v-for="t in toneOptions" :key="t.v" @click="swapTone = t.v" class="rounded-full border px-3 py-1.5 text-xs" :class="swapTone === t.v ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ t.label }}</button>
           </div>
+          <div class="mt-2 flex items-center gap-3">
+            <span class="shrink-0 text-[10px] text-cream-300/60">Mức độ</span>
+            <input type="range" min="0" max="10" v-model.number="swapToneLevel" class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-600">
+            <span class="w-6 text-right text-xs text-cream-200">{{ swapToneLevel }}</span>
+          </div>
+          <p class="mt-1 text-[10px] text-cream-300/50">0 = không áp dụng · 6 = vừa phải (mặc định) · 10 = đậm nhất. Film/Cinematic nhẹ để tránh cháy sáng.</p>
         </div>
         <!-- Thêm / xóa -->
         <div class="mt-5 rounded-2xl border border-dashed border-cream-300/40 p-3">

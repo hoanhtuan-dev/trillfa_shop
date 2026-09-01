@@ -30,15 +30,41 @@ class VirtualTryOnService
 
     public function modelCatalog(): array
     {
-        // 6 model faces (headshots). We pass the selected face as a reference image to qwen-edit so
-        // the swap adopts that person's look; the face's desc text is a secondary descriptor.
+        // Manageable face presets (DB) — the swap picker + backend both read from here, so presets can
+        // be added/edited in Studio Settings. When the table is empty we fall back to built-in presets.
+        $db = \App\Models\FacePreset::where('enabled', true)->orderBy('sort')->orderBy('id')->get();
+        if ($db->isNotEmpty()) {
+            return $db->map(function ($p) {
+                return [
+                    'id' => 'fp'.$p->id,
+                    'name' => $p->name,
+                    'ethnicity' => $p->ethnicity ?: 'Vietnamese female',
+                    'image' => $p->image, // may be null (text-only preset)
+                    'desc' => $p->description,
+                    'preset' => true,
+                ];
+            })->values()->all();
+        }
+
+        return $this->builtinFacePresets();
+    }
+
+    /**
+     * Built-in fallback presets (10 young Vietnamese female looks) — used only when the DB is empty.
+     */
+    public function builtinFacePresets(): array
+    {
         return [
-            ['id' => 'model01', 'name' => 'Mẫu 1', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-01.png', 'desc' => 'East Asian female, shoulder-length reddish-brown hair, fair skin'],
-            ['id' => 'model02', 'name' => 'Mẫu 2', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-02.png', 'desc' => 'East Asian female, long black wavy hair, white shirt'],
-            ['id' => 'model03', 'name' => 'Mẫu 3', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-03.png', 'desc' => 'East Asian female, high bun updo, fair skin'],
-            ['id' => 'model04', 'name' => 'Mẫu 4', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-04.png', 'desc' => 'East Asian female, short bob black hair, smiling'],
-            ['id' => 'model05', 'name' => 'Mẫu 5', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-05.png', 'desc' => 'East Asian female, high ponytail, long black hair'],
-            ['id' => 'model06', 'name' => 'Mẫu 6', 'ethnicity' => 'East Asian female', 'image' => '/samples/model-06.png', 'desc' => 'East Asian female, long wavy black hair, lace top'],
+            ['id' => 'vp01', 'name' => 'Nhẹ nhàng tự nhiên', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 22, light natural everyday makeup, shoulder-length straight black hair, fair skin, gentle warm smile, soft feminine features'],
+            ['id' => 'vp02', 'name' => 'Tóc dài lượn sóng', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 24, long wavy black hair with soft curls, radiant clear skin, subtle Korean-style makeup, elegant and graceful'],
+            ['id' => 'vp03', 'name' => 'Cá tính tóc bob', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 23, chic short black bob haircut, bold natural lipstick, confident modern look, sharp jawline, almond eyes'],
+            ['id' => 'vp04', 'name' => 'Thanh lịch tóc búi', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 25, elegant low bun hairstyle, minimalist makeup, classic Vietnamese beauty, refined and sophisticated'],
+            ['id' => 'vp05', 'name' => 'Năng động tóc đuôi ngựa', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 22, high ponytail, fresh sporty energetic look, clear glowing skin, bright happy smile, youthful'],
+            ['id' => 'vp06', 'name' => 'Ngọt ngào tóc xoăn', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 21, soft loose curls, sweet innocent face, rosy cheeks, gentle dreamy eyes, cute and charming'],
+            ['id' => 'vp07', 'name' => 'Sang trọng mái lệch', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 26, side-swept bangs, sophisticated editorial makeup, elegant high-fashion look, striking features'],
+            ['id' => 'vp08', 'name' => 'Thời trang mắt khói', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 24, sleek center-parted straight hair, trendy smoky-eye makeup, fashion-forward street style, confident gaze'],
+            ['id' => 'vp09', 'name' => 'Dịu dàng tóc đen thẳng', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 23, long straight jet-black hair, fresh natural no-makeup look, serene calm expression, classic beauty'],
+            ['id' => 'vp10', 'name' => 'Hiện đại mái ngố', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 22, modern curtain bangs, fresh glass-skin makeup, trendy K-pop inspired look, sparkling eyes'],
         ];
     }
 
@@ -67,7 +93,22 @@ class VirtualTryOnService
      */
     public function pickModel(string $id): ?array
     {
-        if ($id !== '') {
+        // Manageable DB preset (id like "fp3").
+        if (str_starts_with($id, 'fp')) {
+            $p = \App\Models\FacePreset::find((int) substr($id, 2));
+            if ($p) {
+                return [
+                    'id' => 'fp'.$p->id,
+                    'name' => $p->name,
+                    'image' => $p->image,
+                    'ethnicity' => $p->ethnicity ?: 'Vietnamese female',
+                    'desc' => $p->description,
+                    'preset' => true,
+                ];
+            }
+        }
+        // Custom asset (added via the swap card's "➕ Thêm khuôn mặt").
+        if ($id !== '' && is_numeric($id)) {
             $asset = \App\Models\StudioAsset::where('type', 'model')->where('id', $id)->first();
             if ($asset) {
                 return [
@@ -79,7 +120,8 @@ class VirtualTryOnService
                 ];
             }
         }
-        foreach ($this->modelCatalog() as $m) {
+        // Built-in presets (vp01..vp10).
+        foreach ($this->builtinFacePresets() as $m) {
             if (($m['id'] ?? '') === $id) {
                 return $m;
             }
@@ -183,7 +225,8 @@ class VirtualTryOnService
         return match ($tone) {
             'warm' => ' Color-grade the whole image with a warm, golden studio light that suits the scene.',
             'cool' => ' Color-grade the whole image with a cool, clean, soft tone that suits the scene.',
-            'film' => ' Apply a subtle cinematic film color grade (soft contrast, gentle warm/cool split, fine grain) that suits the scene.',
+            'film' => ' Apply a gentle vintage film color grade: soft warm highlights, muted mid-tones, fine grain — keep the exposure balanced so highlights are NOT blown out.',
+            'cinematic' => ' Apply a cinematic movie color grade: warm golden highlights with teal shadows, smooth contrast and rich color — like a feature film frame.',
             'dramatic' => ' Apply a dramatic, moody high-contrast color grade with deeper shadows that suits the scene.',
             'mono' => ' Render the final image in elegant black-and-white monochrome with soft contrast.',
             default => '',
