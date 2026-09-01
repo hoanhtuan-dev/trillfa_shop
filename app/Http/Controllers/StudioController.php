@@ -28,16 +28,7 @@ class StudioController extends Controller
 
     public function index()
     {
-        $user = auth()->user();
-        $this->reconcileStuckCredits($user);
-
-        $projects = $user->projects()->withCount('generations')->latest()->get();
-        $presets = Preset::orderBy('sort_order')->get()->groupBy('category');
-        $latest = $user->generations()->with('project')->latest()->limit(30)->get();
-        $creditsUsed = (int) $user->generations()->where('status', 'completed')->sum('credits_cost');
-        $pendingCount = (int) $user->generations()->whereIn('status', ['pending', 'processing'])->count();
-
-        $stylistTypes = app(\App\Services\StylistService::class)->garmentTypes();
+        // The Vue studio loads its own data; keep this method minimal.
         return view('studio.vue');
     }
 
