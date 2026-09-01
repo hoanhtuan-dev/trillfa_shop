@@ -118,6 +118,11 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { /* app data loads via Alpine too */ }
     },
     select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); } },
+    async processQueue() {
+      try { await fetch('/studio/process', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); } catch (e) {}
+      // refresh the generations so the processed images appear
+      try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); const items = d.items || d.generations || []; if (Array.isArray(items)) this.generations = items; } catch (e) {}
+    },
     async generateImage() {
       if (!this.imagePromptEn || this.generating) return;
       this.generating = true;
@@ -128,6 +133,8 @@ export const useStudioStore = defineStore('studio', {
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
         this.setBatch(items.map(it => it.generation_id));
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
+        // Process the pending generations (RenderImageJob::dispatchSync, fire-and-forget so the UI isn't blocked).
+        this.processQueue();
       } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh.', 'error'); }
       finally { this.generating = false; }
     },
