@@ -337,16 +337,22 @@ class StudioController extends Controller
             }
         }
 
-        // 3) Làm mờ patch (có lề feather) rồi dán lại cho hòa biên.
+        // 3) Feather mềm biên: COPY vùng (region + lề feather) TỪ ẢNH vào patch (không để
+        //    mép patch đen — imagecreatetruecolor mặc định đen gây viền đen), blur rồi copy về
+        //    ĐÚNG rect đó → biên hòa mượt, không nhuộm đen ra ngoài.
         if (function_exists('imagefilter') && $w * $h <= 8000000) {
             $feather = (int) max(3, min(24, round(min($pw, $ph) * 0.1)));
-            $pw2 = $pw + $feather * 2; $ph2 = $ph + $feather * 2;
-            $patch = imagecreatetruecolor($pw2, $ph2);
-            imagecopy($patch, $img, $feather, $feather, $px, $py, $pw, $ph);
-            @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
-            @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
-            imagecopy($img, $patch, max(0, $px - $feather), max(0, $py - $feather), 0, 0, $pw2, $ph2);
-            imagedestroy($patch);
+            $copyX = max(0, $px - $feather); $copyY = max(0, $py - $feather);
+            $copyX2 = min($w, $px + $pw + $feather); $copyY2 = min($h, $py + $ph + $feather);
+            $cw = $copyX2 - $copyX; $ch = $copyY2 - $copyY;
+            if ($cw > 0 && $ch > 0) {
+                $patch = imagecreatetruecolor($cw, $ch);
+                imagecopy($patch, $img, 0, 0, $copyX, $copyY, $cw, $ch);
+                @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
+                @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
+                imagecopy($img, $patch, $copyX, $copyY, 0, 0, $cw, $ch);
+                imagedestroy($patch);
+            }
         }
     }
 
@@ -1377,6 +1383,102 @@ class StudioController extends Controller
     }
 
     /**
+     * "Tách nền lần 2" (2-pass background separation): ask the edit model to REMOVE the person and
+     * fill the background naturally -> a clean scene with no person. We can then apply effects
+     * (blur / depth-of-field) to that background SAFELY (there is no person to blur), build an alpha
+     * mask from the pixel difference between the composite and the clean background, and recomposite
+     * the ORIGINAL (sharp) person on top. Result: sharp subject, softened background, no mirroring.
+     */
+    protected function applyBackgroundDepth(string $compositeUrl): ?string
+    {
+        // 1) AI: remove the person, fill the scene -> clean background.
+        $bgClean = $this->removePersonBackground($compositeUrl);
+        if (! $bgClean) { return null; }
+
+        $load = function (string $url) {
+            $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+            $file = null;
+            foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $c) {
+                if (is_file($c)) { $file = $c; break; }
+            }
+            return $file ? @imagecreatefromstring((string) file_get_contents($file)) : null;
+        };
+        $comp = $load($compositeUrl); $clean = $load($bgClean);
+        if (! $comp || ! $clean) { return null; }
+        $w = imagesx($comp); $h = imagesy($comp);
+        // Normalise the clean bg to the composite size (it may come back at a different resolution).
+        if (imagesx($clean) !== $w || imagesy($clean) !== $h) {
+            $r2 = imagecreatetruecolor($w, $h);
+            imagecopyresampled($r2, $clean, 0, 0, 0, 0, $w, $h, imagesx($clean), imagesy($clean));
+            imagedestroy($clean); $clean = $r2;
+        }
+
+        // 2) Alpha mask = pixel difference (composite vs clean bg), thresholded + feathered.
+        $alpha = imagecreatetruecolor($w, $h);
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $a = imagecolorat($comp, $x, $y); $b = imagecolorat($clean, $x, $y);
+                $dr = abs((($a>>16)&255) - (($b>>16)&255));
+                $dg = abs((($a>>8)&255) - (($b>>8)&255));
+                $db = abs(($a&255) - ($b&255));
+                $diff = max($dr, max($dg, $db));
+                $v = (int) max(0, min(255, ($diff - 18) * 255 / 70));
+                imagesetpixel($alpha, $x, $y, imagecolorallocate($alpha, $v, $v, $v));
+            }
+        }
+        // Feather the mask (soft hair / silhouette edges).
+        for ($i = 0; $i < 2; $i++) { @imagefilter($alpha, IMG_FILTER_GAUSSIAN_BLUR); }
+
+        // 3) Effect on the CLEAN background: depth-of-field blur (safe — no person).
+        $proc = imagecreatetruecolor($w, $h);
+        imagecopy($proc, $clean, 0, 0, 0, 0, $w, $h);
+        for ($i = 0; $i < 3; $i++) { @imagefilter($proc, IMG_FILTER_GAUSSIAN_BLUR); }
+
+        // 4) Recomposite: sharp composite * alpha + processed bg * (1 - alpha).
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $am = imagecolorat($alpha, $x, $y) & 255;
+                if ($am <= 4) { continue; }               // bg -> keep the processed bg
+                $wg = $am / 255.0;
+                $c = imagecolorat($comp, $x, $y);
+                $b = imagecolorat($proc, $x, $y);
+                $r = (int) round((($c>>16)&255)*$wg + (($b>>16)&255)*(1-$wg));
+                $g = (int) round((($c>>8)&255)*$wg + (($b>>8)&255)*(1-$wg));
+                $bb = (int) round(($c&255)*$wg + ($b&255)*(1-$wg));
+                imagesetpixel($proc, $x, $y, imagecolorallocate($proc, $r, $g, $bb));
+            }
+        }
+        imagedestroy($alpha); imagedestroy($clean); imagedestroy($comp);
+
+        $name = 'studio/bgdepth-'.Str::uuid().'.png';
+        IlluminateSupportFacadesStorage::disk('public')->put($name, $this->pngBytes($proc));
+        imagedestroy($proc);
+        return '/storage/'.$name;
+    }
+
+    /**
+     * Ask the edit model to remove the person and fill the background naturally.
+     */
+    protected function removePersonBackground(string $url): ?string
+    {
+        $prompt = 'Remove the person from this photograph and fill the area behind them with the natural continuation of the scene (the architecture, flowering bougainvillea, plants, lanterns and paved ground). '
+            .'Keep the whole scene otherwise EXACTLY unchanged — same lighting, same colors, same framing. '
+            .'The result must look like the real location with nobody in it. Photorealistic.';
+        try {
+            return app(AppServicesImageAIService::class)->swapEdit(
+                $prompt,
+                $url,
+                (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'),
+                null,
+                null
+            );
+        } catch (Throwable $e) {
+            logger()->warning('removePersonBackground failed: '.$e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * AI Outpainting for "Chân dung & Chiều sâu": extend the frame to ~1.22x (subject ~82%) and let
      * the Qwen edit model GENERATE a natural continuation of the scene (architecture, flowers, ground)
      * into the border — no mirroring, no copy-flip. The center (person) is pasted sharp and hidden
@@ -1632,14 +1734,15 @@ class StudioController extends Controller
         $bright = $this->brightenDarkSubject($fallback);
         if ($bright) { $fallback = $bright; }
 
-        // "Chân dung & Chiều sâu": mode = outpaint (default) | bokeh | off.
-        //  outpaint: frame ~1.22x, the Qwen edit model GENERATES a natural wider scene (no mirroring)
-        //           and the subject stays sharp at ~82%; if outpainting fails, the raw result is kept.
-        //  bokeh:    clean depth-of-field blur on the original frame (no extension).
-        $mode = (string) studio_config('swap_portrait_depth', 'outpaint');
-        if ($mode === 'outpaint') {
-            $outpaint = $this->outpaintBackground($fallback);
-            if ($outpaint) { $fallback = $outpaint; }
+        // "Chân dung & Chiều sâu" (post-process): mode = separate (default) | bokeh | off.
+        //  separate: "tách nền lần 2" — AI removes the person (clean bg), we blur/effect that bg
+        //            safely, then recomposite the sharp person on top (alpha from the difference).
+        //  bokeh:    deterministic depth-of-field on the original frame.
+        //  off:      no background post-processing (the raw swap result).
+        $mode = (string) studio_config('swap_portrait_depth', 'separate');
+        if ($mode === 'separate') {
+            $bgDepth = $this->applyBackgroundDepth($fallback);
+            if ($bgDepth) { $fallback = $bgDepth; }
         } elseif ($mode === 'bokeh') {
             $portrait = $this->applyPortraitDepth($fallback);
             if ($portrait) { $fallback = $portrait; }
