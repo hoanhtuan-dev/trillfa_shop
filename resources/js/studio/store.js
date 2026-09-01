@@ -69,11 +69,12 @@ export const useStudioStore = defineStore('studio', {
     lastBatch: [],
     showBatch: false,
     canvasLayers: [],
+    activeLayerId: '',
   }),
   getters: {
-    upscaleSrc: (s) => (s.editSource && s.editSource.url) || (s.preview && s.preview.media_url) || '',
-    upscaleName: (s) => (s.editSource && s.editSource.name) || (s.preview ? 'Ảnh kết quả #' + s.preview.id : 'Ảnh đang chọn'),
-    activeLayerId() { return this.editSource ? 'source' : (this.previewId ? String(this.previewId) : ''); },
+    upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
+    upscaleName() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; } return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
+
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
   },
   actions: {
@@ -89,6 +90,7 @@ export const useStudioStore = defineStore('studio', {
       else this.generations.unshift(g);
       this.previewId = g.id;
       if (g.status === 'completed') { this.preview = { id: g.id, media_url: g.media_url, type: 'image', status: 'completed' }; }
+      if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); }
     },
     setPreview(g) { if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } },
     toast(msg, type = 'info') { if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type); },
@@ -104,7 +106,7 @@ export const useStudioStore = defineStore('studio', {
         if (comp) { this.previewId = comp.id; this.preview = { id: comp.id, media_url: comp.media_url, type: comp.type || 'image', status: comp.status }; }
       } catch (e) { /* app data loads via Alpine too */ }
     },
-    select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); },
+    select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); } },
     async generateImage() {
       if (!this.imagePromptEn || this.generating) return;
       this.generating = true;
@@ -154,12 +156,13 @@ export const useStudioStore = defineStore('studio', {
     goEdit(g) { this.select(g); this.step = 2; },
     goVideo(g) { this.select(g); this.step = 3; },
     pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) this.canvasLayers.push({ id, kind, name, image, genId }); },
-    selectLayer(item) { if (!item) return; if (item.kind === 'source') { this.editSource = { url: item.image, name: item.name }; } else if (item.genId) { const g = this.generations.find(x => x.id === item.genId); if (g) this.select(g); } },
+    setActiveLayer(id) { if (!id) return; this.activeLayerId = id; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } },
+    selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Remove a layer from the CANVAS ONLY (never deletes the output image or the source file).
     deleteLayer(item) { if (!item) return; this.canvasLayers = this.canvasLayers.filter(l => l.id !== item.id); if (this.activeLayerId === item.id) { const next = this.canvasLayers[0]; if (next) this.selectLayer(next); else { this.editSource = null; this.previewId = null; this.preview = null; } } },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
-    setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.pushCanvasLayer('source', 'source', this.editSource.name, url); this.toast('Đã chọn ảnh nguồn.'); },
+    setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.pushCanvasLayer('source', 'source', this.editSource.name, url); this.setActiveLayer('source'); this.toast('Đã chọn ảnh nguồn.'); },
     async uploadRef(file) {
       if (!file) { this.toast('Chọn file ảnh.', 'error'); return; }
       const fd = new FormData(); fd.append('image', file);
