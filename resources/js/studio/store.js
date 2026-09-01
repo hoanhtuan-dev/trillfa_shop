@@ -63,6 +63,7 @@ export const useStudioStore = defineStore('studio', {
     swapLoading: false,
     inpainting: false,
     inpaintPrompt: '',
+    suggesting: false,
   }),
   getters: {
     upscaleSrc: (s) => (s.editSource && s.editSource.url) || (s.preview && s.preview.media_url) || '',
@@ -127,6 +128,24 @@ export const useStudioStore = defineStore('studio', {
     panStart(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
     panMove(e) { if (this._drag) { this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); } },
     panEnd() { this._drag = null; },
+    setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.toast('Đã chọn ảnh nguồn.'); },
+    async uploadRef(file) {
+      if (!file) { this.toast('Chọn file ảnh.', 'error'); return; }
+      const fd = new FormData(); fd.append('image', file);
+      const res = await fetch('/studio/upload-ref', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { this.toast(d.message || 'Lỗi tải ảnh.', 'error'); return; }
+      this.setSource(d.url, file.name); return d.url;
+    },
+    pickFromProduct(p) { this.setSource(p.url, p.name); },
+    pickFromResult(g) { this.setSource(g.media_url, 'Ảnh kết quả #' + g.id); },
+    async suggestStyle(image) {
+      if (!image) { this.toast('Chọn ảnh nguồn để gợi ý.', 'error'); return; }
+      this.suggesting = true;
+      try { const d = await this.api('/studio/suggest', { image }); const styles = (d.styles || []).join(', '); this.toast(styles ? 'Phong cách: ' + styles + (d.background ? ' · ' + d.background : '') : 'Đã gợi ý.'); }
+      catch(e){ this.toast(e.message || 'Lỗi gợi ý.', 'error'); }
+      finally { this.suggesting = false; }
+    },
     async inpaint(prompt) {
       if (!this.previewId || this.inpainting) { this.toast('Chọn ảnh để sửa.', 'error'); return; }
       this.inpainting = true;

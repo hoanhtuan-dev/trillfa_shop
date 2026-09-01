@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useStudioStore } from './store.js';
+import SourceCard from './components/SourceCard.vue';
 import ConceptCard from './components/ConceptCard.vue';
 import StylistCard from './components/StylistCard.vue';
 import PaletteTextureCard from './components/PaletteTextureCard.vue';
@@ -40,7 +41,7 @@ function cropMove(e) {
   store.cropBox = b;
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, PaletteTextureCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
+const panel = computed(() => store.step === 1 ? [SourceCard, StylistCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, PaletteTextureCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
 </script>
 <template>
   <div class="flex h-full flex-col bg-ink-900 text-cream-100">
@@ -52,7 +53,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, ConceptCard] : sto
     </div>
     <div class="flex flex-1 overflow-hidden">
       <!-- Left sidebar (desktop) -->
-      <aside class="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 p-3 lg:flex">
+      <aside class="hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 p-3 lg:flex">
         <div class="mb-3 flex items-center justify-between"><span class="font-display text-sm font-semibold">🎨 Studio</span><span class="text-[10px] text-cream-300/50">Credit {{ store.creditsLeft }}</span></div>
         <div class="mb-3 flex gap-1 rounded-2xl bg-ink-800 p-1">
           <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0])" class="flex-1 rounded-xl px-2 py-1.5 text-xs font-semibold" :class="store.step === Number(s[0]) ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">{{ s[1] }}</button>
@@ -99,7 +100,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, ConceptCard] : sto
     <!-- Mobile menu overlay -->
     <div v-if="menuOpen" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
       <div class="absolute inset-0 bg-black/60"></div>
-      <div class="absolute left-0 top-0 h-full w-72 overflow-y-auto bg-ink-900 p-3" @click.stop>
+      <div class="absolute left-0 top-0 h-full w-80 overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="mb-2 flex items-center justify-between"><span class="font-display text-sm font-semibold">🎨 Studio</span><button @click="menuOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200">✕</button></div>
         <div class="mb-3 flex gap-1 rounded-2xl bg-ink-800 p-1">
           <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0]); menuOpen=false" class="flex-1 rounded-xl px-2 py-1.5 text-xs font-semibold" :class="store.step === Number(s[0]) ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">{{ s[1] }}</button>
