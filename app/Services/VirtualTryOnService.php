@@ -106,11 +106,18 @@ class VirtualTryOnService
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
 
         if ($faceRefUrl) {
-            // Face-image driven: the FIRST reference image is the model's face, the SECOND is the
-            // design image (person wearing the garment).
-            $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person wearing it in the SECOND image with the person from the FIRST reference image (matching face, hair, skin tone and body build), standing '.$pose.'.';
+            // Face-image driven swap (P3): the FIRST image is the reference person's face, the SECOND
+            // is the person to edit (wearing the garment). We explicitly preserve identity + anatomy to
+            // avoid the distortion the user reported ("dị dạng / không giữ đặc điểm ảnh gốc").
+            $instr = 'High-fidelity face-and-body swap. '
+                .'Keep the exact garment, outfit and all its details 100% unchanged. '
+                .'The FIRST image is the reference person: take their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. '
+                .'The SECOND image is the person to edit (wearing the garment). '
+                .'Render the reference person from the FIRST image in the pose: '.$pose.', wearing the exact garment from the SECOND image. '
+                .'Preserve the reference face precisely and keep natural, anatomically-correct proportions — do NOT distort, stretch, deform or reshape the face, eyes, nose, mouth, hair, hands or body. '
+                .'Realistic skin texture, sharp detail, consistent lighting, studio quality.';
         } else {
-            $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.';
+            $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person with a full-body '.$modelDesc.' standing '.$pose.'. Keep natural proportions; do not distort the face or body.';
         }
         // Hậu cảnh: đưa lên đầu + dùng "replace the ENTIRE background" để model thực sự thay nền.
         if ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original') {

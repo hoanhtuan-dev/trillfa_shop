@@ -16,8 +16,9 @@ onMounted(async () => {
 });
 const faceList = computed(() => [...models.value, ...assets.value.filter(a => a.type === 'model').map(a => ({ id: String(a.id), name: a.name, image: a.path, custom: true }))]);
 const poseList = computed(() => [...poses.value, ...assets.value.filter(a => a.type === 'pose').map(a => ({ id: String(a.id), name: a.name, image: a.path, custom: true }))]);
-// P2: single-select — choosing one face/pose replaces the previous selection.
+// Face: single-select (one reference face). Poses: multi-select (apply creates one result per pose).
 function selectOne(list, id, e) { e.stopPropagation(); if (list.length === 1 && list[0] === id) { list.splice(0, 1); } else { list.splice(0, list.length); list.push(id); } }
+function toggle(list, id, e) { e.stopPropagation(); const i = list.indexOf(id); if (i >= 0) list.splice(i,1); else list.push(id); }
 const selFaceImgs = computed(() => faceList.value.filter(f => store.swapModelIds.includes(f.id)));
 const selPoseImgs = computed(() => poseList.value.filter(p => store.swapPoseIds.includes(p.id)));
 const canApply = computed(() => !store.swapLoading && store.swapModelIds.length > 0 && store.swapPoseIds.length > 0);
@@ -41,7 +42,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
     </div>
     <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button @click="store.runSwap({ background: swapBg, texture: swapTexture })" :disabled="!canApply" class="btn-brand btn-sm">{{ store.swapLoading ? 'Đang ghép…' : 'Áp dụng' }}</button></div>
-    <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + 1 dáng để Áp dụng.</p>
+    <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
     <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" @click.self="open=false">
       <div class="scrollbar-hide max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-brand-500/30 bg-ink-900 p-5" @click.stop>
         <div class="mb-3 flex items-center justify-between"><span class="text-sm font-semibold text-brand-300">🪄 Chọn người mẫu / dáng / bối cảnh</span><button @click="open=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200">✕</button></div>
@@ -53,7 +54,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
         <!-- Dáng -->
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🧍 Dáng</p>
         <div class="flex flex-wrap gap-2">
-          <button v-for="p in poseList" :key="p.id" @click="selectOne(store.swapPoseIds, p.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-xl border-2" :class="store.swapPoseIds.includes(p.id) ? 'border-brand-500' : 'border-ink-700'"><img :src="p.image || '/images/placeholder.svg'" class="h-full w-full bg-ink-900 object-cover"><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span><button v-if="p.custom" @click.stop="delAsset({id:p.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
+          <button v-for="p in poseList" :key="p.id" @click="toggle(store.swapPoseIds, p.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-xl border-2" :class="store.swapPoseIds.includes(p.id) ? 'border-brand-500' : 'border-ink-700'"><img :src="p.image || '/images/placeholder.svg'" class="h-full w-full bg-ink-900 object-cover"><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span><button v-if="p.custom" @click.stop="delAsset({id:p.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
         </div>
         <!-- Bối cảnh -->
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🖼 Bối cảnh</p>

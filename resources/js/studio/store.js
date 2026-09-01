@@ -209,18 +209,23 @@ export const useStudioStore = defineStore('studio', {
     },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
-      // P2: must pick BOTH a face and a pose (single-select).
-      if (!this.swapModelIds.length || !this.swapPoseIds.length) { this.toast('Chọn 1 khuôn mặt + 1 dáng trước.', 'error'); return; }
+      // 1 face reference + 1 or MORE poses -> one result per pose.
+      if (!this.swapModelIds.length || !this.swapPoseIds.length) { this.toast('Chọn 1 khuôn mặt + ít nhất 1 dáng trước.', 'error'); return; }
+      const face = this.swapModelIds[0];
+      const poses = [...this.swapPoseIds];
       this.swapLoading = true;
-      try {
-        const d = await this.api('/studio/swap-model', { image: src, model_id: this.swapModelIds[0], pose_id: this.swapPoseIds[0], background: opts.background || '', texture: Number(opts.texture) || 5 });
-        // P0a: swap is now synchronous (qwen-edit) -> media_url is returned directly.
-        const done = d.media_url && !d.task_id;
-        if (d.generation_id) this.addGen({ id: d.generation_id, type: 'image', status: done ? 'completed' : 'processing', model: 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' });
-        if (done) this.toast('Đã thay đổi người mẫu.');
+      let n = 0; let lastErr = '';
+      for (const poseId of poses) {
+        try {
+          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', texture: Number(opts.texture) || 5 });
+          // P0a: swap is now synchronous (qwen-edit) -> media_url is returned directly.
+          if (d.generation_id) { this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); n++; }
+          else if (d.message) { lastErr = d.message; }
+        } catch (e) { lastErr = e.message || 'Lỗi thay đổi người mẫu.'; }
       }
-      catch (e) { this.toast(e.message || 'Lỗi thay đổi người mẫu.', 'error'); }
-      finally { this.swapLoading = false; }
+      this.swapLoading = false;
+      if (n > 0) { this.toast('Đã thay đổi người mẫu cho ' + n + ' dáng.'); }
+      else { this.toast(lastErr || 'Lỗi thay đổi người mẫu.', 'error'); }
     },
   },
 });
