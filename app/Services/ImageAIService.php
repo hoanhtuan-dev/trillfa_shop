@@ -18,6 +18,23 @@ class ImageAIService
 {
     protected ?string $dashscopeError = null;
 
+    /** Which provider/model actually produced the last successful image (may differ from the requested one). */
+    protected ?string $lastProvider = null;
+    protected ?string $lastModel = null;
+
+    /** True when the fallback chain attempted a provider that had a real API key. */
+    protected bool $triedRealFallback = false;
+
+    public function lastProvider(): ?string
+    {
+        return $this->lastProvider;
+    }
+
+    public function lastModel(): ?string
+    {
+        return $this->lastModel;
+    }
+
     protected function falKey(): ?string
     {
         return studio_api_key('fal');
@@ -66,6 +83,8 @@ class ImageAIService
                 $triedReal = true;
                 $url = $this->tryGeminiImage($prompt, $key, $resolution, $ratio);
                 if ($url) {
+                    $this->lastProvider = 'gemini';
+                    $this->lastModel = (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
                     return $url;
                 }
             }
@@ -79,26 +98,115 @@ class ImageAIService
 
                 $url = $this->tryModels($prompt, $models, studio_qwen_credentials('image'), $resolution, $ratio, $faceRef);
                 if ($url) {
+                    $this->lastProvider = $provider;
+                    // tryModels doesn't reveal which model won; keep the first for the log.
+                    $this->lastModel = isset($models[0]) ? strval($models[0]) : null;
                     return $url;
                 }
             }
-        } elseif (! studio_api_key('fal') && ! studio_api_key('replicate') && $dashscopeKey) {
-            $triedReal = true;
-            // Flux/default without a Fal/Replicate key: use the Qwen image model so a valid
-            // QwenCloud / DashScope key produces a real AI image.
-            $models = ['qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image'];
-            $url = $this->tryModels($prompt, $models, studio_qwen_credentials('image'), $resolution, $ratio);
-            if ($url) {
-                return $url;
-            }
         }
 
-        if ($triedReal) {
+        // The configured provider failed (bad key / exhausted quota / model not exist). Instead of
+        // hard-failing, try the OTHER image models in the registry (by priority) that have a valid key,
+        // so "Tạo Ảnh 2D" still produces an image when the primary provider is down. Also covers the
+        // default "flux" provider (no dedicated branch below) when a DashScope/Gemini key exists.
+        $fallback = $this->tryFallbackProvider($prompt, $provider, $resolution, $ratio, $faceRef);
+        if ($fallback) {
+            return $fallback;
+        }
+
+        // A real provider was attempted but every one failed — surface the error rather than a stub.
+        if ($triedReal || $this->triedRealFallback) {
             throw new \RuntimeException($this->providerErrorMessage());
         }
 
         // No real key configured -> stub (reuse the source image for edits, sample otherwise).
         return $this->copySample($prompt, $baseImage);
+    }
+
+    /**
+     * After the primary image provider fails, walk the enabled image models in the registry
+     * (highest priority first) and try each OTHER provider that has a configured key. This is the
+     * availability check + right-model-selection the user asked for: a Qwen key that 401s or whose
+     * free-tier quota is exhausted falls back to Gemini / Wan / Flux if those keys are valid.
+     */
+    protected function tryFallbackProvider(string $prompt, string $failedProvider, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
+    {
+        $attempted = [$failedProvider => true];
+
+        // Catalog rows (when the DB registry is empty) have no 'enabled' key — treat missing as enabled.
+        $candidates = collect(studio_models('image'))
+            ->filter(function ($m) {
+                return ($m['enabled'] ?? true) == true;
+            })
+            ->sortByDesc('priority')
+            ->values();
+
+        // Gemini uses a fully-independent key (Google), so try it before re-attempting the
+        // DashScope key family (qwen/wan share the same key) when the primary was qwen/wan.
+        $candidates = $candidates->sortBy(function ($m) {
+            $p = (string) ($m['provider'] ?? '');
+            // Gemini first (independent key), then remaining providers by descending priority.
+            return $p === 'gemini' ? -100000 : (-1 * (int) ($m['priority'] ?? 0));
+        })->values();
+
+        foreach ($candidates as $m) {
+            $p = (string) ($m['provider'] ?? '');
+            $model = (string) ($m['model_id'] ?? '');
+
+            if (! $p || ! $model || isset($attempted[$p])) {
+                continue;
+            }
+            $attempted[$p] = true;
+
+            $url = $this->attemptImageProvider($p, $model, $prompt, $resolution, $ratio, $faceRef);
+            if ($url) {
+                // Provider internals (tryDashscope / tryGeminiImage) record the exact model that won.
+                $this->lastProvider = $p;
+                if (! $this->lastModel) {
+                    $this->lastModel = $model;
+                }
+                logger()->info('Image generation fell back to another provider', [
+                    'failed_provider' => $failedProvider, 'provider' => $p, 'model' => $this->lastModel,
+                ]);
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Call a single image provider within the fallback chain. Returns the image URL or null.
+     */
+    protected function attemptImageProvider(string $provider, string $model, string $prompt, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
+    {
+        if ($provider === 'gemini') {
+            $key = studio_api_key('gemini');
+            if (! $key) {
+                return null;
+            }
+            $this->triedRealFallback = true;
+            return $this->tryGeminiImage($prompt, $key, $resolution, $ratio);
+        }
+
+        if (in_array($provider, ['qwen', 'wan'], true)) {
+            $key = $provider === 'wan'
+                ? (studio_api_key('wan') ?: studio_api_key('dashscope'))
+                : (studio_api_key('qwen') ?: studio_api_key('dashscope'));
+            if (! $key) {
+                return null;
+            }
+            $this->triedRealFallback = true;
+            $models = $provider === 'wan'
+                ? array_values(array_unique([$model, 'wan2.7-image-pro', 'wan2.1-image-pro', 'qwen-image-3.0-pro', 'qwen-image', 'qwen-image-max']))
+                : array_values(array_unique([$model, 'qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image', 'wan2.7-image-pro', 'wan2.1-image-pro']));
+
+            return $this->tryModels($prompt, $models, studio_qwen_credentials('image'), $resolution, $ratio, $faceRef);
+        }
+
+        // 'fal' / 'replicate' fallback is not wired into this service (no Fal client), so skip it.
+        return null;
     }
 
     /**
@@ -180,6 +288,8 @@ class ImageAIService
         try {
             $url = $this->callGeminiImage($prompt, $key, $ratio);
             if ($url) {
+                $this->lastProvider = 'gemini';
+                $this->lastModel = (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
                 return $url;
             }
             $this->dashscopeError = 'Gemini không trả về ảnh. Kiểm tra model ảnh (Cài đặt → Ảnh Gemini) và hạn mức.';
@@ -279,6 +389,7 @@ class ImageAIService
         try {
             $url = $this->callDashscope($prompt, $model, $key, $resolution, $ratio);
             if ($url) {
+                $this->lastModel = $model;
                 return $url;
             }
             $this->dashscopeError = 'Nhà cung cấp AI không trả về ảnh. Kiểm tra model / độ phân giải.';

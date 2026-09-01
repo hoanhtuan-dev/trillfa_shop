@@ -53,14 +53,22 @@ class RenderImageJob implements ShouldQueue
 
 
             $pr = (array) ($generation->promptsHistory?->json_response ?? []);
+            // Record the provider/model that actually produced the image — which may differ from the
+            // requested one when the generation fell back to another provider after a key/quota failure.
+            $usedProvider = $images->lastProvider() ?: $generation->provider;
+            $usedModel = $images->lastModel() ?: $generation->model;
             $generation->update([
                 'status' => 'completed',
                 'media_url' => $url,
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
+                'provider' => $usedProvider,
+                'model' => $usedModel,
                 'meta' => [
                     'type' => 'image',
-                    'provider' => $generation->provider,
-                    'model' => $generation->model,
+                    'provider' => $usedProvider,
+                    'model' => $usedModel,
+                    'requested_provider' => $generation->provider,
+                    'requested_model' => $generation->model,
                     'resolution' => $generation->resolution,
                     'ratio' => $generation->ratio,
                     'creative_level' => $pr['creative_level'] ?? null,
@@ -69,8 +77,9 @@ class RenderImageJob implements ShouldQueue
                 ],
             ]);
             logger()->info('Image generation completed', [
-                'generation_id' => $generation->id, 'provider' => $generation->provider,
-                'model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
+                'generation_id' => $generation->id, 'provider' => $usedProvider,
+                'model' => $usedModel, 'requested_provider' => $generation->provider,
+                'requested_model' => $generation->model, 'total_s' => round(microtime(true) - $t0, 2),
                 'elapsed_ms' => (int) round((microtime(true) - $t0) * 1000),
             ]);
         } catch (\Throwable $e) {
