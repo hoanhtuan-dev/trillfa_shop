@@ -232,21 +232,45 @@ class VirtualTryOnService
         // Fixed body-proportion descriptor at the default build=6 (the slider was removed; this is the
         // EXACT clause from the confirmed-good version where the pose was applied correctly).
         $proportion = $this->buildEnglish(6);
-        $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
-            ? 'Replace the ENTIRE background of the scene with: '.$background.'. ' : '';
+        $wantBg = $background && strtolower($background) !== 'keep' && strtolower($background) !== 'original';
         $toneS = $this->toneInstruction($tone, $background);
 
         // Garment = PRODUCT to preserve EXACTLY (dominant directive), then replace the person with
         // the text-described model in the text-described pose. Single image + clear text = reliable.
-        // Proportion clause is the EXACT one from the confirmed-good version (build=6 default).
-        $instr = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '.$bg
+        // A background-replacement clause is intentionally NOT here: inside the same call it competes
+        // with the pose instruction — with a complex background the model redraws the scene and
+        // IGNORES the pose (simple/white backgrounds don't trigger this because they are trivial to
+        // regenerate). The background is applied in a separate PASS 2 below.
+        $instr = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '
             .'Replace the person in the image with a full-body '.$modelDesc.' in the pose: '.$pose.', keeping the EXACT garment unchanged. '
             .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
-            .$toneS.' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
+            .'Keep the background of the original image unchanged. '
+            .($wantBg ? '' : $toneS).' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
 
         $imageSvc = app(ImageAIService::class);
         $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, null, null);
-        if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
+        if (! $url) {
+            return null;
+        }
+        $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+
+        // PASS 2 — replace ONLY the background (person / pose / garment untouched). The tone grade is
+        // applied here so the final composite (new background + person) is graded uniformly.
+        if ($wantBg) {
+            $bgInstr = 'Replace the ENTIRE background of the scene with: '.$background.'. '
+                .'Keep the person, their pose, the garment, body shape and lighting 100% unchanged. '
+                .$toneS.' Photorealistic, studio quality, consistent lighting.';
+            $final = $imageSvc->swapEdit($bgInstr, $url, $swapModel, null, null);
+            if ($final) {
+                $this->calls = 2;
+                $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+                logger()->info('Swap 2-pass done (person+pose, then background)');
+                return $final;
+            }
+            logger()->warning('Swap background pass failed; keeping the person-swap result');
+            $this->calls = 1;
+        }
+
         return $url;
     }
 
