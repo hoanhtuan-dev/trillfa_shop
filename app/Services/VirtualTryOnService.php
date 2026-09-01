@@ -55,17 +55,31 @@ class VirtualTryOnService
     public function builtinFacePresets(): array
     {
         return [
-            ['id' => 'vp01', 'name' => 'Nhẹ nhàng tự nhiên', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 22, light natural everyday makeup, shoulder-length straight black hair, fair skin, gentle warm smile, soft feminine features'],
-            ['id' => 'vp02', 'name' => 'Tóc dài lượn sóng', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 24, long wavy black hair with soft curls, radiant clear skin, subtle Korean-style makeup, elegant and graceful'],
-            ['id' => 'vp03', 'name' => 'Cá tính tóc bob', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 23, chic short black bob haircut, bold natural lipstick, confident modern look, sharp jawline, almond eyes'],
-            ['id' => 'vp04', 'name' => 'Thanh lịch tóc búi', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 25, elegant low bun hairstyle, minimalist makeup, classic Vietnamese beauty, refined and sophisticated'],
-            ['id' => 'vp05', 'name' => 'Năng động tóc đuôi ngựa', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 22, high ponytail, fresh sporty energetic look, clear glowing skin, bright happy smile, youthful'],
-            ['id' => 'vp06', 'name' => 'Ngọt ngào tóc xoăn', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 21, soft loose curls, sweet innocent face, rosy cheeks, gentle dreamy eyes, cute and charming'],
+            ['id' => 'vp01', 'name' => 'Nhẹ nhàng tự nhiên', 'ethnicity' => 'Vietnamese female', 'image' => '/storage/studio/khuon-mat/model-01.png', 'desc' => 'young Vietnamese woman, 22, light natural everyday makeup, shoulder-length straight black hair, fair skin, gentle warm smile, soft feminine features'],
+            ['id' => 'vp02', 'name' => 'Tóc dài lượn sóng', 'ethnicity' => 'Vietnamese female', 'image' => '/storage/studio/khuon-mat/model-02.png', 'desc' => 'young Vietnamese woman, 24, long wavy black hair with soft curls, radiant clear skin, subtle Korean-style makeup, elegant and graceful'],
+            ['id' => 'vp03', 'name' => 'Cá tính tóc bob', 'ethnicity' => 'Vietnamese female', 'image' => '/storage/studio/khuon-mat/model-03.png', 'desc' => 'young Vietnamese woman, 23, chic short black bob haircut, bold natural lipstick, confident modern look, sharp jawline, almond eyes'],
+            ['id' => 'vp04', 'name' => 'Thanh lịch tóc búi', 'ethnicity' => 'Vietnamese female', 'image' => '/storage/studio/khuon-mat/model-04.png', 'desc' => 'young Vietnamese woman, 25, elegant low bun hairstyle, minimalist makeup, classic Vietnamese beauty, refined and sophisticated'],
+            ['id' => 'vp05', 'name' => 'Năng động tóc đuôi ngựa', 'ethnicity' => 'Vietnamese female', 'image' => '/storage/studio/khuon-mat/model-05.png', 'desc' => 'young Vietnamese woman, 22, high ponytail, fresh sporty energetic look, clear glowing skin, bright happy smile, youthful'],
+            ['id' => 'vp06', 'name' => 'Ngọt ngào tóc xoăn', 'ethnicity' => 'Vietnamese female', 'image' => '/storage/studio/khuon-mat/model-06.png', 'desc' => 'young Vietnamese woman, 21, soft loose curls, sweet innocent face, rosy cheeks, gentle dreamy eyes, cute and charming'],
             ['id' => 'vp07', 'name' => 'Sang trọng mái lệch', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 26, side-swept bangs, sophisticated editorial makeup, elegant high-fashion look, striking features'],
             ['id' => 'vp08', 'name' => 'Thời trang mắt khói', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 24, sleek center-parted straight hair, trendy smoky-eye makeup, fashion-forward street style, confident gaze'],
             ['id' => 'vp09', 'name' => 'Dịu dàng tóc đen thẳng', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 23, long straight jet-black hair, fresh natural no-makeup look, serene calm expression, classic beauty'],
             ['id' => 'vp10', 'name' => 'Hiện đại mái ngố', 'ethnicity' => 'Vietnamese female', 'image' => null, 'desc' => 'young Vietnamese woman, 22, modern curtain bangs, fresh glass-skin makeup, trendy K-pop inspired look, sparkling eyes'],
         ];
+    }
+
+    /**
+     * Fall back to the built-in sample photo for a DB face preset that has no image, so the face
+     * reference is still sent to the edit model (face fidelity from text alone is poor).
+     */
+    protected function builtinFaceImageByName(?string $name): ?string
+    {
+        foreach ($this->builtinFacePresets() as $bp) {
+            if (($bp['name'] ?? '') === $name) {
+                return $bp['image'] ?? null;
+            }
+        }
+        return null;
     }
 
     public function poseCatalog(): array
@@ -132,7 +146,7 @@ class VirtualTryOnService
                 return [
                     'id' => 'fp'.$p->id,
                     'name' => $p->name,
-                    'image' => $p->image,
+                    'image' => $p->image ?: $this->builtinFaceImageByName($p->name),
                     'ethnicity' => $p->ethnicity ?: 'Vietnamese female',
                     'desc' => $p->description,
                     'preset' => true,
@@ -215,37 +229,37 @@ class VirtualTryOnService
         $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
             ? 'Replace the ENTIRE background of the scene with: '.$background.'. ' : '';
         $toneS = $this->toneInstruction($tone, $background);
-        // Common body/garment backbone + strong anti-squash proportion instruction.
-        $base = 'Keep the exact garment, outfit and all its details 100% unchanged. '.$bg
+        // Garment is the PRODUCT to preserve EXACTLY — the dominant directive that stops the model
+        // from regenerating a new outfit/person. Plus the strong anti-squash proportion instruction.
+        $base = 'The garment worn by the person in the LAST image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '.$bg
             .'Render a full-length, vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. ';
 
         if ($faceRefUrl) {
-            // Subject-driven swap: Image 1 = reference face, Image 2 = pose reference (optional),
-            // last image = the person to edit (wearing the garment). The pose image lets the edit
-            // model replicate the stance instead of relying on text alone.
+            // Subject-driven swap: Image 1 = reference FACE (identity), Image 2 = pose reference,
+            // last image = the person to edit wearing the garment to preserve.
             $instr = $base
-                .'Image 1 is the reference person: use their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. ';
+                .'Image 1 is the reference person: the person in the output must BE this person — exact face, facial identity, eye shape, nose, mouth, skin tone and hair. Do not invent or substitute another face. ';
             if ($poseRefUrl) {
                 $instr .= 'Image 2 is the pose reference: replicate its pose, stance, body shape and camera angle EXACTLY. '
-                    .'Image 3 is the person to edit (wearing the garment). '
-                    .'Render the reference person from Image 1 in the pose shown in Image 2 ('.$pose.'), wearing the exact garment from Image 3. ';
+                    .'Image 3 is the person to edit, wearing the garment to preserve. '
+                    .'Put the EXACT garment from Image 3 onto the person from Image 1, posed exactly like Image 2 ('.$pose.'). ';
             } else {
-                $instr .= 'Image 2 is the person to edit (wearing the garment). '
-                    .'Render the reference person from Image 1 in the pose: '.$pose.', wearing the exact garment from Image 2. ';
+                $instr .= 'Image 2 is the person to edit, wearing the garment to preserve. '
+                    .'Put the EXACT garment from Image 2 onto the person from Image 1, in the pose: '.$pose.'. ';
             }
             $instr .= 'Preserve the reference face precisely and keep natural, anatomically-correct, symmetrical facial proportions — do NOT distort, stretch, deform, warp or reshape the face, eyes, nose, mouth, hair, hands or body. '
                 .'Keep the eyes sharp and natural (no double/offset eyes), the mouth symmetric, the skin smooth and lifelike. '
-                .$toneS.' Realistic skin texture, sharp detail, consistent lighting, studio quality.';
+                .$toneS.' Match the lighting and camera angle of the garment photo so the composite looks seamless. Photorealistic skin texture, sharp detail, studio quality.';
         } else {
             $instr = $base;
             if ($poseRefUrl) {
                 $instr .= 'Image 1 is the pose reference: replicate its pose, stance, body shape and camera angle EXACTLY. '
-                    .'Image 2 is the person to edit (wearing the garment). '
-                    .'Replace the person in Image 2 with a full-body '.$modelDesc.' in the pose shown in Image 1 ('.$pose.'), wearing the exact garment from Image 2 unchanged.';
+                    .'Image 2 is the person to edit, wearing the garment to preserve. '
+                    .'Replace only the BODY and POSE of the person in Image 2 to match Image 1, keeping the EXACT garment from Image 2 unchanged, with a full-body '.$modelDesc.' ('.$pose.'). ';
             } else {
-                $instr .= 'Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.';
+                $instr .= 'Replace only the person (body and face) in the image with a full-body '.$modelDesc.' standing '.$pose.', keeping the EXACT garment unchanged. ';
             }
-            $instr .= $toneS.' Photorealistic, full body, high fashion.';
+            $instr .= $toneS.' Match the lighting and camera angle of the garment photo. Photorealistic, full body, studio quality, high fashion.';
         }
 
         $imageSvc = app(ImageAIService::class);
