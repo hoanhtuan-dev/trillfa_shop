@@ -647,6 +647,7 @@ class StudioController extends Controller
             'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
             'skin_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
             'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'fabric_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
@@ -661,8 +662,9 @@ class StudioController extends Controller
         if ($refine > 0) {
             try {
                 $keep = 'Keep the exact aspect ratio and framing of the input image — do NOT crop or change the frame. Keep the exact garment, model, pose, composition unchanged. Ultra-detailed, 4K.';
-                $detail = 'Enhance this fashion photograph at high resolution (hyper-realistic, like a professional fashion editorial): hyper-realistic human skin with natural pores and soft sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, rebuild realistic fabric weave and seam/stitching details, crisp sharp edges, rich natural color, '.$keep;
-                $studio = 'Render a high-end professional studio photograph of this fashion garment with hyper-realistic human detail (softbox light, subtle film color grading, shallow depth of field): photorealistic skin with pores, individual hair strands, realistic eyelashes and eye catchlight, ultra-sharp micro-detail, premium catalog quality, '.$keep;
+                $guard = 'IMPORTANT: Do NOT add fabric weave, texture, grain or any pattern to the skin, face, hair or jewellery — keep them smooth, clean and natural. Keep all detail edges (face, hair, garment seams, outlines) crisp, sharp and completely free of aliasing, halos, moiré or blur.';
+                $detail = 'Enhance this fashion photograph at high resolution (hyper-realistic, like a professional fashion editorial): hyper-realistic human skin with natural pores and soft sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, rebuild realistic fabric weave and seam/stitching details ONLY on the garment, crisp sharp edges, rich natural color, '.$guard.' '.$keep;
+                $studio = 'Render a high-end professional studio photograph of this fashion garment with hyper-realistic human detail (softbox light, subtle film color grading, shallow depth of field): photorealistic skin with pores, individual hair strands, realistic eyelashes and eye catchlight, ultra-sharp micro-detail, premium catalog quality, '.$guard.' '.$keep;
                 $prompt = $photoreal > 0 ? $studio : $detail;
                 $out = app(\App\Services\ImageAIService::class)->generate($prompt, $srcUrl);
                 if ($out) { $srcUrl = $out; }
@@ -681,9 +683,12 @@ class StudioController extends Controller
         if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
         $sw = imagesx($src); $sh = imagesy($src);
         $dst = $this->smartUpscale($src, $scale);
-        if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal); }
+        // One coarse skin mask, shared by every texture pass, so the face AND a dilated band
+        // around it are always protected (no weave/grain ever bleeds onto skin or its boundary).
+        $skinMask = $this->buildSkinMask($dst);
+        if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal, $skinMask); }
         if ($skinDetail > 0) { $this->skinTexturePass($dst, $skinDetail); }
-        if ($fabricDetail > 0) { $this->fabricTexturePass($dst, $fabricDetail); }
+        if ($fabricDetail > 0) { $this->fabricTexturePass($dst, $fabricDetail, $skinMask); }
         if ($lightShadow > 0) { $this->lightShadowPass($dst, $lightShadow); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
@@ -700,12 +705,17 @@ class StudioController extends Controller
     }
 
     /**
-     * Professional studio photo finish: contrast, subtle film color grade, film grain, vignette, extra sharpen.
+     * Professional studio photo finish: contrast, subtle film color grade, film grain, vignette, and a
+     * SINGLE gentle unsharp mask. The grain and the final sharpening are skin-aware (they skip the
+     * dilated skin band) so the face and its boundary stay clean, and only ONE USM runs in the whole
+     * upscale pipeline (no double sharpening -> no halos/ringing on detail edges).
      */
-    protected function studioPhotoFinish(\GdImage $img, int $level): void
+    protected function studioPhotoFinish(\GdImage $img, int $level, ?array $skinMask = null): void
     {
         $k = $level / 10.0; // 0..1
         $w = imagesx($img); $h = imagesy($img);
+        if ($skinMask === null) { $skinMask = $this->buildSkinMask($img); }
+        $cols = (int) ceil($w / 2);
         // 1) SOFT LIGHT BLEND — blur + lift a copy and blend it in gently for soft, natural ambient light.
         if (function_exists('imagefilter')) {
             $soft = imagecreatetruecolor($w, $h);
@@ -730,13 +740,15 @@ class StudioController extends Controller
             @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(7 * $k));
             @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
         }
-        // 2) SUBTLE FILM GRAIN — on shadows/midtones, but SKIPS skin (the mask) so the face stays clean.
+        // 2) SUBTLE FILM GRAIN — on shadows/midtones, but SKIPS the dilated skin band (the face
+        //    plus a small rim around it) so the face and its boundary never get a grainy edge.
         for ($y = 0; $y < $h; $y += 3) {
             for ($x = 0; $x < $w; $x += 3) {
+                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
                 $c = imagecolorat($img, $x, $y);
                 $r3 = ($c >> 16) & 0xFF; $g3 = ($c >> 8) & 0xFF; $b3 = $c & 0xFF;
                 $lum = $r3 * 0.3 + $g3 * 0.6 + $b3 * 0.1;
-                if ($lum < 215 && ! $this->isSkinPixel($r3, $g3, $b3)) {
+                if ($lum < 215) {
                     $n = (int) ((mt_rand(-450, 450) / 1000.0) * 6 * $k);
                     $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
                     $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
@@ -756,16 +768,18 @@ class StudioController extends Controller
                 imagesetpixel($img, $x, $y, imagecolorallocate($img, (int) $r, (int) $g, (int) $b));
             }
         }
-        // 4) FINAL UN-SHARP MASK — crisp the edges back after the light/grain/vignette softness.
+        // 4) FINAL UN-SHARP MASK — ONE crisp pass; skipped on skin so pores stay natural and the
+        //    weave/grain are never amplified into halos on detail boundaries.
         if (function_exists('imagefilter') && $w * $h <= 20000000) {
             $blur = imagecreatetruecolor($w, $h);
             imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
             @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
-            $amount = 0.55 + 0.60 * $k;
+            $amount = 0.30 + 0.35 * $k;
             for ($y = 0; $y < $h; $y++) {
                 for ($x = 0; $x < $w; $x++) {
                     $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
                     $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                    if ($this->isSkinPixel($cr, $cg, $cb)) { continue; }
                     $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
                     $nr = max(0, min(255, (int) round($cr + $amount * ($cr - $br))));
                     $ng = max(0, min(255, (int) round($cg + $amount * ($cg - $bg))));
@@ -792,6 +806,64 @@ class StudioController extends Controller
     protected function isSkinPixel(int $r, int $g, int $b): bool
     {
         return $r > 70 && $r > $g && $g > $b && ($r - $b) > 12 && $r < 250 && $g > 45 && $g < 235 && $b > 30;
+    }
+
+    /**
+     * Coarse skin mask (stride 2, one byte per coarse cell, one string per row).
+     * Shared by the fabric / grain / USM passes so the face AND a dilated band around it are
+     * always protected — no texture ever bleeds onto the face or its boundary.
+     * @return array<int, string>
+     */
+    protected function buildSkinMask(\GdImage $img): array
+    {
+        $w = imagesx($img); $h = imagesy($img);
+        $mask = [];
+        for ($y = 0; $y < $h; $y += 2) {
+            $row = '';
+            for ($x = 0; $x < $w; $x += 2) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $row .= $this->isSkinPixel($r, $g, $b) ? "\x01" : "\x00";
+            }
+            $mask[$y >> 1] = $row;
+        }
+        return $mask;
+    }
+
+    /**
+     * Whether the coarse skin-mask cell at (cx, cy) — or any cell within radius $rad — is skin.
+     */
+    protected function maskNearSkin(array $mask, int $cols, int $cx, int $cy, int $rad): bool
+    {
+        $r0 = max(0, $cy - $rad);
+        $r1 = min(count($mask) - 1, $cy + $rad);
+        $c0 = max(0, $cx - $rad);
+        $c1 = min($cols - 1, $cx + $rad);
+        for ($ry = $r0; $ry <= $r1; $ry++) {
+            $row = $mask[$ry] ?? '';
+            for ($rx = $c0; $rx <= $c1; $rx++) {
+                if (isset($row[$rx]) && $row[$rx] === "\x01") { return true; }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when a strong luminance edge is within a small neighbourhood of (x, y).
+     * Used by fabricTexturePass to keep the weave off detail boundaries (seams, outlines, folds).
+     */
+    protected function nearStrongEdge(\GdImage $img, int $x, int $y, int $w, int $h, int $threshold): bool
+    {
+        $c = imagecolorat($img, $x, $y);
+        $lum0 = ((($c >> 16) & 0xFF) * 0.3) + ((($c >> 8) & 0xFF) * 0.6) + (($c & 0xFF) * 0.1);
+        foreach ([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]] as [$dx, $dy]) {
+            $nx = $x + $dx; $ny = $y + $dy;
+            if ($nx < 0 || $ny < 0 || $nx >= $w || $ny >= $h) { continue; }
+            $cc = imagecolorat($img, $nx, $ny);
+            $lum2 = ((($cc >> 16) & 0xFF) * 0.3) + ((($cc >> 8) & 0xFF) * 0.6) + (($cc & 0xFF) * 0.1);
+            if (abs($lum0 - $lum2) > $threshold) { return true; }
+        }
+        return false;
     }
 
     /**
@@ -856,32 +928,41 @@ class StudioController extends Controller
     }
 
     /**
-     * Fabric roughness / weave: adds a fine diagonal weave pattern + subtle grain on non-skin
-     * mid-tone regions (the garment), leaving skin smooth and bright background untouched.
-     * Amplitude ramps gently (k² curve) so low levels stay barely visible — no harsh checkerboard —
-     * and the weave always skips skin-mask pixels to protect the face.
+     * Fabric roughness / weave — skin- and edge-aware, so it can never touch the face or detail
+     * boundaries:
+     *  - the weave is a SMOOTH diagonal wave (sin), not a hard 4px checkerboard, so it cannot
+     *    create new aliased "răng cưa" lines;
+     *  - it SKIPS a dilated skin band (face, hairline, neck) AND a small band around strong
+     *    gradients (garment seams, outlines, folds) — the exact regions that previously got
+     *    jagged / blurry;
+     *  - amplitude stays low and ramps with level², so low levels are nearly invisible.
      */
-    protected function fabricTexturePass(\GdImage $img, int $level): void
+    protected function fabricTexturePass(\GdImage $img, int $level, ?array $skinMask = null): void
     {
         if ($level <= 0) { return; }
         $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
-        // Gentle ramp: level 1-4 nearly invisible, level 10 clearly woven.
-        $amp = (1.2 + 2.6 * $k * $k);
-        $noise = 2.4 * $k;
+        if ($skinMask === null) { $skinMask = $this->buildSkinMask($img); }
+        $cols = (int) ceil($w / 2);
+        $amp = 1.0 + 2.4 * $k * $k; // level 10 ≈ 3.4 (was 3.8 but checkered/aggressive)
+        $noise = 1.5 * $k;          // level 10 ≈ 1.5 (was 2.4)
+        $edgeT = 40;                // luminance-gradient threshold: stronger edges are protected
         for ($y = 0; $y < $h; $y += 2) {
             for ($x = 0; $x < $w; $x += 2) {
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
                 $lum = $r * 0.3 + $g * 0.6 + $b * 0.1;
-                // garment/fabric: NOT skin (face excluded via the mask), mid-tone (excludes dark + bright bg)
-                if (! $this->isSkinPixel($r, $g, $b) && $lum > 70 && $lum < 205) {
-                    $weave = ((($x + $y) % 4) < 2) ? 1 : -1;
-                    $n = (int) (($weave * $amp) + ((mt_rand(-140, 140) / 1000.0) * $noise));
-                    $nr = max(0, min(255, $r + $n));
-                    $ng = max(0, min(255, $g + $n));
-                    $nb = max(0, min(255, $b + (int) ($n * 0.9)));
-                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
-                }
+                // garment interior only: NOT skin, NOT near skin (dilated band), mid-tone.
+                if ($this->isSkinPixel($r, $g, $b) || $lum <= 70 || $lum >= 205) { continue; }
+                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 2)) { continue; }
+                // protect detail boundaries: never weave on/next to a strong edge.
+                if ($this->nearStrongEdge($img, $x, $y, $w, $h, $edgeT)) { continue; }
+                // smooth diagonal wave (no hard checkerboard) + faint grain.
+                $phase = ($x + $y) * 0.55 + 0.55 * sin($x * 0.11 + $y * 0.19);
+                $n = (int) ($amp * sin($phase) + (mt_rand(-120, 120) / 1000.0) * $noise);
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    max(0, min(255, $r + $n)),
+                    max(0, min(255, $g + $n)),
+                    max(0, min(255, $b + (int) ($n * 0.9)))));
             }
         }
     }
@@ -1040,28 +1121,8 @@ class StudioController extends Controller
             if ($isCopy) { imagedestroy($img); }
             $img = $next; $isCopy = true;
         }
-        $w = imagesx($img); $h = imagesy($img);
-        if (function_exists('imagefilter') && $w * $h <= 16000000) {
-            $blur = imagecreatetruecolor($w, $h);
-            imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
-            @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
-            @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
-            $amount = 0.55;
-            for ($y = 0; $y < $h; $y++) {
-                for ($x = 0; $x < $w; $x++) {
-                    $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
-                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
-                    $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
-                    $nr = max(0, min(255, (int) round($cr + $amount * ($cr - $br))));
-                    $ng = max(0, min(255, (int) round($cg + $amount * ($cg - $bg))));
-                    $nb = max(0, min(255, (int) round($cb + $amount * ($cb - $bb))));
-                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
-                }
-            }
-            imagedestroy($blur);
-        } elseif (function_exists('imageconvolution')) {
-            @imageconvolution($img, [[0, -1, 0], [-1, 5, -1], [0, -1, 0]], 1, 0);
-        }
+        // NOTE: no unsharp mask here. A single, skin-aware USM runs once in studioPhotoFinish,
+        // so edges are never double-sharpened (no halos / ringing on detail boundaries).
         return $img;
     }
 
@@ -1101,8 +1162,9 @@ class StudioController extends Controller
         if (! $file) { return null; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
+        $skinMask = $this->buildSkinMask($img);
         $this->unsharpMask($img, 0.65);
-        if ($fabric > 0) { $this->fabricTexturePass($img, $fabric); }
+        if ($fabric > 0) { $this->fabricTexturePass($img, $fabric, $skinMask); }
         if ($skin > 0) { $this->skinTexturePass($img, $skin); }
         $this->unsharpMask($img, 0.35); // final gentle crisp
         $name = 'studio/swapdetail-'.Str::uuid().'.png';
@@ -1255,8 +1317,7 @@ class StudioController extends Controller
             'build' => ['nullable', 'integer', 'min:0', 'max:10'], // Tỷ lệ dáng (0 lùn-nở -> 10 cao-thon chuẩn mẫu)
             'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
             'tone_level' => ['nullable', 'integer', 'min:0', 'max:10'], // Mức độ ảnh hưởng của hiệu ứng
-            'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL — sent to the edit model so the pose is actually applied
-            'face_pass' => ['nullable', 'boolean'], // 2-pass ghép khuôn mặt: mặc định bật khi có ảnh mặt
+            'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL (picker thumbnail; not sent to the model)
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -1289,7 +1350,6 @@ class StudioController extends Controller
                 'model_name' => $model['name'] ?? null,
                 'pose_name' => $pose['name'] ?? null,
                 'face_ref' => (bool) ($model['image'] ?? null),
-                'face_pass' => (bool) ($data['face_pass'] ?? false),
                 'pose_ref' => $poseRefUrl,
                 'background' => (string) ($data['background'] ?? ''),
                 'build' => (int) ($data['build'] ?? 6),
@@ -1328,7 +1388,6 @@ class StudioController extends Controller
             (int) ($meta['build'] ?? 6),
             (string) ($meta['tone'] ?? 'none'),
             (string) ($meta['pose_ref'] ?? ''),
-            (bool) ($meta['face_pass'] ?? false),
         );
         if (! $fallback) {
             $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).']);
@@ -1347,7 +1406,6 @@ class StudioController extends Controller
             'model' => $actualModel, 'credits_cost' => $credits,
             'meta' => array_merge($meta, [
                 'type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel,
-                'face_pass' => (bool) (($model['image'] ?? null) && studio_config('swap_face_pass', true)),
                 'steps' => $credits,
             ]),
         ]);

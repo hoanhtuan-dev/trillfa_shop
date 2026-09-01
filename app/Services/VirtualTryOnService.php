@@ -214,12 +214,16 @@ class VirtualTryOnService
     }
 
     /**
-     * Swap via a SINGLE-pass Qwen image-edit call (the 2-step approach was dropped: its Step-2
-     * "swap only the face" is unreliable on the edit model and it lost the reference face).
-     * $build (0-10) controls body proportions (height vs slimness): high = tall runway-model build,
-     * low = shorter/fuller. $tone adds a color-grade hint (warm/cool/film/neutral/auto) to the prompt.
+     * Swap via a SINGLE-pass, TEXT-DRIVEN Qwen image-edit call.
+     *
+     * The face and pose are described in WORDS only (modelDesc + pose skeleton). The face/pose
+     * reference IMAGES are intentionally NOT sent to the model — they stay in the picker as visual
+     * labels. Deep-evaluation finding: sending full-body reference photos confuses the qwen edit
+     * models (several human bodies in one request) and makes them IGNORE the pose; the earlier
+     * text-driven version demonstrably produced the correct pose, and it broke exactly when the
+     * reference images were introduced. $build (0-10) controls proportions; $tone is prompt-level.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, int $build = 6, string $tone = 'none', ?string $poseRefUrl = null, bool $facePass = false): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, int $build = 6, string $tone = 'none', ?string $poseRefUrl = null): ?string
     {
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $this->calls = 1;
@@ -229,66 +233,16 @@ class VirtualTryOnService
         $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
             ? 'Replace the ENTIRE background of the scene with: '.$background.'. ' : '';
         $toneS = $this->toneInstruction($tone, $background);
-        // Garment is the PRODUCT to preserve EXACTLY — the dominant directive that stops the model
-        // from regenerating a new outfit/person. Plus the strong anti-squash proportion instruction.
-        $base = 'The garment worn by the person in the LAST image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '.$bg
-            .'Render a full-length, vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. ';
 
-        if ($faceRefUrl) {
-            // Subject-driven swap: Image 1 = reference FACE (identity), Image 2 = pose reference,
-            // last image = the person to edit wearing the garment to preserve.
-            $instr = $base
-                .'Image 1 is the reference person: the person in the output must BE this person — exact face, facial identity, eye shape, nose, mouth, skin tone and hair. Do not invent or substitute another face. ';
-            if ($poseRefUrl) {
-                $instr .= 'Image 2 is the pose reference: replicate its pose, stance, body shape and camera angle EXACTLY. '
-                    .'Image 3 is the person to edit, wearing the garment to preserve. '
-                    .'Put the EXACT garment from Image 3 onto the person from Image 1, posed exactly like Image 2 ('.$pose.'). ';
-            } else {
-                $instr .= 'Image 2 is the person to edit, wearing the garment to preserve. '
-                    .'Put the EXACT garment from Image 2 onto the person from Image 1, in the pose: '.$pose.'. ';
-            }
-            $instr .= 'Preserve the reference face precisely and keep natural, anatomically-correct, symmetrical facial proportions — do NOT distort, stretch, deform, warp or reshape the face, eyes, nose, mouth, hair, hands or body. '
-                .'Keep the eyes sharp and natural (no double/offset eyes), the mouth symmetric, the skin smooth and lifelike. '
-                .$toneS.' Match the lighting and camera angle of the garment photo so the composite looks seamless. Photorealistic skin texture, sharp detail, studio quality.';
-        } else {
-            $instr = $base;
-            if ($poseRefUrl) {
-                $instr .= 'Image 1 is the pose reference: replicate its pose, stance, body shape and camera angle EXACTLY. '
-                    .'Image 2 is the person to edit, wearing the garment to preserve. '
-                    .'Replace only the BODY and POSE of the person in Image 2 to match Image 1, keeping the EXACT garment from Image 2 unchanged, with a full-body '.$modelDesc.' ('.$pose.'). ';
-            } else {
-                $instr .= 'Replace only the person (body and face) in the image with a full-body '.$modelDesc.' standing '.$pose.', keeping the EXACT garment unchanged. ';
-            }
-            $instr .= $toneS.' Match the lighting and camera angle of the garment photo. Photorealistic, full body, studio quality, high fashion.';
-        }
+        // Garment = PRODUCT to preserve EXACTLY (dominant directive), then replace the person with
+        // the text-described model in the text-described pose. Single image + clear text = reliable.
+        $instr = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '.$bg
+            .'Replace the person in the image with a full-body '.$modelDesc.' in the pose: '.$pose.', keeping the EXACT garment unchanged. '
+            .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
+            .$toneS.' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
 
         $imageSvc = app(ImageAIService::class);
-
-        // 2-PASS PIPELINE (face applied): PASS 1 is the COMBINED call (face + pose + garment refs
-        // together) — the flow that demonstrably wears the garment and pose correctly. PASS 2 then
-        // refines ONLY the face on top of it, so the reference face actually shows up. The refine
-        // pass is user-controllable (face_pass): if it fails or degrades, the pass-1 result is kept.
-        if ($faceRefUrl && $facePass) {
-            $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl, $poseRefUrl);
-            if ($url) {
-                $faceInstr = 'Image 1 is the reference person. Replace ONLY the face of the person in the main image with the EXACT face from Image 1 — same facial identity, eyes, nose, mouth, skin tone and hair. '
-                    .'Match the head size, angle and lighting of the existing head. '
-                    .'Keep the garment, pose, body, background and lighting 100% unchanged. Do not change anything else. Photorealistic, seamless composite.';
-                $final = $imageSvc->swapFace($faceInstr, $url, $swapModel, $faceRefUrl);
-                if ($final) {
-                    $this->calls = 2;
-                    $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
-                    logger()->info('Swap 2-pass done (combined try-on + face-refine)');
-                    return $final;
-                }
-                logger()->warning('Swap face-refine failed; keeping the combined try-on result');
-                $this->calls = 1;
-                return $url;
-            }
-            logger()->warning('Swap pass-1 (combined) failed; falling back to single-pass');
-        }
-
-        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl, $poseRefUrl);
+        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, null, null);
         if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
         return $url;
     }
