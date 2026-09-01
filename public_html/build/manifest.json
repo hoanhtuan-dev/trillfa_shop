@@ -1,9 +1,9 @@
 {
-  "_GalleryModal-CGywvSch.js": {
-    "file": "assets/GalleryModal-CGywvSch.js",
+  "_GalleryModal-H_qPrmjh.js": {
+    "file": "assets/GalleryModal-H_qPrmjh.js",
     "name": "GalleryModal",
     "imports": [
-      "_pinia-D6v-wq6D.js"
+      "_pinia-DYa9Z6h2.js"
     ]
   },
   "_fonts-BRD9E1vz.css": {
@@ -74,12 +74,12 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "_pinia-D6v-wq6D.js": {
-    "file": "assets/pinia-D6v-wq6D.js",
+  "_pinia-DYa9Z6h2.js": {
+    "file": "assets/pinia-DYa9Z6h2.js",
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-C866bcQ3.css",
+    "file": "assets/app-DQpMs1ds.css",
     "name": "app",
     "names": [
       "app.css"
@@ -94,35 +94,35 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-RW8mCDu2.js",
+    "file": "assets/app-BK5dRkDY.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
-      "_pinia-D6v-wq6D.js",
-      "_GalleryModal-CGywvSch.js"
+      "_pinia-DYa9Z6h2.js",
+      "_GalleryModal-H_qPrmjh.js"
     ],
     "css": [
-      "assets/app-BKQNp6AB.css"
+      "assets/app-B3xPWFI8.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-B4HzWh9v.js",
+    "file": "assets/library-HswVnejc.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
-      "_pinia-D6v-wq6D.js",
-      "_GalleryModal-CGywvSch.js"
+      "_pinia-DYa9Z6h2.js",
+      "_GalleryModal-H_qPrmjh.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-DE0Sq2PH.js",
+    "file": "assets/settings-BWtYMhKr.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
-      "_pinia-D6v-wq6D.js"
+      "_pinia-DYa9Z6h2.js"
     ]
   }
 }

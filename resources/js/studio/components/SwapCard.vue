@@ -12,6 +12,7 @@ const swapBuild = ref(6); // Tỷ lệ dáng mặc định: 6 (cân đối) — 
 const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
 const swapToneLevel = ref(5); // Mức độ ảnh hưởng mặc định: 5 — 0-10
 const swapFabric = ref(0); // Vân vải hậu kỳ: 0 = tắt (mặc định, bảo vệ khuôn mặt) — 1-10 cường độ
+const swapFacePass = ref(true); // 2-pass ghép khuôn mặt theo ảnh (mặc định bật)
 const toneOptions = [
   { v: 'auto', label: '🎨 Tự động (theo bối cảnh)' },
   { v: 'warm', label: '☀️ Ấm' },
@@ -32,14 +33,15 @@ function loadSwapMemory() {
     if (m.toneLevel != null) swapToneLevel.value = Number(m.toneLevel);
     if (m.fabric != null) swapFabric.value = Number(m.fabric);
     if (typeof m.bg === 'string') swapBg.value = m.bg;
+    if (m.facePass != null) swapFacePass.value = !!m.facePass;
   } catch (e) {}
 }
 function saveSwapMemory() {
   try {
-    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, toneLevel: swapToneLevel.value, fabric: swapFabric.value, bg: swapBg.value }));
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ build: swapBuild.value, tone: swapTone.value, toneLevel: swapToneLevel.value, fabric: swapFabric.value, bg: swapBg.value, facePass: swapFacePass.value }));
   } catch (e) {}
 }
-watch([swapBg, swapBuild, swapTone, swapToneLevel, swapFabric], saveSwapMemory);
+watch([swapBg, swapBuild, swapTone, swapToneLevel, swapFabric, swapFacePass], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; } catch(e){}
@@ -75,7 +77,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
       <div v-if="swapFabric > 0" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Vân vải hậu kỳ:</span><span class="truncate text-cream-100">{{ swapFabric }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ '⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel, fabric_detail: swapFabric })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, build: swapBuild, tone: swapTone, tone_level: swapToneLevel, fabric_detail: swapFabric, face_pass: swapFacePass })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
     <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
         <!-- Khuôn mặt -->
@@ -123,6 +125,17 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
             <span class="w-6 text-right text-xs text-cream-200">{{ swapFabric === 0 ? 'Tắt' : swapFabric }}</span>
           </div>
           <p class="mt-1 text-[10px] text-cream-300/50">Mặc định 0 (tắt) để khuôn mặt luôn sạch. Bật 1-10 nếu muốn vải rõ vân hơn; không áp dụng lên vùng da.</p>
+        </div>
+        <!-- Ghép khuôn mặt theo ảnh (2-pass) -->
+        <div class="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+          <div>
+            <p class="text-xs font-semibold text-cream-200">👤 Ghép khuôn mặt theo ảnh</p>
+            <p class="text-[10px] text-cream-300/50">Bước 2: thay mặt bằng đúng khuôn mặt đã chọn (chậm hơn ~30s). Tắt nếu muốn kết quả nhanh.</p>
+          </div>
+          <label class="relative inline-flex cursor-pointer items-center">
+            <input type="checkbox" v-model="swapFacePass" class="peer sr-only">
+            <span class="h-5 w-9 rounded-full bg-ink-700 peer-checked:bg-brand-600 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-4"></span>
+          </label>
         </div>
         <!-- Thêm / xóa -->
         <div class="mt-5 rounded-2xl border border-dashed border-cream-300/40 p-3">

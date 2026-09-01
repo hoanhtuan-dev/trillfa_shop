@@ -1245,6 +1245,7 @@ class StudioController extends Controller
             'tone_level' => ['nullable', 'integer', 'min:0', 'max:10'], // Mức độ ảnh hưởng của hiệu ứng
             'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL — sent to the edit model so the pose is actually applied
             'fabric_detail' => ['nullable', 'integer', 'min:0', 'max:10'], // Vân vải hậu kỳ: 0 = tắt (mặc định), 1-10 = cường độ
+            'face_pass' => ['nullable', 'boolean'], // 2-pass ghép khuôn mặt: mặc định bật khi có ảnh mặt
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -1277,6 +1278,7 @@ class StudioController extends Controller
                 'model_name' => $model['name'] ?? null,
                 'pose_name' => $pose['name'] ?? null,
                 'face_ref' => (bool) ($model['image'] ?? null),
+                'face_pass' => (bool) ($data['face_pass'] ?? (($model['image'] ?? null) ? true : false)),
                 'pose_ref' => $poseRefUrl,
                 'background' => (string) ($data['background'] ?? ''),
                 'build' => (int) ($data['build'] ?? 6),
@@ -1316,6 +1318,7 @@ class StudioController extends Controller
             (int) ($meta['build'] ?? 6),
             (string) ($meta['tone'] ?? 'none'),
             (string) ($meta['pose_ref'] ?? ''),
+            (bool) ($meta['face_pass'] ?? true),
         );
         if (! $fallback) {
             $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).']);

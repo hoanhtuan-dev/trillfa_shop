@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { markRaw } from 'vue';
 
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
@@ -35,6 +36,8 @@ export const useStudioStore = defineStore('studio', {
     cvImg: null,
     canvasZoom: null,
     _cropDrag: null,
+    _cropRaf: null,
+    _cropPending: null,
     // canvas foundation (zoom/pan/background)
     zoom: 1,
     pan: { x: 0, y: 0 },
@@ -64,6 +67,8 @@ export const useStudioStore = defineStore('studio', {
     swapDone: 0,      // poses completed (for progress UI)
     swapTotal: 0,     // total poses in the current run
     swapAbort: null,  // AbortController for cancel
+    swapProcessing: false, // true while polling the background queue results
+    _swapStop: false,     // flag to stop the background-result polling
     inpainting: false,
     inpaintPrompt: '',
     suggesting: false,
@@ -157,6 +162,146 @@ export const useStudioStore = defineStore('studio', {
       finally { this.videoBusy = false; }
     },
     wheelZoom(delta) { const f = delta > 0 ? 0.9 : 1.1; const nz = Math.max(0.25, Math.min(4, +(this.zoom * f).toFixed(2))); this.zoom = nz; },
+    // ── Canvas refs (set by StudioApp template refs; markRaw so Vue never proxies DOM nodes) ──
+    setCanvasRefs(img, zoom) { this.cvImg = img ? markRaw(img) : null; this.canvasZoom = zoom ? markRaw(zoom) : null; },
+    // ── Reframe / Crop ──
+    _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); },
+    ratioAspect() { const p = (this.reframeRatio || '3:4').split(':').map(Number); return p[1] ? p[0] / p[1] : 0.75; },
+    // Geometry of the *visible* (object-contain) image inside the pan container, in container space.
+    canvasMetrics() {
+      const img = this.cvImg, cont = this.canvasZoom;
+      if (!img || !cont) return null;
+      const ir = img.getBoundingClientRect(), cr = cont.getBoundingClientRect();
+      if (!ir.width || !ir.height || !cr.width || !cr.height) return null;
+      const iw = img.naturalWidth || 1, ih = img.naturalHeight || 1;
+      const ia = iw / ih, box = ir.width / ir.height;
+      let vw, vh;
+      if (ia > box) { vw = ir.width; vh = ir.width / ia; } else { vh = ir.height; vw = ir.height * ia; }
+      return { vw, vh, vx: ir.left - cr.left + (ir.width - vw) / 2, vy: ir.top - cr.top + (ir.height - vh) / 2, crW: cr.width, crH: cr.height, ia, iw, ih };
+    },
+    cropStyle() {
+      const m = this.canvasMetrics(); if (!m) return { display: 'none' };
+      const b = this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 };
+      return { left: ((m.vx + b.x * m.vw) / m.crW * 100) + '%', top: ((m.vy + b.y * m.vh) / m.crH * 100) + '%', width: (b.w * m.vw / m.crW * 100) + '%', height: (b.h * m.vh / m.crH * 100) + '%' };
+    },
+    cropSizeLabel() {
+      const img = this.cvImg, b = this.cropBox;
+      if (!img || !b) return this.reframeRatio;
+      const w = Math.max(1, Math.round(b.w * (img.naturalWidth || 1)));
+      const h = Math.max(1, Math.round(b.h * (img.naturalHeight || 1)));
+      return this.reframeRatio + ' · ' + w + '×' + h;
+    },
+    // (Re)create the crop box: 70% tall, keeping the current ratio, centered on the image.
+    initCropBox() {
+      const m = this.canvasMetrics();
+      const ia = m ? m.ia : (this.cropBox && this.cropBox.h ? this.cropBox.w / this.cropBox.h : 0.75);
+      const r = this.ratioAspect();
+      const ratioFrac = r / ia;
+      let h = 0.7; if (h * ratioFrac > 1) h = 1 / ratioFrac;
+      let w = h * ratioFrac;
+      if (w > 1) { w = 1; h = w / ratioFrac; }
+      this.cropBox = { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+    },
+    // Re-fit an existing crop box to a new ratio, keeping its center and height where possible.
+    refitCropBox() {
+      const m = this.canvasMetrics(); if (!m) return;
+      const old = this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 };
+      const cx = old.x + old.w / 2, cy = old.y + old.h / 2;
+      const ratioFrac = this.ratioAspect() / m.ia;
+      let h = Math.max(0.2, Math.min(0.9, old.h));
+      let w = h * ratioFrac;
+      if (w > 1) { w = 1; h = w / ratioFrac; }
+      if (h > 1) { h = 1; w = h * ratioFrac; }
+      this.cropBox = { x: this._clamp(cx - w / 2, 0, 1 - w), y: this._clamp(cy - h / 2, 0, 1 - h), w, h };
+    },
+    toggleCrop() {
+      this.cropMode = !this.cropMode;
+      if (this.cropMode) this.initCropBox();
+      else this._cropStop(null);
+    },
+    onCanvasImgLoad() { if (this.cropMode) this.initCropBox(); },
+    cropStart(e, key) {
+      if (!this.cropMode) return;
+      // NOTE: no preventDefault() here — canceling pointerdown would also suppress the
+      // compatibility dblclick used for "double-click to cancel". touch-action:none (CSS)
+      // already blocks scroll/zoom and select-none blocks text selection.
+      e.stopPropagation();
+      const handlers = { move: (ev) => this._cropQueue(ev), up: () => this._cropStop(handlers) };
+      this._cropDrag = { key, sx: e.clientX, sy: e.clientY, box: { ...(this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }) }, handlers };
+      window.addEventListener('pointermove', handlers.move);
+      window.addEventListener('pointerup', handlers.up);
+      window.addEventListener('pointercancel', handlers.up);
+    },
+    // Batch pointermoves through rAF so dragging never triggers a layout read per event.
+    _cropQueue(e) {
+      if (!this._cropDrag) return;
+      this._cropPending = e;
+      if (this._cropRaf) return;
+      const flush = () => { this._cropRaf = null; const ev = this._cropPending; this._cropPending = null; if (ev && this._cropDrag) this.cropMove(ev); };
+      if (typeof requestAnimationFrame === 'function') this._cropRaf = requestAnimationFrame(flush);
+      else flush();
+    },
+    _cropStop(handlers) {
+      this._cropDrag = null;
+      this._cropPending = null;
+      if (this._cropRaf != null) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._cropRaf); this._cropRaf = null; }
+      if (handlers) {
+        window.removeEventListener('pointermove', handlers.move);
+        window.removeEventListener('pointerup', handlers.up);
+        window.removeEventListener('pointercancel', handlers.up);
+      }
+    },
+    cropMove(e) {
+      const d = this._cropDrag; if (!d || !this.cropMode) return;
+      const m = this.canvasMetrics(); if (!m) return;
+      const bx = (e.clientX - d.sx) / m.vw, by = (e.clientY - d.sy) / m.vh;
+      const b = { ...d.box };
+      const MIN = 0.05;
+      if (d.key === 'move') {
+        b.x = this._clamp(b.x + bx, 0, 1 - b.w);
+        b.y = this._clamp(b.y + by, 0, 1 - b.h);
+      } else {
+        // Corner resize, ratio-locked, opposite corner anchored.
+        const ratioFrac = this.ratioAspect() / m.ia;
+        const maxRight = 1 - b.x, maxBottom = 1 - b.y;
+        const right = b.x + b.w, bottom = b.y + b.h;
+        let nw = b.w, nh = b.h, x = b.x, y = b.y;
+        if (d.key === 'se' || d.key === 'resize') { nh = this._clamp(b.h + Math.max(bx, by), MIN, Math.max(MIN, Math.min(maxBottom, maxRight / ratioFrac))); nw = nh * ratioFrac; }
+        else if (d.key === 'sw') { nh = this._clamp(b.h + Math.max(-bx, by), MIN, Math.max(MIN, Math.min(maxBottom, right / ratioFrac))); nw = nh * ratioFrac; x = right - nw; }
+        else if (d.key === 'ne') { nw = this._clamp(b.w + Math.max(bx, -by), MIN, Math.max(MIN, Math.min(maxRight, bottom * ratioFrac))); nh = nw / ratioFrac; y = bottom - nh; }
+        else if (d.key === 'nw') { nw = this._clamp(b.w + Math.max(-bx, -by), MIN, Math.max(MIN, Math.min(right, bottom * ratioFrac))); nh = nw / ratioFrac; x = right - nw; y = bottom - nh; }
+        b.w = this._clamp(nw, MIN, 1); b.h = this._clamp(nh, MIN, 1); b.x = x; b.y = y;
+      }
+      this.cropBox = b;
+    },
+    async confirmCrop() {
+      if (!this.cropMode) return;
+      const img = this.cvImg;
+      if (!img) { this.toast('Chưa có ảnh trên canvas.', 'error'); return; }
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+      if (!iw || !ih) { this.toast('Ảnh chưa tải xong.', 'error'); return; }
+      const b = this.cropBox || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 };
+      const x = Math.max(0, Math.round(b.x * iw)), y = Math.max(0, Math.round(b.y * ih));
+      const w = Math.max(1, Math.min(iw - x, Math.round(b.w * iw))), h = Math.max(1, Math.min(ih - y, Math.round(b.h * ih)));
+      this.reframing = true;
+      try {
+        const d = await this.api('/studio/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio, x, y, w, h });
+        this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' });
+        this.cropMode = false; this._cropStop(null);
+        this.toast('Đã cắt vùng đã chọn.');
+      } catch (err) { this.toast(err.message || 'Lỗi cắt.', 'error'); }
+      finally { this.reframing = false; }
+    },
+    async reframeCenter() {
+      if (!this.upscaleSrc || this.reframing) return;
+      this.reframing = true;
+      try {
+        const d = await this.api('/studio/reframe', { image: this.upscaleSrc, ratio: this.reframeRatio });
+        this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'reframe', provider: 'reframe', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa cắt' });
+        this.toast('Đã cắt giữa ' + this.reframeRatio + '.');
+      } catch (e) { this.toast(e.message || 'Lỗi cắt.', 'error'); }
+      finally { this.reframing = false; }
+    },
     upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, skin: this.skinDetail, light: this.lightShadow, fabric: this.fabricDetail }; },
     loadUpscaleMemory() {
       try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, skinDetail: m.settings.skin ?? 4, lightShadow: m.settings.light ?? 5, fabricDetail: m.settings.fabric ?? 5 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
@@ -168,7 +313,7 @@ export const useStudioStore = defineStore('studio', {
     zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25)); },
     zoomOut() { this.zoom = Math.max(0.25, +(this.zoom - 0.25)); },
     zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
-    panStart(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
+    panStart(e) { if (this._cropDrag) return; this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
     panMove(e) { if (this._drag) { this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); } },
     panEnd() { this._drag = null; },
     async deleteGen(g) {
@@ -254,8 +399,11 @@ export const useStudioStore = defineStore('studio', {
     },
     // Poll /studio/latest until the just-submitted swap generations finish (the queue worker fills them in).
     async refreshSwapResults(ids) {
+      this.swapProcessing = true;
+      this._swapStop = false;
       const deadline = Date.now() + 300000; // wait up to 5 min
       while (Date.now() < deadline) {
+        if (this._swapStop) { break; }
         await new Promise((r) => setTimeout(r, 5000));
         try {
           const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
@@ -285,11 +433,14 @@ export const useStudioStore = defineStore('studio', {
         });
         if (done) { this.toast('Đã xong thay đổi người mẫu.'); break; }
       }
+      this.swapProcessing = false;
+      this._swapStop = false;
     },
     cancelSwap() {
       if (this.swapAbort) { this.swapAbort.abort(); }
+      if (this.swapProcessing) { this._swapStop = true; this.swapProcessing = false; }
       this.swapLoading = false;
-      this.toast('Đang hủy…');
+      this.toast('Đã hủy.');
     },
   },
 });

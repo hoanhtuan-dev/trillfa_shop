@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import { useStudioStore } from './store.js';
 import SourceCard from './components/SourceCard.vue';
 import SuggestCard from './components/SuggestCard.vue';
@@ -20,31 +20,22 @@ function copyColor(c) { try { navigator.clipboard.writeText(c); store.toast('Đ�
 const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 const menuOpen = ref(false);
 const outputOpen = ref(false);
-onMounted(async () => { store.load(); store.loadPalette(store.previewId); });
+onMounted(async () => { store.load(); store.loadPalette(store.previewId); window.addEventListener('keydown', onCanvasKey); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); });
 watch(() => store.previewId, (id) => { store.loadPalette(id); });
-function cropMetrics() {
-  const img = store.cvImg, cont = store.canvasZoom;
-  if (!img || !cont) return null;
-  const ir = img.getBoundingClientRect(), cr = cont.getBoundingClientRect();
-  const iw = img.naturalWidth || 1, ih = img.naturalHeight || 1;
-  const ia = iw / ih, box = ir.width / ir.height;
-  let vw, vh;
-  if (ia > box) { vw = ir.width; vh = ir.width / ia; } else { vh = ir.height; vw = ir.height * ia; }
-  return { vw, vh, vx: ir.left - cr.left + (ir.width - vw)/2, vy: ir.top - cr.top + (ir.height - vh)/2, crW: cr.width, crH: cr.height, ia };
-}
-function cropStyle() {
-  const m = cropMetrics(); if (!m) return {};
-  return { left: ((m.vx + store.cropBox.x * m.vw) / m.crW * 100) + '%', top: ((m.vy + store.cropBox.y * m.vh) / m.crH * 100) + '%', width: (store.cropBox.w * m.vw / m.crW * 100) + '%', height: (store.cropBox.h * m.vh / m.crH * 100) + '%' };
-}
-function cropStart(e, key) { e.preventDefault(); e.stopPropagation(); store._cropDrag = { key, sx: e.clientX, sy: e.clientY, box: { ...store.cropBox } }; const move = (ev) => cropMove(ev); const up = () => { store._cropDrag = null; window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up); }; window.addEventListener('mousemove', move); window.addEventListener('mouseup', up); window.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', up); }
-function cropMove(e) {
-  const d = store._cropDrag; if (!d || !store.cropMode) return;
-  const m = cropMetrics(); if (!m) return;
-  const bx = (e.clientX - d.sx) / m.vw, by = (e.clientY - d.sy) / m.vh;
-  const b = { ...d.box };
-  if (d.key === 'move') { b.x = Math.max(0, Math.min(1 - b.w, b.x + bx)); b.y = Math.max(0, Math.min(1 - b.h, b.y + by)); }
-  else { const r = Number(store.reframeRatio.split(':')[0]) / Number(store.reframeRatio.split(':')[1]); const ratioFrac = r / m.ia; const step = Math.max(bx, by); let nh = Math.max(0.05, b.h + step); let nw = nh * ratioFrac; if (nw > 1) { nw = 1; nh = nw / ratioFrac; } if (b.y + nh > 1) { nh = Math.max(0.05, 1 - b.y); nw = nh * ratioFrac; } if (b.x + nw > 1) { nw = Math.max(0.05, 1 - b.x); nh = nw / ratioFrac; } b.w = Math.max(0.05, Math.min(1, nw)); b.h = Math.max(0.05, Math.min(1, nh)); }
-  store.cropBox = b;
+// Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
+const cvImg = ref(null);
+const canvasZoom = ref(null);
+watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
+// While crop mode is on: re-fit the box when the ratio changes, re-init when the image changes.
+watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
+watch(() => store.upscaleSrc, () => { if (store.cropMode) store.initCropBox(); });
+function onCanvasKey(e) {
+  if (!store.cropMode) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  if (e.key === 'Escape') store.toggleCrop();
+  else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) store.confirmCrop();
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
@@ -80,14 +71,23 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             <button v-if="store.editSource" @click="store.editSource = null" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn">✕</button>
             <button v-else @click="store.deleteGen(store.preview)" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-red-200 hover:bg-red-600" title="Xóa ảnh kết quả này">🗑</button>
           </div>
-          <div ref="canvasZoom" class="absolute inset-0 grid place-items-center p-4 cursor-grab active:cursor-grabbing" @wheel.prevent="store.wheelZoom($event.deltaY)" @pointerdown="store.panStart($event)" @pointermove="store.panMove($event)" @pointerup="store.panEnd" @pointerleave="store.panEnd">
-            <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" />
+          <div ref="canvasZoom" class="absolute inset-0 grid place-items-center p-4 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event.deltaY)" @pointerdown="store.panStart($event)" @pointermove="store.panMove($event)" @pointerup="store.panEnd" @pointerleave="store.panEnd">
+            <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
             <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             <div v-if="store.cropMode && store.upscaleSrc" class="pointer-events-none absolute inset-0" style="z-index:30">
-              <div class="absolute cursor-move" style="pointer-events:auto" :style="cropStyle()" @mousedown.stop="cropStart($event,'move')" @touchstart.stop="cropStart($event,'move')">
+              <div class="absolute cursor-move select-none" style="pointer-events:auto; touch-action:none" :style="store.cropStyle()" @pointerdown.stop="store.cropStart($event,'move')" @dblclick="store.toggleCrop" title="Kéo để di chuyển · nhấn đúp để hủy">
                 <div class="pointer-events-none absolute inset-0 border-2 border-white/85" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
-                <div class="pointer-events-none absolute inset-0 flex items-center justify-center"><span class="rounded bg-white/70 px-1 py-0.5 text-[10px] font-semibold text-ink-900">{{ store.reframeRatio }}</span></div>
-                <div class="absolute -bottom-3 -right-3 h-6 w-6 cursor-nwse-resize rounded-sm bg-white shadow" style="pointer-events:auto" @mousedown.stop="cropStart($event,'resize')" @touchstart.stop="cropStart($event,'resize')"></div>
+                <div class="pointer-events-none absolute inset-0 opacity-40">
+                  <div class="absolute left-1/3 top-0 h-full w-px bg-white/60"></div>
+                  <div class="absolute left-2/3 top-0 h-full w-px bg-white/60"></div>
+                  <div class="absolute left-0 top-1/3 h-px w-full bg-white/60"></div>
+                  <div class="absolute left-0 top-2/3 h-px w-full bg-white/60"></div>
+                </div>
+                <div class="pointer-events-none absolute inset-0 flex items-center justify-center"><span class="rounded bg-white/70 px-1 py-0.5 text-[10px] font-semibold text-ink-900">{{ store.cropSizeLabel() }}</span></div>
+                <div class="absolute -left-1.5 -top-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'nw')"></div>
+                <div class="absolute -right-1.5 -top-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-white shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'ne')"></div>
+                <div class="absolute -bottom-1.5 -left-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-white shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'sw')"></div>
+                <div class="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'se')"></div>
               </div>
             </div>
           </div>
