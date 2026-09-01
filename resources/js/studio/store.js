@@ -65,6 +65,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintPrompt: '',
     suggesting: false,
     suggestResult: null,
+    promptOpen: false,
     viewer: null,
     upscalePresets: [],
     lastBatch: [],
@@ -174,6 +175,7 @@ export const useStudioStore = defineStore('studio', {
     },
     pickFromProduct(p) { this.setSource(p.url, p.name); },
     pickFromResult(g) { this.setSource(g.media_url, 'Ảnh kết quả #' + g.id); },
+    async translate(promptTo) { if (!promptTo) { this.toast('Nhập prompt.', 'error'); return; } this.suggestResult = this.suggestResult || {}; try { const d = await this.api('/studio/translate', { text: promptTo, direction: 'vi' }); this.suggestResult.prompt_vi = d.text || d; this.toast('Đã dịch sang tiếng Việt.'); } catch (e) { this.toast(e.message || 'Lỗi dịch.', 'error'); } },
     async suggestStyle(image) {
       if (!image) { this.toast('Chọn ảnh nguồn để gợi ý.', 'error'); return; }
       this.suggesting = true;
