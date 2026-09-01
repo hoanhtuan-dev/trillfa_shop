@@ -11,6 +11,7 @@ import FilmLookCard from './components/FilmLookCard.vue';
 import ReframeCard from './components/ReframeCard.vue';
 import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
+import RegionCard from './components/RegionCard.vue';
 import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
@@ -31,14 +32,14 @@ watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); })
 watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
 watch(() => store.upscaleSrc, () => { if (store.cropMode) store.initCropBox(); });
 function onCanvasKey(e) {
-  if (!store.cropMode) return;
+  if (!store.cropMode && !store.regionMode) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-  if (e.key === 'Escape') store.toggleCrop();
-  else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) store.confirmCrop();
+  if (e.key === 'Escape') { if (store.regionMode) store.stopRegionSelect(); else store.toggleCrop(); }
+  else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON') && !store.regionMode) store.confirmCrop();
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
+const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, RegionCard, UpscaleCard, FilmLookCard, ReframeCard] : [DirectorCard]);
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
@@ -90,6 +91,14 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
                 <div class="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'se')" @dblclick.stop></div>
               </div>
             </div>
+            <!-- Region selection overlay (xóa/thay vùng) -->
+            <div v-if="store.regionMode && store.upscaleSrc" class="absolute inset-0" style="z-index:31; cursor:crosshair" @pointerdown="store.regionStart($event)" @pointermove="store.regionMove($event)" @pointerup="store.regionStop()" @pointerleave="store.regionStop()">
+              <div class="pointer-events-none absolute inset-0 bg-black/45"></div>
+              <div class="pointer-events-none absolute" :style="store.regionStyle()">
+                <div class="absolute -inset-px border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
+                <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">Kéo để chọn vùng · Esc để hủy</div>
+              </div>
+            </div>
           </div>
           <!-- Canvas toolbar -->
           <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
@@ -97,6 +106,10 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             <button @click="store.zoomFit()" class="rounded-full px-2 py-1 text-xs text-cream-200 hover:bg-ink-700">Vừa</button>
             <button @click="store.zoomIn()" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700">+</button>
             <span class="px-1 text-xs text-cream-200">{{ Math.round(store.zoom * 100) }}%</span>
+            <template v-if="store.upscaleSrc">
+              <span class="mx-0.5 h-4 w-px bg-ink-700"></span>
+              <button v-for="(op, key) in store.regionOps" :key="key" @click="store.startRegionSelect(key)" class="rounded-full px-2 py-1 text-[11px] font-semibold transition-colors" :class="store.regionMode === key ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'" :title="op.hint">{{ op.label }}</button>
+            </template>
           </div>
           <!-- right column: layers (top) + floating palette (below, same width) -->
           <div class="absolute right-3 top-3 z-20 flex w-40 flex-col gap-1.5">

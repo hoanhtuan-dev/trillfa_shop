@@ -70,6 +70,29 @@ export const useStudioStore = defineStore('studio', {
     _swapStop: false,     // flag to stop the background-result polling
     inpainting: false,
     inpaintPrompt: '',
+    // Inpaint progress/status state (rõ ràng cho người dùng)
+    inpaintGenId: null,       // generation đang chạy inpaint
+    inpaintStage: '',         // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled'
+    inpaintStartTs: 0,        // timestamp bắt đầu (đếm thời gian)
+    inpaintError: '',         // thông báo lỗi cuối
+    inpaintPreserveBg: true,  // giữ nguyên nền
+    inpaintPreserveFace: true,// giữ nguyên khuôn mặt
+    // ── Region Tools (xóa/thay vùng chọn trên canvas) — MỞ RỘNG: thêm op mới vào đây +
+    //    backend StudioController::REGION_OPS (và regionPrompt) là đủ. ──
+    regionOps: {
+      erase: { label: '🧹 Xóa vùng', hint: 'Kéo chọn vùng cần xóa — AI lấp tự nhiên, không dấu vết', needsPrompt: false },
+      replace: { label: '🪄 Thay vùng', hint: 'Kéo chọn vùng rồi mô tả nội dung thay thế', needsPrompt: true },
+    },
+    regionMode: '',           // '' | 'erase' | 'replace' (đang chọn vùng trên canvas)
+    regionOp: null,           // op đang chạy (lưu khi bấm Áp dụng)
+    regionBox: { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, // vùng chọn (normalized 0..1)
+    _regionDrag: null,
+    regionPrompt: '',
+    regionStage: '',          // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled'
+    regionGenId: null,
+    regionStartTs: 0,
+    regionError: '',
+    _pollTimers: {},          // single-flight poll per generation id
     suggesting: false,
     suggestResult: null,
     promptOpen: false,
@@ -349,13 +372,143 @@ export const useStudioStore = defineStore('studio', {
       catch(e){ this.toast(e.message || 'Lỗi gợi ý.', 'error'); }
       finally { this.suggesting = false; }
     },
-    async inpaint(prompt) {
-      if (!this.previewId || this.inpainting) { this.toast('Chọn ảnh để sửa.', 'error'); return; }
-      this.inpainting = true;
-      try { const d = await this.api('/studio/generations/' + this.previewId + '/inpaint', { prompt, preserve_background: true, preserve_face: true, image: this.preview?.media_url || '' }); if (d.media_url) { this.addGen({ id: d.generation_id || ('ip-' + Date.now()), type: 'image', status: 'completed', model: 'inpaint', provider: d.provider || 'qwen', media_url: d.media_url, error: null, credits_cost: 1, created_at: 'Vừa sửa' }); this.toast('Đã sửa ảnh.'); } }
-      catch (e) { this.toast(e.message || 'Lỗi inpaint.', 'error'); }
-      finally { this.inpainting = false; }
+    statusLabel(s) { return { pending: 'Đang chờ', processing: 'Đang xử lý', completed: 'Hoàn tất', failed: 'Lỗi', cancelled: 'Đã hủy' }[s] || s || ''; },
+    // Lazy worker poll: theo dõi một generation qua /studio/generations/{id} (backend tự xử lý
+    // job đang pending và tự "heal" job kẹt). Single-flight: không bao giờ gửi 2 request song song.
+    pollGeneration(id) {
+      if (this._pollTimers[id]) return;
+      const tick = async () => {
+        try {
+          const res = await fetch('/studio/generations/' + id, { headers: { Accept: 'application/json' } });
+          if (!res.ok) { delete this._pollTimers[id]; return; }
+          const g = await res.json();
+          const item = this.generations.find(x => x.id === Number(g.id));
+          if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; }
+          if (['completed', 'failed', 'cancelled'].includes(g.status)) {
+            delete this._pollTimers[id];
+            const isInpaint = String(id) === String(this.inpaintGenId);
+            const isRegion = String(id) === String(this.regionGenId);
+            if (g.status === 'completed' && g.media_url) {
+              if (isInpaint) { this.inpaintStage = 'done'; this.toast('✅ Đã sửa xong ảnh.'); }
+              if (isRegion) { this.regionStage = 'done'; this.regionMode = ''; this.toast('✅ Đã xong thao tác vùng.'); }
+              this.select({ id: g.id, media_url: g.media_url, type: 'image', status: 'completed' });
+            } else if (g.status === 'failed') {
+              if (isInpaint) { this.inpaintStage = 'error'; this.inpaintError = g.error || 'Sửa ảnh thất bại.'; this.toast(this.inpaintError, 'error'); }
+              if (isRegion) { this.regionStage = 'error'; this.regionError = g.error || 'Thao tác vùng thất bại.'; this.toast(this.regionError, 'error'); }
+            } else {
+              if (isInpaint) { this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
+              if (isRegion) { this.regionStage = 'cancelled'; this.regionMode = ''; this.toast('Đã hủy thao tác vùng.'); }
+            }
+            return;
+          }
+        } catch (e) { delete this._pollTimers[id]; return; }
+        this._pollTimers[id] = setTimeout(tick, 500);
+      };
+      this._pollTimers[id] = setTimeout(tick, 2000);
     },
+    async inpaint(prompt) {
+      const src = this.preview && this.preview.media_url;
+      if (!this.previewId || !src || this.inpainting) { this.toast('Chọn ảnh kết quả để sửa.', 'error'); return; }
+      if (!(prompt || '').trim()) { this.toast('Nhập mô tả chỉnh sửa.', 'error'); return; }
+      this.inpainting = true;
+      this.inpaintError = '';
+      this.inpaintStage = 'send';
+      this.inpaintStartTs = Date.now();
+      try {
+        const d = await this.api('/studio/generations/' + this.previewId + '/inpaint', { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace });
+        if (!d.generation_id) { throw new Error(d.message || 'Không tạo được yêu cầu sửa ảnh.'); }
+        this.inpaintGenId = d.generation_id;
+        this.inpaintStage = 'processing';
+        this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'inpaint', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa gửi' });
+        if (d.credits_left != null) this.creditsLeft = d.credits_left;
+        this.pollGeneration(d.generation_id);
+      } catch (e) {
+        this.inpaintError = e.message || 'Lỗi sửa ảnh.';
+        this.inpaintStage = 'error';
+        this.toast(this.inpaintError, 'error');
+      } finally { this.inpainting = false; }
+    },
+    async cancelInpaint() {
+      if (!this.inpaintGenId || !this.inpaintStage) return;
+      try { await this.api('/studio/generations/' + this.inpaintGenId + '/cancel', {}); this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
+      catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
+    },
+    clearInpaintStatus() { this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; },
+    // ── Region Tools: chọn vùng trên canvas (kéo-thả hình chữ nhật, normalized 0..1) ──
+    startRegionSelect(op) {
+      if (!this.regionOps[op]) return;
+      if (this.regionStage === 'send' || this.regionStage === 'processing') { this.toast('Đang xử lý thao tác vùng — chờ xong rồi chọn vùng mới.', 'error'); return; }
+      if (this.cropMode) { this.cropMode = false; this._cropStop(null); } // không dùng chung crop
+      this.regionMode = op;
+      this.regionBox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
+      this.regionError = '';
+      this.toast(this.regionOps[op].hint);
+    },
+    stopRegionSelect() { this.regionMode = ''; this._regionDrag = null; },
+    // Geometry: vùng chọn (normalized) -> style % overlay trên canvas (dùng canvasMetrics của crop).
+    regionStyle() {
+      const m = this.canvasMetrics(); if (!m) return { display: 'none' };
+      const b = this.regionBox || { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
+      return { left: ((m.vx + b.x * m.vw) / m.crW * 100) + '%', top: ((m.vy + b.y * m.vh) / m.crH * 100) + '%', width: (b.w * m.vw / m.crW * 100) + '%', height: (b.h * m.vh / m.crH * 100) + '%' };
+    },
+    regionStart(e) {
+      if (!this.regionMode) return;
+      e.stopPropagation();
+      const m = this.canvasMetrics(); if (!m) return;
+      const nx = this._clamp((e.clientX - m.vx) / m.vw, 0, 1);
+      const ny = this._clamp((e.clientY - m.vy) / m.vh, 0, 1);
+      this._regionDrag = { x: nx, y: ny };
+      this.regionBox = { x: nx, y: ny, w: 0.005, h: 0.005 };
+    },
+    regionMove(e) {
+      const d = this._regionDrag; if (!d || !this.regionMode) return;
+      const m = this.canvasMetrics(); if (!m) return;
+      const nx = this._clamp((e.clientX - m.vx) / m.vw, 0, 1);
+      const ny = this._clamp((e.clientY - m.vy) / m.vh, 0, 1);
+      const x = Math.min(d.x, nx), y = Math.min(d.y, ny);
+      this.regionBox = { x, y, w: Math.max(0.005, Math.abs(nx - d.x)), h: Math.max(0.005, Math.abs(ny - d.y)) };
+    },
+    regionStop() { this._regionDrag = null; },
+    // Gửi thao tác vùng -> backend /generations/{id}/region (mask + AI/local) -> poll.
+    async applyRegion() {
+      const op = this.regionOp || this.regionMode;
+      if (!op || !this.regionOps[op]) { this.toast('Chọn thao tác vùng trước.', 'error'); return; }
+      if (!this.previewId || !this.preview?.media_url) { this.toast('Chọn ảnh kết quả để chỉnh vùng.', 'error'); return; }
+      if (this.regionOps[op].needsPrompt && !this.regionPrompt.trim()) { this.toast('Nhập mô tả nội dung thay thế cho vùng.', 'error'); return; }
+      const b = this.regionBox || {}; const w = b.w || 0, h = b.h || 0;
+      if (w < 0.02 || h < 0.02) { this.toast('Vùng chọn quá nhỏ — kéo chọn lại trên canvas.', 'error'); return; }
+      this.regionOp = op;
+      this.regionStage = 'send';
+      this.regionError = '';
+      this.regionStartTs = Date.now();
+      try {
+        const d = await this.api('/studio/generations/' + this.previewId + '/region', { op, region: { x: b.x, y: b.y, w, h }, prompt: this.regionPrompt });
+        if (!d.generation_id) { throw new Error(d.message || 'Không tạo được yêu cầu.'); }
+        this.regionGenId = d.generation_id;
+        if (d.status === 'completed') {
+          // Không có key AI → backend lấp cục bộ, trả completed ngay.
+          this.regionStage = 'done';
+          this.regionMode = '';
+          this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.model || 'erase', provider: d.provider || 'local', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa xóa vùng' });
+          this.toast('✅ Đã xong thao tác vùng.');
+        } else {
+          this.regionStage = 'processing';
+          this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'erase', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa gửi' });
+          if (d.credits_left != null) this.creditsLeft = d.credits_left;
+          this.pollGeneration(d.generation_id);
+        }
+      } catch (e) {
+        this.regionError = e.message || 'Lỗi xử lý vùng.';
+        this.regionStage = 'error';
+        this.toast(this.regionError, 'error');
+      }
+    },
+    async cancelRegion() {
+      if (!this.regionGenId || !this.regionStage) return;
+      try { await this.api('/studio/generations/' + this.regionGenId + '/cancel', {}); this.regionStage = 'cancelled'; this.regionMode = ''; this.toast('Đã hủy thao tác vùng.'); }
+      catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
+    },
+    clearRegionStatus() { this.regionStage = ''; this.regionError = ''; this.regionGenId = null; this.regionStartTs = 0; this.regionOp = null; this.regionMode = ''; },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
       // 1 face reference + 1 or MORE poses -> one result per pose.

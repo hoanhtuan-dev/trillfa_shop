@@ -62,7 +62,7 @@ class ImageAIService
         // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
         // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
         if ($baseImage && (studio_api_key('qwen_edit') || $this->providerKey() || $dashscopeKey)) {
-            $edited = $this->editImage($prompt, $baseImage);
+            $edited = $this->editImage($prompt, $baseImage, null, null, null, $maskImage);
             if ($edited) {
                 return $edited;
             }
@@ -476,7 +476,7 @@ class ImageAIService
         return 'data:'.$mime.';base64,'.$b64;
     }
 
-    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null): ?string
+    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null, ?string $maskImage = null): ?string
     {
         $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
         if (! $this->isImageEditCapableModel($model)) {
@@ -492,6 +492,10 @@ class ImageAIService
         }
         $faceRef = $faceRefUrl ? $this->imageDataUri($faceRefUrl) : null;
         $poseRef = $poseRefUrl ? $this->imageDataUri($poseRefUrl) : null;
+        // Region edit (xóa/thay vùng chọn): mask image kèm theo, vùng ĐEN = nơi được chỉnh sửa.
+        if ($maskImage) {
+            $prompt .= ' A mask image is provided (last image, same size as the base): its BLACK region is the exact area to edit — change ONLY that black region and keep every pixel outside it identical to the original image.';
+        }
 
         // Edit (Inpaint) prioritises the Pay-As-You-Go credential (edit models usually live on the pay-go
         // host), then falls back to Token Plan — via studio_qwen_credentials('edit').
@@ -508,6 +512,10 @@ class ImageAIService
             if ($faceRef) { $content[] = ['image' => $faceRef]; }
             if ($poseRef) { $content[] = ['image' => $poseRef]; }
             $content[] = ['image' => $source];
+            if ($maskImage) {
+                $maskUri = $this->imageDataUri($maskImage);
+                if ($maskUri) { $content[] = ['image' => $maskUri]; }
+            }
             $content[] = ['text' => $prompt];
 
             $editUrl = $this->postMultimodalEdit($model, $base, $key, $content);

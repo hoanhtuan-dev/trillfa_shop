@@ -17,6 +17,19 @@ use Illuminate\Support\Str;
 class StudioController extends Controller
 {
     /**
+     * Registry các thao tác theo vùng chọn trên canvas ("Region Tools") — MỞ RỘNG:
+     * muốn thêm thao tác mới (vd: recolor, remove-person, replace…) chỉ cần:
+     *   1) thêm entry vào đây (+ label),
+     *   2) thêm entry mirror trong resources/js/studio/store.js → regionOps,
+     *   3) (tuỳ chọn) bổ sung nhánh prompt trong regionPrompt().
+     * Luồng chung (mask → AI edit / local fill → generation + poll) tự động áp dụng.
+     */
+    protected const REGION_OPS = [
+        'erase' => ['label' => 'Xóa vùng', 'needs_prompt' => false],
+        'replace' => ['label' => 'Thay vùng', 'needs_prompt' => true],
+    ];
+
+    /**
      * Vue-style studio (migration preview): mounts the Vue 3 + Pinia studio app.
      */
     public function studioVue()
@@ -160,6 +173,139 @@ class StudioController extends Controller
         $cost = (int) studio_config('image_credits', 1);
 
         return $this->queueGeneration('image', $data, $cost, $generation);
+    }
+
+    /**
+     * Region edit ("xóa theo vùng chọn trên canvas"): nhận vùng chọn (normalized 0..1),
+     * dựng mask ảnh (TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa, cùng kích thước ảnh gốc) rồi:
+     *  - có key AI (Qwen Edit / DashScope / Qwen) → gửi mask + prompt cho model edit (async, poll như inpaint);
+     *  - chưa có key → lấp vùng bằng GD cục bộ (vẫn hoạt động chế độ stub), trả completed ngay.
+     * Trả về đúng cấu trúc generation để frontend dùng chung pollGeneration().
+     */
+    public function regionEdit(Request $request, Generation $generation)
+    {
+        abort_unless($generation->user_id === auth()->id(), 403);
+
+        $data = $request->validate([
+            'op' => ['required', 'string', 'in:'.implode(',', array_keys(self::REGION_OPS))],
+            'region' => ['required', 'array'],
+            'region.x' => ['required', 'numeric', 'min:0', 'max:1'],
+            'region.y' => ['required', 'numeric', 'min:0', 'max:1'],
+            'region.w' => ['required', 'numeric', 'min:0.005', 'max:1'],
+            'region.h' => ['required', 'numeric', 'min:0.005', 'max:1'],
+            'prompt' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $op = (string) $data['op'];
+        if (self::REGION_OPS[$op]['needs_prompt'] && trim((string) ($data['prompt'] ?? '')) === '') {
+            return response()->json(['message' => 'Nhập mô tả nội dung thay thế cho vùng chọn.'], 422);
+        }
+
+        if (! $generation->media_url) {
+            return response()->json(['message' => 'Ảnh nguồn chưa có kết quả.'], 422);
+        }
+
+        $file = null;
+        foreach ([public_path(ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/')))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
+        $src = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
+
+        $w = imagesx($src); $h = imagesy($src);
+        // region normalized -> pixel rect (clamp, tối thiểu 8px)
+        $rx = max(0.0, min(0.99, (float) $data['region']['x']));
+        $ry = max(0.0, min(0.99, (float) $data['region']['y']));
+        $rw = max(0.005, min(1 - $rx, (float) $data['region']['w']));
+        $rh = max(0.005, min(1 - $ry, (float) $data['region']['h']));
+        $px = (int) round($rx * $w); $py = (int) round($ry * $h);
+        $pw = max(8, min($w - $px, (int) round($rw * $w)));
+        $ph = max(8, min($h - $py, (int) round($rh * $h)));
+
+        // Mask: TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa (cùng kích thước ảnh gốc)
+        $mask = imagecreatetruecolor($w, $h);
+        imagefilledrectangle($mask, 0, 0, $w - 1, $h - 1, imagecolorallocate($mask, 255, 255, 255));
+        imagefilledrectangle($mask, $px, $py, $px + $pw - 1, $py + $ph - 1, imagecolorallocate($mask, 0, 0, 0));
+        $maskName = 'studio/mask-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($maskName, $this->pngBytes($mask));
+        imagedestroy($mask);
+        $maskUrl = '/storage/'.$maskName;
+
+        $cost = (int) studio_config('image_credits', 1);
+        $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
+
+        if ($hasAi) {
+            return $this->queueGeneration('image', [
+                'prompt' => $this->regionPrompt($op, (string) ($data['prompt'] ?? '')),
+                'base_image' => $generation->media_url,
+                'mask_image' => $maskUrl,
+                'edit' => true,
+            ], $cost, $generation);
+        }
+
+        // Không có key AI → lấp cục bộ bằng GD (chế độ stub / offline vẫn dùng được)
+        $this->localEraseFill($src, $px, $py, $pw, $ph);
+        $name = 'studio/erase-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
+        imagedestroy($src);
+        $gen = auth()->user()->generations()->create([
+            'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
+            'prompt' => 'Xóa vùng chọn (local)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
+        ]);
+        return response()->json(['generation_id' => $gen->id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
+    }
+
+    /**
+     * Prompt theo thao tác vùng chọn — MỞ RỘNG: thêm nhánh mới khi thêm op vào REGION_OPS.
+     */
+    protected function regionPrompt(string $op, string $userPrompt): string
+    {
+        $mask = ' A mask image is provided (same size as the base image): its BLACK region is the exact area to edit — change ONLY that black region and keep every pixel outside it identical to the original image.';
+        if ($op === 'erase') {
+            return 'Remove the object, person or content inside the BLACK region of the mask and fill the area naturally with the surrounding background, fabric or pattern so the result looks clean, seamless and untouched. Do not leave any trace, edge artifact or blur of the removed content.'.$mask;
+        }
+        $p = trim($userPrompt);
+        return $p.'. Apply this change ONLY inside the BLACK region of the mask; keep everything outside it identical to the original image.'.$mask;
+    }
+
+    /**
+     * GD fallback khi chưa cấu hình key AI: lấp vùng chọn bằng màu trung bình viền xung quanh
+     * + làm mờ patch để hòa vào ảnh (chất lượng tạm — dùng khi chưa có key / chế độ stub).
+     */
+    protected function localEraseFill(\GdImage $img, int $px, int $py, int $pw, int $ph): void
+    {
+        $w = imagesx($img); $h = imagesy($img);
+        $samples = [];
+        for ($i = 0; $i < $ph; $i += 4) {
+            $yy = min($h - 1, $py + $i);
+            $samples[] = imagecolorat($img, max(0, $px - 1), $yy);
+            $samples[] = imagecolorat($img, min($w - 1, $px + $pw), $yy);
+        }
+        for ($i = 0; $i < $pw; $i += 4) {
+            $xx = min($w - 1, $px + $i);
+            $samples[] = imagecolorat($img, $xx, max(0, $py - 1));
+            $samples[] = imagecolorat($img, $xx, min($h - 1, $py + $ph));
+        }
+        $sr = 0; $sg = 0; $sb = 0; $n = 0;
+        foreach ($samples as $s) {
+            $sr += ($s >> 16) & 0xFF; $sg += ($s >> 8) & 0xFF; $sb += $s & 0xFF; $n++;
+        }
+        if (! $n) { return; }
+        $fill = imagecolorallocate($img, (int) ($sr / $n), (int) ($sg / $n), (int) ($sb / $n));
+        imagefilledrectangle($img, $px, $py, $px + $pw - 1, $py + $ph - 1, $fill);
+
+        // Làm mờ patch (có lề feather) rồi dán lại cho hòa biên.
+        if (function_exists('imagefilter') && $w * $h <= 8000000) {
+            $feather = (int) max(3, min(24, round(min($pw, $ph) * 0.1)));
+            $pw2 = $pw + $feather * 2; $ph2 = $ph + $feather * 2;
+            $patch = imagecreatetruecolor($pw2, $ph2);
+            imagecopy($patch, $img, $feather, $feather, $px, $py, $pw, $ph);
+            @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
+            @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
+            imagecopy($img, $patch, max(0, $px - $feather), max(0, $py - $feather), 0, 0, $pw2, $ph2);
+            imagedestroy($patch);
+        }
     }
 
     /**
@@ -411,6 +557,7 @@ class StudioController extends Controller
             'provider' => $fresh->provider,
             'media_url' => $fresh->media_url,
             'error' => $fresh->error,
+            'credits_cost' => $fresh->credits_cost,
             'credits_left' => $user->fresh()->credits_balance,
             'prompts_history_id' => $fresh->prompts_history_id,
         ]);
@@ -1188,6 +1335,56 @@ class StudioController extends Controller
     }
 
     /**
+     * Safety net: if the edit model darkened the subject against a dark background (silhouette),
+     * lift the exposure of the central subject band with a soft falloff. Only applies when the
+     * subject region is genuinely dark — an already-lit result (e.g. a good composite) is untouched.
+     */
+    protected function brightenDarkSubject(string $url): ?string
+    {
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return null; }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return null; }
+        $w = imagesx($img); $h = imagesy($img);
+        $x0 = (int) ($w * 0.30); $x1 = (int) ($w * 0.70);
+        $y0 = (int) ($h * 0.05); $y1 = (int) ($h * 0.95);
+        $sum = 0; $n = 0;
+        for ($y = $y0; $y < $y1; $y += 4) for ($x = $x0; $x < $x1; $x += 4) {
+            $c = imagecolorat($img, $x, $y);
+            $sum += 0.299 * (($c >> 16) & 255) + 0.587 * (($c >> 8) & 255) + 0.114 * ($c & 255);
+            $n++;
+        }
+        $avg = $n ? $sum / $n : 0;
+        if ($avg >= 45) { imagedestroy($img); return null; }   // subject already lit -> keep as-is
+
+        $boost = min(2.2, 1.15 * (55 / max(22, $avg)));
+        $cx = ($x0 + $x1) / 2;
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $wx = max(0.0, 1 - abs($x - $cx) / ($w * 0.22));
+                $wy = ($y >= $y0 && $y <= $y1) ? 1.0 : max(0.0, 1 - min(abs($y - $y0), abs($y - $y1)) / ($h * 0.06));
+                $wgt = $wx * $wy;
+                if ($wgt <= 0.03) { continue; }
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 255; $g = ($c >> 8) & 255; $b = $c & 255;
+                $f = 1 + ($boost - 1) * $wgt;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    max(0, min(255, (int) round($r * $f))),
+                    max(0, min(255, (int) round($g * $f))),
+                    max(0, min(255, (int) round($b * $f)))));
+            }
+        }
+        $name = 'studio/swapbright-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
+        imagedestroy($img);
+        return '/storage/'.$name;
+    }
+
+    /**
      * "Thay Đổi Người Mẫu" (Click-to-Swap) — virtual try-on with a chosen model + pose.
      */
     public function swapModel(Request $request)
@@ -1272,9 +1469,12 @@ class StudioController extends Controller
             return;
         }
 
-        // NO post-process passes: the raw edit-model result is stored as-is. Fabric texture,
-        // skin and tone re-grading passes all recode the image and degrade quality (swapdetail /
-        // swaptone files) — the user explicitly asked to remove every post-process effect.
+        // Safety net: never let the subject become a black silhouette against a dark background.
+        // The edit model is non-deterministic — a "keep bright" prompt usually works but not always,
+        // so this lifts a genuinely-dark subject band (an already-lit result is left untouched).
+        $bright = $this->brightenDarkSubject($fallback);
+        if ($bright) { $fallback = $bright; }
+
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $actualModel = $svc->lastModel() ?: $swapModel;
         $credits = max(1, $svc->calls()); // 2 for the try-on + face-swap passes, 1 otherwise

@@ -356,6 +356,14 @@
                     <label class="flex items-center gap-2"><input type="checkbox" x-model="preserveBg" class="h-4 w-4 accent-brand-600"> Giữ nguyên nền</label>
                 </div>
                 <button @click="surgery()" :disabled="editSurging || !(editSource && editSource.url)" class="btn-brand mt-3 w-full"><span x-show="!editSurging">🔧 Phẫu thuật Ảnh</span><span x-show="editSurging">Đang phẫu thuật…</span></button>
+                <template x-if="editSurging || (surgeryGenId && isActive((generations.find(g => g.id === surgeryGenId) || {}).status))">
+                    <div class="mt-2 flex items-center gap-2 rounded-xl bg-amber-50 p-2 text-xs text-amber-700">
+                        <span class="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></span>
+                        <span x-text="surgeryStatus()"></span>
+                        <button @click="cancelSurgery()" class="ml-auto shrink-0 rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-600 hover:bg-red-600 hover:text-white">✕ Hủy</button>
+                    </div>
+                </template>
+                <div x-show="surgeryError" class="mt-2 whitespace-pre-line rounded-xl bg-red-50 p-2 text-xs text-red-600" x-text="'⚠️ ' + surgeryError"></div>
             </div>
 
             <!-- Color Palette (Bước 2) -->
@@ -795,7 +803,7 @@ document.addEventListener('alpine:init', () => {
         ],
         pickTarget: 'ref',
         editSource: null, editSourceTmp: '', canvasImg: '', editFace: '', editFaceRef: '',
-        editPresetOpen: false, editPresetIds: [], editSurging: false,
+        editPresetOpen: false, editPresetIds: [], editSurging: false, surgeryGenId: null, surgeryError: '',
         translateViOpen: false, viPrompt: '', translating: false, translateMeta: {},
         stylistOpen: false, stylistType: '', stylistTypes: @json($stylistTypes), stylistHistory: [], stylistStep: null, stylistLoading: false, stylistFlash: '', stylistMessages: [], stylistCustom: '', stylistQuestions: [], stylistAnswers: {}, stylistCustom: {}, stylistPromptEn: '', stylistPromptVi: '', stylistPromptLang: 'en', stylistSummary: '', stylistAdvice: '', stylistVersions: [],
 
@@ -1094,6 +1102,7 @@ document.addEventListener('alpine:init', () => {
         async surgery() {
             if (!this.editSource || !this.editSource.url || this.editSurging) { Alpine.store('toast').show('Chọn ảnh để chỉnh sửa trước.', 'error'); return; }
             this.editSurging = true;
+            this.surgeryError = ''; this.surgeryGenId = null;
             try {
                 const bg = this.editPresetText('background');
                 const pose = this.editPresetText('pose');
@@ -1108,9 +1117,20 @@ document.addEventListener('alpine:init', () => {
                 const data = await this.api('/studio/generate', { prompt, base_image: this.editSource.url, edit: '1', history_id: this.output.history_id, project_id: this.currentProjectId || null });
                 const items = Array.isArray(data.items) ? data.items : [data];
                 items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, prompts_history_id: it.prompts_history_id, created_at: 'Vừa gửi' }));
-                if (items.length) { this.previewId = items[0].generation_id; Alpine.store('toast').show('Đang phẫu thuật ảnh… #' + items[0].generation_id); }
-            } catch (e) { Alpine.store('toast').show(e.message || String(e), 'error'); }
+                if (items.length) { this.previewId = items[0].generation_id; this.surgeryGenId = items[0].generation_id; Alpine.store('toast').show('Đang phẫu thuật ảnh… #' + items[0].generation_id); }
+            } catch (e) { this.surgeryError = e.message || String(e); Alpine.store('toast').show(this.surgeryError, 'error'); }
             finally { this.editSurging = false; }
+        },
+        surgeryStatus() {
+            const g = this.generations.find(x => x.id === this.surgeryGenId);
+            if (!g) return this.editSurging ? 'Đang gửi yêu cầu…' : '';
+            const sec = Math.max(0, Math.round((this.now - (g._t0 || this.now)) / 1000));
+            return '⏳ ' + this.statusLabel(g.status) + (g.status === 'processing' ? ' · ' + sec + 's' : '');
+        },
+        async cancelSurgery() {
+            if (!this.surgeryGenId) return;
+            try { await this.api('/studio/generations/' + this.surgeryGenId + '/cancel', {}); Alpine.store('toast').show('Đã hủy phẫu thuật ảnh.'); }
+            catch (e) { Alpine.store('toast').show(e.message || 'Lỗi hủy.', 'error'); }
         },
         // ===== Thay Đổi Người Mẫu (Click-to-Swap) =====
         openLookbook(item) {

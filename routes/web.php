@@ -141,6 +141,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/assets', [StudioController::class, 'assetStore'])->name('assets.store');
     Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
+    Route::post('/generations/{generation}/region', [StudioController::class, 'regionEdit'])->name('region');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');
     Route::get('/pattern', [StudioController::class, 'patternPage'])->name('pattern');
     Route::post('/pattern', [StudioController::class, 'pattern'])->name('pattern.generate');
