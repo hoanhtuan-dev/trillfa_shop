@@ -231,25 +231,15 @@ class StudioController extends Controller
      */
     protected function defaultProviderModel(string $type): array
     {
-        // Prefer the registered model registry (highest-priority enabled model for the group).
+        // Unified priority: default-settings model first, then registered models of the group by priority.
+        // Same list as generation and the settings check, so they never disagree.
         $group = in_array($type, ['video', 'inference', 'text']) ? $type : 'image';
-        $reg = resolve_studio_model($group);
-        if ($reg) return [$reg['provider'], $reg['model']];
-
-        // Registry empty / no enabled -> fall back to legacy configured values.
-        if ($type === 'video') {
-            return ['wan', (string) studio_config('video_model', 'wan2.5-t2v')];
+        $list = studio_model_candidates($group);
+        if ($list) {
+            return [$list[0]['provider'], $list[0]['model']];
         }
 
-        $provider = (string) studio_config('image_provider', 'flux');
-        $model = match ($provider) {
-            'gemini' => (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image'),
-            'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
-            'qwen' => (string) studio_config('qwen_model', 'qwen-image-3.0-pro'),
-            default => (string) studio_config('image_model', 'flux-1.1-schnell'),
-        };
-
-        return [$provider, $model];
+        return ['flux', (string) studio_config('image_model', 'flux-1.1-schnell')];
     }
 
     /**
@@ -328,55 +318,49 @@ class StudioController extends Controller
     public function testModel(\App\Models\StudioModel $model)
     {
         $knownVideo = ['wan2.5-t2v', 'wan2.2-i2v', 'wan2.5-i2v', 'wan2.1-i2v-turbo', 'happyhorse-1.1-i2v', 'wanx2.1-t2v-turbo', 'wanx2.1-i2v-turbo'];
-        $qwenFamily = in_array($model->provider, ['qwen', 'dashscope', 'wan'], true);
+        $group = $model->group;
 
-        $keyVal = null;
-        $keyPrefix = null;
-        $baseUrl = '';
-        $hasPlanKey = false;
+        // Same unified, priority-driven candidate list that generation uses. This is the single source
+        // of truth, so the check can never disagree with what "Tạo Ảnh 2D" will actually call.
+        $candidates = studio_model_candidates($group);
+        $names = array_map(fn ($c) => ($c['provider'] ?? '').':'.($c['model'] ?? ''), $candidates);
+        $first = $candidates[0] ?? ['provider' => $model->provider, 'model' => $model->model_id];
 
-        if ($qwenFamily) {
-            // Image/video generation rotates credentials Pay-As-You-Go first (studio_qwen_credentials),
-            // so report the key the service will ACTUALLY use — not the highest-priority registered key,
-            // which may be a Token/Coding Plan (sk-sp-…) key that cannot serve generation models.
-            $task = $model->group === 'video' ? 'video' : 'image';
-            $keys = array_values(studio_qwen_credentials($task));
-            $keyVal = $keys[0] ?? null;
-            $hasPlanKey = count(array_filter($keys, fn ($k) => str_starts_with($k, 'sk-sp-'))) > 0;
-            $keyPrefix = $keyVal ? substr($keyVal, 0, 8).'…' : null;
-            $baseUrl = $keyVal ? dashscope_base_url($keyVal) : '';
-        } else {
-            $key = studio_api_keys_for($model->provider, $model->model_id, $model->group)->first();
-            $keyVal = $key ? studio_api_key_value($key) : null;
-            $keyPrefix = $keyVal ? substr($keyVal, 0, 8).'…' : null;
-            $baseUrl = $keyVal ? dashscope_base_url($keyVal) : '';
-        }
+        // The key is chosen the same way generation chooses it: by registered priority (never key type).
+        $candidateKeys = studio_candidate_key($first, $group);
+        $keyVal = $candidateKeys[0] ?? null;
+        $keyPrefix = $keyVal ? substr($keyVal, 0, 8).'…' : null;
+        $baseUrl = $keyVal ? dashscope_base_url($keyVal) : '';
+        $keyOrder = array_map(fn ($k) => substr($k, 0, 8).'…', $candidateKeys);
 
         $note = '';
-        if ($model->group === 'video' && ! in_array($model->model_id, $knownVideo)) {
+        if ($group === 'video' && ! in_array($model->model_id, $knownVideo)) {
             $note .= '⚠️ Model_id này KHÔNG nằm trong nhóm model video phổ biến của DashScope/Wan — dễ gặp lỗi "Model not exist". ';
         }
         if (! $keyVal) {
-            $note .= 'Chưa có KEY cho provider "'.$model->provider.'" — thêm key Pay-As-You-Go (sk-… hoặc sk-ws-…) trong API Keys Registry (hoặc env).';
+            $note .= 'Chưa có KEY dùng được cho "'.$first['provider'].'" — thêm key trong API Keys Registry (hoặc env).';
         } elseif (str_starts_with($keyVal, 'sk-sp-')) {
-            $note .= '⚠️ Key đang dùng cho mục đích TẠO ẢNH/VIDEO là Token/Coding Plan (sk-sp-…). Host plan KHÔNG có model '.$model->model_id.' → sẽ báo "Model not exist". Hãy đăng ký/ưu tiên key Pay-As-You-Go (sk-… hoặc sk-ws-…) cho mục đích tạo ảnh.';
-        } elseif ($hasPlanKey && str_contains($baseUrl, 'token-plan')) {
-            $note .= '⚠️ Đang có key Token/Coding Plan (sk-sp-…) với độ ưu tiên cao, nhưng tạo ảnh sẽ gọi key Pay-As-You-Go trước. Host hiển thị là token-plan — nếu key Pay-As-You-Go dùng chung base URL này sẽ lỗi "Model not exist". Đặt "DashScope Base" về host Pay-As-You-Go (dashscope-intl.aliyuncs.com).';
-        } elseif ($hasPlanKey) {
-            $note .= 'Đã có key Token/Coding Plan (sk-sp-…) nhưng model tạo ảnh '.$model->model_id.' sẽ gọi key Pay-As-You-Go ('.$keyPrefix.') trước — chấp nhận được.';
+            $note .= '⚠️ Key đang dùng (theo độ ưu tiên) là Token/Coding Plan (sk-sp-…). Host plan KHÔNG phục vụ model '.$first['model'].' → dễ báo "Model not exist". Đăng ký/ưu tiên key Pay-As-You-Go (sk-… hoặc sk-ws-…).';
+        } elseif (str_contains($baseUrl, 'token-plan')) {
+            $note .= '⚠️ Base URL đang trỏ tới host Token/Coding Plan — không phục vụ model tạo ảnh. Đặt "DashScope Base" về host Pay-As-You-Go (dashscope-intl.aliyuncs.com).';
         } else {
-            $note .= 'OK — gọi key Pay-As-You-Go '.$keyPrefix.' trước cho model này.';
+            $note .= 'OK — gọi key '.$keyPrefix.' cho '.$first['provider'].':'.$first['model'].' trước.';
+        }
+        if ($names) {
+            $note .= ' | Thứ tự ưu tiên: '.implode(' → ', $names);
         }
 
         return response()->json([
-            'provider' => $model->provider,
-            'model_id' => $model->model_id,
+            'provider' => $first['provider'],
+            'model_id' => $first['model'],
             'model_name' => $model->name,
-            'group' => $model->group,
-            'api_key_ref' => $model->api_key_ref,
+            'group' => $group,
+            'api_key_ref' => $first['provider'],
             'key_exists' => (bool) $keyVal,
             'key_prefix' => $keyPrefix,
             'base_url' => $baseUrl,
+            'candidates' => $names,
+            'keys' => $keyOrder,
             'note' => $note ?: 'OK — provider + key + model_id đã cấu hình hợp lý.',
         ]);
     }

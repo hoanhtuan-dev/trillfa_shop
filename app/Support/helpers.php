@@ -507,6 +507,111 @@ if (! function_exists('resolve_studio_model')) {
     }
 }
 
+if (! function_exists('studio_model_candidates')) {
+    /**
+     * Unified, priority-driven model list for a group. Order is:
+     *   1. the model id from the DEFAULT settings (Cài đặt) for the group — highest priority;
+     *   2. the registered (enabled) models of the group, by their registered priority (desc).
+     * Deduplicated by provider:model. This single list drives generation, the default model
+     * resolution and the settings check, so they can never disagree.
+     */
+    function studio_model_candidates(string $group): array
+    {
+        $list = [];
+        $seen = [];
+        $add = function ($provider, $model) use (&$list, &$seen) {
+            $provider = (string) $provider;
+            $model = (string) $model;
+            if (! $provider || ! $model) {
+                return;
+            }
+            $k = $provider.':'.$model;
+            if (isset($seen[$k])) {
+                return;
+            }
+            $seen[$k] = true;
+            $list[] = ['provider' => $provider, 'model' => $model, 'api_key_ref' => $provider];
+        };
+
+        // 1. Default settings model for the group (top priority).
+        if ($group === 'video') {
+            $add('wan', (string) studio_config('video_model', 'wan2.5-t2v'));
+        } elseif (in_array($group, ['image', 'inference', 'text'], true)) {
+            $p = (string) studio_config('image_provider', 'flux');
+            $m = match ($p) {
+                'gemini' => (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image'),
+                'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
+                'qwen' => (string) studio_config('qwen_model', 'qwen-image-3.0-pro'),
+                default => (string) studio_config('image_model', 'flux-1.1-schnell'),
+            };
+            $add($p, $m);
+        }
+
+        // 2. Registered models of the group, by priority (desc).
+        foreach (studio_models($group)->filter(function ($m) {
+            return ($m['enabled'] ?? true) == true;
+        })->sortByDesc('priority')->values() as $m) {
+            $add($m['provider'] ?? null, $m['model_id'] ?? null);
+        }
+
+        return $list;
+    }
+}
+
+if (! function_exists('studio_candidate_key')) {
+    /**
+     * Ordered list of API keys for a given (provider, model) candidate, chosen ONLY by registered
+     * priority within the group (and the model/group scope) — never by key type. Qwen/DashScope/Wan
+     * candidates may use any Qwen-family key, and the host is routed automatically by key prefix.
+     * The first element is the top-priority key used first; each subsequent key is tried if it fails.
+     */
+    function studio_candidate_key(array $candidate, string $group): array
+    {
+        $provider = (string) ($candidate['provider'] ?? '');
+        $model = (string) ($candidate['model'] ?? '');
+        if (! $provider) {
+            return [];
+        }
+
+        $families = in_array($provider, ['qwen', 'wan', 'dashscope'], true)
+            ? ['qwen', 'dashscope', 'wan', 'qwen_edit']
+            : [$provider];
+
+        $keys = [];
+        foreach ($families as $fam) {
+            foreach (studio_api_keys_for($fam, $model, $group) as $k) {
+                $v = studio_api_key_value($k);
+                if ($v) {
+                    $keys[] = ['value' => $v, 'priority' => (int) ($k->priority ?? 0)];
+                }
+            }
+        }
+        // env/config slots (lowest priority, deduped against registered values).
+        foreach ($families as $fam) {
+            $v = studio_api_key($fam);
+            if ($v) {
+                $keys[] = ['value' => $v, 'priority' => -1000];
+            }
+        }
+
+        usort($keys, function ($a, $b) {
+            return $b['priority'] <=> $a['priority'];
+        });
+
+        $seen = [];
+        $out = [];
+        foreach ($keys as $k) {
+            if (isset($seen[$k['value']])) {
+                continue;
+            }
+            $seen[$k['value']] = true;
+            $out[] = $k['value'];
+        }
+
+        return $out;
+    }
+}
+
 }
 
 
