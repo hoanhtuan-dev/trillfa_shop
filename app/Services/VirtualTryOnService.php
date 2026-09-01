@@ -15,9 +15,17 @@ class VirtualTryOnService
     /** The image model that actually produced the last swap (may differ from the configured swap_model). */
     public ?string $lastModel = null;
 
+    /** Number of real model calls made for the last swap (2 for a face-ref 2-step swap, 1 otherwise). */
+    protected int $calls = 0;
+
     public function lastModel(): ?string
     {
         return $this->lastModel;
+    }
+
+    public function calls(): int
+    {
+        return $this->calls;
     }
 
     public function modelCatalog(): array
@@ -104,48 +112,80 @@ class VirtualTryOnService
     }
 
     /**
-     * qwen-image-edit swap: re-render the person in the design image to match the chosen model,
-     * keeping the garment 100% unchanged. $faceRefUrl (the model's face photo) is passed as an extra
-     * reference image so the result adopts that face; if the edit model rejects a second image it
-     * retries with just the design image (the prompt still carries the model description).
+     * Swap via Qwen image-edit. $build (0-10) controls body proportions (height vs slimness): high =
+     * tall runway-model build, low = shorter/fuller. When a $faceRefUrl is provided we use a 2-STEP
+     * approach for higher face fidelity:
+     *   Step 1 — re-pose/re-clothe the design person (no face) into a clean full-length figure.
+     *   Step 2 — swap ONLY the face of that figure to the reference face (keeps body/pose/garment).
+     * If Step 1 fails we fall back to the single-pass face+body swap; if Step 2 fails we keep Step 1.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', int $texture = 5, ?string $faceRefUrl = null): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', int $texture = 5, ?string $faceRefUrl = null, int $build = 7): ?string
     {
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
+        $this->calls = 0;
+        $this->lastModel = null;
+
+        $proportion = $this->buildEnglish($build);
+        $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
+            ? 'Replace the ENTIRE background of the scene with: '.$background.'. ' : '';
+        $tex = $this->textureEnglish($texture);
+        $texS = $tex ? ' Make the outfit fabric '.$tex.'.' : '';
+        // Common body/garment backbone + strong anti-squash proportion instruction.
+        $base = 'Keep the exact garment, outfit and all its details 100% unchanged. '.$bg
+            .'Render a full-length, vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. ';
+
+        $imageSvc = app(ImageAIService::class);
 
         if ($faceRefUrl) {
-            // Face-image driven swap (P3): Image 1 = reference person's face, Image 2 = person to edit
-            // (wearing the garment). Aligned with QwenCloud's multi-image convention (subject + garment).
-            // Explicitly preserve identity + anatomy to avoid the reported distortion / lost features.
-            $instr = 'High-fidelity face-and-body swap with two images. '
-                .'Keep the exact garment, outfit and all its details 100% unchanged. '
+            // ---- Step 1: re-pose + re-clothe (no face), with the chosen build ----
+            $step1Prompt = $base.'Replace the person in the scene with a full-length model standing '.$pose.'.'.$texS.' Photorealistic, sharp detail, studio quality.';
+            $step1 = $imageSvc->swapEdit($step1Prompt, $designImage, $swapModel, null);
+            $this->calls++;
+            if ($step1) {
+                // ---- Step 2: swap ONLY the face of step1 to the reference face ----
+                $facePrompt = $base
+                    .'Image 1 is the reference face. Image 2 is the full-body person to edit. '
+                    .'Swap ONLY the face/head of the person in Image 2 with the exact face from Image 1 — preserve the reference facial identity, eye shape, nose, mouth, skin tone and hair. '
+                    .'Keep the body, pose, garment, hair and background of Image 2 EXACTLY as they are; do NOT change the pose, body shape, garment or background. '
+                    .'Keep the face natural, symmetrical and lifelike; do NOT distort, deform, warp or double the features. '.$texS.' Photorealistic, sharp detail.';
+                $step2 = $imageSvc->swapEdit($facePrompt, $step1, $swapModel, $faceRefUrl);
+                $this->calls++;
+                $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+                return $step2 ?: $step1; // if face swap fails, keep the re-posed body
+            }
+            // Step 1 failed -> fall back to the single-pass face+body swap.
+            $instr = $base
                 .'Image 1 is the reference person: use their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. '
                 .'Image 2 is the person to edit (wearing the garment). '
                 .'Render the reference person from Image 1 in the pose: '.$pose.', wearing the exact garment from Image 2. '
                 .'Preserve the reference face precisely and keep natural, anatomically-correct, symmetrical facial proportions — do NOT distort, stretch, deform, warp or reshape the face, eyes, nose, mouth, hair, hands or body. '
-                .'Keep the eyes sharp and natural (no double/offset eyes), the mouth symmetric, the skin smooth and lifelike, and the head-to-body ratio natural. '
-                .'Realistic skin texture, sharp detail, consistent lighting, studio quality.';
-        } else {
-            $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person with a full-body '.$modelDesc.' standing '.$pose.'. Keep natural proportions; do not distort the face or body.';
+                .'Keep the eyes sharp and natural (no double/offset eyes), the mouth symmetric. '.$texS.' Photorealistic, sharp detail, studio quality.';
+            $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl);
+            $this->calls++;
+            if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
+            return $url;
         }
-        // Hậu cảnh: đưa lên đầu + dùng "replace the ENTIRE background" để model thực sự thay nền.
-        if ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original') {
-            $instr = 'Replace the ENTIRE background of the scene with: '.$background.'. '.$instr;
-        }
-        // Texture: 0 mịn -> 10 dệt kim thô.
-        $tex = $this->textureEnglish($texture);
-        if ($tex) {
-            $instr .= ' Make the outfit fabric '.$tex.'.';
-        }
-        $instr .= ' Photorealistic, full body, high fashion.';
 
-        $imageSvc = app(ImageAIService::class);
-        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl);
-        if ($url) {
-            // Record the model that actually produced the result (may be qwen-image-3.0-pro, not swap_model).
-            $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
-        }
+        // ---- Single-pass (no face reference): re-pose with the model descriptor + build ----
+        $instr = $base.'Replace the person with a full-body '.$modelDesc.' standing '.$pose.'.'.$texS.' Photorealistic, full body, high fashion.';
+        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, null);
+        $this->calls++;
+        if ($url) { $this->lastModel = $imageSvc->lastModel() ?: $swapModel; }
         return $url;
+    }
+
+    /**
+     * Body-proportion descriptor for the "Tỷ lệ dáng" build slider (0 = short/fuller, 10 = tall/runway).
+     */
+    protected function buildEnglish(int $v): string
+    {
+        return match (true) {
+            $v >= 9 => 'tall, slender runway-model build with long legs and an ~1:8 head-to-body ratio',
+            $v >= 7 => 'tall, slim fashion-model build with long legs and an ~1:7.5 head-to-body ratio',
+            $v >= 5 => 'average height, slim fitness-model build with an ~1:7 head-to-body ratio',
+            $v >= 3 => 'slightly shorter, curvy/athletic build with an ~1:6.5 head-to-body ratio',
+            default => 'shorter, fuller curvy build with an ~1:6 head-to-body ratio',
+        };
     }
 
     protected function textureEnglish(int $v): string

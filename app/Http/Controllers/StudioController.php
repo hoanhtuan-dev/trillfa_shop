@@ -1187,6 +1187,7 @@ class StudioController extends Controller
             'pose_id' => ['required', 'string', 'max:80'],
             'background' => ['nullable', 'string', 'max:400'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'build' => ['nullable', 'integer', 'min:0', 'max:10'], // Tỷ lệ dáng (0 lùn-nở -> 10 cao-thon chuẩn mẫu)
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -1201,7 +1202,8 @@ class StudioController extends Controller
 
         // P0a: DashScope virtual-try-on is NOT available on this account ("Model not exist"), so the
         // swap is driven by the Qwen image-edit model directly (synchronous), keeping the garment 100%
-        // unchanged and passing the chosen model face as a reference image.
+        // unchanged. With a face reference we run a 2-STEP swap (re-pose, then face-swap) for higher
+        // fidelity; $build controls the body proportions (height vs slimness).
         $fallback = $svc->fallbackEdit(
             $data['image'],
             $model['desc'] ?? ($model['ethnicity'] ?? 'a model'),
@@ -1209,6 +1211,7 @@ class StudioController extends Controller
             (string) ($data['background'] ?? ''),
             (int) ($data['texture'] ?? 5),
             $model['image'] ?? null, // P3: face reference image (custom/catalog)
+            (int) ($data['build'] ?? 7),
         );
         if (! $fallback) {
             return response()->json(['message' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).'], 422);
@@ -1221,11 +1224,12 @@ class StudioController extends Controller
 
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $actualModel = $svc->lastModel() ?: $swapModel;   // model actually used (e.g. qwen-image-3.0-pro)
+        $credits = max(1, $svc->calls());                 // 2-step = 2 real AI calls; else 1
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
             'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
-            'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => 1, // 1 generation (enhance is local, no extra AI cost)
-            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null)],
+            'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => $credits,
+            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'build' => (int) ($data['build'] ?? 7), 'steps' => $credits],
         ]);
         return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'model' => $actualModel, 'task_id' => null]);
     }
