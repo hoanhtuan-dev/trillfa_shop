@@ -1721,34 +1721,34 @@ class StudioController extends Controller
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
         $w = imagesx($img); $h = imagesy($img);
-        $x0 = (int) ($w * 0.30); $x1 = (int) ($w * 0.70);
-        $y0 = (int) ($h * 0.05); $y1 = (int) ($h * 0.95);
-        $sum = 0; $n = 0;
-        for ($y = $y0; $y < $y1; $y += 4) for ($x = $x0; $x < $x1; $x += 4) {
-            $c = imagecolorat($img, $x, $y);
-            $sum += 0.299 * (($c >> 16) & 255) + 0.587 * (($c >> 8) & 255) + 0.114 * ($c & 255);
-            $n++;
-        }
-        $avg = $n ? $sum / $n : 0;
-        if ($avg >= 45) { imagedestroy($img); return null; }   // subject already lit -> keep as-is
-
-        $boost = min(2.2, 1.15 * (55 / max(22, $avg)));
-        $cx = ($x0 + $x1) / 2;
+        $cx = $w / 2;
+        $x0 = (int) ($w * 0.26); $x1 = (int) ($w * 0.74);
+        $y0 = (int) ($h * 0.04); $y1 = (int) ($h * 0.96);
+        $changed = false;
+        // Selective shadow-lift: brighten DARK pixels only (the subject), within the central band,
+        // leaving bright background (lanterns, lit walls) and an already-lit subject untouched.
+        // This works even when the background is bright (night scene with lights) and the box-average
+        // heuristic would have failed to trigger.
         for ($y = 0; $y < $h; $y += 2) {
             for ($x = 0; $x < $w; $x += 2) {
-                $wx = max(0.0, 1 - abs($x - $cx) / ($w * 0.22));
-                $wy = ($y >= $y0 && $y <= $y1) ? 1.0 : max(0.0, 1 - min(abs($y - $y0), abs($y - $y1)) / ($h * 0.06));
+                $wx = max(0.0, 1 - abs($x - $cx) / ($w * 0.24));
+                $wy = ($y >= $y0 && $y <= $y1) ? 1.0 : max(0.0, 1 - min(abs($y - $y0), abs($y - $y1)) / ($h * 0.05));
                 $wgt = $wx * $wy;
                 if ($wgt <= 0.03) { continue; }
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 255; $g = ($c >> 8) & 255; $b = $c & 255;
-                $f = 1 + ($boost - 1) * $wgt;
+                $lum = 0.299 * $r + 0.587 * $g + 0.114 * $b;
+                if ($lum >= 78) { continue; }   // already bright (lantern / wall / lit subject) -> skip
+                $lift = (78 - $lum) / 78;
+                $boost = 1 + 0.6 * $lift * $wgt;
                 imagesetpixel($img, $x, $y, imagecolorallocate($img,
-                    max(0, min(255, (int) round($r * $f))),
-                    max(0, min(255, (int) round($g * $f))),
-                    max(0, min(255, (int) round($b * $f)))));
+                    max(0, min(255, (int) round($r * $boost))),
+                    max(0, min(255, (int) round($g * $boost))),
+                    max(0, min(255, (int) round($b * $boost)))));
+                $changed = true;
             }
         }
+        if (! $changed) { imagedestroy($img); return null; }   // nothing was dark -> untouched
         $name = 'studio/swapbright-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
         imagedestroy($img);
