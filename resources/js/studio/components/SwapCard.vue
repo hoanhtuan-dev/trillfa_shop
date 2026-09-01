@@ -34,10 +34,10 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.12), rgba(74,122,144,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
-    <div class="mt-2 space-y-1.5 text-xs">
-      <div class="flex items-center gap-2"><span class="text-cream-300/60">Khuôn mặt:</span><span class="text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') || '—' }}</span></div>
-      <div class="flex items-center gap-2"><span class="text-cream-300/60">Dáng:</span><span class="text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') || '—' }}</span></div>
-      <div class="flex items-center gap-2"><span class="text-cream-300/60">Bối cảnh:</span><span class="text-cream-100">{{ swapBg ? (bgs.find(b=>b.value===swapBg)?.label || swapBg) : '—' }}</span></div>
+    <div v-if="store.swapModelIds.length || store.swapPoseIds.length || swapBg" class="scrollbar-hide mt-2 max-h-40 space-y-1.5 overflow-y-auto text-xs">
+      <div v-if="store.swapModelIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><img :src="selFaceImgs[0]?.image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') }}</span></div>
+      <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img :src="selPoseImgs[0]?.image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
+      <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
     </div>
     <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button @click="store.runSwap({ background: swapBg })" :disabled="store.swapLoading || !store.swapModelIds.length" class="btn-brand btn-sm">{{ store.swapLoading ? 'Đang ghép…' : 'Áp dụng' }}</button></div>
     <div v-if="open" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" @click.self="open=false">

@@ -68,10 +68,17 @@ const panel = computed(() => store.step === 1 ? [StylistCard, ConceptCard] : sto
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative h-full overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
+          <!-- active image indicator + actions -->
+          <div v-if="store.upscaleSrc" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
+            <span class="text-[10px] text-cream-300/60">{{ store.editSource ? 'Nguồn:' : 'Kết quả:' }}</span>
+            <span class="max-w-40 truncate font-semibold text-cream-100">{{ store.editSource ? (store.editSource.name || 'Ảnh nguồn') : ('Ảnh #' + store.preview?.id) }}</span>
+            <button v-if="store.editSource" @click="store.editSource = null" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn">✕</button>
+            <button v-else @click="store.deleteGen(store.preview)" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-red-200 hover:bg-red-600" title="Xóa ảnh kết quả này">🗑</button>
+          </div>
           <div ref="canvasZoom" class="absolute inset-0 grid place-items-center p-4 cursor-grab active:cursor-grabbing" @wheel.prevent="store.wheelZoom($event.deltaY)" @pointerdown="store.panStart($event)" @pointermove="store.panMove($event)" @pointerup="store.panEnd" @pointerleave="store.panEnd">
-            <img v-if="store.preview?.media_url" ref="cvImg" :src="store.preview.media_url" class="max-h-full max-w-full select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" />
-            <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh để làm việc.</p>
-            <div v-if="store.cropMode && store.preview?.media_url" class="pointer-events-none absolute inset-0" style="z-index:30">
+            <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" />
+            <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
+            <div v-if="store.cropMode && store.upscaleSrc" class="pointer-events-none absolute inset-0" style="z-index:30">
               <div class="absolute cursor-move" style="pointer-events:auto" :style="cropStyle()" @mousedown.stop="cropStart($event,'move')" @touchstart.stop="cropStart($event,'move')">
                 <div class="pointer-events-none absolute inset-0 border-2 border-white/85" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
                 <div class="pointer-events-none absolute inset-0 flex items-center justify-center"><span class="rounded bg-white/70 px-1 py-0.5 text-[10px] font-semibold text-ink-900">{{ store.reframeRatio }}</span></div>
