@@ -457,15 +457,14 @@ class StudioController extends Controller
      */
     public function refImages(): \Illuminate\Http\JsonResponse
     {
-        $dir = public_path('studio/images/assets');
+        $dir = storage_path('app/public/studio/ref');
         $files = is_dir($dir) ? glob($dir.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) : [];
         $items = [];
         $current = request()->get('current', '');
         foreach ($files as $f) {
             $name = basename($f);
-            // usage check: referenced by any generation or the current editSource.
             $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
-            $items[] = ['name' => $name, 'url' => '/studio/images/assets/'.$name, 'used' => $used];
+            $items[] = ['name' => $name, 'url' => '/storage/studio/ref/'.$name, 'used' => $used];
         }
         return response()->json(['items' => $items]);
     }
@@ -478,7 +477,7 @@ class StudioController extends Controller
         $name = basename($name);
         $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
         if ($used) { return response()->json(['message' => 'Ảnh đang được dùng, không thể xóa.'], 422); }
-        $file = public_path('studio/images/assets/'.$name);
+        $file = storage_path('app/public/studio/ref/'.$name);
         if (is_file($file)) { @unlink($file); }
         return response()->json(['ok' => true]);
     }
@@ -486,11 +485,9 @@ class StudioController extends Controller
     public function uploadRef(Request $request)
     {
         $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
-        $dir = public_path('studio/images/assets');
-        if (! is_dir($dir)) { @mkdir($dir, 0775, true); }
         $name = 'ref-'.Str::uuid()->toString().'.'.$request->file('image')->extension();
-        $request->file('image')->move($dir, $name);
-        $url = '/studio/images/assets/'.$name;
+        $request->file('image')->storeAs('studio/ref', $name, 'public');
+        $url = '/storage/studio/ref/'.$name;
         return response()->json(['url' => $url, 'name' => $name]);
     }
 
