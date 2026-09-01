@@ -65,6 +65,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintPrompt: '',
     suggesting: false,
     viewer: null,
+    upscalePresets: [],
   }),
   getters: {
     upscaleSrc: (s) => (s.editSource && s.editSource.url) || (s.preview && s.preview.media_url) || '',
@@ -87,6 +88,7 @@ export const useStudioStore = defineStore('studio', {
     setPreview(g) { if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } },
     toast(msg, type = 'info') { if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type); },
     async load() {
+      this.loadUpscaleMemory();
       try {
         const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
         const d = await res.json();
@@ -125,6 +127,14 @@ export const useStudioStore = defineStore('studio', {
       finally { this.videoBusy = false; }
     },
     wheelZoom(delta) { const f = delta > 0 ? 0.9 : 1.1; const nz = Math.max(0.25, Math.min(4, +(this.zoom * f).toFixed(2))); this.zoom = nz; },
+    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, skin: this.skinDetail, light: this.lightShadow, fabric: this.fabricDetail }; },
+    loadUpscaleMemory() {
+      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, skinDetail: m.settings.skin ?? 4, lightShadow: m.settings.light ?? 5, fabricDetail: m.settings.fabric ?? 5 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
+    },
+    saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg(), presets: this.upscalePresets })); } catch (e) {} },
+    savePreset(name) { const n = (name || 'Preset ' + (this.upscalePresets.length + 1)).trim(); const existing = this.upscalePresets.find(p => p.name === n); const cfg = this.upscaleCfg(); if (existing) Object.assign(existing, cfg); else this.upscalePresets.push({ name: n, ...cfg }); this.saveUpscaleMemory(); this.toast('Đã lưu preset "' + n + '".'); },
+    applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, skinDetail: p.skin ?? 4, lightShadow: p.light ?? 5, fabricDetail: p.fabric ?? 5 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
+    deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
     zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25)); },
     zoomOut() { this.zoom = Math.max(0.25, +(this.zoom - 0.25)); },
     zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
