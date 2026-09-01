@@ -35,6 +35,11 @@ export const useStudioStore = defineStore('studio', {
     cvImg: null,
     canvasZoom: null,
     _cropDrag: null,
+    // canvas foundation (zoom/pan/background)
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    canvasBg: 'grid',
+    _drag: null,
     // concept
     imagePromptEn: '',
     creativeLevel: 6,
@@ -116,6 +121,12 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
       finally { this.videoBusy = false; }
     },
+    zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25)); },
+    zoomOut() { this.zoom = Math.max(0.25, +(this.zoom - 0.25)); },
+    zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
+    panStart(e) { this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
+    panMove(e) { if (this._drag) { this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); } },
+    panEnd() { this._drag = null; },
     async inpaint(prompt) {
       if (!this.previewId || this.inpainting) { this.toast('Chọn ảnh để sửa.', 'error'); return; }
       this.inpainting = true;
