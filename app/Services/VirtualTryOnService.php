@@ -261,7 +261,8 @@ class VirtualTryOnService
             $bgInstr = 'Replace the ENTIRE background of the scene with: '.$background.'. '
                 .'Keep the person, their pose, the garment and body shape 100% unchanged. '
                 .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look and stay clearly visible; do NOT darken or shade them into a silhouette to match the new background. '
-                .'Scale the person NATURALLY to the scene: match the camera distance and perspective so the person is correctly proportioned against the buildings, doorways, lanterns and ground of the new background — do NOT make the person oversized, floating or out of scale with the environment. '
+                .'Frame the person at about 75-80% of the image height, with the background clearly visible all around them: pull the camera back a little and place the person slightly deeper into the scene so they are naturally scaled, not oversized or dominating the frame. '
+                .'Blend the person into the scene: the HAIR and its edges, the clothing silhouette and the body outline must merge naturally with the background — NO hard cut-out outline, halo, white fringe or aliasing around the hair; soften the hair edge so it melts into the flowers, wall and light behind it. '
                 .'Unify the color grading, warmth and lighting of the person and the new background so they blend into ONE cohesive photograph with no visible seam, halo or separation between the person and the scene. '
                 .$toneS.' Photorealistic.';
             $final = $imageSvc->swapEdit($bgInstr, $url, $swapModel, null, null);
