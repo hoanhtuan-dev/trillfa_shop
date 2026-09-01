@@ -830,8 +830,12 @@ class ShopFlowTest extends TestCase
 
     public function test_studio_is_admin_only(): void
     {
+        // /studio is now a PUBLIC page (renders the Vue shell; the API routes remain admin-only).
+        $this->get('/studio')->assertOk()->assertSee('studio-root');
+
+        // The studio API (the actual data/actions) is still admin-only.
         $customer = User::where('email', 'customer@trillfa.com')->first();
-        $this->actingAs($customer)->get('/studio')->assertForbidden();
+        $this->actingAs($customer)->get('/studio/latest')->assertForbidden();
 
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin)->get('/studio')->assertOk();

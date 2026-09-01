@@ -106,7 +106,6 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function
 
 // Trillfa Studio — INTERNAL only (admin team). Not a public customer service.
 Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.')->group(function () {
-    Route::get('/', [StudioController::class, 'index'])->name('index');
     Route::get('/vue', [StudioController::class, 'studioVue'])->name('vue');
     Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
     Route::get('/models', [StudioController::class, 'models'])->name('models');
@@ -168,6 +167,10 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');
     Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
 });
+
+// PUBLIC studio page (renders the Vue app for everyone — no auth redirect, so /studio never loops).
+// The Vue app handles the auth state client-side; the API routes above stay auth+admin protected.
+Route::get('/studio', [StudioController::class, 'index'])->name('studio.index');
 
 // Public garment-avatar endpoint (bypasses auth + static cache — served by Laravel with immutable cache).
 Route::get('/garment/{id}', [StudioController::class, 'garmentAvatar'])->name('garment.avatar');
