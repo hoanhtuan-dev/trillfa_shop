@@ -35,6 +35,27 @@ export const useStudioStore = defineStore('studio', {
     cvImg: null,
     canvasZoom: null,
     _cropDrag: null,
+    // concept
+    imagePromptEn: '',
+    creativeLevel: 6,
+    variantCount: 1,
+    imageRatio: '1:1',
+    imageRes: '1K',
+    generating: false,
+    // palette / texture
+    palette: [],
+    // director
+    videoModel: '',
+    videoScene: '',
+    videoDuration: '5',
+    videoRes: '720',
+    videoPromptEn: '',
+    videoBusy: false,
+    videoSourceId: null,
+    // swap (try-on)
+    swapModelIds: [],
+    swapPoseIds: [],
+    swapLoading: false,
   }),
   getters: {
     upscaleSrc: (s) => (s.editSource && s.editSource.url) || (s.preview && s.preview.media_url) || '',
@@ -67,5 +88,38 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { /* app data loads via Alpine too */ }
     },
     select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; },
+    async generateImage() {
+      if (!this.imagePromptEn || this.generating) return;
+      this.generating = true;
+      try {
+        const d = await this.api('/studio/generate', { prompt: this.imagePromptEn, resolution: this.imageRes, ratio: this.imageRatio, variants: Number(this.variantCount) || 1 });
+        const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
+        items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
+        if (d.credits_left != null) this.creditsLeft = d.credits_left;
+      } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh.', 'error'); }
+      finally { this.generating = false; }
+    },
+    async loadPalette(id) {
+      if (!id) { this.palette = []; return; }
+      try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
+      catch (e) { this.palette = []; }
+    },
+    async renderVideo() {
+      if (!this.videoPromptEn && !this.videoSourceId) { this.toast('Chọn ảnh nguồn hoặc nhập prompt video.', 'error'); return; }
+      if (this.videoBusy) return;
+      this.videoBusy = true;
+      try {
+        const d = await this.api('/studio/render-video', { prompt: this.videoPromptEn, source_id: this.videoSourceId, model: this.videoModel, scene: this.videoScene, duration: this.videoDuration, resolution: this.videoRes, image: this.preview?.media_url || '' });
+        this.addGen({ id: d.generation_id, type: 'video', status: d.status || 'processing', model: d.model || this.videoModel, provider: d.provider || 'video', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' });
+      } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
+      finally { this.videoBusy = false; }
+    },
+    async runSwap() {
+      const src = this.upscaleSrc; if (!src || this.swapLoading || !this.swapModelIds.length) { this.toast('Chọn người mẫu + dáng trước.', 'error'); return; }
+      this.swapLoading = true;
+      try { const d = await this.api('/studio/swap-model', { image: src, model_id: this.swapModelIds[0], pose_id: this.swapPoseIds[0] || '', texture: 5 }); if (d.generation_id) this.addGen({ id: d.generation_id, type: 'image', status: d.task_id ? 'processing' : 'completed', model: 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); }
+      catch (e) { this.toast(e.message || 'Lỗi thay đổi người mẫu.', 'error'); }
+      finally { this.swapLoading = false; }
+    },
   },
 });

@@ -1,9 +1,13 @@
 <script setup>
 import { onMounted, computed } from 'vue';
 import { useStudioStore } from './store.js';
+import ConceptCard from './components/ConceptCard.vue';
+import PaletteTextureCard from './components/PaletteTextureCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import FilmLookCard from './components/FilmLookCard.vue';
 import ReframeCard from './components/ReframeCard.vue';
+import SwapCard from './components/SwapCard.vue';
+import DirectorCard from './components/DirectorCard.vue';
 const store = useStudioStore();
 const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 onMounted(async () => { store.load(); });
@@ -75,10 +79,10 @@ function cropMove(e) {
           <button v-for="g in store.generations" :key="g.id" @click="store.select(g)" class="relative h-14 w-14 overflow-hidden rounded-lg border" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'"><img :src="g.media_url" class="h-full w-full object-cover bg-ink-900" loading="lazy"><span v-if="g.status !== 'completed'" class="absolute inset-0 grid place-items-center bg-black/60 text-[10px] text-cream-200">{{ g.status }}</span></button>
         </div>
       </div>
-      <!-- Fitting Room cards (step 2) -->
-      <template v-if="store.step === 2">
-        <UpscaleCard /><FilmLookCard /><ReframeCard />
-      </template>
+      <!-- cards per step -->
+      <template v-if="store.step === 1"><ConceptCard /></template>
+      <template v-else-if="store.step === 2"><SwapCard /><PaletteTextureCard /><UpscaleCard /><FilmLookCard /><ReframeCard /></template>
+      <template v-else-if="store.step === 3"><DirectorCard /></template>
     </div>
   </div>
 </template>
