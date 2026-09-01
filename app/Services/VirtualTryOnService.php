@@ -78,13 +78,27 @@ class VirtualTryOnService
                     'id' => 'pp'.$p->id,
                     'name' => $p->name,
                     'skeleton' => $p->description,
-                    'image' => $p->image,
+                    'image' => $p->image ?: $this->builtinPoseImageByName($p->name),
                     'preset' => true,
                 ];
             })->values()->all();
         }
 
         return $this->builtinPosePresets();
+    }
+
+    /**
+     * Fall back to the built-in sample image for a DB pose preset that has no image, so the pose
+     * reference is still sent to the edit model (a pose described only in text is rarely applied).
+     */
+    protected function builtinPoseImageByName(?string $name): ?string
+    {
+        foreach ($this->builtinPosePresets() as $bp) {
+            if (($bp['name'] ?? '') === $name) {
+                return $bp['image'] ?? null;
+            }
+        }
+        return null;
     }
 
     public function builtinPosePresets(): array
@@ -160,7 +174,7 @@ class VirtualTryOnService
                     'id' => 'pp'.$p->id,
                     'name' => $p->name,
                     'skeleton' => $p->description,
-                    'image' => $p->image,
+                    'image' => $p->image ?: $this->builtinPoseImageByName($p->name),
                     'preset' => true,
                 ];
             }
