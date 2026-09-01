@@ -1097,6 +1097,51 @@ class StudioController extends Controller
     }
 
     /**
+     * Deterministic color-tone effect for the swap result: picks a grade (auto = by the chosen
+     * background) and applies applyLook(). Returns the new /storage URL or null when no grade applies.
+     */
+    protected function applyToneToStoredImage(string $url, string $tone, string $background = ''): ?string
+    {
+        $tone = strtolower(trim((string) $tone));
+        $look = match ($tone) {
+            'warm' => 'warm',
+            'cool' => 'cool',
+            'film' => 'retro',
+            'dramatic' => 'dramatic',
+            'mono' => 'mono',
+            'auto' => $this->autoLookForBackground($background),
+            default => null,
+        };
+        if (! $look || $look === 'none') {
+            return null;
+        }
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return null; }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return null; }
+        $this->applyLook($img, $look, 7);
+        $name = 'studio/swaptone-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
+        imagedestroy($img);
+        return '/storage/'.$name;
+    }
+
+    protected function autoLookForBackground(string $background): ?string
+    {
+        $b = strtolower((string) $background);
+        if ($b === '' || in_array($b, ['keep', 'original'], true)) { return null; }
+        if (str_contains($b, 'dark') || str_contains($b, 'moody') || str_contains($b, 'tối') || str_contains($b, 'đêm')) { return 'dramatic'; }
+        if (str_contains($b, 'street') || str_contains($b, 'urban') || str_contains($b, 'đường') || str_contains($b, 'phố')) { return 'warm'; }
+        if (str_contains($b, 'beige') || str_contains($b, 'neutral') || str_contains($b, 'warm') || str_contains($b, 'cream') || str_contains($b, 'seamless')) { return 'warm'; }
+        if (str_contains($b, 'white') || str_contains($b, 'trắng')) { return 'cool'; }
+        return null;
+    }
+
+    /**
      * ✨ Thuật sỹ ảo — guided fashion-stylist wizard.
      */
     public function stylistTypes(): \Illuminate\Http\JsonResponse
@@ -1188,6 +1233,7 @@ class StudioController extends Controller
             'background' => ['nullable', 'string', 'max:400'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
             'build' => ['nullable', 'integer', 'min:0', 'max:10'], // Tỷ lệ dáng (0 lùn-nở -> 10 cao-thon chuẩn mẫu)
+            'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/dramatic/mono/none)
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -1201,9 +1247,8 @@ class StudioController extends Controller
         }
 
         // P0a: DashScope virtual-try-on is NOT available on this account ("Model not exist"), so the
-        // swap is driven by the Qwen image-edit model directly (synchronous), keeping the garment 100%
-        // unchanged. With a face reference we run a 2-STEP swap (re-pose, then face-swap) for higher
-        // fidelity; $build controls the body proportions (height vs slimness).
+        // swap is a SINGLE-pass Qwen image-edit call (keeping the garment 100% unchanged). The chosen
+        // model face is the subject reference (Image 1) — this is what best preserves the reference face.
         $fallback = $svc->fallbackEdit(
             $data['image'],
             $model['desc'] ?? ($model['ethnicity'] ?? 'a model'),
@@ -1212,6 +1257,7 @@ class StudioController extends Controller
             (int) ($data['texture'] ?? 5),
             $model['image'] ?? null, // P3: face reference image (custom/catalog)
             (int) ($data['build'] ?? 7),
+            (string) ($data['tone'] ?? 'auto'),
         );
         if (! $fallback) {
             return response()->json(['message' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).'], 422);
@@ -1222,14 +1268,19 @@ class StudioController extends Controller
         $det = $this->enhanceStoredImage($fallback, 3, 1);
         if ($det) { $fallback = $det; }
 
+        // Color-tone effect: deterministic grade matching the chosen tone / background.
+        $tone = (string) ($data['tone'] ?? 'auto');
+        $toned = $this->applyToneToStoredImage($fallback, $tone, (string) ($data['background'] ?? ''));
+        if ($toned) { $fallback = $toned; }
+
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $actualModel = $svc->lastModel() ?: $swapModel;   // model actually used (e.g. qwen-image-3.0-pro)
-        $credits = max(1, $svc->calls());                 // 2-step = 2 real AI calls; else 1
+        $credits = max(1, $svc->calls());                 // single-pass = 1 real AI call
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
             'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
             'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => $credits,
-            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'build' => (int) ($data['build'] ?? 7), 'steps' => $credits],
+            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null), 'build' => (int) ($data['build'] ?? 7), 'tone' => $tone, 'steps' => $credits],
         ]);
         return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'model' => $actualModel, 'task_id' => null]);
     }
