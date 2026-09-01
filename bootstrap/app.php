@@ -17,6 +17,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
+            'nostore' => \App\Http\Middleware\NoStoreCache::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

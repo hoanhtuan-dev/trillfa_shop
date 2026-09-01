@@ -105,7 +105,7 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function
 });
 
 // Trillfa Studio — INTERNAL only (admin team). Not a public customer service.
-Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(function () {
+Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.')->group(function () {
     Route::get('/', [StudioController::class, 'index'])->name('index');
     Route::get('/vue', [StudioController::class, 'studioVue'])->name('vue');
     Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
