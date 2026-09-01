@@ -38,7 +38,7 @@ class StudioController extends Controller
         $pendingCount = (int) $user->generations()->whereIn('status', ['pending', 'processing'])->count();
 
         $stylistTypes = app(\App\Services\StylistService::class)->garmentTypes();
-        return view('studio.index', compact('projects', 'presets', 'latest', 'creditsUsed', 'pendingCount', 'stylistTypes'));
+        return view('studio.vue');
     }
 
     public function storeProject(Request $request)
