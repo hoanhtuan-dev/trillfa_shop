@@ -9,6 +9,7 @@
     <div class="mt-4 flex flex-wrap gap-1.5 rounded-2xl border border-ink-700 bg-ink-800 p-1 text-xs font-semibold">
         <button @click="tab='general'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='general' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">⚙️ Cấu hình</button>
         <button @click="tab='models'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='models' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🤖 Model</button>
+        <button @click="tab='faces'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='faces' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">💃 Dáng & Khuôn mặt</button>
         <button @click="tab='keys'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🔑 API Keys</button>
     </div>
 
@@ -210,53 +211,6 @@
             </div>
         @endforeach
 
-        {{-- Khuôn mặt mẫu (Face Presets) --}}
-        <div class="mt-6">
-            <h3 class="text-sm font-semibold text-ink-900">👩 Khuôn mặt mẫu (preset — dùng trong 🪄 Thay Đổi Người Mẫu)</h3>
-            <p class="mt-1 text-xs text-ink-500">Preset là <b>mô tả khuôn mặt</b> (không cần tải ảnh) — nhập mô tả tiếng Anh rõ ràng để model dựng đúng. Nếu có ảnh kèm, hệ thống dùng ảnh làm tham chiếu (độ giống cao hơn).</p>
-            <div class="mt-2 space-y-2">
-                @forelse($face_presets as $fp)
-                    <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editf:false }">
-                        <div x-show="!editf" class="flex flex-wrap items-center gap-2">
-                            @if($fp->image)<img src="{{ $fp->image }}" class="h-10 w-8 rounded bg-ink-900 object-cover">@else<span class="grid h-10 w-8 place-items-center rounded bg-ink-900 text-sm">👩</span>@endif
-                            <span class="font-semibold text-ink-900">{{ $fp->name }}</span>
-                            <span class="text-ink-500">{{ $fp->ethnicity ?: 'Vietnamese female' }} · Ưu tiên {{ $fp->sort }}</span>
-                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $fp->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $fp->enabled ? 'Bật' : 'Tắt' }}</span>
-                            <div class="ml-auto flex items-center gap-1.5">
-                                <button type="button" @click="editf=true" class="btn-outline btn-sm">✏️ Sửa</button>
-                                <form method="POST" action="{{ route('studio.face-presets.destroy', $fp) }}" onsubmit="return confirm('Xóa khuôn mặt «{{ $fp->name }}»?')">@csrf @method('DELETE')<button class="btn-outline btn-sm text-red-600">Xóa</button></form>
-                            </div>
-                        </div>
-                        <form x-show="editf" method="POST" action="{{ route('studio.face-presets.update', $fp) }}" enctype="multipart/form-data" class="mt-2 space-y-2 border-t border-cream-200 pt-2">
-                            @csrf @method('PUT')
-                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                <div><label class="label">Tên</label><input name="name" value="{{ $fp->name }}" class="input !py-1" required></div>
-                                <div><label class="label">Dân tộc/Phong cách</label><input name="ethnicity" value="{{ $fp->ethnicity }}" class="input !py-1" placeholder="Vietnamese female"></div>
-                                <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="{{ $fp->sort }}" min="0" class="input !py-1"></div>
-                                <div class="col-span-2"><label class="label">Mô tả khuôn mặt (tiếng Anh)</label><textarea name="description" rows="2" class="input !py-1" required>{{ $fp->description }}</textarea></div>
-                                <div class="col-span-2"><label class="label">Ảnh tham chiếu (tuỳ chọn — bỏ trống giữ ảnh cũ)</label><input type="file" name="image" accept="image/*" class="input !py-1"></div>
-                                <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($fp->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
-                            </div>
-                            <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editf=false" class="btn-ghost btn-sm">Hủy</button></div>
-                        </form>
-                    </div>
-                @empty
-                    <p class="text-xs text-ink-500">Chưa có khuôn mặt mẫu — thêm bên dưới (hoặc chạy seed FacePresetSeeder).</p>
-                @endforelse
-            </div>
-            <form method="POST" action="{{ route('studio.face-presets.store') }}" enctype="multipart/form-data" class="mt-3 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
-                @csrf
-                <h4 class="text-sm font-semibold text-ink-900">➕ Thêm khuôn mặt mẫu</h4>
-                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <div><label class="label">Tên</label><input name="name" class="input !py-2" placeholder="VD: Nhẹ nhàng tự nhiên" required></div>
-                    <div><label class="label">Dân tộc/Phong cách</label><input name="ethnicity" class="input !py-2" placeholder="Vietnamese female"></div>
-                    <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="0" min="0" class="input !py-2"></div>
-                    <div class="col-span-3"><label class="label">Mô tả khuôn mặt (tiếng Anh — model dùng mô tả này để dựng)</label><textarea name="description" rows="2" class="input !py-2" placeholder="VD: young Vietnamese woman, 22, light natural makeup, shoulder-length straight black hair, fair skin, gentle smile" required></textarea></div>
-                    <div class="col-span-3"><label class="label">Ảnh tham chiếu (tuỳ chọn)</label><input type="file" name="image" accept="image/*" class="input !py-2"></div>
-                </div>
-                <button class="btn-brand btn-sm">Thêm khuôn mặt mẫu</button>
-            </form>
-        </div>
 
         {{-- Add / edit model --}}
         <form method="POST" action="{{ route('studio.models.store') }}" class="mt-6 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
@@ -285,6 +239,102 @@
             <button class="btn-brand btn-sm">➕ Thêm model</button>
         </form>
     </div>
+    </div>
+
+    <div x-show="tab==='faces'" class="mt-6 space-y-8">
+        {{-- Khuôn mặt mẫu --}}
+        <div>
+            <h3 class="text-sm font-semibold text-ink-900">👩 Khuôn mặt mẫu <span class="text-ink-500">(dùng trong 🪄 Thay Đổi Người Mẫu)</span></h3>
+            <p class="mt-1 text-xs text-ink-500">Preset là <b>mô tả khuôn mặt</b> (không cần tải ảnh) — nhập mô tả tiếng Anh rõ ràng để model dựng đúng. Nếu có ảnh kèm, hệ thống dùng ảnh làm tham chiếu (độ giống cao hơn).</p>
+            <div class="mt-2 space-y-2">
+                @forelse($face_presets as $fp)
+                    <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editf:false }">
+                        <div x-show="!editf" class="flex flex-wrap items-center gap-2">
+                            @if($fp->image)<img src="{{ $fp->image }}" class="h-10 w-8 rounded bg-ink-900 object-cover">@else<span class="grid h-10 w-8 place-items-center rounded bg-ink-900 text-sm">👩</span>@endif
+                            <span class="font-semibold text-ink-900">{{ $fp->name }}</span>
+                            <span class="text-ink-500">{{ $fp->ethnicity ?: 'Vietnamese female' }} · Ưu tiên {{ $fp->sort }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $fp->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $fp->enabled ? 'Bật' : 'Tắt' }}</span>
+                            <div class="ml-auto flex items-center gap-1.5">
+                                <button type="button" @click="editf=true" class="btn-outline btn-sm">✏️ Sửa</button>
+                                <form method="POST" action="{{ route('studio.face-presets.destroy', $fp) }}" onsubmit="return confirm('Xóa khuôn mặt «{{ $fp->name }}»?')">@csrf @method('DELETE')<button class="btn-outline btn-sm text-red-600">Xóa</button></form>
+                            </div>
+                        </div>
+                        <form x-show="editf" method="POST" action="{{ route('studio.face-presets.update', $fp) }}" enctype="multipart/form-data" class="mt-2 space-y-2 border-t border-cream-200 pt-2">
+                            @csrf @method('PUT')
+                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                <div><label class="label">Tên</label><input name="name" value="{{ $fp->name }}" class="input !py-1" required></div>
+                                <div><label class="label">Dân tộc/Phong cách</label><input name="ethnicity" value="{{ $fp->ethnicity }}" class="input !py-1" placeholder="Vietnamese female"></div>
+                                <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="{{ $fp->sort }}" min="0" class="input !py-1"></div>
+                                <div class="col-span-2"><label class="label">Mô tả khuôn mặt (tiếng Anh)</label><textarea name="description" rows="2" class="input !py-1" required>{{ $fp->description }}</textarea></div>
+                                <div class="col-span-2"><label class="label">Ảnh tham chiếu (tuỳ chọn — bỏ trống giữ ảnh cũ)</label><input type="file" name="image" accept="image/*" class="input !py-1"></div>
+                                <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($fp->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
+                            </div>
+                            <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editf=false" class="btn-ghost btn-sm">Hủy</button></div>
+                        </form>
+                    </div>
+                @empty
+                    <p class="text-xs text-ink-500">Chưa có khuôn mặt mẫu — thêm bên dưới.</p>
+                @endforelse
+            </div>
+            <form method="POST" action="{{ route('studio.face-presets.store') }}" enctype="multipart/form-data" class="mt-3 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+                @csrf
+                <h4 class="text-sm font-semibold text-ink-900">➕ Thêm khuôn mặt mẫu</h4>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div><label class="label">Tên</label><input name="name" class="input !py-2" placeholder="VD: Nhẹ nhàng tự nhiên" required></div>
+                    <div><label class="label">Dân tộc/Phong cách</label><input name="ethnicity" class="input !py-2" placeholder="Vietnamese female"></div>
+                    <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="0" min="0" class="input !py-2"></div>
+                    <div class="col-span-3"><label class="label">Mô tả khuôn mặt (tiếng Anh — model dùng mô tả này để dựng)</label><textarea name="description" rows="2" class="input !py-2" placeholder="VD: young Vietnamese woman, 22, light natural makeup, shoulder-length straight black hair, fair skin, gentle smile" required></textarea></div>
+                    <div class="col-span-3"><label class="label">Ảnh tham chiếu (tuỳ chọn)</label><input type="file" name="image" accept="image/*" class="input !py-2"></div>
+                </div>
+                <button class="btn-brand btn-sm">Thêm khuôn mặt mẫu</button>
+            </form>
+        </div>
+
+        {{-- Dáng mẫu --}}
+        <div>
+            <h3 class="text-sm font-semibold text-ink-900">🧍 Dáng mẫu <span class="text-ink-500">(pose — dùng trong 🪄 Thay Đổi Người Mẫu)</span></h3>
+            <p class="mt-1 text-xs text-ink-500">Mô tả dáng (tiếng Anh) để model dựng đúng tư thế; ảnh kèm là tuỳ chọn.</p>
+            <div class="mt-2 space-y-2">
+                @forelse($pose_presets as $pp)
+                    <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editp:false }">
+                        <div x-show="!editp" class="flex flex-wrap items-center gap-2">
+                            @if($pp->image)<img src="{{ $pp->image }}" class="h-10 w-8 rounded bg-ink-900 object-cover">@else<span class="grid h-10 w-8 place-items-center rounded bg-ink-900 text-sm">🧍</span>@endif
+                            <span class="font-semibold text-ink-900">{{ $pp->name }}</span>
+                            <span class="text-ink-500">Ưu tiên {{ $pp->sort }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $pp->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $pp->enabled ? 'Bật' : 'Tắt' }}</span>
+                            <div class="ml-auto flex items-center gap-1.5">
+                                <button type="button" @click="editp=true" class="btn-outline btn-sm">✏️ Sửa</button>
+                                <form method="POST" action="{{ route('studio.pose-presets.destroy', $pp) }}" onsubmit="return confirm('Xóa dáng «{{ $pp->name }}»?')">@csrf @method('DELETE')<button class="btn-outline btn-sm text-red-600">Xóa</button></form>
+                            </div>
+                        </div>
+                        <form x-show="editp" method="POST" action="{{ route('studio.pose-presets.update', $pp) }}" enctype="multipart/form-data" class="mt-2 space-y-2 border-t border-cream-200 pt-2">
+                            @csrf @method('PUT')
+                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                <div><label class="label">Tên</label><input name="name" value="{{ $pp->name }}" class="input !py-1" required></div>
+                                <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="{{ $pp->sort }}" min="0" class="input !py-1"></div>
+                                <div class="col-span-2"><label class="label">Mô tả dáng (tiếng Anh)</label><textarea name="description" rows="2" class="input !py-1" required>{{ $pp->description }}</textarea></div>
+                                <div class="col-span-2"><label class="label">Ảnh tham chiếu (tuỳ chọn — bỏ trống giữ ảnh cũ)</label><input type="file" name="image" accept="image/*" class="input !py-1"></div>
+                                <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($pp->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
+                            </div>
+                            <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editp=false" class="btn-ghost btn-sm">Hủy</button></div>
+                        </form>
+                    </div>
+                @empty
+                    <p class="text-xs text-ink-500">Chưa có dáng mẫu — thêm bên dưới.</p>
+                @endforelse
+            </div>
+            <form method="POST" action="{{ route('studio.pose-presets.store') }}" enctype="multipart/form-data" class="mt-3 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+                @csrf
+                <h4 class="text-sm font-semibold text-ink-900">➕ Thêm dáng mẫu</h4>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div><label class="label">Tên</label><input name="name" class="input !py-2" placeholder="VD: Tay chống hông" required></div>
+                    <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="0" min="0" class="input !py-2"></div>
+                    <div class="col-span-3"><label class="label">Mô tả dáng (tiếng Anh — model dùng mô tả này để dựng tư thế)</label><textarea name="description" rows="2" class="input !py-2" placeholder="VD: standing, one hand on hip, one leg crossed" required></textarea></div>
+                    <div class="col-span-3"><label class="label">Ảnh tham chiếu (tuỳ chọn)</label><input type="file" name="image" accept="image/*" class="input !py-2"></div>
+                </div>
+                <button class="btn-brand btn-sm">Thêm dáng mẫu</button>
+            </form>
+        </div>
     </div>
 
     <div x-show="tab==='keys'">

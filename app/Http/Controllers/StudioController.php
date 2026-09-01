@@ -1749,6 +1749,7 @@ class StudioController extends Controller
             'models' => studio_models(), // registry models (grouped by category)
             'api_keys' => \App\Models\StudioApiKey::orderBy('provider')->orderByDesc('priority')->orderBy('id')->get(),
             'face_presets' => \App\Models\FacePreset::orderBy('sort')->orderBy('id')->get(),
+            'pose_presets' => \App\Models\PosePreset::orderBy('sort')->orderBy('id')->get(),
             'providers' => $this->providerStatus(),
         ]);
     }
@@ -1870,6 +1871,64 @@ class StudioController extends Controller
     {
         $preset->delete();
         return back()->with('success', 'Đã xóa khuôn mặt mẫu.');
+    }
+
+    /**
+     * Pose presets (dáng mẫu) — manageable from Studio Settings.
+     */
+    public function posePresetStore(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'description' => ['required', 'string', 'max:1200'],
+            'image' => ['nullable', 'image', 'max:8192'],
+            'sort' => ['nullable', 'integer', 'min:0', 'max:9999'],
+        ]);
+
+        $image = null;
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $image = '/storage/'.$request->file('image')->store('studio/poses', 'public');
+        }
+
+        \App\Models\PosePreset::create([
+            'name' => $data['name'],
+            'description' => $data['description'],
+            'image' => $image,
+            'sort' => (int) ($data['sort'] ?? 0),
+            'enabled' => true,
+        ]);
+
+        return back()->with('success', 'Đã thêm dáng mẫu.');
+    }
+
+    public function posePresetUpdate(Request $request, \App\Models\PosePreset $preset)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'description' => ['required', 'string', 'max:1200'],
+            'image' => ['nullable', 'image', 'max:8192'],
+            'sort' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'enabled' => ['nullable', 'boolean'],
+        ]);
+
+        $fill = [
+            'name' => $data['name'],
+            'description' => $data['description'],
+            'sort' => (int) ($data['sort'] ?? $preset->sort),
+            'enabled' => ! empty($data['enabled']),
+        ];
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $fill['image'] = '/storage/'.$request->file('image')->store('studio/poses', 'public');
+        }
+        $preset->update($fill);
+
+        return back()->with('success', 'Đã cập nhật dáng mẫu.');
+    }
+
+    public function posePresetDestroy(\App\Models\PosePreset $preset)
+    {
+        $preset->delete();
+        return back()->with('success', 'Đã xóa dáng mẫu.');
     }
 
     public function storeApiKey(Request $request)

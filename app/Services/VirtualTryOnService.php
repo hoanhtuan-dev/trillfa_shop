@@ -70,7 +70,25 @@ class VirtualTryOnService
 
     public function poseCatalog(): array
     {
-        // 12 pose presets. Only the text skeleton is used (qwen-edit re-renders the pose from text).
+        // Manageable pose presets (DB) — read by the swap picker + backend. Falls back to built-ins.
+        $db = \App\Models\PosePreset::where('enabled', true)->orderBy('sort')->orderBy('id')->get();
+        if ($db->isNotEmpty()) {
+            return $db->map(function ($p) {
+                return [
+                    'id' => 'pp'.$p->id,
+                    'name' => $p->name,
+                    'skeleton' => $p->description,
+                    'image' => $p->image,
+                    'preset' => true,
+                ];
+            })->values()->all();
+        }
+
+        return $this->builtinPosePresets();
+    }
+
+    public function builtinPosePresets(): array
+    {
         return [
             ['id' => 'pose01', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body', 'image' => '/samples/pose-01.png'],
             ['id' => 'pose02', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, one leg crossed', 'image' => '/samples/pose-02.png'],
@@ -134,7 +152,21 @@ class VirtualTryOnService
      */
     public function pickPose(string $id): ?array
     {
-        if ($id !== '') {
+        // Manageable DB preset (id like "pp3").
+        if (str_starts_with($id, 'pp')) {
+            $p = \App\Models\PosePreset::find((int) substr($id, 2));
+            if ($p) {
+                return [
+                    'id' => 'pp'.$p->id,
+                    'name' => $p->name,
+                    'skeleton' => $p->description,
+                    'image' => $p->image,
+                    'preset' => true,
+                ];
+            }
+        }
+        // Custom asset (added via the swap card's "➕ Thêm dáng").
+        if ($id !== '' && is_numeric($id)) {
             $asset = \App\Models\StudioAsset::where('type', 'pose')->where('id', $id)->first();
             if ($asset) {
                 return [
@@ -145,7 +177,7 @@ class VirtualTryOnService
                 ];
             }
         }
-        foreach ($this->poseCatalog() as $p) {
+        foreach ($this->builtinPosePresets() as $p) {
             if (($p['id'] ?? '') === $id) {
                 return $p;
             }
