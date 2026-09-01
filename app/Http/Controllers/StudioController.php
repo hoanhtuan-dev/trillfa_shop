@@ -1335,6 +1335,64 @@ class StudioController extends Controller
     }
 
     /**
+     * "Chân dung & Chiều sâu" (Portrait & Depth) post-process. Deterministic, preserves the subject:
+     *  1) frame is extended (canvas *~1.22) so the person occupies ~82% of the height (smaller,
+     *     background visible around them);
+     *  2) a blurred, stretched copy of the scene fills the extended frame as a soft backdrop;
+     *  3) the original image is composited centered with a depth-of-field mask — the subject stays
+     *     sharp and pixel-identical, the surrounding background is softly blurred (bokeh / depth).
+     */
+    protected function applyPortraitDepth(string $url): ?string
+    {
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return null; }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return null; }
+
+        $scale = 0.82;          // person target = ~82% of frame height
+        $w = imagesx($img); $h = imagesy($img);
+        $cw = (int) round($w / $scale); $ch = (int) round($h / $scale);
+
+        // 1) blurred extended backdrop (cover-fit the scene, then soften).
+        $back = imagecreatetruecolor($cw, $ch);
+        imagecopyresampled($back, $img, 0, 0, 0, 0, $cw, $ch, $w, $h);
+        for ($i = 0; $i < 3; $i++) { @imagefilter($back, IMG_FILTER_GAUSSIAN_BLUR); }
+
+        // 2) depth-of-field person layer: original with the background blurred, subject sharp.
+        $blur2 = imagecreatetruecolor($w, $h);
+        imagecopy($blur2, $img, 0, 0, 0, 0, $w, $h);
+        for ($i = 0; $i < 3; $i++) { @imagefilter($blur2, IMG_FILTER_GAUSSIAN_BLUR); }
+        $cx = $w / 2; $x0 = (int) ($w * 0.28); $x1 = (int) ($w * 0.72);
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $t = $x < $cx ? ($x / max(1, $x0)) : (($w - $x) / max(1, $w - $x1));
+                $t = max(0.0, min(1.0, $t));
+                if ($t >= 1.0) { continue; }            // fully sharp inside the subject band
+                $wg = $t * $t * (3 - 2 * $t);           // smoothstep falloff -> soft transition
+                $c = imagecolorat($img, $x, $y);
+                $b = imagecolorat($blur2, $x, $y);
+                $r = (int) round((($c >> 16) & 255) * $wg + (($b >> 16) & 255) * (1 - $wg));
+                $g = (int) round((($c >> 8) & 255) * $wg + (($b >> 8) & 255) * (1 - $wg));
+                $bb = (int) round(($c & 255) * $wg + ($b & 255) * (1 - $wg));
+                imagesetpixel($blur2, $x, $y, imagecolorallocate($blur2, $r, $g, $bb));
+            }
+        }
+
+        // 3) composite the (depth-of-field) original centered on the extended blurred backdrop.
+        $ox = (int) (($cw - $w) / 2); $oy = (int) (($ch - $h) / 2);
+        imagecopy($back, $blur2, $ox, $oy, 0, 0, $w, $h);
+
+        $name = 'studio/portrait-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($back));
+        imagedestroy($back); imagedestroy($blur2); imagedestroy($img);
+        return '/storage/'.$name;
+    }
+
+    /**
      * Safety net: if the edit model darkened the subject against a dark background (silhouette),
      * lift the exposure of the central subject band with a soft falloff. Only applies when the
      * subject region is genuinely dark — an already-lit result (e.g. a good composite) is untouched.
@@ -1474,6 +1532,14 @@ class StudioController extends Controller
         // so this lifts a genuinely-dark subject band (an already-lit result is left untouched).
         $bright = $this->brightenDarkSubject($fallback);
         if ($bright) { $fallback = $bright; }
+
+        // "Chân dung & Chiều sâu": scale the subject to ~82% of the frame and soften the background
+        // (depth of field) so the scene looks natural and dimensional. Deterministic, keeps the
+        // subject pixels identical. Opt-out via studio.swap_portrait_depth = false.
+        if ((bool) studio_config('swap_portrait_depth', true)) {
+            $portrait = $this->applyPortraitDepth($fallback);
+            if ($portrait) { $fallback = $portrait; }
+        }
 
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $actualModel = $svc->lastModel() ?: $swapModel;
