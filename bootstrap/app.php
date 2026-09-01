@@ -19,6 +19,9 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureUserIsAdmin::class,
             'nostore' => \App\Http\Middleware\NoStoreCache::class,
         ]);
+        // Apply no-store to ALL web responses so the browser never caches any auth/redirect
+        // (definitively fixes ERR_TOO_MANY_REDIRECTS from stale cached redirects).
+        $middleware->web(append: [\App\Http\Middleware\NoStoreCache::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
