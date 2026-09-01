@@ -461,12 +461,46 @@ class StudioController extends Controller
      * Upload a reference image (from a local blob) and return a public storage URL so it can be
      * used as a base_image for the pixel-preserving edit flow.
      */
+    /**
+     * List images under public_html/studio/images/assets (for the source-image upload popup).
+     */
+    public function refImages(): \Illuminate\Http\JsonResponse
+    {
+        $dir = public_path('studio/images/assets');
+        $files = is_dir($dir) ? glob($dir.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) : [];
+        $items = [];
+        $current = $this->request()->get('current', '');
+        foreach ($files as $f) {
+            $name = basename($f);
+            // usage check: referenced by any generation or the current editSource.
+            $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
+            $items[] = ['name' => $name, 'url' => '/studio/images/assets/'.$name, 'used' => $used];
+        }
+        return response()->json(['items' => $items]);
+    }
+
+    /**
+     * Delete an uploaded source image if it isn't referenced by any generation (not in use).
+     */
+    public function refImageDelete(Request $request, string $name): \Illuminate\Http\JsonResponse
+    {
+        $name = basename($name);
+        $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
+        if ($used) { return response()->json(['message' => 'Ảnh đang được dùng, không thể xóa.'], 422); }
+        $file = public_path('studio/images/assets/'.$name);
+        if (is_file($file)) { @unlink($file); }
+        return response()->json(['ok' => true]);
+    }
+
     public function uploadRef(Request $request)
     {
         $data = $request->validate(['image' => ['required', 'image', 'max:8192']]);
-        $path = $request->file('image')->store('studio/ref', 'public');
-
-        return response()->json(['url' => '/storage/'.$path]);
+        $dir = public_path('studio/images/assets');
+        if (! is_dir($dir)) { @mkdir($dir, 0775, true); }
+        $name = 'ref-'.Str::uuid()->toString().'.'.$request->file('image')->extension();
+        $request->file('image')->move($dir, $name);
+        $url = '/studio/images/assets/'.$name;
+        return response()->json(['url' => $url, 'name' => $name]);
     }
 
     /**
@@ -1091,6 +1125,20 @@ class StudioController extends Controller
     /**
      * Swap model/pose catalog (with images) for the Vue studio picker.
      */
+    /**
+     * Background presets for the swap popup (Preset category 'background').
+     */
+    public function swapBackgrounds(): \Illuminate\Http\JsonResponse
+    {
+        $items = \App\Models\Preset::category('background')->get()
+            ->map(fn ($p) => ['value' => $p->prompt_injection, 'label' => $p->ui_label ?: $p->prompt_injection])
+            ->filter(fn ($i) => ! empty($i['value']))->values();
+        if ($items->isEmpty()) {
+            $items = collect([['value' => 'clean studio, neutral beige seamless backdrop', 'label' => 'Studio be'], ['value' => 'white seamless studio backdrop, soft light', 'label' => 'Trắng'], ['value' => 'dark moody studio, dramatic light', 'label' => 'Tối'], ['value' => 'outdoor urban street, natural light', 'label' => 'Đường phố']]);
+        }
+        return response()->json(['items' => $items]);
+    }
+
     public function swapCatalog(string $kind): \Illuminate\Http\JsonResponse
     {
         $svc = app(\App\Services\VirtualTryOnService::class);
@@ -1459,6 +1507,14 @@ class StudioController extends Controller
     /**
      * Library — browse & manage all generated assets.
      */
+    /**
+     * Vue library page (Thư viện) — grid of all generations + gallery popup.
+     */
+    public function libraryVue()
+    {
+        return view('studio.library-vue');
+    }
+
     public function library(Request $request)
     {
         $query = auth()->user()->generations()->with('project')->latest();

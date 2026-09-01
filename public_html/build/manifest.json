@@ -1,4 +1,11 @@
 {
+  "_GalleryModal-CTGh7ag0.js": {
+    "file": "assets/GalleryModal-CTGh7ag0.js",
+    "name": "GalleryModal",
+    "imports": [
+      "_pinia-CUxnBRgh.js"
+    ]
+  },
   "_fonts-BRD9E1vz.css": {
     "file": "assets/fonts-BRD9E1vz.css",
     "src": "_fonts-BRD9E1vz.css"
@@ -72,7 +79,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-bQev0NrT.css",
+    "file": "assets/app-CC-XKmWq.css",
     "name": "app",
     "names": [
       "app.css"
@@ -87,15 +94,26 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-CtBtc6v3.js",
+    "file": "assets/app-DcCyoKKN.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
-      "_pinia-CUxnBRgh.js"
+      "_pinia-CUxnBRgh.js",
+      "_GalleryModal-CTGh7ag0.js"
     ],
     "css": [
       "assets/app-CEMNuG5m.css"
+    ]
+  },
+  "resources/js/studio/library.js": {
+    "file": "assets/library-DqM4Uwfl.js",
+    "name": "library",
+    "src": "resources/js/studio/library.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-CUxnBRgh.js",
+      "_GalleryModal-CTGh7ag0.js"
     ]
   },
   "resources/js/studio/settings.js": {

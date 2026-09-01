@@ -122,6 +122,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/swap-model', [StudioController::class, 'swapModel'])->name('swapModel');
     Route::get('/swap-models', [StudioController::class, 'swapCatalog'])->defaults('kind', 'models')->name('swap-models');
     Route::get('/swap-poses', [StudioController::class, 'swapCatalog'])->defaults('kind', 'poses')->name('swap-poses');
+    Route::get('/swap-backgrounds', [StudioController::class, 'swapBackgrounds'])->name('swap-backgrounds');
     Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
     Route::get('/studiosample/{file}', [StudioController::class, 'assetSample'])->name('studio.asset');
     Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');
@@ -141,7 +142,7 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::post('/pattern', [StudioController::class, 'pattern'])->name('pattern.generate');
     Route::get('/tryon', [StudioController::class, 'tryonPage'])->name('tryon');
     Route::post('/tryon', [StudioController::class, 'tryon'])->name('tryon.generate');
-    Route::get('/library', [StudioController::class, 'library'])->name('library');
+    Route::get('/library', [StudioController::class, 'libraryVue'])->name('library');
     Route::get('/generations/{generation}/download', [StudioController::class, 'download'])->name('generations.download');
     Route::get('/generations/{generation}/palette', [StudioController::class, 'palette'])->name('generations.palette');
     Route::get('/references', [StudioController::class, 'references'])->name('references');
@@ -155,6 +156,8 @@ Route::middleware(['auth', 'admin'])->prefix('studio')->name('studio.')->group(f
     Route::delete('/generations/{generation}', [StudioController::class, 'destroy'])->name('generations.destroy');
     Route::post('/suggest', [StudioController::class, 'suggest'])->name('suggest');
     Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
+    Route::get('/ref-images', [StudioController::class, 'refImages'])->name('ref-images');
+    Route::delete('/ref-images/{name}', [StudioController::class, 'refImageDelete'])->name('ref-images.delete');
     Route::post('/translate', [StudioController::class, 'translate'])->name('translate');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');

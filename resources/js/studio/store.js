@@ -162,10 +162,10 @@ export const useStudioStore = defineStore('studio', {
       catch (e) { this.toast(e.message || 'Lỗi inpaint.', 'error'); }
       finally { this.inpainting = false; }
     },
-    async runSwap() {
+    async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading || !this.swapModelIds.length) { this.toast('Chọn người mẫu + dáng trước.', 'error'); return; }
       this.swapLoading = true;
-      try { const d = await this.api('/studio/swap-model', { image: src, model_id: this.swapModelIds[0], pose_id: this.swapPoseIds[0] || '', texture: 5 }); if (d.generation_id) this.addGen({ id: d.generation_id, type: 'image', status: d.task_id ? 'processing' : 'completed', model: 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); }
+      try { const d = await this.api('/studio/swap-model', { image: src, model_id: this.swapModelIds[0], pose_id: this.swapPoseIds[0] || '', background: opts.background || '', texture: 5 }); if (d.generation_id) this.addGen({ id: d.generation_id, type: 'image', status: d.task_id ? 'processing' : 'completed', model: 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); }
       catch (e) { this.toast(e.message || 'Lỗi thay đổi người mẫu.', 'error'); }
       finally { this.swapLoading = false; }
     },
