@@ -103,9 +103,15 @@
                 <div><label class="label">Model dịch prompt (tiếng Việt)</label><input type="text" name="translate_model" value="{{ old('translate_model', $translate_model) }}" class="input !py-2" placeholder="gemini-3.6-flash-image"></div>
                 <div><label class="label">Model Thay Đổi Người Mẫu</label><input type="text" name="swap_model" value="{{ old('swap_model', $swap_model) }}" class="input !py-2" placeholder="qwen-image-edit-plus-2025-12-15"></div>
                 <div><label class="label">Model Thuật sỹ ảo</label><input type="text" name="stylist_model" value="{{ old('stylist_model', $stylist_model) }}" class="input !py-2" placeholder="qwen3.8-flash"></div>
-                <div><label class="label">Ảnh Flux</label><input type="text" name="image_model" value="{{ old('image_model', $image_model) }}" class="input !py-2" placeholder="flux-1.1-schnell"></div>
-                <div><label class="label">Ảnh Wan</label><input type="text" name="wan_model" value="{{ old('wan_model', $wan_model) }}" class="input !py-2" placeholder="wan2.7-image-pro"></div>
-                <div><label class="label">Ảnh Qwen</label><input type="text" name="qwen_model" value="{{ old('qwen_model', $qwen_model) }}" class="input !py-2" placeholder="qwen-image-3.0-pro"></div>
+                <div class="sm:col-span-2">
+                    <label class="label">Model tạo ảnh</label>
+                    <input type="text" id="default-image-model" class="input !py-2" placeholder="VD: qwen-image-3.0-pro / wan2.7-image-pro / flux-1.1-schnell" value="{{ old('image_model', $image_model) }}">
+                    <input type="hidden" name="image_model" value="{{ old('image_model', $image_model) }}">
+                    <input type="hidden" name="wan_model" value="{{ old('wan_model', $wan_model) }}">
+                    <input type="hidden" name="qwen_model" value="{{ old('qwen_model', $qwen_model) }}">
+                    <input type="hidden" name="gemini_image_model" value="{{ old('gemini_image_model', $gemini_image_model) }}">
+                    <p class="mt-1 text-xs text-ink-500">Model mặc định cho <strong>nhà cung cấp sinh ảnh</strong> đang chọn (đổi nhà cung cấp để thấy model tương ứng). Thứ tự ưu tiên thực tế do <strong>Model Registry (tab Model)</strong> quyết định.</p>
+                </div>
                 <div>
                     <label class="label">Qwen Edit (chỉnh sửa ảnh / Inpaint)</label>
                     <input type="text" name="qwen_edit_model" value="{{ old('qwen_edit_model', $qwen_edit_model) }}" class="input !py-2" placeholder="qwen-image-edit" list="qwen-edit-models">
@@ -117,7 +123,7 @@
                     </datalist>
                     <p class="mt-1 text-xs text-ink-500">Có nhiều model edit ảnh chuyên dụng của Qwen (qwen-image-edit, qwen-image-edit-plus, wanx2.1-imageedit…). Nhập đúng model tài khoản bạn hỗ trợ; dùng chung khoá <strong>Qwen / Wan</strong> ở trang API.</p>
                 </div>
-                <div><label class="label">Ảnh Gemini</label><input type="text" name="gemini_image_model" value="{{ old('gemini_image_model', $gemini_image_model) }}" class="input !py-2" placeholder="gemini-2.5-flash-image"><p class="mt-1 text-xs text-ink-500">Model hợp lệ: <code class="rounded bg-white px-1">gemini-2.5-flash-image</code> · <code class="rounded bg-white px-1">gemini-2.0-flash-preview-image-generation</code> · <code class="rounded bg-white px-1">imagen-4.0-generate-001</code>. Key dùng <code class="rounded bg-white px-1">x-goog-api-key</code> (lấy tại <code class="rounded bg-white px-1">aistudio.google.com/apikey</code>).</p></div>
+
                 <div>
                     <label class="label">Video (Wan / Veo)</label>
                     <input type="text" name="video_model" list="video-model-list" value="{{ old('video_model', $video_model) }}" class="input !py-2" placeholder="wan2.5-t2v">
@@ -165,26 +171,36 @@
                 <div class="mt-2 space-y-2">
                     @forelse($models->where('group', $grp) as $m)
                         @php $id = data_get($m, 'id'); $name = data_get($m, 'name'); $provider = data_get($m, 'provider'); $modelId = data_get($m, 'model_id'); $priority = data_get($m, 'priority', 0); $enabled = (bool) data_get($m, 'enabled', true); @endphp
-                        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
-                            <span class="font-semibold text-ink-900">{{ $name }}</span>
-                            <span class="text-ink-500">{{ $provider }} · {{ $modelId }}@if(data_get($m,'api_key_ref')) <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">🔑 {{ data_get($m,'api_key_ref') }}</span>@endif</span>
-                            <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $priority }}</span>
-                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $enabled ? 'Bật' : 'Tắt' }}</span>
-                            @if($id)<button type="button" class="btn-outline btn-sm" onclick="studioTestModel(this, {{ $id }})" :title="'Kiểm tra model này'">🔍 Kiểm tra</button><span class="test-result block w-full text-[10px]"></span>@endif
+                        <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editing:false }">
+                            <div x-show="!editing" class="flex flex-wrap items-center gap-2">
+                                <span class="font-semibold text-ink-900">{{ $name }}</span>
+                                <span class="text-ink-500">{{ $provider }} · {{ $modelId }}@if(data_get($m,'api_key_ref')) <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">🔑 {{ data_get($m,'api_key_ref') }}</span>@endif</span>
+                                <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $priority }}</span>
+                                <span class="rounded-full px-2 py-0.5 text-[10px] {{ $enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $enabled ? 'Bật' : 'Tắt' }}</span>
+                                @if($id)<button type="button" class="btn-outline btn-sm" onclick="studioTestModel(this, {{ $id }})">🔍 Kiểm tra</button><span class="test-result block w-full text-[10px]"></span>@endif
+                                @if($id)
+                                    <div class="ml-auto flex items-center gap-1.5">
+                                        <button type="button" @click="editing=true" class="btn-outline btn-sm">✏️ Sửa</button>
+                                        <form method="POST" action="{{ route('studio.models.delete', $m) }}" onsubmit="return confirm('Xóa model «{{ $name }}»?')">@csrf @method('DELETE')<button class="btn-outline btn-sm text-red-600">Xóa</button></form>
+                                    </div>
+                                @else
+                                    <span class="ml-auto text-[10px] text-ink-500">(mặc định — thêm lại để chỉnh sửa)</span>
+                                @endif
+                            </div>
                             @if($id)
-                                <form method="POST" action="{{ route('studio.models.update', $m) }}" class="ml-auto flex flex-wrap items-center gap-1.5">
-                                    @csrf @method('PUT')
-                                    <input type="hidden" name="group" value="{{ data_get($m,'group') }}"><input type="hidden" name="name" value="{{ $name }}"><input type="hidden" name="provider" value="{{ $provider }}"><input type="hidden" name="model_id" value="{{ $modelId }}">
-                                    <label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label>
-                                    <input type="number" name="priority" value="{{ $priority }}" min="0" max="100" class="input !w-16 !py-1">
-                                    <button class="btn-outline btn-sm">Lưu</button>
-                                </form>
-                                <form method="POST" action="{{ route('studio.models.delete', $m) }}" onsubmit="return confirm('Xóa model «{{ $name }}»?')">
-                                    @csrf @method('DELETE')
-                                    <button class="btn-outline btn-sm text-red-600">Xóa</button>
-                                </form>
-                            @else
-                                <span class="ml-auto text-[10px] text-ink-500">(mặc định — thêm lại để chỉnh sửa)</span>
+                            <form x-show="editing" method="POST" action="{{ route('studio.models.update', $m) }}" class="mt-2 space-y-2 border-t border-cream-200 pt-2">
+                                @csrf @method('PUT')
+                                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                    <div><label class="label">Tên</label><input name="name" value="{{ $name }}" class="input !py-1"></div>
+                                    <div><label class="label">Vai trò</label><select name="group" class="input !py-1"><option value="image" @selected($m->group==='image')>Ảnh</option><option value="video" @selected($m->group==='video')>Video</option><option value="inference" @selected($m->group==='inference')>Suy luận</option><option value="text" @selected($m->group==='text')>Ngôn ngữ</option></select></div>
+                                    <div><label class="label">Provider</label><input name="provider" value="{{ $provider }}" class="input !py-1"></div>
+                                    <div><label class="label">Model ID</label><input name="model_id" value="{{ $modelId }}" class="input !py-1"></div>
+                                    <div><label class="label">Khóa (API key)</label><select name="api_key_ref" class="input !py-1"><option value="">—</option>@foreach($api_keys as $ak)<option value="{{ $ak->provider }}" @selected(data_get($m,'api_key_ref')===$ak->provider)>{{ $ak->provider }} · {{ $ak->label ?: ($ak->kind ?: '') }}</option>@endforeach</select></div>
+                                    <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="{{ $priority }}" min="0" max="100" class="input !py-1"></div>
+                                    <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
+                                </div>
+                                <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editing=false" class="btn-ghost btn-sm">Hủy</button></div>
+                            </form>
                             @endif
                         </div>
                     @empty
@@ -247,24 +263,29 @@
                 </h3>
                 <div class="mt-2 space-y-2">
                     @foreach($keys as $k)
-                        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
-                            <span class="font-semibold text-ink-900">{{ $k->label }}</span>
-                            <span class="text-ink-500">{{ $k->kind ?: $provider }}</span>
-                            <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $k->priority }}</span>
-                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $k->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $k->enabled ? 'Bật' : 'Tắt' }}</span>
-                            <span class="ml-auto flex flex-wrap items-center gap-1.5">
-                                <form method="POST" action="{{ route('studio.keys.update', $k) }}" class="ml-auto flex flex-wrap items-center gap-1.5">
-                                    @csrf @method('PUT')
-                                    <input type="hidden" name="provider" value="{{ $k->provider }}"><input type="hidden" name="label" value="{{ $k->label }}"><input type="hidden" name="kind" value="{{ $k->kind }}">
-                                    <label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($k->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label>
-                                    <input type="number" name="priority" value="{{ $k->priority }}" min="0" max="100" class="input !w-16 !py-1">
-                                    <button class="btn-outline btn-sm">Lưu</button>
-                                </form>
-                                <form method="POST" action="{{ route('studio.keys.delete', $k) }}" onsubmit="return confirm('Xóa key «{{ $k->label }}»?')">
-                                    @csrf @method('DELETE')
-                                    <button class="btn-outline btn-sm text-red-600">Xóa</button>
-                                </form>
-                            </span>
+                        <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editk:false }">
+                            <div x-show="!editk" class="flex flex-wrap items-center gap-2">
+                                <span class="font-semibold text-ink-900">{{ $k->label }}</span>
+                                <span class="text-ink-500">{{ $k->kind ?: $provider }}</span>
+                                <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $k->priority }}</span>
+                                <span class="rounded-full px-2 py-0.5 text-[10px] {{ $k->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $k->enabled ? 'Bật' : 'Tắt' }}</span>
+                                <span class="ml-auto flex flex-wrap items-center gap-1.5">
+                                    <button type="button" @click="editk=true" class="btn-outline btn-sm">✏️ Sửa</button>
+                                    <form method="POST" action="{{ route('studio.keys.delete', $k) }}" onsubmit="return confirm('Xóa key «{{ $k->label }}»?')">@csrf @method('DELETE')<button class="btn-outline btn-sm text-red-600">Xóa</button></form>
+                                </span>
+                            </div>
+                            <form x-show="editk" method="POST" action="{{ route('studio.keys.update', $k) }}" class="mt-2 space-y-2 border-t border-cream-200 pt-2">
+                                @csrf @method('PUT')
+                                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                    <div><label class="label">Provider</label><input name="provider" value="{{ $k->provider }}" class="input !py-1"></div>
+                                    <div><label class="label">Nhãn</label><input name="label" value="{{ $k->label }}" class="input !py-1"></div>
+                                    <div><label class="label">Loại (kind)</label><input name="kind" value="{{ $k->kind }}" class="input !py-1" placeholder="plan / paygo / ..."></div>
+                                    <div class="col-span-2"><label class="label">Key (chỉ nhập nếu đổi)</label><input name="value" class="input !py-1" placeholder="để trống để giữ nguyên key hiện tại"></div>
+                                    <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="{{ $k->priority }}" min="0" max="100" class="input !py-1"></div>
+                                    <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($k->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
+                                </div>
+                                <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editk=false" class="btn-ghost btn-sm">Hủy</button></div>
+                            </form>
                         </div>
                     @endforeach
                 </div>
@@ -310,6 +331,24 @@ function studioTestModel(btn, id) {
           if (d.note && d.note.indexOf('OK') !== 0) { alert(d.note); }
       }).catch(e => { if (el) { el.textContent = 'Lỗi kiểm tra: ' + e.message; el.className = 'block w-full text-[10px] text-red-400'; } });
 }
+
+// Single "Model tạo ảnh" field <-> the selected provider's model (default config).
+(function () {
+    const field = document.getElementById('default-image-model');
+    if (!field) return;
+    const providerSelect = document.querySelector('[name=image_provider]');
+    const hiddenMap = {
+        flux: document.querySelector('[name=image_model]'),
+        wan: document.querySelector('[name=wan_model]'),
+        qwen: document.querySelector('[name=qwen_model]'),
+        gemini: document.querySelector('[name=gemini_image_model]'),
+    };
+    const activeHidden = function () { return hiddenMap[providerSelect ? providerSelect.value : 'flux']; };
+    function sync() { const h = activeHidden(); if (h) field.value = h.value; }
+    if (providerSelect) { providerSelect.addEventListener('change', sync); }
+    field.addEventListener('input', function () { const h = activeHidden(); if (h) h.value = field.value; });
+    sync();
+})();
 </script>
 @endpush
 @endsection
