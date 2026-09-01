@@ -308,6 +308,10 @@ class StudioController extends Controller
         $lx = max(0, $px - 1); $rx = min($w - 1, $px + $pw);
         $ty = max(0, $py - 1); $by = min($h - 1, $py + $ph);
 
+        // Snapshot ảnh gốc để feather (blend mép vùng với ảnh gốc — KHÔNG dùng blurred patch).
+        $orig = imagecreatetruecolor($w, $h);
+        imagecopy($orig, $img, 0, 0, 0, 0, $w, $h);
+
         // 1+2) Reconstruction tuyến tính: trộn nền ngang (trái↔phải) và dọc (trên↔dưới) theo vị trí.
         //      Guard đen: nếu một cạnh gần đen (thanh đen/letterbox) thì dùng màu cạnh đối diện.
         $dark = function (int $c): bool { return ((($c >> 16) & 0xFF) + (($c >> 8) & 0xFF) + ($c & 0xFF)) < 72; };
@@ -337,23 +341,23 @@ class StudioController extends Controller
             }
         }
 
-        // 3) Feather mềm biên: COPY vùng (region + lề feather) TỪ ẢNH vào patch (không để
-        //    mép patch đen — imagecreatetruecolor mặc định đen gây viền đen), blur rồi copy về
-        //    ĐÚNG rect đó → biên hòa mượt, không nhuộm đen ra ngoài.
-        if (function_exists('imagefilter') && $w * $h <= 8000000) {
-            $feather = (int) max(3, min(24, round(min($pw, $ph) * 0.1)));
-            $copyX = max(0, $px - $feather); $copyY = max(0, $py - $feather);
-            $copyX2 = min($w, $px + $pw + $feather); $copyY2 = min($h, $py + $ph + $feather);
-            $cw = $copyX2 - $copyX; $ch = $copyY2 - $copyY;
-            if ($cw > 0 && $ch > 0) {
-                $patch = imagecreatetruecolor($cw, $ch);
-                imagecopy($patch, $img, 0, 0, $copyX, $copyY, $cw, $ch);
-                @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
-                @imagefilter($patch, IMG_FILTER_GAUSSIAN_BLUR);
-                imagecopy($img, $patch, $copyX, $copyY, 0, 0, $cw, $ch);
-                imagedestroy($patch);
+        // 3) Feather mềm biên KHÔNG DÙNG BLUR (GD blur pad mép = đen gây vệt đen):
+        //    trộn mép vùng với ẢNH GỐC theo khoảng cách tới biên → mép = ảnh gốc (liền mạch),
+        //    vào trong dần = màu tái tạo. Không patch, không viền đen.
+        $feather = (int) max(2, min(32, round(min($x1 - $x0, $y1 - $y0) * 0.08)));
+        for ($y = $y0; $y <= $y1; $y++) {
+            for ($x = $x0; $x <= $x1; $x++) {
+                $d = min($x - $x0, $x1 - $x, $y - $y0, $y1 - $y);
+                if ($d >= $feather) { continue; }
+                $a = $d / max(1, $feather); // 0 ở mép (giữ ảnh gốc) → 1 vào trong (tái tạo)
+                $fc = imagecolorat($img, $x, $y); $oc = imagecolorat($orig, $x, $y);
+                $r = (int) round((($oc >> 16) & 0xFF) * (1 - $a) + (($fc >> 16) & 0xFF) * $a);
+                $g2 = (int) round((($oc >> 8) & 0xFF) * (1 - $a) + (($fc >> 8) & 0xFF) * $a);
+                $b2 = (int) round(($oc & 0xFF) * (1 - $a) + ($fc & 0xFF) * $a);
+                imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g2, $b2));
             }
         }
+        imagedestroy($orig);
     }
 
     /**
