@@ -327,18 +327,45 @@ class StudioController extends Controller
      */
     public function testModel(\App\Models\StudioModel $model)
     {
-        $key = studio_api_keys_for($model->provider, $model->model_id, $model->group)->first();
-        $keyVal = $key ? studio_api_key_value($key) : null;
         $knownVideo = ['wan2.5-t2v', 'wan2.2-i2v', 'wan2.5-i2v', 'wan2.1-i2v-turbo', 'happyhorse-1.1-i2v', 'wanx2.1-t2v-turbo', 'wanx2.1-i2v-turbo'];
+        $qwenFamily = in_array($model->provider, ['qwen', 'dashscope', 'wan'], true);
+
+        $keyVal = null;
+        $keyPrefix = null;
+        $baseUrl = '';
+        $hasPlanKey = false;
+
+        if ($qwenFamily) {
+            // Image/video generation rotates credentials Pay-As-You-Go first (studio_qwen_credentials),
+            // so report the key the service will ACTUALLY use — not the highest-priority registered key,
+            // which may be a Token/Coding Plan (sk-sp-…) key that cannot serve generation models.
+            $task = $model->group === 'video' ? 'video' : 'image';
+            $keys = array_values(studio_qwen_credentials($task));
+            $keyVal = $keys[0] ?? null;
+            $hasPlanKey = count(array_filter($keys, fn ($k) => str_starts_with($k, 'sk-sp-'))) > 0;
+            $keyPrefix = $keyVal ? substr($keyVal, 0, 8).'…' : null;
+            $baseUrl = $keyVal ? dashscope_base_url($keyVal) : '';
+        } else {
+            $key = studio_api_keys_for($model->provider, $model->model_id, $model->group)->first();
+            $keyVal = $key ? studio_api_key_value($key) : null;
+            $keyPrefix = $keyVal ? substr($keyVal, 0, 8).'…' : null;
+            $baseUrl = $keyVal ? dashscope_base_url($keyVal) : '';
+        }
 
         $note = '';
         if ($model->group === 'video' && ! in_array($model->model_id, $knownVideo)) {
-            $note = '⚠️ Model_id này KHÔNG nằm trong nhóm model video phổ biến của DashScope/Wan — dễ gặp lỗi "Model not exist". ';
+            $note .= '⚠️ Model_id này KHÔNG nằm trong nhóm model video phổ biến của DashScope/Wan — dễ gặp lỗi "Model not exist". ';
         }
         if (! $keyVal) {
-            $note .= 'Chưa có KEY cho provider "'.$model->provider.'" — thêm key trong API Keys Registry (hoặc env).';
-        } elseif ($key && $key->scopes && ! in_array('*', $key->scopes) && ! in_array($model->model_id, $key->scopes)) {
-            $note .= 'Key hiện có scope hạn chế ('.implode(', ', $key->scopes).') — key này có thể KHÔNG phục vụ model "'.$model->model_id.'".';
+            $note .= 'Chưa có KEY cho provider "'.$model->provider.'" — thêm key Pay-As-You-Go (sk-… hoặc sk-ws-…) trong API Keys Registry (hoặc env).';
+        } elseif (str_starts_with($keyVal, 'sk-sp-')) {
+            $note .= '⚠️ Key đang dùng cho mục đích TẠO ẢNH/VIDEO là Token/Coding Plan (sk-sp-…). Host plan KHÔNG có model '.$model->model_id.' → sẽ báo "Model not exist". Hãy đăng ký/ưu tiên key Pay-As-You-Go (sk-… hoặc sk-ws-…) cho mục đích tạo ảnh.';
+        } elseif ($hasPlanKey && str_contains($baseUrl, 'token-plan')) {
+            $note .= '⚠️ Đang có key Token/Coding Plan (sk-sp-…) với độ ưu tiên cao, nhưng tạo ảnh sẽ gọi key Pay-As-You-Go trước. Host hiển thị là token-plan — nếu key Pay-As-You-Go dùng chung base URL này sẽ lỗi "Model not exist". Đặt "DashScope Base" về host Pay-As-You-Go (dashscope-intl.aliyuncs.com).';
+        } elseif ($hasPlanKey) {
+            $note .= 'Đã có key Token/Coding Plan (sk-sp-…) nhưng model tạo ảnh '.$model->model_id.' sẽ gọi key Pay-As-You-Go ('.$keyPrefix.') trước — chấp nhận được.';
+        } else {
+            $note .= 'OK — gọi key Pay-As-You-Go '.$keyPrefix.' trước cho model này.';
         }
 
         return response()->json([
@@ -348,8 +375,8 @@ class StudioController extends Controller
             'group' => $model->group,
             'api_key_ref' => $model->api_key_ref,
             'key_exists' => (bool) $keyVal,
-            'key_prefix' => $keyVal ? substr($keyVal, 0, 8).'…' : null,
-            'base_url' => $keyVal ? dashscope_base_url($keyVal) : '',
+            'key_prefix' => $keyPrefix,
+            'base_url' => $baseUrl,
             'note' => $note ?: 'OK — provider + key + model_id đã cấu hình hợp lý.',
         ]);
     }

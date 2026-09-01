@@ -45,6 +45,9 @@ class RenderImageJob implements ShouldQueue
                 $generation->mask_image,
                 $generation->resolution,
                 $generation->ratio,
+                null,
+                $generation->provider,
+                $generation->model,
             );
 
             // NOTE: Face sync ("Đồng bộ khuôn mặt") was removed from the UI. We no longer do a second

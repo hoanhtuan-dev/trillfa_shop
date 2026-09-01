@@ -15,6 +15,7 @@ class ImageFallbackTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed();
         Storage::fake('public');
     }
 
@@ -64,5 +65,55 @@ class ImageFallbackTest extends TestCase
         $this->expectExceptionMessageMatches('/InvalidApiKey|Khoá API|Pay-As-You-Go/');
 
         $service->generate('photo of a red silk dress', null, null, null, null);
+    }
+
+    public function test_model_check_reports_the_key_generation_actually_uses(): void
+    {
+        \App\Models\StudioModel::create([
+            'group' => 'image', 'name' => 'Qwen Image 3.0 Pro', 'provider' => 'qwen',
+            'model_id' => 'qwen-image-3.0-pro', 'api_key_ref' => 'qwen', 'priority' => 8, 'enabled' => true,
+        ]);
+        // A Token/Coding Plan key registered with HIGHER priority than the Pay-As-You-Go key.
+        \App\Models\StudioApiKey::create([
+            'provider' => 'qwen', 'label' => 'plan', 'value' => 'sk-sp-TESTPLANKEY', 'priority' => 10, 'enabled' => true, 'scopes' => ['*'],
+        ]);
+        \App\Models\StudioApiKey::create([
+            'provider' => 'qwen', 'label' => 'paygo', 'value' => 'sk-ws-TESTPAYGO', 'priority' => 5, 'enabled' => true, 'scopes' => ['*'],
+        ]);
+
+        $admin = \App\Models\User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $model = \App\Models\StudioModel::first();
+        $res = $this->getJson('/studio/models/'.$model->id.'/test')->assertOk()->json();
+
+        // The check must report the Pay-As-You-Go key (what image generation actually uses), NOT the plan key.
+        $this->assertSame('qwen', $res['provider']);
+        $this->assertSame('qwen-image-3.0-pro', $res['model_id']);
+        $this->assertStringStartsWith('sk-ws', (string) $res['key_prefix']);
+        $this->assertStringContainsString('dashscope-intl', (string) $res['base_url']);
+        $this->assertStringContainsString('Pay-As-You-Go', (string) $res['note']);
+    }
+
+    public function test_model_check_warns_when_only_plan_key_registered(): void
+    {
+        \App\Models\StudioModel::create([
+            'group' => 'image', 'name' => 'Qwen Image 3.0 Pro', 'provider' => 'qwen',
+            'model_id' => 'qwen-image-3.0-pro', 'api_key_ref' => 'qwen', 'priority' => 8, 'enabled' => true,
+        ]);
+        // Only a Token/Coding Plan key registered.
+        \App\Models\StudioApiKey::create([
+            'provider' => 'qwen', 'label' => 'plan', 'value' => 'sk-sp-TESTPLANKEY', 'priority' => 10, 'enabled' => true, 'scopes' => ['*'],
+        ]);
+
+        $admin = \App\Models\User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $model = \App\Models\StudioModel::first();
+        $res = $this->getJson('/studio/models/'.$model->id.'/test')->assertOk()->json();
+
+        $this->assertStringStartsWith('sk-sp', (string) $res['key_prefix']);
+        $this->assertStringContainsString('token-plan', (string) $res['base_url']);
+        $this->assertStringContainsString('Token/Coding Plan', (string) $res['note']);
     }
 }

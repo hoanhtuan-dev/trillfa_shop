@@ -55,9 +55,12 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null): string
     {
-        $provider = $this->provider();
+        // Honor the provider/model the generation was created with (from the registry), instead of a
+        // possibly-stale global config, so we call the SAME model the user selected. The override comes
+        // from the Job (RenderImageJob) so the requested model is tried first, then the fallback kicks in.
+        $provider = $providerOverride ?: $this->provider();
         $dashscopeKey = studio_api_key('dashscope');
         $triedReal = false;
 
@@ -81,10 +84,10 @@ class ImageAIService
             $key = $this->providerKey();
             if ($key) {
                 $triedReal = true;
-                $url = $this->tryGeminiImage($prompt, $key, $resolution, $ratio);
+                $url = $this->tryGeminiImage($prompt, $key, $resolution, $ratio, $modelOverride);
                 if ($url) {
                     $this->lastProvider = 'gemini';
-                    $this->lastModel = (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
+                    $this->lastModel = $modelOverride ?: (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
                     return $url;
                 }
             }
@@ -92,15 +95,15 @@ class ImageAIService
             $key = $this->providerKey();
             if ($key) {
                 $triedReal = true;
+                // The model override (from the job) is tried first, then the provider's fallback models.
                 $models = $provider === 'wan'
-                    ? array_values(array_unique([(string) studio_config('wan_model', 'wan2.7-image-pro'), 'wan2.7-image-pro', 'wan2.1-image-pro']))
-                    : array_values(array_unique([(string) studio_config('qwen_model', 'qwen-image-3.0-pro'), 'qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image']));
+                    ? array_values(array_unique(array_filter([$modelOverride, (string) studio_config('wan_model', 'wan2.7-image-pro'), 'wan2.7-image-pro', 'wan2.1-image-pro'])))
+                    : array_values(array_unique(array_filter([$modelOverride, (string) studio_config('qwen_model', 'qwen-image-3.0-pro'), 'qwen-image-3.0-pro', 'qwen-image-max', 'qwen-image-plus', 'qwen-image'])));
 
                 $url = $this->tryModels($prompt, $models, studio_qwen_credentials('image'), $resolution, $ratio, $faceRef);
                 if ($url) {
                     $this->lastProvider = $provider;
-                    // tryModels doesn't reveal which model won; keep the first for the log.
-                    $this->lastModel = isset($models[0]) ? strval($models[0]) : null;
+                    // tryDashscope records the exact model that won; keep it.
                     return $url;
                 }
             }
@@ -187,7 +190,7 @@ class ImageAIService
                 return null;
             }
             $this->triedRealFallback = true;
-            return $this->tryGeminiImage($prompt, $key, $resolution, $ratio);
+            return $this->tryGeminiImage($prompt, $key, $resolution, $ratio, $model);
         }
 
         if (in_array($provider, ['qwen', 'wan'], true)) {
@@ -283,13 +286,13 @@ class ImageAIService
         return $msg;
     }
 
-    protected function tryGeminiImage(string $prompt, string $key, ?string $resolution = null, ?string $ratio = null): ?string
+    protected function tryGeminiImage(string $prompt, string $key, ?string $resolution = null, ?string $ratio = null, ?string $modelOverride = null): ?string
     {
         try {
-            $url = $this->callGeminiImage($prompt, $key, $ratio);
+            $url = $this->callGeminiImage($prompt, $key, $ratio, $modelOverride);
             if ($url) {
                 $this->lastProvider = 'gemini';
-                $this->lastModel = (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
+                $this->lastModel = $modelOverride ?: (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
                 return $url;
             }
             $this->dashscopeError = 'Gemini không trả về ảnh. Kiểm tra model ảnh (Cài đặt → Ảnh Gemini) và hạn mức.';
@@ -305,9 +308,9 @@ class ImageAIService
      * Gemini image generation via generateContent with responseModalities IMAGE.
      * The image is returned as a base64 inlineData part.
      */
-    protected function callGeminiImage(string $prompt, string $key, ?string $ratio = null): ?string
+    protected function callGeminiImage(string $prompt, string $key, ?string $ratio = null, ?string $modelOverride = null): ?string
     {
-        $model = (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
+        $model = $modelOverride ?: (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
 
         if (! $this->isGeminiImageModel($model)) {
             throw new \RuntimeException('Model “'.$model.'” không phải model tạo ảnh. Trong Cài đặt → “Ảnh Gemini”, hãy dùng gemini-2.5-flash-image (hoặc gemini-2.0-flash-preview-image-generation / imagen-4.0-generate-001).');
