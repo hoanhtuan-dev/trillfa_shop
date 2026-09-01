@@ -66,10 +66,20 @@ export const useStudioStore = defineStore('studio', {
     suggesting: false,
     viewer: null,
     upscalePresets: [],
+    lastBatch: [],
+    showBatch: false,
   }),
   getters: {
     upscaleSrc: (s) => (s.editSource && s.editSource.url) || (s.preview && s.preview.media_url) || '',
     upscaleName: (s) => (s.editSource && s.editSource.name) || (s.preview ? 'Ảnh kết quả #' + s.preview.id : 'Ảnh đang chọn'),
+    canvasLayers() {
+      const layers = [];
+      if (this.editSource) layers.push({ id: 'source', kind: 'source', name: this.editSource.name || 'Ảnh nguồn', image: this.editSource.url });
+      this.generations.filter(g => g.media_url).forEach(g => layers.push({ id: String(g.id), kind: 'gen', name: 'Ảnh #' + g.id, image: g.media_url, gen: g }));
+      return layers;
+    },
+    activeLayerId() { return this.editSource ? 'source' : (this.previewId ? String(this.previewId) : ''); },
+    activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
   },
   actions: {
     async api(url, body = {}) {
@@ -107,6 +117,7 @@ export const useStudioStore = defineStore('studio', {
         const d = await this.api('/studio/generate', { prompt: this.imagePromptEn, resolution: this.imageRes, ratio: this.imageRatio, variants: Number(this.variantCount) || 1 });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
+        this.setBatch(items.map(it => it.generation_id));
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
       } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh.', 'error'); }
       finally { this.generating = false; }
@@ -147,6 +158,10 @@ export const useStudioStore = defineStore('studio', {
     },
     goEdit(g) { this.select(g); this.step = 2; },
     goVideo(g) { this.select(g); this.step = 3; },
+    selectLayer(item) { if (!item) return; if (item.kind === 'source') { /** already active */ } else if (item.gen) { this.select(item.gen); } },
+    deleteLayer(item) { if (!item) return; if (item.kind === 'source') { this.editSource = null; } else if (item.gen) { this.deleteGen(item.gen); } },
+    setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
+    hideBatch() { this.showBatch = false; },
     setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.toast('Đã chọn ảnh nguồn.'); },
     async uploadRef(file) {
       if (!file) { this.toast('Chọn file ảnh.', 'error'); return; }

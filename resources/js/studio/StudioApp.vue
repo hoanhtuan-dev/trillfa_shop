@@ -93,9 +93,27 @@ const panel = computed(() => store.step === 1 ? [StylistCard, ConceptCard] : sto
             <button @click="store.zoomIn()" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700">+</button>
             <span class="px-1 text-xs text-cream-200">{{ Math.round(store.zoom * 100) }}%</span>
           </div>
+          <!-- canvas layers card (right, floating foundation) -->
+          <div v-if="store.canvasLayers.length" class="absolute right-3 top-3 z-20 flex max-w-52 flex-col gap-1.5 rounded-2xl bg-ink-900/85 p-2 shadow-lg">
+            <p class="px-0.5 text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
+            <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
+              <div v-for="l in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1.5 rounded-lg border p-1" :class="store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60'">
+                <button @click="store.selectLayer(l)" class="flex min-w-0 items-center gap-1.5"><img :src="l.image" class="h-8 w-8 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-[11px] text-cream-100">{{ l.name }}</span></button>
+                <button @click="store.deleteLayer(l)" class="ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-full bg-red-600/25 text-red-200 opacity-0 hover:bg-red-600 group-hover:opacity-100">🗑</button>
+              </div>
+            </div>
+          </div>
           <!-- canvas bg + crop toggles -->
           <div class="absolute right-3 bottom-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
             <button v-for="b in ['grid','dark','white','cream']" :key="b" @click="store.canvasBg = b" class="h-6 w-6 rounded-full border" :class="store.canvasBg === b ? 'border-white' : 'border-ink-600'" :style="{ background: b === 'grid' ? 'repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 10px 10px' : b === 'dark' ? '#0a0a0f' : b === 'white' ? '#fff' : '#f5ead9' }" :title="b"></button>
+          </div>
+          <!-- variant slider (bottom, only when multiple variants) -->
+          <div v-if="store.showBatch && store.activeBatch.length > 1" class="absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] text-cream-300/60">{{ store.activeBatch.length }} biến thể</span>
+              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2" :class="store.previewId === v.id ? 'border-brand-500' : 'border-ink-700'"><img :src="v.media_url" class="h-full w-full bg-ink-900 object-cover"><span v-if="v.status !== 'completed'" class="absolute inset-0 grid place-items-center bg-black/60 text-[9px] text-cream-200">{{ v.status }}</span></button>
+              <button @click="store.hideBatch()" class="ml-1 grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600">✕</button>
+            </div>
           </div>
         </div>
       </main>
