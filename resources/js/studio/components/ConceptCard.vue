@@ -8,7 +8,7 @@ const promptPreview = computed(() => { const t = store.imagePromptEn || ''; retu
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
     <button @click="store.promptOpen = true" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
-      <span class="flex-1"><span class="text-sm font-semibold text-brand-300">🎛 Prompt Tạo Ảnh</span><br><span class="block max-w-full truncate text-[11px] text-ink-500">{{ promptPreview }}</span></span><span class="text-lg text-cream-200">›</span>
+      <span class="min-w-0 flex-1 overflow-hidden"><span class="block truncate text-sm font-semibold text-brand-300">🎛 Prompt Tạo Ảnh</span><span class="mt-0.5 block w-full truncate text-[11px] text-ink-500">{{ promptPreview }}</span></span><span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
     </button>
     <!-- Prompt popup (shared for AI generation) -->
     <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="🎛 Prompt Tạo Ảnh">
