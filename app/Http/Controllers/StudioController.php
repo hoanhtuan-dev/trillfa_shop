@@ -1451,7 +1451,7 @@ class StudioController extends Controller
         imagedestroy($alpha); imagedestroy($clean); imagedestroy($comp);
 
         $name = 'studio/bgdepth-'.Str::uuid().'.png';
-        IlluminateSupportFacadesStorage::disk('public')->put($name, $this->pngBytes($proc));
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($proc));
         imagedestroy($proc);
         return '/storage/'.$name;
     }
@@ -1465,7 +1465,7 @@ class StudioController extends Controller
             .'Keep the whole scene otherwise EXACTLY unchanged — same lighting, same colors, same framing. '
             .'The result must look like the real location with nobody in it. Photorealistic.';
         try {
-            return app(AppServicesImageAIService::class)->swapEdit(
+            return app(\App\Services\ImageAIService::class)->swapEdit(
                 $prompt,
                 $url,
                 (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'),
