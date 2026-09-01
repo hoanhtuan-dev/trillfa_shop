@@ -1214,18 +1214,20 @@ class StudioController extends Controller
             return response()->json(['message' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).'], 422);
         }
 
-        // P5: gentler enhance (was fabric=6, skin=3) to avoid over-sharpening/texturing the swap result.
-        $det = $this->enhanceStoredImage($fallback, 4, 2);
+        // Lighter post-process: skip most skin-pore texture so the generated FACE stays clean (the skin
+        // pass adds noise that can read as deformities). Only a very subtle fabric touch + gentle sharpen.
+        $det = $this->enhanceStoredImage($fallback, 3, 1);
         if ($det) { $fallback = $det; }
 
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
+        $actualModel = $svc->lastModel() ?: $swapModel;   // model actually used (e.g. qwen-image-3.0-pro)
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'completed', 'media_url' => $fallback,
             'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
-            'model' => $swapModel, 'provider' => 'qwen', 'credits_cost' => 1, // 1 generation (enhance is local, no extra AI cost)
-            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null)],
+            'model' => $actualModel, 'provider' => 'qwen', 'credits_cost' => 1, // 1 generation (enhance is local, no extra AI cost)
+            'meta' => ['type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel, 'swap' => true, 'face_ref' => (bool) ($model['image'] ?? null)],
         ]);
-        return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'task_id' => null]);
+        return response()->json(['generation_id' => $gen->id, 'media_url' => $fallback, 'provider' => 'qwen', 'model' => $actualModel, 'task_id' => null]);
     }
 
     public function translate(Request $request)

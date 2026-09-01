@@ -1,6 +1,6 @@
 {
-  "_GalleryModal-BKDn5hnu.js": {
-    "file": "assets/GalleryModal-BKDn5hnu.js",
+  "_GalleryModal-Lbdv-Ucs.js": {
+    "file": "assets/GalleryModal-Lbdv-Ucs.js",
     "name": "GalleryModal",
     "imports": [
       "_pinia-D6v-wq6D.js"
@@ -79,7 +79,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DnswxWnb.css",
+    "file": "assets/app-DIHqIvEP.css",
     "name": "app",
     "names": [
       "app.css"
@@ -94,26 +94,26 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DZUnfMWL.js",
+    "file": "assets/app-TgUUHnGm.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-D6v-wq6D.js",
-      "_GalleryModal-BKDn5hnu.js"
+      "_GalleryModal-Lbdv-Ucs.js"
     ],
     "css": [
       "assets/app-BKQNp6AB.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-sy0nn_BD.js",
+    "file": "assets/library-DZpkbZSh.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
       "_pinia-D6v-wq6D.js",
-      "_GalleryModal-BKDn5hnu.js"
+      "_GalleryModal-Lbdv-Ucs.js"
     ]
   },
   "resources/js/studio/settings.js": {

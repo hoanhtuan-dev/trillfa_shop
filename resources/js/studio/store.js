@@ -219,7 +219,7 @@ export const useStudioStore = defineStore('studio', {
         try {
           const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', texture: Number(opts.texture) || 5 });
           // P0a: swap is now synchronous (qwen-edit) -> media_url is returned directly.
-          if (d.generation_id) { this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); n++; }
+          if (d.generation_id) { this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.model || 'swap', provider: d.provider || 'swap', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' }); n++; }
           else if (d.message) { lastErr = d.message; }
         } catch (e) { lastErr = e.message || 'Lỗi thay đổi người mẫu.'; }
       }

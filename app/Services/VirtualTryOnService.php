@@ -12,6 +12,14 @@ namespace App\Services;
  */
 class VirtualTryOnService
 {
+    /** The image model that actually produced the last swap (may differ from the configured swap_model). */
+    public ?string $lastModel = null;
+
+    public function lastModel(): ?string
+    {
+        return $this->lastModel;
+    }
+
     public function modelCatalog(): array
     {
         // 6 model faces (headshots). We pass the selected face as a reference image to qwen-edit so
@@ -114,7 +122,8 @@ class VirtualTryOnService
                 .'Image 1 is the reference person: use their exact face, facial identity, eye shape, nose, mouth, skin tone and hair. '
                 .'Image 2 is the person to edit (wearing the garment). '
                 .'Render the reference person from Image 1 in the pose: '.$pose.', wearing the exact garment from Image 2. '
-                .'Preserve the reference face precisely and keep natural, anatomically-correct proportions — do NOT distort, stretch, deform or reshape the face, eyes, nose, mouth, hair, hands or body. '
+                .'Preserve the reference face precisely and keep natural, anatomically-correct, symmetrical facial proportions — do NOT distort, stretch, deform, warp or reshape the face, eyes, nose, mouth, hair, hands or body. '
+                .'Keep the eyes sharp and natural (no double/offset eyes), the mouth symmetric, the skin smooth and lifelike, and the head-to-body ratio natural. '
                 .'Realistic skin texture, sharp detail, consistent lighting, studio quality.';
         } else {
             $instr = 'Keep the exact garment, outfit and all its details 100% unchanged. Replace the person with a full-body '.$modelDesc.' standing '.$pose.'. Keep natural proportions; do not distort the face or body.';
@@ -130,8 +139,13 @@ class VirtualTryOnService
         }
         $instr .= ' Photorealistic, full body, high fashion.';
 
-        $svc = app(ImageAIService::class);
-        return $svc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl);
+        $imageSvc = app(ImageAIService::class);
+        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, $faceRefUrl);
+        if ($url) {
+            // Record the model that actually produced the result (may be qwen-image-3.0-pro, not swap_model).
+            $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+        }
+        return $url;
     }
 
     protected function textureEnglish(int $v): string
