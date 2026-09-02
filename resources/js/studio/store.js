@@ -483,16 +483,25 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintBrushData = '';
       if (mode === 'brush') this._initInpaintBrush();
     },
-    inpaintMaskPointer(e, imgEl) {
-      if (!imgEl) return null;
-      const r = imgEl.getBoundingClientRect();
-      if (!r.width || !r.height) return null;
-      return { nx: this._clamp((e.clientX - r.left) / r.width, 0, 1), ny: this._clamp((e.clientY - r.top) / r.height, 0, 1) };
+    inpaintMaskPointer(e) {
+      const m = this.canvasMetrics();
+      if (!m) return null;
+      // Convert clientX/Y to normalized coords (0..1) on the visible image, accounting for zoom/pan
+      const nx = this._clamp((e.clientX - m.crLeft - m.vx) / m.vw, 0, 1);
+      const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
+      return { nx, ny };
     },
-    inpaintMaskStart(e, imgEl) {
+    inpaintHandleDown(e, key) {
       if (this.inpaintMaskMode === 'none') return;
       e.stopPropagation();
-      const p = this.inpaintMaskPointer(e, imgEl); if (!p) return;
+      const p = this.inpaintMaskPointer(e); if (!p) return;
+      this._inpaintHandle = key;
+      this._inpaintDrag = { x: p.nx, y: p.ny, box: { ...this.inpaintMaskBox } };
+    },
+    inpaintMaskStart(e) {
+      if (this.inpaintMaskMode === 'none') return;
+      e.stopPropagation();
+      const p = this.inpaintMaskPointer(e); if (!p) return;
       if (this.inpaintMaskMode === 'brush') {
         this._inpaintBrushDrawing = true;
         this._inpaintBrushLast = p;
@@ -510,16 +519,16 @@ export const useStudioStore = defineStore('studio', {
         this.inpaintMaskBox = { x: p.nx, y: p.ny, w: 0.005, h: 0.005 };
       }
     },
-    inpaintMaskMove(e, imgEl) {
+    inpaintMaskMove(e) {
       if (this.inpaintMaskMode === 'none') return;
       if (this.inpaintMaskMode === 'brush' && this._inpaintBrushDrawing) {
-        const p = this.inpaintMaskPointer(e, imgEl); if (!p) return;
+        const p = this.inpaintMaskPointer(e); if (!p) return;
         this._drawInpaintBrushLine(this._inpaintBrushLast, p);
         this._inpaintBrushLast = p;
         return;
       }
       const d = this._inpaintDrag; if (!d) return;
-      const p = this.inpaintMaskPointer(e, imgEl); if (!p) return;
+      const p = this.inpaintMaskPointer(e); if (!p) return;
       if (this._inpaintHandle) {
         const bx = (p.nx - d.x), by = (p.ny - d.y);
         const b = { ...d.box }; const MIN = 0.02;

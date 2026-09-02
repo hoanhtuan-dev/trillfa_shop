@@ -1,6 +1,6 @@
 {
-  "_GalleryModal-ChF9BMEX.js": {
-    "file": "assets/GalleryModal-ChF9BMEX.js",
+  "_GalleryModal-BLGcbe8M.js": {
+    "file": "assets/GalleryModal-BLGcbe8M.js",
     "name": "GalleryModal",
     "imports": [
       "_pinia-DYa9Z6h2.js"
@@ -94,26 +94,26 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-BOBOma2u.js",
+    "file": "assets/app-qReePbs6.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-DYa9Z6h2.js",
-      "_GalleryModal-ChF9BMEX.js"
+      "_GalleryModal-BLGcbe8M.js"
     ],
     "css": [
       "assets/app-CiMpIVC7.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-BRrEdekF.js",
+    "file": "assets/library-IhnCSqGN.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
       "_pinia-DYa9Z6h2.js",
-      "_GalleryModal-ChF9BMEX.js"
+      "_GalleryModal-BLGcbe8M.js"
     ]
   },
   "resources/js/studio/settings.js": {
