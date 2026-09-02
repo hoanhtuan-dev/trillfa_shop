@@ -245,22 +245,9 @@ class StudioController extends Controller
 
         $cost = (int) studio_config('image_credits', 1);
 
-        // "XÓA VÙNG" → tái tạo nền CỤC BỘ (tức thì, miễn phí, bám gradient — không gọi AI,
-        // tránh chậm/tốn credit và trường hợp AI không edit). CHỈ "THAY VÙNG" mới gọi AI
-        // (mask nhị phân + prompt) vì cần sinh nội dung mới; composite sẽ feather mềm.
-        if ($op === 'erase') {
-            $this->localEraseFill($src, $px, $py, $pw, $ph);
-            $name = 'studio/erase-'.Str::uuid().'.png';
-            \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
-            imagedestroy($src);
-            $gen = auth()->user()->generations()->create([
-                'type' => 'image', 'status' => 'completed', 'media_url' => '/storage/'.$name,
-                'prompt' => 'Xóa vùng chọn (tái tạo nền)', 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0,
-            ]);
-            return response()->json(['generation_id' => $gen->id, 'status' => 'completed', 'media_url' => '/storage/'.$name, 'model' => 'erase', 'provider' => 'local', 'credits_cost' => 0]);
-        }
-
-        // "THAY VÙNG" → AI (cần mô tả); fallback tái tạo nền cục bộ khi chưa có key.
+        // Cả "XÓA VÙNG" lẫn "THAY VÙNG" đều DÙNG AI (mask nhị phân + prompt hiệu quả) —
+        // vì AI tái tạo nền đúng ngữ cảnh. Composite feather mềm đảm bảo ngoài vùng giữ nguyên.
+        // Fallback tái tạo nền cục bộ khi chưa có key / AI thất bại.
         $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
         if ($hasAi) {
             return $this->queueGeneration('image', [
@@ -271,7 +258,7 @@ class StudioController extends Controller
             ], $cost, $generation);
         }
 
-        // Chưa có key AI cho replace → tái tạo nền cục bộ (degrade)
+        // Chưa có key AI → tái tạo nền cục bộ (degrade)
         $this->localEraseFill($src, $px, $py, $pw, $ph);
         $name = 'studio/erase-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
@@ -288,12 +275,24 @@ class StudioController extends Controller
      */
     protected function regionPrompt(string $op, string $userPrompt): string
     {
-        $mask = ' A feathered mask image is provided (same size as the base). Its darkest (black) core is the edit region and it fades smoothly to white at the edges — edit with a soft, natural transition across the feather.';
+        // Prompt hiệu quả & nhất quán: mask nhị phân (đã giãn pad), composite feather mềm.
+        $mask = ' You are given the ORIGINAL photo PLUS a mask image (same size): the BLACK region is the only area you may change; every pixel OUTSIDE the black region must stay EXACTLY identical to the original. The mask already has soft edges.';
         if ($op === 'erase') {
-            return 'Remove the object, person or content inside the black (masked) region and fill the area naturally with the surrounding background, fabric or pattern so the result looks clean, seamless and untouched. Blend smoothly at the soft feathered mask edges — do NOT create any hard rectangle edge or border. Keep every pixel beyond the feathered mask identical to the original image. Do not leave any trace, edge artifact or blur of the removed content.'.$mask;
+            return 'PROFESSIONAL OBJECT REMOVAL / INPAINTING: erase the object, person or content inside the BLACK region of the mask completely, then reconstruct the background that was hidden behind it.
+RULES:
+- Fill ONLY with the EXACT surrounding background visible just outside the black region (wall, floor, fabric of the backdrop, table, grass...), extending its color, gradient, texture, lighting and any soft shadows naturally INTO the masked area so it looks continuous.
+- Do NOT bring in any fabric, clothing, skin, garment texture, pattern or color from the removed subject — keep the fill purely background.
+- Result must look like the object was never there: perfectly seamless, no visible seam, border, halo, blur or leftover artifact at the mask edges.
+- Blend softly at the mask edge (feathered), never a hard rectangle line.
+'.$mask;
         }
         $p = trim($userPrompt);
-        return $p.'. Create this content inside the black (masked) region, extending smoothly across the soft feathered mask edges — the object may reach and lightly feather into the mask boundary but must NOT be abruptly cut off by a hard rectangle edge. Keep every pixel beyond the feathered mask identical to the original image.'.$mask;
+        return 'PROFESSIONAL OBJECT INSERTION: create and place the following inside the BLACK region of the mask and blend it naturally into the scene: '.$p.'.
+RULES:
+- Render it realistically: correct perspective, scale, lighting, shadows and color grading to match the surrounding scene.
+- Fill the masked area, extending the object naturally toward the soft mask edges — it may lightly feather into the boundary but must NOT be abruptly cut off by a hard rectangle edge.
+- Do NOT change anything outside the black region.
+'.$mask;
     }
 
     /**
