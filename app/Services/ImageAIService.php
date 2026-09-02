@@ -611,7 +611,7 @@ class ImageAIService
         $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
         if (! $this->isImageEditCapableModel($model)) {
             $this->dashscopeError = 'Model “'.$model.'” có vẻ KHÔNG phải model chỉnh sửa ảnh. '
-                .'Chọn model Qwen Edit chuyên dụng (vd: qwen-image-edit, qwen-image-edit-plus, qwen-image-3.0-pro…) trong Cài đặt — không dùng model văn bản/thị giác (qwen3.8-flash, qwen-vl-…).';
+                .'Chọn model Qwen Edit chuyên dụng (vd: qwen-image-edit, qwen-image-edit-plus, qwen-image-3.0-pro…) trong Cài đặt — qwen3.8-flash/max là model chat đa phương thức (đọc ảnh/video) chứ KHÔNG sinh/chỉnh sửa ảnh, nên không dùng được ở đây.';
             logger()->warning('Edit model không phải model edit', ['model' => $model]);
             return null;
         }

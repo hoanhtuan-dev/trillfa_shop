@@ -196,27 +196,41 @@ PROMPT;
         return 'Thiết kế với: '.implode(' · ', $lines).'.';
     }
 
-    /** Text chat that returns parsed JSON. Tries Qwen (qwen3.8-flash) -> Gemini -> others. */
+    /**
+     * Text chat that returns parsed JSON. Tries Qwen multimodal (qwen3.8-flash -> qwen3.8-max ->
+     * qwen-plus/turbo) over the OpenAI-compatible endpoint, then Gemini, then others.
+     */
     protected function chat(string $instruction): ?array
     {
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        $qwenModels = array_values(array_unique(array_filter([
-            (string) studio_config('stylist_model', 'qwen3.8-flash'), 'qwen3.8-flash', (string) studio_config('qwen_prompt_model', 'qwen-plus'), 'qwen-plus', 'qwen-turbo',
-        ])));
         if ($qwenKey) {
-            foreach ($qwenModels as $qm) {
-                try {
-                    $resp = Http::withToken($qwenKey)->timeout(50)->post(dashscope_base_url($qwenKey).'/api/v1/services/aigc/text-generation/generation', [
-                        'model' => $qm,
-                        'input' => ['messages' => [['role' => 'user', 'content' => $instruction]]],
-                        'parameters' => ['result_format' => 'message'],
-                    ]);
-                    if ($resp->successful()) {
-                        $out = trim((string) data_get($resp->json(), 'output.choices.0.message.content'));
-                        $decoded = $this->decodeJson($out);
-                        if ($decoded) { return $decoded; }
+            foreach (studio_qwen_text_models() as $qm) {
+                foreach (studio_qwen_credentials('prompt') as $key) {
+                    $base = dashscope_base_url($key).'/compatible-mode/v1';
+                    try {
+                        $resp = Http::withToken($key)->timeout(50)
+                            ->post($base.'/chat/completions', [
+                                'model' => $qm,
+                                'messages' => [['role' => 'user', 'content' => $instruction]],
+                                'response_format' => ['type' => 'json_object'],
+                            ]);
+                        if ($resp->successful()) {
+                            $out = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                            $decoded = $this->decodeJson($out);
+                            if ($decoded) { return $decoded; }
+                        } elseif (is_qwen_quota_error((string) $resp->body())) {
+                            continue; // quota -> thử key tiếp theo
+                        } elseif ($resp->status() === 404
+                            || str_contains(strtolower((string) $resp->body()), 'model_not_found')
+                            || str_contains(strtolower((string) $resp->body()), 'model not exist')) {
+                            break; // model không tồn tại -> thử model kế tiếp
+                        }
+                        logger()->warning('Stylist Qwen('.$qm.') HTTP '.$resp->status().' '.substr((string) $resp->body(), 0, 160));
+                    } catch (\Throwable $e) {
+                        logger()->warning('Stylist Qwen('.$qm.') failed: '.$e->getMessage());
+                        break;
                     }
-                } catch (\Throwable $e) { logger()->warning('Stylist Qwen('.$qm.') failed: '.$e->getMessage()); }
+                }
             }
         }
 

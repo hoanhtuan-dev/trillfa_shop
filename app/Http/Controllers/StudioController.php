@@ -2366,7 +2366,7 @@ RULES:
         $target = $data['direction'] === 'vi' ? 'Vietnamese' : 'English';
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
         $geminiKey = studio_api_key('gemini');
-        $qwenModel = (string) studio_config('qwen_prompt_model', 'qwen-plus'); // Qwen chat (fallback)
+        $qwenModel = (string) studio_config('qwen_prompt_model', 'qwen3.8-flash'); // Qwen chat multimodal (fallback)
         $translateModel = (string) studio_config('translate_model', 'gemini-3.6-flash-image'); // Model dịch chuyên dụng
         $instruction = 'You are a professional fashion prompt translator. Translate the following image-generation prompt to '.$target.'. '
             .'Keep all technical descriptors (fabric, silhouette, camera, lighting) precise. Return ONLY the translated prompt, nothing else.';
@@ -2790,7 +2790,9 @@ RULES:
             'prompt_provider' => setting('studio_prompt_provider', config('studio.prompt_provider')),
             'vision_provider' => setting('studio_vision_provider', config('studio.vision_provider')),
             'prompt_model' => setting('studio_prompt_model', config('studio.prompt_model')),
-            'qwen_prompt_model' => setting('studio_qwen_prompt_model', config('studio.qwen_prompt_model', 'qwen-plus')),
+            'qwen_prompt_model' => setting('studio_qwen_prompt_model', config('studio.qwen_prompt_model', 'qwen3.8-flash')),
+            'qwen_max_model' => setting('studio_qwen_max_model', config('studio.qwen_max_model', 'qwen3.8-max')),
+            'qwen_vision_model' => setting('studio_qwen_vision_model', config('studio.qwen_vision_model', 'qwen3.8-flash')),
             'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
             'swap_model' => setting('studio_swap_model', config('studio.swap_model')),
             'stylist_model' => setting('studio_stylist_model', config('studio.stylist_model')),
@@ -3058,6 +3060,8 @@ RULES:
             'vision_provider' => ['required', 'string', 'in:gemini,qwen'],
             'prompt_model' => ['required', 'string', 'max:255'],
             'qwen_prompt_model' => ['nullable', 'string', 'max:255'],
+            'qwen_max_model' => ['nullable', 'string', 'max:255'],
+            'qwen_vision_model' => ['nullable', 'string', 'max:255'],
             'translate_model' => ['nullable', 'string', 'max:255'],
             'swap_model' => ['nullable', 'string', 'max:255'],
             'stylist_model' => ['nullable', 'string', 'max:255'],
@@ -3091,6 +3095,8 @@ RULES:
         set_setting('studio_vision_provider', $data['vision_provider']);
         set_setting('studio_prompt_model', $data['prompt_model']);
         if (isset($data['qwen_prompt_model'])) set_setting('studio_qwen_prompt_model', $data['qwen_prompt_model']);
+        if (isset($data['qwen_max_model'])) set_setting('studio_qwen_max_model', $data['qwen_max_model']);
+        if (isset($data['qwen_vision_model'])) set_setting('studio_qwen_vision_model', $data['qwen_vision_model']);
         if (isset($data['translate_model'])) set_setting('studio_translate_model', $data['translate_model']);
         if (isset($data['swap_model'])) set_setting('studio_swap_model', $data['swap_model']);
         if (isset($data['stylist_model'])) set_setting('studio_stylist_model', $data['stylist_model']);

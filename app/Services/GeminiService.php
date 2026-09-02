@@ -56,7 +56,6 @@ class GeminiService
 
     protected function callQwen(string $idea, array $injections, int $creativeLevel): array
     {
-        $model = (string) studio_config('qwen_prompt_model', 'qwen-plus');
         $system = $this->systemPrompt($creativeLevel);
         $prompt = 'Idea: '.$idea."
 Creative level: {$creativeLevel}/10
@@ -64,25 +63,26 @@ Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
 
         $raw = null;
         $last = null;
-        foreach (studio_qwen_credentials('prompt') as $key) {
-            $base = dashscope_base_url($key).'/compatible-mode/v1';
-            try {
-                $resp = Http::withToken($key)->timeout(90)
-                    ->post($base.'/chat/completions', [
-                        'model' => $model,
-                        'messages' => [
-                            ['role' => 'system', 'content' => $system],
-                            ['role' => 'user', 'content' => $prompt],
-                        ],
-                        'response_format' => ['type' => 'json_object'],
-                    ]);
+        foreach (studio_qwen_text_models() as $model) {
+            foreach (studio_qwen_credentials('prompt') as $key) {
+                $base = dashscope_base_url($key).'/compatible-mode/v1';
+                try {
+                    $resp = Http::withToken($key)->timeout(90)
+                        ->post($base.'/chat/completions', [
+                            'model' => $model,
+                            'messages' => [
+                                ['role' => 'system', 'content' => $system],
+                                ['role' => 'user', 'content' => $prompt],
+                            ],
+                            'response_format' => ['type' => 'json_object'],
+                        ]);
 
                 if ($resp->successful()) {
                     $text = (string) data_get($resp->json(), 'choices.0.message.content');
                     $json = json_decode(trim($text), true);
                     if (is_array($json)) {
                         $raw = $json;
-                        break;
+                        break 2; // đã có kết quả -> thoát cả vòng model lẫn vòng key
                     }
                     $last = 'Bad JSON from Qwen.';
                 } elseif (is_qwen_quota_error((string) $resp->body())) {
@@ -96,6 +96,7 @@ Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
                 $last = $e->getMessage();
                 logger()->error('Qwen prompt failed: '.$e->getMessage());
                 break;
+                }
             }
         }
         if ($raw === null && $last) {

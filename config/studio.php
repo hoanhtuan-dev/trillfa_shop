@@ -23,9 +23,10 @@ return [
     */
     'prompt_provider' => env('STUDIO_PROMPT_PROVIDER', 'gemini'), // gemini | qwen
     'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-2.5-flash'),
-    'qwen_prompt_model' => env('STUDIO_QWEN_PROMPT_MODEL', 'qwen-plus'),
+    'qwen_prompt_model' => env('STUDIO_QWEN_PROMPT_MODEL', 'qwen3.8-flash'), // multimodal mặc định (đọc ảnh/video/text)
+    'qwen_max_model' => env('STUDIO_QWEN_MAX_MODEL', 'qwen3.8-max'), // chất lượng cao hơn cho vision/chat
     'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-2.5-flash'),
-    'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen trước)
+    'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen multimodal trước)
     'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtualmodel'), // Virtual Try-On (Thay đổi người mẫu) — Beijing-only, free-trial
     'swap_model' => env('STUDIO_SWAP_MODEL', 'qwen-image-edit-plus-2025-12-15'), // Model Thay Đổi Người Mẫu (qwen-image-edit)
     'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
@@ -36,9 +37,9 @@ return [
     'brand_name' => env('STUDIO_BRAND_NAME', ''),
     'gemini_image_model' => env('STUDIO_GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
-    'vision_provider' => env('STUDIO_VISION_PROVIDER', 'gemini'), // gemini | qwen
+    'vision_provider' => env('STUDIO_VISION_PROVIDER', 'gemini'), // gemini | qwen (đa phương thức qwen3.8-flash/max)
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-2.5-flash'),
-    'qwen_vision_model' => env('STUDIO_QWEN_VISION_MODEL', 'qwen-vl-plus'),
+    'qwen_vision_model' => env('STUDIO_QWEN_VISION_MODEL', 'qwen3.8-flash'), // multimodal: flash (nhanh) / qwen3.8-max (mạnh), vẫn giữ fallback qwen-vl-*
     'image_resolution' => env('STUDIO_IMAGE_RESOLUTION', '2K'), // 1K | 2K
     'video_resolution' => env('STUDIO_VIDEO_RESOLUTION', '720'), // 480 | 720 | 1080
     'image_ratio' => env('STUDIO_IMAGE_RATIO', '1:1'), // 1:1 | 4:3 | 3:4 | 16:9 | 9:16 | 4:5 | 21:9 | 19:6

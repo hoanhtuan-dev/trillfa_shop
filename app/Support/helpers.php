@@ -446,7 +446,8 @@ if (! function_exists('studio_model_catalog')) {
             ['group' => 'video', 'name' => 'Wan 2.1 i2v Turbo', 'provider' => 'wan', 'model_id' => 'wan2.1-i2v-turbo', 'api_key_ref' => 'wan', 'priority' => 5, 'note' => 'Nhanh'],
             ['group' => 'video', 'name' => 'Kling i2v', 'provider' => 'kling', 'model_id' => 'kling-v1-6-i2v', 'api_key_ref' => 'kling', 'priority' => 8, 'note' => 'Nếu có key Kling'],
             ['group' => 'inference', 'name' => 'Gemini (Giám đốc sáng tạo)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 9, 'note' => 'Suy luận prompt'],
-            ['group' => 'inference', 'name' => 'Qwen Chat', 'provider' => 'qwen', 'model_id' => 'qwen-plus', 'api_key_ref' => 'qwen', 'priority' => 7, 'note' => 'Suy luận prompt'],
+            ['group' => 'inference', 'name' => 'Qwen 3.8 Flash (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-flash', 'api_key_ref' => 'qwen', 'priority' => 8, 'note' => 'Suy luận prompt — đọc được ảnh/video/text'],
+            ['group' => 'inference', 'name' => 'Qwen 3.8 Max (multimodal)', 'provider' => 'qwen', 'model_id' => 'qwen3.8-max', 'api_key_ref' => 'qwen', 'priority' => 7, 'note' => 'Chất lượng cao hơn flash'],
         ];
     }
 }
@@ -586,19 +587,23 @@ if (! function_exists('studio_candidate_key')) {
 
 /**
  * Resolve a robust VISION model for describing a face / analyzing a reference image.
- * Ignores clearly-wrong configs (e.g. qwen3.8-flash — a text-only model) so face sync
- * and style-suggest don't fail with "Model not found / not supported" on the vision call.
+ *
+ * Qwen 3.8 series (qwen3.8-flash / qwen3.8-max) are NATIVE multimodal models — they read
+ * images, video and text through the standard OpenAI-compatible chat endpoint, so they are
+ * preferred over the legacy qwen-vl-* vision models (faster, cheaper, 1M-token context).
+ * Only models that are clearly NOT vision-capable (image/video GENERATION models such as
+ * qwen-image-*, wanx*-image*, plus audio/embedding services) are rejected.
  */
 function studio_vision_model(?string $provider = null): string
 {
     $provider = $provider ?: (string) studio_config('vision_provider', 'gemini');
 
     if ($provider === 'qwen') {
-        $m = (string) studio_config('qwen_vision_model', 'qwen-vl-plus');
-        if (! preg_match('/vl|vision|minimax|wanx|owl/i', $m)) {
-            return 'qwen-vl-plus'; // text-only Qwen model -> use a vision-capable one
+        $m = trim((string) studio_config('qwen_vision_model', 'qwen3.8-flash'));
+        if (! is_qwen_vision_capable($m)) {
+            return 'qwen3.8-flash'; // generation/audio model -> multimodal default (qwen3.8-flash)
         }
-        return $m ?: 'qwen-vl-plus';
+        return $m ?: 'qwen3.8-flash';
     }
 
     $m = (string) studio_config('vision_model', 'gemini-2.5-flash');
@@ -609,13 +614,61 @@ function studio_vision_model(?string $provider = null): string
 }
 
 /**
- * Candidate Qwen (DashScope) VISION models to try in order — some accounts/hosts only expose a
- * subset (e.g. qwen-vl-max not qwen-vl-plus), so walking the list makes the vision call robust.
+ * Whether a Qwen model can be used for vision/chat-multimodal calls.
+ * qwen3.x-flash/max and the legacy qwen-vl-* / qwen2*-vl-* series are multimodal chat models;
+ * image/video GENERATION & EDIT models (qwen-image-*, wanx*-image*…) and non-chat services
+ * (embedding, TTS, ASR, rerank…) are excluded because they do not accept chat+image content.
+ */
+function is_qwen_vision_capable(?string $model): bool
+{
+    if (! $model) {
+        return false;
+    }
+    $m = strtolower(trim($model));
+
+    // Sinh / chỉnh sửa ảnh, sinh video, dịch vụ không-chat -> KHÔNG dùng được cho vision chat.
+    if (preg_match('/(^|[-_.])(image|img)(edit)?([-_.]|$)/', $m)
+        || str_contains($m, 'wanx')
+        || str_contains($m, 'videogen')
+        || str_contains($m, 'taichu')
+        || str_contains($m, 'embedding')
+        || str_contains($m, 'paraformer')
+        || str_contains($m, 'speech')
+        || str_contains($m, 'tts')
+        || str_contains($m, 'rerank')
+        || str_contains($m, 'asr')) {
+        return false;
+    }
+
+    return true; // qwen3.8-flash/max, qwen-plus/turbo, qwen-vl-* … đều chấp nhận chat multimodal
+}
+
+/**
+ * Candidate Qwen (DashScope) VISION models to try in order. qwen3.8-flash (nhanh, rẻ, 1M context)
+ * is the default; qwen3.8-max gives higher quality; the legacy qwen-vl-* series remain as
+ * fallbacks for accounts that only expose them. Walking the list makes the vision call robust.
  */
 function studio_qwen_vision_models(): array
 {
-    $primary = studio_vision_model('qwen');
-    $candidates = [$primary, 'qwen-vl-max', 'qwen2.5-vl-72b-instruct', 'qwen-vl-plus', 'qwen2-vl-plus'];
+    $primary = studio_vision_model('qwen'); // qwen3.8-flash (hoặc model được cấu hình)
+    $max = trim((string) studio_config('qwen_max_model', 'qwen3.8-max'));
+    $candidates = [$primary, $max, 'qwen-vl-max', 'qwen2.5-vl-72b-instruct', 'qwen-vl-plus', 'qwen2-vl-plus'];
+    return array_values(array_unique(array_filter($candidates)));
+}
+
+/**
+ * Candidate Qwen TEXT/chat models to try in order (OpenAI-compatible chat completions).
+ * qwen3.8-flash is the fast multimodal default; qwen3.8-max gives higher quality; qwen-plus /
+ * qwen-turbo are legacy fallbacks. Used by the stylist, the translate fallback and the
+ * creative-director (Qwen) path.
+ */
+function studio_qwen_text_models(): array
+{
+    $configured = trim((string) studio_config('qwen_prompt_model', 'qwen3.8-flash'));
+    $stylist = trim((string) studio_config('stylist_model', 'qwen3.8-flash'));
+    $max = trim((string) studio_config('qwen_max_model', 'qwen3.8-max'));
+    $candidates = [$configured, $stylist, $max, 'qwen3.8-flash', 'qwen-plus', 'qwen-turbo'];
+
     return array_values(array_unique(array_filter($candidates)));
 }
 

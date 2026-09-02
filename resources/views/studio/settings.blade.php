@@ -101,10 +101,17 @@
                     </select>
                 </div>
                 <div><label class="label">Prompt model</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-2.5-flash"></div>
-                <div><label class="label">Qwen Prompt model</label><input type="text" name="qwen_prompt_model" value="{{ old('qwen_prompt_model', $qwen_prompt_model ?? 'qwen-plus') }}" class="input !py-2" placeholder="qwen-plus / qwen3.8-flash / qwen-turbo"></div>
+                <div><label class="label">Qwen Prompt model</label><input type="text" name="qwen_prompt_model" value="{{ old('qwen_prompt_model', $qwen_prompt_model ?? 'qwen3.8-flash') }}" class="input !py-2" placeholder="qwen3.8-flash / qwen3.8-max / qwen-plus" list="qwen-chat-models"></div>
+                <div><label class="label">Qwen Max model (cao cấp)</label><input type="text" name="qwen_max_model" value="{{ old('qwen_max_model', $qwen_max_model ?? 'qwen3.8-max') }}" class="input !py-2" placeholder="qwen3.8-max" list="qwen-chat-models"></div>
+                <datalist id="qwen-chat-models">
+                    <option value="qwen3.8-flash"></option>
+                    <option value="qwen3.8-max"></option>
+                    <option value="qwen-plus"></option>
+                    <option value="qwen-turbo"></option>
+                </datalist>
                 <div><label class="label">Model dịch prompt (tiếng Việt)</label><input type="text" name="translate_model" value="{{ old('translate_model', $translate_model) }}" class="input !py-2" placeholder="gemini-3.6-flash-image"></div>
                 <div><label class="label">Model Thay Đổi Người Mẫu</label><input type="text" name="swap_model" value="{{ old('swap_model', $swap_model) }}" class="input !py-2" placeholder="qwen-image-edit-plus-2025-12-15"></div>
-                <div><label class="label">Model Thuật sỹ ảo</label><input type="text" name="stylist_model" value="{{ old('stylist_model', $stylist_model) }}" class="input !py-2" placeholder="qwen3.8-flash"></div>
+                <div><label class="label">Model Thuật sỹ ảo</label><input type="text" name="stylist_model" value="{{ old('stylist_model', $stylist_model) }}" class="input !py-2" placeholder="qwen3.8-flash" list="qwen-chat-models"></div>
                 <div class="sm:col-span-2">
                     <label class="label">Model tạo ảnh</label>
                     <input type="text" id="default-image-model" class="input !py-2" placeholder="VD: qwen-image-3.0-pro / wan2.7-image-pro / flux-1.1-schnell" value="{{ old('image_model', $image_model) }}">
@@ -137,11 +144,22 @@
                     <label class="label">Vision — nhà cung cấp</label>
                     <select name="vision_provider" class="input !py-2">
                         <option value="gemini" @selected(old('vision_provider', $vision_provider) === 'gemini')>Gemini</option>
-                        <option value="qwen" @selected(old('vision_provider', $vision_provider) === 'qwen')>Qwen (VL)</option>
+                        <option value="qwen" @selected(old('vision_provider', $vision_provider) === 'qwen')>Qwen (multimodal 3.8)</option>
                         <option value="deepseek" @selected(old('vision_provider', $vision_provider) === 'deepseek')>DeepSeek</option>
                     </select>
                 </div>
-                <div><label class="label">Vision model</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-2.5-flash / qwen-vl-max"></div>
+                <div><label class="label">Vision model (Gemini)</label><input type="text" name="vision_model" value="{{ old('vision_model', $vision_model) }}" class="input !py-2" placeholder="gemini-2.5-flash"></div>
+                <div>
+                    <label class="label">Qwen Vision model (đa phương thức)</label>
+                    <input type="text" name="qwen_vision_model" value="{{ old('qwen_vision_model', $qwen_vision_model ?? 'qwen3.8-flash') }}" class="input !py-2" placeholder="qwen3.8-flash / qwen3.8-max" list="qwen-vision-models">
+                    <datalist id="qwen-vision-models">
+                        <option value="qwen3.8-flash"></option>
+                        <option value="qwen3.8-max"></option>
+                        <option value="qwen-vl-max"></option>
+                        <option value="qwen-vl-plus"></option>
+                    </datalist>
+                    <p class="mt-1 text-xs text-ink-500">qwen3.8-flash / qwen3.8-max là model <strong>đa phương thức</strong> — tự đọc ảnh, video và text qua endpoint chat; dùng cho "Gợi ý từ ảnh" & phân tích khuôn mặt. qwen-vl-* giữ làm fallback.</p>
+                </div>
             </div>
         </div>
         <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">

@@ -1032,6 +1032,37 @@ class ShopFlowTest extends TestCase
         $this->assertStringContainsString('pose', strtolower($pose->first()->prompt_injection));
     }
 
+    public function test_studio_qwen_multimodal_model_resolution(): void
+    {
+        // qwen3.8-flash / qwen3.8-max là model ĐA PHƯƠNG THỨC (đọc ảnh/video/text) —
+        // không được loại khỏi đường vision như model text-only cũ.
+        $this->assertSame('qwen3.8-flash', studio_vision_model('qwen'));
+        $this->assertTrue(is_qwen_vision_capable('qwen3.8-flash'));
+        $this->assertTrue(is_qwen_vision_capable('qwen3.8-max'));
+        $this->assertTrue(is_qwen_vision_capable('qwen-vl-max'));
+
+        // Model SINH / CHỈNH SỬA ẢNH (qwen-image-*, wanx*-image*) không dùng được cho vision chat.
+        $this->assertFalse(is_qwen_vision_capable('qwen-image-3.0-pro'));
+        $this->assertFalse(is_qwen_vision_capable('qwen-image-edit'));
+        $this->assertFalse(is_qwen_vision_capable('wanx2.1-imageedit'));
+
+        // Danh sách vision thử multimodal qwen3.8 trước, rồi mới đến VL cũ làm fallback.
+        $models = studio_qwen_vision_models();
+        $this->assertSame('qwen3.8-flash', $models[0]);
+        $this->assertTrue(in_array('qwen3.8-max', $models, true));
+        $this->assertTrue(in_array('qwen-vl-max', $models, true));
+
+        // Admin cấu hình nhầm model sinh ảnh làm qwen_vision_model -> tự revert về qwen3.8-flash.
+        set_setting('studio_qwen_vision_model', 'qwen-image-3.0-pro');
+        $this->assertSame('qwen3.8-flash', studio_vision_model('qwen'));
+        set_setting('studio_qwen_vision_model', '');
+
+        // Text/chat path (stylist, prompt director, translate) dùng danh sách qwen3.8 trước.
+        $text = studio_qwen_text_models();
+        $this->assertSame('qwen3.8-flash', $text[0]);
+        $this->assertTrue(in_array('qwen3.8-max', $text, true));
+    }
+
 
     public function test_studio_api_qwen_edit_key(): void
     {

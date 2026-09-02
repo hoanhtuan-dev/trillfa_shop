@@ -71,7 +71,7 @@ class StyleSuggestService
             .'"prompt_vi" (a Vietnamese translation of image_prompt_en — keep technical fashion terms like fabric, silhouette, pose, camera in English; translate only the descriptive parts naturally into Vietnamese), '
             .'"video_prompt_en" (a matching English video-catwalk prompt for the SAME garment), "keywords" (array).';
 
-        // Try several Qwen VISION models × keys (some accounts only expose qwen-vl-max, others only qwen-vl-plus).
+        // Try several Qwen VISION models × keys. qwen3.8-flash/max (multimodal) thường thử trước; các tài khoản cũ chỉ expose qwen-vl-* nên giữ fallback ở cuối danh sách.
         $last = null;
         foreach (studio_qwen_vision_models() as $model) {
             foreach (studio_qwen_credentials('vision') as $key) {
