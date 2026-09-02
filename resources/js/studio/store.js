@@ -88,6 +88,7 @@ export const useStudioStore = defineStore('studio', {
     regionBox: { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, // vùng chọn (normalized 0..1)
     _regionDrag: null,
     regionPrompt: '',
+    regionSrc: '',            // ảnh nguồn bị khóa khi chọn vùng (tránh lệch vị trí)
     regionStage: '',          // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled'
     regionGenId: null,
     regionStartTs: 0,
@@ -440,11 +441,13 @@ export const useStudioStore = defineStore('studio', {
       if (this.regionStage === 'send' || this.regionStage === 'processing') { this.toast('Đang xử lý thao tác vùng — chờ xong rồi chọn vùng mới.', 'error'); return; }
       if (this.cropMode) { this.cropMode = false; this._cropStop(null); } // không dùng chung crop
       this.regionMode = op;
+      // Khóa ảnh nguồn ĐANG HIỂN THỊ tại lúc chọn vùng → tọa độ + ảnh sửa luôn trùng khớp.
+      this.regionSrc = this.upscaleSrc || '';
       this.regionBox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
       this.regionError = '';
       this.toast(this.regionOps[op].hint);
     },
-    stopRegionSelect() { this.regionMode = ''; this._regionDrag = null; },
+    stopRegionSelect() { this.regionMode = ''; this._regionDrag = null; this.regionSrc = ''; },
     // Geometry: vùng chọn (normalized) -> style % overlay trên canvas (dùng canvasMetrics của crop).
     regionStyle() {
       const m = this.canvasMetrics(); if (!m) return { display: 'none' };
@@ -484,7 +487,7 @@ export const useStudioStore = defineStore('studio', {
       if (!op || !this.regionOps[op]) { this.toast('Chọn thao tác vùng trước.', 'error'); return; }
       // Vùng chọn được tính theo ẢNH ĐANG HIỂN THỊ (upscaleSrc) — gửi chính URL đó làm source_url
       // để backend sửa đúng ảnh này, vị trí tái tạo khớp vùng đã chọn trên canvas.
-      const src = this.upscaleSrc;
+      const src = this.regionSrc || this.upscaleSrc;
       if (!this.previewId || !src) { this.toast('Chọn ảnh kết quả để chỉnh vùng.', 'error'); return; }
       if (this.regionOps[op].needsPrompt && !this.regionPrompt.trim()) { this.toast('Nhập mô tả nội dung thay thế cho vùng.', 'error'); return; }
       const b = this.regionBox || {}; const w = b.w || 0, h = b.h || 0;
@@ -520,7 +523,7 @@ export const useStudioStore = defineStore('studio', {
       try { await this.api('/studio/generations/' + this.regionGenId + '/cancel', {}); this.regionStage = 'cancelled'; this.regionMode = ''; this.toast('Đã hủy thao tác vùng.'); }
       catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
     },
-    clearRegionStatus() { this.regionStage = ''; this.regionError = ''; this.regionGenId = null; this.regionStartTs = 0; this.regionOp = null; this.regionMode = ''; },
+    clearRegionStatus() { this.regionStage = ''; this.regionError = ''; this.regionGenId = null; this.regionStartTs = 0; this.regionOp = null; this.regionMode = ''; this.regionSrc = ''; },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
       // 1 face reference + 1 or MORE poses -> one result per pose.

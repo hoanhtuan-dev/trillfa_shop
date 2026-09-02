@@ -16,15 +16,20 @@ const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s 
 const activeGen = computed(() => store.regionGenId ? store.generations.find(g => g.id === Number(store.regionGenId)) : null);
 const hasRegion = computed(() => store.regionBox && (store.regionBox.w || 0) >= 0.02 && (store.regionBox.h || 0) >= 0.02);
 const panelOpen = computed(() => !!store.regionMode || ['send', 'processing', 'done', 'error', 'cancelled'].includes(store.regionStage));
+const reframeOpen = ref(false);
+const reframeRatios = ['1:1','3:4','4:5','9:16','16:9','2:3'];
 </script>
 <template>
   <!-- 2 icon công cụ nổi mép trái canvas -->
   <div class="absolute left-2 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-1.5" v-if="store.upscaleSrc">
-    <button v-for="(op, key) in store.regionOps" :key="key" @click="store.startRegionSelect(key)"
+    <button v-for="(op, key) in store.regionOps" :key="key" @click="store.startRegionSelect(key); reframeOpen = false"
       :class="store.regionMode === key ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'bg-ink-900/85 text-cream-200 border-ink-700 hover:bg-ink-700'"
       class="grid h-10 w-10 place-items-center rounded-full border text-lg shadow-lg transition-colors" :title="op.label + ' · ' + op.hint">
       {{ op.icon }}
     </button>
+    <button @click="reframeOpen = !reframeOpen; store.stopRegionSelect()"
+      :class="(reframeOpen || store.cropMode) ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'bg-ink-900/85 text-cream-200 border-ink-700 hover:bg-ink-700'"
+      class="grid h-10 w-10 place-items-center rounded-full border text-lg shadow-lg transition-colors" title="📐 Reframe / Crop · Cắt khung theo tỷ lệ / chọn vùng">📐</button>
   </div>
 
   <!-- Panel nổi trong vùng canvas (khi chọn công cụ / đang chạy) -->
@@ -72,5 +77,23 @@ const panelOpen = computed(() => !!store.regionMode || ['send', 'processing', 'd
 
     <!-- Đã hủy -->
     <div v-if="store.regionStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-2.5 text-xs text-cream-200">🛑 Đã hủy.<button @click="store.clearRegionStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button></div>
+  </div>
+
+  <!-- Panel Reframe / Crop nổi (giống 2 lệnh xóa/thay) -->
+  <div v-if="reframeOpen || store.cropMode" class="absolute left-14 top-1/2 z-40 w-64 max-w-[80vw] -translate-y-1/2 rounded-2xl border border-brand-500/30 bg-ink-900/95 p-4 shadow-2xl backdrop-blur">
+    <div class="flex items-center justify-between gap-2">
+      <p class="text-sm font-semibold text-brand-300">📐 Reframe / Crop</p>
+      <button @click="reframeOpen = false; if (store.cropMode) store.toggleCrop()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
+    </div>
+    <p class="mt-1 text-[11px] text-cream-200/80">Cắt lại khung theo tỷ lệ hoặc chọn vùng trên canvas.</p>
+    <div class="mt-2 flex flex-wrap gap-1.5">
+      <button v-for="r in reframeRatios" :key="r" type="button" @click="store.reframeRatio = r" class="rounded-full border px-2.5 py-1 text-xs transition-colors" :class="store.reframeRatio === r ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ r }}</button>
+    </div>
+    <button @click="store.reframeCenter" :disabled="store.reframing || !store.upscaleSrc" class="btn-outline btn-sm mt-3 w-full whitespace-nowrap">{{ store.reframing ? 'Đang cắt…' : '📐 Cắt giữa' }}</button>
+    <button @click="store.toggleCrop" :disabled="store.reframing || !store.upscaleSrc" class="mt-1.5 w-full whitespace-nowrap rounded-2xl border py-2 text-sm font-semibold transition-colors" :class="store.cropMode ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ store.cropMode ? '✂️ Đang chọn vùng… (Hủy)' : '✂️ Chọn vùng trên canvas' }}</button>
+    <template v-if="store.cropMode">
+      <button @click="store.confirmCrop" :disabled="store.reframing || !store.upscaleSrc" class="btn-brand mt-1.5 w-full whitespace-nowrap">✅ Áp dụng vùng đã chọn</button>
+      <p class="mt-1.5 text-center text-[10px] text-cream-200/60">Kéo khung để di chuyển · kéo góc để đổi kích thước · đúp / Esc để hủy</p>
+    </template>
   </div>
 </template>

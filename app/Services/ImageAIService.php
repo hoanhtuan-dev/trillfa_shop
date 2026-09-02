@@ -753,7 +753,14 @@ class ImageAIService
                 return $editedUrl;
             }
             $out = imagecreatetruecolor($sw, $sh);
-            imagecopyresampled($out, $edited, 0, 0, 0, 0, $sw, $sh, $ew, $eh);
+            // COVER-CROP thay vì STRETCH: scale edited phủ kín ảnh gốc (giữ tỷ lệ) rồi crop giữa
+            // → vật thể không bị méo/lệch do model trả tỷ lệ khác ảnh gốc.
+            $scale = max($sw / $ew, $sh / $eh);
+            $cw = (int) round($ew * $scale); $ch = (int) round($eh * $scale);
+            $tmp = imagecreatetruecolor($cw, $ch);
+            imagecopyresampled($tmp, $edited, 0, 0, 0, 0, $cw, $ch, $ew, $eh);
+            imagecopy($out, $tmp, 0, 0, (int) (($cw - $sw) / 2), (int) (($ch - $sh) / 2), $sw, $sh);
+            imagedestroy($tmp);
             imagedestroy($edited); imagedestroy($source);
             ob_start(); imagepng($out); $bytes = (string) ob_get_clean();
             imagedestroy($out);
@@ -823,14 +830,25 @@ class ImageAIService
                     imagesetpixel($out, $x, $y, imagecolorallocate($out, $r, $g, $b));
                 }
             }
-            // Fallback: nếu AI trả vùng đen (kết quả vùng gần đen mà ảnh gốc sáng) →
-            // bỏ kết quả AI, tái tạo nền cục bộ từ cạnh viền (không bao giờ để vùng đen).
+            // Fallback: nếu AI trả vùng ĐEN (kết quả vùng gần đen mà ảnh gốc sáng) HOẶC AI
+            // KHÔNG HỀ SỬA (vùng gần như y nguyên — "không thể xóa") → bỏ kết quả AI, tái tạo
+            // nền cục bộ từ cạnh viền để LUÔN có thay đổi nhìn thấy được.
             if ($hasRegion) {
+                $diff = 0.0; $n = 0;
+                $gx = max(1, intdiv($bz1 - $bz0, 6)); $gy = max(1, intdiv($bt1 - $bt0, 6));
+                for ($yy = $bt0; $yy <= $bt1; $yy += $gy) {
+                    for ($xx = $bz0; $xx <= $bz1; $xx += $gx) {
+                        $a = imagecolorat($out, $xx, $yy); $b = imagecolorat($source, $xx, $yy);
+                        $diff += abs((($a >> 16) & 255) - (($b >> 16) & 255)) + abs((($a >> 8) & 255) - (($b >> 8) & 255)) + abs(($a & 255) - ($b & 255));
+                        $n += 3;
+                    }
+                }
+                $meanDiff = $n ? $diff / $n : 0.0;
                 $ec = imagecolorat($out, $cx, $cy);
                 $elum = (($ec >> 16) & 0xFF) + (($ec >> 8) & 0xFF) + ($ec & 0xFF);
                 $sc = imagecolorat($source, $cx, $cy);
                 $slum = (($sc >> 16) & 0xFF) + (($sc >> 8) & 0xFF) + ($sc & 0xFF);
-                if ($elum < 100 && $slum > 190) {
+                if ($meanDiff < 3.0 || ($elum < 100 && $slum > 190)) {
                     imagedestroy($edited); imagedestroy($source); imagedestroy($mask); imagedestroy($out);
                     $fb = imagecreatetruecolor($w, $h);
                     imagecopy($fb, $source, 0, 0, 0, 0, $w, $h);
