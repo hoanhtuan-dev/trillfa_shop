@@ -116,18 +116,24 @@ function applyTemplate(tpl) {
 
 // ── Live Enrich Preview ──
 let enrichDebounce = null;
+let enrichAbort = null;
 function scheduleEnrichPreview() {
   if (enrichDebounce) clearTimeout(enrichDebounce);
-  enrichDebounce = setTimeout(doEnrichPreview, 400);
+  enrichDebounce = setTimeout(doEnrichPreview, 800);
 }
 async function doEnrichPreview() {
   const p = store.imagePromptEn?.trim();
-  if (!p) { enrichPreview.value = ''; return; }
+  if (!p) { enrichPreview.value = ''; enrichLoading.value = false; return; }
+  // Cancel any in-flight request
+  if (enrichAbort) { enrichAbort.abort(); enrichAbort = null; }
+  const controller = new AbortController();
+  enrichAbort = controller;
   enrichLoading.value = true;
   enrichError.value = '';
   try {
     const res = await fetch('/studio/preview-enrich', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
         'Content-Type': 'application/json',
@@ -142,13 +148,21 @@ async function doEnrichPreview() {
     });
     if (!res.ok) throw new Error('Lỗi preview');
     const d = await res.json();
-    enrichPreview.value = d.enriched || '';
-    if (d.negative_prompt) enrichPreview.value += '\n\n— Negative: ' + d.negative_prompt;
+    // Only update if this request wasn't superseded
+    if (enrichAbort === controller) {
+      enrichPreview.value = d.enriched || '';
+      if (d.negative_prompt) enrichPreview.value += '\n\n— Negative: ' + d.negative_prompt;
+      enrichLoading.value = false;
+      enrichAbort = null;
+    }
   } catch (e) {
-    enrichError.value = e.message;
-    enrichPreview.value = '';
+    if (e.name === 'AbortError') return; // silently ignore aborted requests
+    if (enrichAbort === controller) {
+      enrichError.value = e.message;
+      enrichLoading.value = false;
+      enrichAbort = null;
+    }
   }
-  finally { enrichLoading.value = false; }
 }
 </script>
 <template>
@@ -190,12 +204,15 @@ async function doEnrichPreview() {
         <textarea v-model="store.imagePromptEn" @input="scheduleEnrichPreview" rows="4" class="input !text-xs" placeholder="Nhập ý tưởng / prompt (EN hoặc VI)."></textarea>
 
         <!-- Live enrich preview -->
-        <div v-if="enrichLoading" class="mt-1 text-[10px] text-brand-300/60">⏳ Đang preview prompt đã enrich…</div>
-        <div v-else-if="enrichPreview" class="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-900/20 p-2.5">
-          <p class="text-[10px] text-emerald-300/60 mb-1">✨ Prompt sau khi enrich (gửi lên model):</p>
-          <p class="max-h-24 overflow-y-auto text-[10px] leading-relaxed text-emerald-100 whitespace-pre-wrap">{{ enrichPreview }}</p>
+        <div v-if="enrichPreview || enrichLoading" class="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-900/20 p-2.5">
+          <div class="flex items-center justify-between mb-1">
+            <p class="text-[10px] text-emerald-300/60">✨ Prompt sau khi enrich (gửi lên model):</p>
+            <button @click="doEnrichPreview" class="rounded-full bg-ink-700 px-2 py-0.5 text-[9px] text-cream-200 hover:bg-brand-600" :disabled="enrichLoading">{{ enrichLoading ? '⏳' : '🔄 Làm mới' }}</button>
+          </div>
+          <p v-if="enrichPreview" class="max-h-24 overflow-y-auto text-[10px] leading-relaxed text-emerald-100 whitespace-pre-wrap">{{ enrichPreview }}</p>
+          <p v-else class="text-[10px] text-brand-300/60">⏳ Đang phân tích prompt…</p>
         </div>
-        <div v-else-if="enrichError" class="mt-1 text-[10px] text-red-300/60">{{ enrichError }}</div>
+        <div v-if="enrichError" class="mt-1 text-[10px] text-red-300/60">{{ enrichError }}</div>
 
         <div class="mt-3 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs">
           <p class="mb-1 font-medium text-cream-200">Sáng tạo <span class="float-right font-semibold text-cream-50">{{ localCreative }}/10</span></p>
