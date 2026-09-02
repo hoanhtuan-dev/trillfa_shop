@@ -52,6 +52,14 @@ function toggle(list, id, e) { e.stopPropagation(); const i = list.indexOf(id); 
 const selFaceImgs = computed(() => faceList.value.filter(f => store.swapModelIds.includes(f.id)));
 const selPoseImgs = computed(() => poseList.value.filter(p => store.swapPoseIds.includes(p.id)));
 const canApply = computed(() => !store.swapLoading && store.swapPoseIds.length > 0 && (changeFace.value ? store.swapModelIds.length > 0 : true));
+const hasSelection = computed(() => store.swapModelIds.length > 0 || store.swapPoseIds.length > 0 || !!swapBg.value);
+function resetSelections() {
+  store.swapModelIds = [];
+  store.swapPoseIds = [];
+  swapBg.value = '';
+  swapTone.value = 'none';
+  store.toast('Đã bỏ lựa chọn khuôn mặt / dáng / bối cảnh.');
+}
 async function addAsset() {
   if (!addName.value || !addFile.value) { store.toast('Nhập tên + chọn file.', 'error'); return; }
   const fd = new FormData(); fd.append('type', addType.value); fd.append('name', addName.value); fd.append('image', addFile.value);
@@ -73,6 +81,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
     </div>
     <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
+    <div v-if="hasSelection && !store.swapLoading && !store.swapProcessing" class="mt-1.5 flex justify-end"><button type="button" @click="resetSelections" class="text-[11px] text-cream-300/60 underline-offset-2 transition hover:text-red-300 hover:underline" title="Bỏ lựa chọn khuôn mặt / dáng / bối cảnh đã chọn">↺ Bỏ chọn lựa</button></div>
     <p v-if="!canApply" class="mt-1 text-[10px] text-cream-300/60">{{ changeFace ? 'Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.' : 'Chọn ít nhất 1 dáng để Áp dụng (khuôn mặt gốc được giữ nguyên).' }}</p>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
         <div class="mb-4 flex items-center gap-3 rounded-2xl border p-3" :class="changeFace ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-800/50'">

@@ -173,9 +173,19 @@ export const useStudioStore = defineStore('studio', {
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         const comp = this.generations.find(g => g.status === 'completed' && (g.type === 'image' || !g.type));
         if (comp) { this.previewId = comp.id; this.preview = { id: comp.id, media_url: comp.media_url, type: comp.type || 'image', status: comp.status }; }
+        // In các kết quả Đổi người mẫu đã hoàn tất vào layer canvas (không cưỡng chế active).
+        (this.generations || []).forEach((g) => { if (g.status === 'completed' && g.media_url && g.meta && g.meta.swap) this.syncLayerForGen(g.id, g.media_url, 'Ảnh #' + g.id, false); });
       } catch (e) { /* app data loads via Alpine too */ }
     },
     select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); } },
+    // Đảm bảo một kết quả swap được "in" vào layer canvas (id duy nhất, không trùng).
+    syncLayerForGen(id, mediaUrl, name, setActive) {
+      if (!id || !mediaUrl) return;
+      const lid = String(id);
+      if (this.canvasLayers.some((l) => l.id === lid)) return;
+      this.pushCanvasLayer(lid, 'gen', name || 'Ảnh #' + id, mediaUrl, id);
+      if (setActive) this.setActiveLayer(lid);
+    },
     async processQueue() {
       try { await fetch('/studio/process', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); } catch (e) {}
       // refresh the generations so the processed images appear
@@ -673,10 +683,7 @@ export const useStudioStore = defineStore('studio', {
                 if (it.status === 'completed' && it.media_url) {
                   this.previewId = it.id;
                   this.preview = { id: it.id, media_url: it.media_url, type: 'image', status: 'completed' };
-                  if (!this.canvasLayers.some((l) => l.id === String(it.id))) {
-                    this.pushCanvasLayer(String(it.id), 'gen', 'Ảnh #' + it.id, it.media_url, it.id);
-                    this.setActiveLayer(String(it.id));
-                  }
+                  this.syncLayerForGen(it.id, it.media_url, 'Ảnh #' + it.id, true);
                 }
               }
             }
@@ -687,6 +694,21 @@ export const useStudioStore = defineStore('studio', {
           return !g || g.status === 'completed' || g.status === 'failed' || g.status === 'cancelled';
         });
         if (done) { this.toast('Đã xong thay đổi người mẫu.'); break; }
+      }
+      // Pass cuối: kết quả hoàn tất sau deadline (queue lâu) vẫn được in vào layer canvas
+      // (trừ khi người dùng đã bấm Hủy).
+      const stopped = this._swapStop;
+      if (!stopped) {
+        try {
+          const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
+          const d = await res.json();
+          const items = Array.isArray(d.items) ? d.items : [];
+          items.forEach((it) => {
+            if (it.status === 'completed' && it.media_url && ids.some((x) => String(x) === String(it.id))) {
+              this.syncLayerForGen(it.id, it.media_url, 'Ảnh #' + it.id, false);
+            }
+          });
+        } catch (e) { /* bỏ qua */ }
       }
       this.swapProcessing = false;
       this._swapStop = false;
