@@ -1848,6 +1848,101 @@ RULES:
     }
 
     /**
+     * Moderate the final image via DashScope image-moderation (free tier).
+     * Returns true if the image passes, false if it should be blocked.
+     */
+    protected function moderateImage(string $imageUrl): bool
+    {
+        $key = studio_api_key('dashscope') ?: studio_api_key('qwen') ?: studio_api_key('qwen_edit');
+        if (! $key) { return true; } // no key -> skip moderation (don't block the pipeline)
+
+        $base = dashscope_base_url($key).'/api/v1';
+        try {
+            $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(30)
+                ->post($base.'/services/aigc/image-moderation/image-moderation', [
+                    'model' => 'image-moderation',
+                    'input' => ['image' => $imageUrl],
+                ]);
+            if ($resp->successful()) {
+                $suggestion = data_get($resp->json(), 'output.suggestion', 'pass');
+                $label = data_get($resp->json(), 'output.label', '');
+                if ($suggestion === 'block') {
+                    logger()->warning('Image moderation BLOCKED', ['label' => $label, 'url' => $imageUrl]);
+                    return false;
+                }
+                if ($suggestion === 'review') {
+                    logger()->info('Image moderation REVIEW', ['label' => $label, 'url' => $imageUrl]);
+                    // Allow review items through but log them
+                }
+                return true;
+            }
+            logger()->warning('Image moderation API failed', ['status' => $resp->status()]);
+        } catch (\Throwable $e) {
+            logger()->warning('Image moderation error: '.$e->getMessage());
+        }
+        return true; // moderation failed -> allow (don't block the pipeline on API errors)
+    }
+
+    /**
+     * Score a swap result via qwen-vl-max on 4 criteria: garment preservation, face quality,
+     * pose accuracy, and overall aesthetic. Returns a 0-10 score array or null on failure.
+     */
+    protected function scoreSwapResult(string $imageUrl, string $garmentDesc = ''): ?array
+    {
+        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        if (! $key) { return null; }
+
+        $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
+        $models = studio_qwen_vision_models();
+
+        $garmentHint = $garmentDesc ? ' The original garment is: '.$garmentDesc.'.' : '';
+        $instruction = 'You are a fashion photography quality evaluator. Rate this virtual try-on result on a scale of 1-10 for each criterion:'
+            .$garmentHint
+            .'\n1. garment_preservation: Is the garment identical to the original? (colors, patterns, silhouette, length)'
+            .'\n2. face_quality: Is the face sharp, natural, well-lit, and photorealistic?'
+            .'\n3. pose_accuracy: Is the pose natural and correctly executed?'
+            .'\n4. overall_aesthetic: Overall visual appeal, lighting, composition.'
+            .'\nReturn ONLY valid JSON: {"garment_preservation":N,"face_quality":N,"pose_accuracy":N,"overall_aesthetic":N}';
+
+        foreach ($models as $model) {
+            try {
+                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(45)
+                    ->post($base, [
+                        'model' => $model,
+                        'messages' => [[
+                            'role' => 'user',
+                            'content' => [
+                                ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
+                                ['type' => 'text', 'text' => $instruction],
+                            ],
+                        ]],
+                        'temperature' => 0.1,
+                    ]);
+
+                if ($resp->successful()) {
+                    $raw = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                    // Extract JSON from response (may be wrapped in markdown code fences)
+                    if (preg_match('/\{[^}]+\}/s', $raw, $m)) {
+                        $scores = json_decode($m[0], true);
+                        if (is_array($scores) && isset($scores['garment_preservation'])) {
+                            logger()->info('QA scored swap result', ['model' => $model, 'scores' => $scores]);
+                            return $scores;
+                        }
+                    }
+                }
+                // 404/not-found -> try next vision model
+                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')) {
+                    continue;
+                }
+                logger()->warning('QA scoring failed', ['model' => $model, 'status' => $resp->status()]);
+            } catch (\Throwable $e) {
+                logger()->warning('QA scoring error: '.$e->getMessage());
+            }
+        }
+        return null;
+    }
+
+    /**
      * Upscale the swap result via DashScope image-super-resolution (2x or 4x).
      * Falls back gracefully when no key is configured or the API call fails.
      */
@@ -2106,6 +2201,17 @@ RULES:
         $enhanced = $this->applyFaceEnhance($fallback);
         if ($enhanced) { $fallback = $enhanced; }
 
+        // Safety: moderate the final image before saving (DashScope image-moderation, free).
+        if (! $this->moderateImage($fallback)) {
+            logger()->warning('Swap result flagged by moderation, replacing with fallback');
+            $gen->update(['status' => 'failed', 'error' => 'Kết quả không đạt kiểm duyệt nội dung. Vui lòng thử lại với ảnh khác.']);
+            return;
+        }
+
+        // QA: score the result for quality tracking (qwen-vl-max, optional — skips if no key).
+        $garmentDesc = $model['desc'] ?? ($model['ethnicity'] ?? '');
+        $qaScores = $this->scoreSwapResult($fallback, $garmentDesc);
+
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $actualModel = $svc->lastModel() ?: $swapModel;
         $credits = max(1, $svc->calls()); // 2-3 for the try-on + face-swap + background passes, 1 otherwise
@@ -2116,6 +2222,7 @@ RULES:
             'meta' => array_merge($meta, [
                 'type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel,
                 'steps' => $credits,
+                'qa' => $qaScores,
             ]),
         ]);
     }

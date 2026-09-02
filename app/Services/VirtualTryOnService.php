@@ -250,7 +250,33 @@ class VirtualTryOnService
         $imageSvc = app(ImageAIService::class);
 
         // PASS 1 — replace the person (garment kept, face described in text, pose from text).
-        $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, null, null);
+        // The edit model is non-deterministic: retry with 2 prompt variants if the first attempt
+        // fails, because different wording can produce drastically different results.
+        $variants = [
+            $instr,
+            // Variant 2: emphasise garment preservation first, then person replacement
+            'PRESERVE the garment EXACTLY: keep every detail of the clothing — colors, patterns, prints, seams, folds, silhouette, length and fabric — 100% unchanged. '
+                .'Change ONLY the person wearing it: replace them with a full-body '.$modelDesc.' in the pose: '.$pose.'. '
+                .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions. '
+                .'Keep the background of the original image unchanged. '
+                .($wantBg ? '' : $toneS).' Photorealistic, full body, studio quality, high fashion.',
+            // Variant 3: direct instruction style
+            'Keep the outfit identical. Replace the model with '.$modelDesc.' in pose: '.$pose.'. '
+                .$proportion.'. Do not change the background. '
+                .($wantBg ? '' : $toneS).' Photorealistic fashion editorial.',
+        ];
+
+        $url = null;
+        foreach ($variants as $vi => $variant) {
+            $url = $imageSvc->swapEdit($variant, $designImage, $swapModel, null, null);
+            if ($url) {
+                if ($vi > 0) {
+                    logger()->info('Swap PASS 1 succeeded on prompt variant '.($vi + 1));
+                }
+                break;
+            }
+            logger()->warning('Swap PASS 1 variant '.($vi + 1).' failed, trying next');
+        }
         if (! $url) {
             return null;
         }
