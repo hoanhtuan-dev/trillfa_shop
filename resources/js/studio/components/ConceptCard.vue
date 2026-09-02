@@ -4,6 +4,7 @@ import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
 const showAdvanced = ref(false);
+const defaultsLoaded = ref(false);
 const promptPreview = computed(() => { const t = store.imagePromptEn || ''; return t.length > 54 ? t.slice(0, 54) + '…' : (t || 'Nhập/áp dụng prompt…'); });
 const textureLabel = computed(() => {
   const t = store.texture;
@@ -14,10 +15,27 @@ const textureLabel = computed(() => {
   if (t <= 8) return 'Chi tiết cao';
   return 'Siêu chi tiết';
 });
+async function openPrompt() {
+  if (!defaultsLoaded.value) {
+    try {
+      const cfg = await fetch('/studio/defaults', { headers: { Accept: 'application/json' } });
+      const defaults = await cfg.json();
+      if (defaults.creative_level != null) store.creativeLevel = Number(defaults.creative_level);
+      if (defaults.texture != null) store.texture = Number(defaults.texture);
+      if (defaults.image_resolution) store.imageRes = defaults.image_resolution;
+      if (defaults.image_ratio) store.imageRatio = defaults.image_ratio;
+      if (defaults.video_duration) store.videoDuration = defaults.video_duration;
+      if (defaults.video_resolution) store.videoRes = defaults.video_resolution;
+      if (defaults.negative_prompt) store.negativePromptEn = defaults.negative_prompt;
+      defaultsLoaded.value = true;
+    } catch (e) { /* keep current values */ }
+  }
+  store.promptOpen = true;
+}
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
-    <button @click="store.promptOpen = true" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
+    <button @click="openPrompt" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
       <span class="min-w-0 flex-1 overflow-hidden"><span class="block truncate text-sm font-semibold text-brand-300">🎛 Prompt Tạo Ảnh</span><span class="mt-0.5 block w-full truncate text-[11px] text-ink-500">{{ promptPreview }}</span></span><span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
     </button>
     <!-- Prompt popup (shared for AI generation) -->
