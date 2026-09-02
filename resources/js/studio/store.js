@@ -8,6 +8,7 @@ export const useStudioStore = defineStore('studio', {
   state: () => ({
     step: 1,
     opening: false,
+    defaultsLoaded: false,
     previewId: null,
     preview: null,
     generations: [],
@@ -147,20 +148,33 @@ export const useStudioStore = defineStore('studio', {
       this._flashTimer = setTimeout(() => { this.flashMsg = ''; }, 2600);
       if (window.Alpine?.store?.('toast')) window.Alpine.store('toast').show(msg, type);
     },
-    async load() {
-      this.loadUpscaleMemory();
-      // Load settings defaults from backend (set in Studio Settings page)
+    async loadDefaults() {
       try {
         const cfg = await fetch('/studio/defaults', { headers: { Accept: 'application/json' } });
         const defaults = await cfg.json();
-        if (defaults.creative_level != null) this.creativeLevel = Number(defaults.creative_level);
-        if (defaults.texture != null) this.texture = Number(defaults.texture);
-        if (defaults.image_resolution) this.imageRes = defaults.image_resolution;
-        if (defaults.image_ratio) this.imageRatio = defaults.image_ratio;
-        if (defaults.video_duration) this.videoDuration = defaults.video_duration;
-        if (defaults.video_resolution) this.videoRes = defaults.video_resolution;
-        if (defaults.negative_prompt) this.negativePromptEn = defaults.negative_prompt;
-      } catch (e) { /* defaults not available — keep hardcoded fallbacks */ }
+        this._applyDefaultValues(defaults);
+        this.defaultsLoaded = true;
+        return defaults;
+      } catch (e) { /* keep current values */ return null; }
+    },
+    _applyDefaultValues(defaults) {
+      if (!defaults) return;
+      if (defaults.creative_level != null) this.creativeLevel = Number(defaults.creative_level);
+      if (defaults.texture != null) this.texture = Number(defaults.texture);
+      if (defaults.image_resolution) this.imageRes = defaults.image_resolution;
+      if (defaults.image_ratio) this.imageRatio = defaults.image_ratio;
+      if (defaults.video_duration) this.videoDuration = defaults.video_duration;
+      if (defaults.video_resolution) this.videoRes = defaults.video_resolution;
+      if (defaults.negative_prompt !== undefined) this.negativePromptEn = defaults.negative_prompt;
+    },
+    applyDefaults() {
+      // Re-fetch and apply default values (used by reset button)
+      this.loadDefaults();
+    },
+    async load() {
+      this.loadUpscaleMemory();
+      // Load settings defaults from backend (set in Studio Settings page)
+      await this.loadDefaults();
       try {
         const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
         const d = await res.json();

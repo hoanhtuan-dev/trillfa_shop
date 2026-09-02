@@ -4,7 +4,7 @@ import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
 const showAdvanced = ref(false);
-const defaultsLoaded = ref(false);
+const promptLoading = ref(false);
 const promptPreview = computed(() => { const t = store.imagePromptEn || ''; return t.length > 54 ? t.slice(0, 54) + '…' : (t || 'Nhập/áp dụng prompt…'); });
 const textureLabel = computed(() => {
   const t = store.texture;
@@ -15,22 +15,27 @@ const textureLabel = computed(() => {
   if (t <= 8) return 'Chi tiết cao';
   return 'Siêu chi tiết';
 });
+// Credit cost estimate
+const creditEstimate = computed(() => {
+  const base = 1; // base image credit
+  return base * store.variantCount;
+});
 async function openPrompt() {
-  if (!defaultsLoaded.value) {
+  // Store defaults are loaded once in store.load() — no duplicate fetch needed.
+  // If store.defaults aren't loaded yet (edge case), load them now with loading state.
+  if (!store.defaultsLoaded) {
+    promptLoading.value = true;
     try {
-      const cfg = await fetch('/studio/defaults', { headers: { Accept: 'application/json' } });
-      const defaults = await cfg.json();
-      if (defaults.creative_level != null) store.creativeLevel = Number(defaults.creative_level);
-      if (defaults.texture != null) store.texture = Number(defaults.texture);
-      if (defaults.image_resolution) store.imageRes = defaults.image_resolution;
-      if (defaults.image_ratio) store.imageRatio = defaults.image_ratio;
-      if (defaults.video_duration) store.videoDuration = defaults.video_duration;
-      if (defaults.video_resolution) store.videoRes = defaults.video_resolution;
-      if (defaults.negative_prompt) store.negativePromptEn = defaults.negative_prompt;
-      defaultsLoaded.value = true;
+      await store.loadDefaults();
     } catch (e) { /* keep current values */ }
+    finally { promptLoading.value = false; }
   }
   store.promptOpen = true;
+}
+// Reset all prompt fields to system defaults
+function resetToDefaults() {
+  store.applyDefaults();
+  store.toast('Đã đặt lại về mặc định hệ thống.');
 }
 </script>
 <template>
@@ -40,6 +45,9 @@ async function openPrompt() {
     </button>
     <!-- Prompt popup (shared for AI generation) -->
     <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="🎛 Prompt Tạo Ảnh">
+        <!-- Loading state -->
+        <div v-if="promptLoading" class="py-8 text-center text-sm text-cream-300/60">⏳ Đang tải cài đặt mặc định…</div>
+        <template v-else>
         <textarea v-model="store.imagePromptEn" rows="5" class="input !text-xs" placeholder="Nhập ý tưởng / prompt (EN hoặc VI)."></textarea>
         <div class="mt-3 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs">
           <p class="mb-1 font-medium text-cream-200">Sáng tạo <span class="float-right font-semibold text-cream-50">{{ store.creativeLevel }}/10</span></p>
@@ -62,7 +70,13 @@ async function openPrompt() {
           <textarea v-model="store.negativePromptEn" rows="2" class="input !text-xs" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..."></textarea>
           <p class="mt-1 text-[10px] text-cream-300/50">Để trống để dùng negative prompt mặc định từ Cài đặt.</p>
         </div>
-        <button @click="store.promptOpen = false; store.generateImage()" :disabled="store.generating || !store.imagePromptEn" class="btn-brand mt-3 w-full whitespace-nowrap">{{ store.generating ? 'Đang gửi…' : '🎨 Tạo Ảnh 2D' }}</button>
+        <!-- Credit info + reset -->
+        <div class="mt-3 flex items-center justify-between text-[10px] text-cream-300/50">
+          <span>💰 ~{{ creditEstimate }} credit / {{ store.variantCount }} biến thể</span>
+          <button @click="resetToDefaults" class="underline hover:text-brand-300">↺ Đặt lại mặc định</button>
+        </div>
+        <button @click="store.promptOpen = false; store.generateImage()" :disabled="store.generating || !store.imagePromptEn" class="btn-brand mt-2 w-full whitespace-nowrap">{{ store.generating ? 'Đang gửi…' : '🎨 Tạo Ảnh 2D' }}</button>
+        </template>
     </BaseModal>
   </div>
 </template>
