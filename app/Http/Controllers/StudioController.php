@@ -247,12 +247,44 @@ class StudioController extends Controller
         imagecopy($cropImg, $src, 0, 0, $cropX, $cropY, $cropW, $cropH);
 
         // Mask (tương đối CROP): TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa (đã giãn pad).
+        // Brush mode: frontend gửi mask_data (PNG base64, nền TRẮNG + nét ĐEN theo TỈ LỆ ẢNH GỐC)
+        // → resize về đúng kích thước ảnh gốc rồi crop theo bbox; nếu không có/không đọc được thì
+        // quay về vẽ hình chữ nhật (mãi vẫn an toàn).
+        $maskMode = (string) ($data['mask_mode'] ?? 'rect');
+        $brushMaskFull = null;
+        if ($maskMode === 'brush' && ! empty($data['mask_data'])) {
+            $b64 = (string) $data['mask_data'];
+            if (str_starts_with($b64, 'data:')) {
+                $comma = strpos($b64, ',');
+                if ($comma !== false) { $b64 = substr($b64, $comma + 1); }
+            }
+            $brushRaw = base64_decode($b64, true);
+            if ($brushRaw !== false && $brushRaw !== '') {
+                $brushImg = @imagecreatefromstring($brushRaw);
+                if ($brushImg) {
+                    $bw = imagesx($brushImg); $bh = imagesy($brushImg);
+                    if ($bw > 0 && $bh > 0 && ($bw !== $w || $bh !== $h)) {
+                        $resized = imagecreatetruecolor($w, $h);
+                        imagecopyresampled($resized, $brushImg, 0, 0, 0, 0, $w, $h, $bw, $bh);
+                        imagedestroy($brushImg);
+                        $brushImg = $resized;
+                    }
+                    $brushMaskFull = $brushImg;
+                }
+            }
+        }
+
         $cord_x = max(0, $px - $pad - $cropX); $cord_y = max(0, $py - $pad - $cropY);
         $cord_x2 = min($cropW - 1, $px + $pw - 1 + $pad - $cropX);
         $cord_y2 = min($cropH - 1, $py + $ph - 1 + $pad - $cropY);
         $mask = imagecreatetruecolor($cropW, $cropH);
         imagefilledrectangle($mask, 0, 0, $cropW - 1, $cropH - 1, imagecolorallocate($mask, 255, 255, 255));
-        imagefilledrectangle($mask, $cord_x, $cord_y, $cord_x2, $cord_y2, imagecolorallocate($mask, 0, 0, 0));
+        if ($brushMaskFull) {
+            imagecopy($mask, $brushMaskFull, 0, 0, $cropX, $cropY, $cropW, $cropH);
+            imagedestroy($brushMaskFull);
+        } else {
+            imagefilledrectangle($mask, $cord_x, $cord_y, $cord_x2, $cord_y2, imagecolorallocate($mask, 0, 0, 0));
+        }
 
         // UP-SCALE crop + mask lên tối thiểu ~512px để AI có đủ độ phân giải (vùng hẹp/phức tạp).
         // Paste sẽ cover-crop về kích thước GỐC (origCropW/H) nên vị trí vẫn chính xác.

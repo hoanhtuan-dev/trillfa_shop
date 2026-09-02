@@ -16,6 +16,13 @@ const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s 
 const activeGen = computed(() => store.regionGenId ? store.generations.find(g => g.id === Number(store.regionGenId)) : null);
 const hasRegion = computed(() => store.regionBox && (store.regionBox.w || 0) >= 0.02 && (store.regionBox.h || 0) >= 0.02);
 const panelOpen = computed(() => !!store.regionMode || ['send', 'processing', 'done', 'error', 'cancelled'].includes(store.regionStage));
+// Neo panel theo HÀNG NÚT công cụ đang active (không che giữa ảnh): erase=0→top 4, replace=1→top 52.
+const panelTop = computed(() => {
+  const keys = Object.keys(store.regionOps);
+  const idx = keys.indexOf(activeOp.value);
+  return (idx >= 0 ? idx * 48 : 0) + 4;
+});
+const panelStyle = computed(() => ({ top: panelTop.value + 'px' }));
 const reframeOpen = ref(false);
 const reframeRatios = ['1:1','3:4','4:5','9:16','16:9','2:3'];
 const filmOpen = ref(false);
@@ -57,18 +64,18 @@ async function applyFilmLook() {
     </div>
   </div>
 
-  <!-- Panel nổi trong vùng canvas (khi chọn công cụ / đang chạy) -->
-  <div v-if="panelOpen" class="absolute left-14 top-1/2 z-40 w-72 max-w-[82vw] -translate-y-1/2 rounded-2xl border border-brand-500/30 bg-ink-900/95 p-4 shadow-2xl backdrop-blur">
+  <!-- Panel nổi trong vùng canvas (khi chọn công cụ / đang chạy) — neo sát hàng nút, gọn nhẹ -->
+  <div v-if="panelOpen" class="scrollbar-hide absolute left-14 z-40 max-h-[calc(100%-2rem)] w-60 max-w-[76vw] overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-900/95 p-3 text-[11px] shadow-2xl backdrop-blur" :style="panelStyle">
     <div class="flex items-center justify-between gap-2">
-      <p class="text-sm font-semibold text-brand-300">{{ activeMeta?.icon }} {{ activeMeta?.label }}</p>
-      <button @click="store.clearRegionStatus(); store.stopRegionSelect()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
+      <p class="truncate text-xs font-semibold text-brand-300">{{ activeMeta?.icon }} {{ activeMeta?.label }}</p>
+      <button @click="store.clearRegionStatus(); store.stopRegionSelect()" class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
     </div>
-    <p class="mt-1 text-[11px] text-cream-200/80">{{ activeMeta?.hint }}</p>
+    <p class="mt-0.5 line-clamp-2 text-[10px] leading-snug text-cream-200/70">{{ activeMeta?.hint }}</p>
 
     <!-- Toggle Rect / Brush (chỉ cho erase) -->
     <div v-if="store.regionMode === 'erase'" class="mt-2 flex gap-1">
-      <button @click="store.regionMaskMode = 'rect'" class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors" :class="store.regionMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700 bg-ink-800'">▭ Rect</button>
-      <button @click="store.regionMaskMode = 'brush'" class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors" :class="store.regionMaskMode === 'brush' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700 bg-ink-800'">🖌 Brush</button>
+      <button @click="store.setRegionMaskMode('rect')" class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors" :class="store.regionMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700 bg-ink-800'">▭ Rect</button>
+      <button @click="store.setRegionMaskMode('brush')" class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors" :class="store.regionMaskMode === 'brush' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700 bg-ink-800'">🖌 Brush</button>
     </div>
 
     <!-- Vùng đã chọn + nút áp dụng -->
@@ -82,7 +89,7 @@ async function applyFilmLook() {
       <textarea v-if="activeMeta?.needsPrompt" v-model="store.regionPrompt" rows="2" maxlength="2000" class="input mt-2 !text-xs" :placeholder="store.regionTranslating ? 'Đang dịch prompt…' : 'VD: thay bằng túi xách da đen…'" :disabled="store.regionTranslating"></textarea>
       <div v-if="store.regionTranslating" class="mt-1 flex items-center gap-1 text-[10px] text-brand-300"><span class="h-2.5 w-2.5 animate-spin rounded-full border border-brand-300 border-t-transparent"></span> Đang dịch prompt sang tiếng Anh…</div>
       <div class="mt-2 flex gap-2">
-        <button @click="store.applyRegion()" :disabled="running || store.regionTranslating" class="btn-brand btn-sm whitespace-nowrap">
+        <button @click="store.applyRegion()" :disabled="running || store.regionTranslating || (store.regionMaskMode === 'brush' && !store.regionBrushData)" class="btn-brand btn-sm whitespace-nowrap">
           <template v-if="store.regionTranslating">⏳ Đang dịch…</template>
           <template v-else>{{ activeOp === 'erase' ? '🗑 Xóa vùng chọn' : '🪄 Thay vùng chọn' }}</template>
         </button>
@@ -120,12 +127,12 @@ async function applyFilmLook() {
   </div>
 
   <!-- Panel Reframe / Crop nổi (giống 2 lệnh xóa/thay) -->
-  <div v-if="reframeOpen || store.cropMode" class="absolute left-14 top-1/2 z-40 w-64 max-w-[80vw] -translate-y-1/2 rounded-2xl border border-brand-500/30 bg-ink-900/95 p-4 shadow-2xl backdrop-blur">
+  <div v-if="reframeOpen || store.cropMode" class="scrollbar-hide absolute left-14 top-4 z-40 max-h-[calc(100%-2rem)] w-56 max-w-[76vw] overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-900/95 p-3 text-[11px] shadow-2xl backdrop-blur">
     <div class="flex items-center justify-between gap-2">
-      <p class="text-sm font-semibold text-brand-300">📐 Reframe / Crop</p>
-      <button @click="reframeOpen = false; if (store.cropMode) store.toggleCrop()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
+      <p class="truncate text-xs font-semibold text-brand-300">📐 Reframe / Crop</p>
+      <button @click="reframeOpen = false; if (store.cropMode) store.toggleCrop()" class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
     </div>
-    <p class="mt-1 text-[11px] text-cream-200/80">Cắt lại khung theo tỷ lệ hoặc chọn vùng trên canvas.</p>
+    <p class="mt-0.5 text-[10px] leading-snug text-cream-200/70">Cắt lại khung theo tỷ lệ hoặc chọn vùng trên canvas.</p>
     <div class="mt-2 flex flex-wrap gap-1.5">
       <button v-for="r in reframeRatios" :key="r" type="button" @click="store.reframeRatio = r" class="rounded-full border px-2.5 py-1 text-xs transition-colors" :class="store.reframeRatio === r ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'">{{ r }}</button>
     </div>
@@ -138,10 +145,10 @@ async function applyFilmLook() {
   </div>
 
   <!-- Panel Film Look nổi -->
-  <div v-if="filmOpen || store.looking" class="absolute left-14 top-1/2 z-40 w-64 max-w-[80vw] -translate-y-1/2 rounded-2xl border border-brand-500/30 bg-ink-900/95 p-4 shadow-2xl backdrop-blur">
+  <div v-if="filmOpen || store.looking" class="scrollbar-hide absolute left-14 top-4 z-40 max-h-[calc(100%-2rem)] w-56 max-w-[76vw] overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-900/95 p-3 text-[11px] shadow-2xl backdrop-blur">
     <div class="flex items-center justify-between gap-2">
-      <p class="text-sm font-semibold text-brand-300">🎨 Film Look</p>
-      <button @click="filmOpen = false" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
+      <p class="truncate text-xs font-semibold text-brand-300">🎨 Film Look</p>
+      <button @click="filmOpen = false" class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
     </div>
     <p class="mt-1 text-[11px] text-cream-200/80">Gán tone màu phim cho ảnh đang chọn. Mức 1–4 nhẹ · 5–7 vừa · 8–10 đậm.</p>
     <div class="mt-2 flex flex-wrap gap-1.5">

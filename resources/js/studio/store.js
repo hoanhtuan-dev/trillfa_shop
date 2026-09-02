@@ -456,19 +456,39 @@ export const useStudioStore = defineStore('studio', {
       this.regionError = '';
       this.regionBrushData = '';
       this.regionPromptEn = '';
-      // Khởi tạo brush canvas nếu ở rect mode (để sẵn sàng khi chuyển sang brush)
-      if (!this._brushCanvas) {
-        const c = document.createElement('canvas');
-        c.width = 512; c.height = 512;
-        this._brushCanvas = c;
-        this._brushCtx = c.getContext('2d');
+      this._initBrushCanvas();
+      this.toast(this.regionOps[op].hint);
+    },
+    // Brush canvas theo ĐÚNG tỉ lệ ảnh hiển thị (mask không bị méo khi ảnh không vuông),
+    // cạnh dài tối đa ~1024px để payload PNG không quá lớn. Tọa độ vẽ dùng normalized (0..1)
+    // nhân với canvas size nên luôn khớp ảnh gốc.
+    // Chuyển chế độ chọn vùng (rect/brush) — reset brush canvas khi vào brush để không giữ nét cũ
+    setRegionMaskMode(mode) {
+      this.regionMaskMode = mode === 'brush' ? 'brush' : 'rect';
+      if (mode === 'brush') {
+        this._initBrushCanvas();
+      } else {
+        this.regionBrushData = '';
       }
-      // Reset brush canvas về trắng
+    },
+    _initBrushCanvas() {
+      const img = this.cvImg;
+      const iw = img && img.naturalWidth ? img.naturalWidth : 1;
+      const ih = img && img.naturalHeight ? img.naturalHeight : 1;
+      const MAX = 1024;
+      const scale = Math.min(1, MAX / Math.max(iw, ih));
+      const cw = Math.max(1, Math.round(iw * scale));
+      const ch = Math.max(1, Math.round(ih * scale));
+      if (!this._brushCanvas) { this._brushCanvas = document.createElement('canvas'); }
+      if (this._brushCanvas.width !== cw || this._brushCanvas.height !== ch) {
+        this._brushCanvas.width = cw; this._brushCanvas.height = ch;
+      }
+      this._brushCtx = this._brushCanvas.getContext('2d');
       if (this._brushCtx) {
         this._brushCtx.fillStyle = 'rgba(255,255,255,1)';
-        this._brushCtx.fillRect(0, 0, 512, 512);
+        this._brushCtx.fillRect(0, 0, cw, ch);
       }
-      this.toast(this.regionOps[op].hint);
+      this.regionBrushData = '';
     },
     stopRegionSelect() { this.regionMode = ''; this._regionDrag = null; this._regionHandle = null; this.regionSrc = ''; this._brushDrawing = false; this._brushLast = null; },
     // Geometry: vùng chọn (normalized) -> style % overlay trên canvas (dùng canvasMetrics của crop).
@@ -488,23 +508,32 @@ export const useStudioStore = defineStore('studio', {
       const ny = this._clamp((e.clientY - ir.top) / ir.height, 0, 1);
       return { nx, ny };
     },
-    // Hit-test: pointer có nằm trong vùng chữ nhật hiện tại không (và gần handle nào).
+    // Hit-test: ưu tiên 4 GÓC (kể cả click hơi ngoài bbox — handle nằm lệch ra ngoài),
+    // sau đó mới "move" nếu trong vùng. Click ngoài → null (kéo vùng mới).
     _regionHit(p) {
       const b = this.regionBox || { x: 0, y: 0, w: 0, h: 0 };
       if (b.w < 0.02 || b.h < 0.02) return null; // vùng quá nhỏ → kéo mới
-      const margin = 0.025; // khoảng cách hit handle
-      const inBox = p.nx >= b.x && p.nx <= b.x + b.w && p.ny >= b.y && p.ny <= b.y + b.h;
-      if (!inBox) return null;
-      // Xác định góc gần nhất
-      const dl = p.nx - b.x, dr = (b.x + b.w) - p.nx;
-      const dt = p.ny - b.y, db = (b.y + b.h) - p.ny;
-      const nearLeft = dl < margin, nearRight = dr < margin;
-      const nearTop = dt < margin, nearBottom = db < margin;
-      if (nearLeft && nearTop) return 'nw';
-      if (nearRight && nearTop) return 'ne';
-      if (nearLeft && nearBottom) return 'sw';
-      if (nearRight && nearBottom) return 'se';
-      return 'move';
+      const margin = 0.05; // bán kính bắt góc (rộng hơn trước — dễ bắt tay cầm)
+      const corners = [
+        ['nw', b.x, b.y],
+        ['ne', b.x + b.w, b.y],
+        ['sw', b.x, b.y + b.h],
+        ['se', b.x + b.w, b.y + b.h],
+      ];
+      for (const [key, cx, cy] of corners) {
+        if (Math.abs(p.nx - cx) <= margin && Math.abs(p.ny - cy) <= margin) return key;
+      }
+      if (p.nx >= b.x && p.nx <= b.x + b.w && p.ny >= b.y && p.ny <= b.y + b.h) return 'move';
+      return null;
+    },
+    // Bắt đầu kéo 1 HANDLE góc (gọi từ div handle trên overlay) — tính tọa độ ĐÚNG bằng
+    // regionPointer (normalized theo ảnh hiển thị), không phải clientX/width của div 12px.
+    regionHandleDown(e, key) {
+      if (!this.regionMode || !this.regionOps[this.regionMode]) return;
+      e.stopPropagation();
+      const p = this.regionPointer(e); if (!p) return;
+      this._regionHandle = key;
+      this._regionDrag = { x: p.nx, y: p.ny, box: { ...this.regionBox } };
     },
     regionStart(e) {
       if (!this.regionMode) return;
@@ -615,15 +644,18 @@ export const useStudioStore = defineStore('studio', {
     _finalizeBrushMask() {
       if (!this._brushCanvas) return;
       this.regionBrushData = this._brushCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
-      // Cập nhật regionBox từ bounding box của brush mask
+      // Cập nhật regionBox từ bounding box của VÙNG VẼ (pixel ĐEN — nền canvas là TRẮNG a=255,
+      // nên không thể dùng alpha; chỉ những pixel nét cọ mới là vùng cần sửa).
       const ctx = this._brushCtx;
       const w = this._brushCanvas.width, h = this._brushCanvas.height;
       const imgData = ctx.getImageData(0, 0, w, h).data;
-      let minX = w, minY = h, maxX = 0, maxY = 0;
+      let minX = w, minY = h, maxX = 0, maxY = 0, found = false;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-          const a = imgData[(y * w + x) * 4 + 3];
-          if (a > 0) {
+          const i = (y * w + x) * 4;
+          const lum = imgData[i] + imgData[i + 1] + imgData[i + 2];
+          if (lum < 300) { // đủ tối = thuộc nét vẽ
+            found = true;
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
@@ -631,7 +663,7 @@ export const useStudioStore = defineStore('studio', {
           }
         }
       }
-      if (minX <= maxX && minY <= maxY) {
+      if (found && minX <= maxX && minY <= maxY) {
         this.regionBox = { x: minX / w, y: minY / h, w: (maxX - minX + 1) / w, h: (maxY - minY + 1) / h };
       }
     },
@@ -643,6 +675,7 @@ export const useStudioStore = defineStore('studio', {
       if (!this.previewId || !src) { this.toast('Chọn ảnh kết quả để chỉnh vùng.', 'error'); return; }
       const b = this.regionBox || {}; const w = b.w || 0, h = b.h || 0;
       if (this.regionMaskMode === 'rect' && (w < 0.02 || h < 0.02)) { this.toast('Vùng chọn quá nhỏ — kéo chọn lại trên canvas.', 'error'); return; }
+      if (this.regionMaskMode === 'brush' && !this.regionBrushData) { this.toast('Vẽ mask trên canvas trước khi áp dụng.', 'error'); return; }
 
       // Prompt translation: nếu replace + prompt có ký tự tiếng Việt → dịch tự động
       let finalPrompt = this.regionPrompt;
