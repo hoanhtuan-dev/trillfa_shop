@@ -611,9 +611,12 @@ export const useStudioStore = defineStore('studio', {
     },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
-      // 1 face reference + 1 or MORE poses -> one result per pose.
-      if (!this.swapModelIds.length || !this.swapPoseIds.length) { this.toast('Chọn 1 khuôn mặt + ít nhất 1 dáng trước.', 'error'); return; }
-      const face = this.swapModelIds[0];
+      // change_face=false (mặc định): giữ nguyên khuôn mặt gốc, chỉ cần pose.
+      // change_face=true: 1 face reference + 1 or MORE poses -> one result per pose.
+      const changeFace = !!opts.change_face;
+      if (changeFace && !this.swapModelIds.length) { this.toast('Chọn 1 khuôn mặt để đổi.', 'error'); return; }
+      if (!this.swapPoseIds.length) { this.toast('Chọn ít nhất 1 dáng trước.', 'error'); return; }
+      const face = changeFace ? this.swapModelIds[0] : '';
       const poses = [...this.swapPoseIds];
       // P0: keep explicit 0 values (slider minimums) — never coerce 0 back into a default.
       const toInt = (v, dflt) => (v != null && Number.isFinite(Number(v)) ? Number(v) : dflt);
@@ -629,7 +632,7 @@ export const useStudioStore = defineStore('studio', {
       for (const poseId of poses) {
         if (abort.signal.aborted) { lastErr = 'Đã hủy.'; break; }
         try {
-          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', tone: opts.tone ?? 'none' }, abort.signal);
+          const d = await this.api('/studio/swap-model', { image: src, model_id: face, pose_id: poseId, background: opts.background || '', tone: opts.tone ?? 'none', change_face: changeFace }, abort.signal);
           // Swap now runs in the background queue (SwapModelJob) — the response is async (pending).
           if (d.generation_id) {
             createdIds.push(d.generation_id);

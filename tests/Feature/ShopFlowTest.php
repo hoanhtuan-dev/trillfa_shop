@@ -1052,15 +1052,30 @@ class ShopFlowTest extends TestCase
         $this->assertTrue(in_array('qwen3.8-max', $models, true));
         $this->assertTrue(in_array('qwen-vl-max', $models, true));
 
-        // Admin cấu hình nhầm model sinh ảnh làm qwen_vision_model -> tự revert về qwen3.8-flash.
+        // Admin cấu hình nhầm model sinh ảnh làm qwen_vision_model -> tự chọn model vision-capable
+        // ưu tiên kế tiếp (qwen3.8-max trong danh sách), không ép cứng về một model.
         set_setting('studio_qwen_vision_model', 'qwen-image-3.0-pro');
-        $this->assertSame('qwen3.8-flash', studio_vision_model('qwen'));
+        $this->assertSame('qwen3.8-max', studio_vision_model('qwen'));
         set_setting('studio_qwen_vision_model', '');
 
         // Text/chat path (stylist, prompt director, translate) dùng danh sách qwen3.8 trước.
         $text = studio_qwen_text_models();
         $this->assertSame('qwen3.8-flash', $text[0]);
         $this->assertTrue(in_array('qwen3.8-max', $text, true));
+
+        // KHÔNG hard-code: đổi qwen_vision_model sang qwen3.8-max -> được tôn trọng ngay lập tức.
+        set_setting('studio_qwen_vision_model', 'qwen3.8-max');
+        $this->assertSame('qwen3.8-max', studio_vision_model('qwen'));
+        $this->assertSame('qwen3.8-max', studio_qwen_vision_models()[0]);
+        set_setting('studio_qwen_vision_model', '');
+
+        // Danh sách ưu tiên tùy biến (Settings) ghi đè hoàn toàn mặc định — đổi model không cần sửa code.
+        set_setting('studio_qwen_vision_models', 'qwen3.8-max,qwen3.8-flash,qwen-vl-plus');
+        $this->assertSame(['qwen3.8-max', 'qwen3.8-flash', 'qwen-vl-plus'], studio_qwen_vision_models());
+        set_setting('studio_qwen_vision_models', '');
+        set_setting('studio_qwen_text_models', 'qwen3.8-max,qwen-turbo');
+        $this->assertSame(['qwen3.8-max', 'qwen-turbo'], studio_qwen_text_models());
+        set_setting('studio_qwen_text_models', '');
     }
 
 

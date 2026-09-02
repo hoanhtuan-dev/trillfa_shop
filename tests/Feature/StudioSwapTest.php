@@ -64,4 +64,53 @@ class StudioSwapTest extends TestCase
             'image' => '/storage/design.png', 'model_id' => 'model01', 'pose_id' => '',
         ])->assertStatus(422);
     }
+
+    public function test_swap_model_keep_face_by_default_without_model(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Mặc định giữ nguyên khuôn mặt: model_id có thể bỏ trống, vẫn tạo generation + dispatch job.
+        $res = $this->postJson('/studio/swap-model', [
+            'image' => '/storage/design.png', 'model_id' => '', 'pose_id' => 'pose01',
+        ])->assertStatus(200)->assertJson(['status' => 'pending']);
+
+        $gen = \App\Models\Generation::find($res->json('generation_id'));
+        $this->assertNotNull($gen);
+        $this->assertTrue((bool) ($gen->meta['swap'] ?? false));
+        $this->assertFalse((bool) ($gen->meta['change_face'] ?? false));
+        $this->assertSame('', (string) ($gen->meta['model_id'] ?? ''));
+        $this->assertSame('pose01', (string) ($gen->meta['pose_id'] ?? ''));
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SwapModelJob::class);
+    }
+
+    public function test_swap_model_change_face_stores_meta_and_prompt(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $res = $this->postJson('/studio/swap-model', [
+            'image' => '/storage/design.png', 'model_id' => 'vp01', 'pose_id' => 'pose01', 'change_face' => true,
+        ])->assertStatus(200);
+        $gen = \App\Models\Generation::find($res->json('generation_id'));
+        $this->assertNotNull($gen);
+        $this->assertTrue((bool) ($gen->meta['change_face'] ?? false));
+        $this->assertSame('vp01', (string) ($gen->meta['model_id'] ?? ''));
+        // Prompt hiển thị tên người mẫu (không phải marker giữ nguyên khuôn mặt).
+        $this->assertStringNotContainsString('giữ nguyên khuôn mặt', (string) $gen->prompt);
+        $this->assertStringContainsString('Nhẹ nhàng tự nhiên', (string) $gen->prompt);
+    }
+
+    public function test_swap_model_change_face_requires_model(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Bật đổi khuôn mặt nhưng model_id trống -> 422 (không tìm thấy người mẫu).
+        $this->postJson('/studio/swap-model', [
+            'image' => '/storage/design.png', 'model_id' => '', 'pose_id' => 'pose01', 'change_face' => true,
+        ])->assertStatus(422);
+    }
 }

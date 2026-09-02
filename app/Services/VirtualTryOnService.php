@@ -223,8 +223,11 @@ class VirtualTryOnService
      * text-driven version demonstrably produced the correct pose, and it broke exactly when the
      * reference images were introduced. $tone is prompt-level.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null, bool $changeFace = false): ?string
     {
+        // $changeFace=false (mặc định): GIỮ NGUYÊN khuôn mặt gốc — prompt chỉ đổi dáng/cơ thể/hậu cảnh,
+        // không dùng mô tả mặt người mẫu, không gửi ảnh mặt tham chiếu, bỏ qua pass face-swap riêng.
+        // $changeFace=true: thay người bằng khuôn mặt người mẫu (mô tả văn bản + ảnh ref + pass 1b).
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $this->calls = 1;
         $this->lastModel = null;
@@ -241,8 +244,12 @@ class VirtualTryOnService
         // with the pose instruction — with a complex background the model redraws the scene and
         // IGNORES the pose (simple/white backgrounds don't trigger this because they are trivial to
         // regenerate). The background is applied in a separate PASS 2 below.
+        $personClause = $changeFace && $modelDesc !== ''
+            ? 'Replace the person in the image with a full-body '.$modelDesc.' in the pose: '.$pose.', keeping the EXACT garment unchanged. '
+            : 'Replace the person in the image with a full-body model figure in the pose: '.$pose.', keeping the ORIGINAL person\'s face and hair 100% unchanged — the face, facial features, identity and hairstyle must stay exactly like the original person; do NOT swap, alter or restyle the face; keep the EXACT garment unchanged. ';
+
         $instr = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '
-            .'Replace the person in the image with a full-body '.$modelDesc.' in the pose: '.$pose.', keeping the EXACT garment unchanged. '
+            .$personClause
             .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
             .'Keep the background of the original image unchanged. '
             .($wantBg ? '' : $toneS).' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
@@ -256,12 +263,12 @@ class VirtualTryOnService
             $instr,
             // Variant 2: emphasise garment preservation first, then person replacement
             'PRESERVE the garment EXACTLY: keep every detail of the clothing — colors, patterns, prints, seams, folds, silhouette, length and fabric — 100% unchanged. '
-                .'Change ONLY the person wearing it: replace them with a full-body '.$modelDesc.' in the pose: '.$pose.'. '
+                .'Change ONLY the person wearing it: '.$personClause
                 .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions. '
                 .'Keep the background of the original image unchanged. '
                 .($wantBg ? '' : $toneS).' Photorealistic, full body, studio quality, high fashion.',
             // Variant 3: direct instruction style
-            'Keep the outfit identical. Replace the model with '.$modelDesc.' in pose: '.$pose.'. '
+            'Keep the outfit identical. '.$personClause
                 .$proportion.'. Do not change the background. '
                 .($wantBg ? '' : $toneS).' Photorealistic fashion editorial.',
         ];
@@ -286,7 +293,7 @@ class VirtualTryOnService
         // A separate pass prevents the edit model from ignoring the face reference (the original
         // evaluation found that sending a full-body ref alongside the garment image confuses the
         // model). With face-only as the sole instruction, fidelity is much higher.
-        if ($faceRefUrl) {
+        if ($changeFace && $faceRefUrl) {
             $faceInstr = 'Replace ONLY the face of this person with the face from the reference image. '
                 .'Keep the hairstyle, head shape, body, pose, garment and background 100% unchanged. '
                 .'Match the skin tone of the reference face exactly. '

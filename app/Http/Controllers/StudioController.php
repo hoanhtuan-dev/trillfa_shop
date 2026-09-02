@@ -2215,7 +2215,8 @@ RULES:
     {
         $data = $request->validate([
             'image' => ['required', 'string', 'max:2048'],   // design image URL (generation media_url or /storage)
-            'model_id' => ['required', 'string', 'max:80'],
+            'model_id' => ['nullable', 'string', 'max:80'],   // bắt buộc khi change_face=true
+            'change_face' => ['nullable', 'boolean'],            // true = đổi khuôn mặt theo người mẫu; false/mặc định = giữ khuôn mặt gốc
             'pose_id' => ['required', 'string', 'max:80'],
             'background' => ['nullable', 'string', 'max:400'],
             'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
@@ -2223,9 +2224,10 @@ RULES:
         ]);
 
         $svc = app(\App\Services\VirtualTryOnService::class);
-        $model = $svc->pickModel($data['model_id']);
+        $changeFace = (bool) ($data['change_face'] ?? false);
+        $model = $changeFace ? $svc->pickModel((string) $data['model_id']) : null;
         $pose = $svc->pickPose($data['pose_id']);
-        if (! $model) {
+        if ($changeFace && ! $model) {
             return response()->json(['message' => 'Không tìm thấy người mẫu.'], 422);
         }
         if (! $pose) {
@@ -2242,7 +2244,7 @@ RULES:
         // cut by the hosting proxy timeout ("chạy lâu không thấy kết quả").
         $gen = auth()->user()->generations()->create([
             'type' => 'image', 'status' => 'pending',
-            'prompt' => 'Thay đổi người mẫu · '.($model['name'] ?? 'model').' · '.($pose['name'] ?? 'pose'),
+            'prompt' => 'Thay đổi người mẫu · '.($changeFace ? ($model['name'] ?? 'model') : 'giữ nguyên khuôn mặt').' · '.($pose['name'] ?? 'pose'),
             'model' => $swapModel, 'provider' => 'qwen', 'credits_cost' => 1,
             'meta' => [
                 'swap' => true,
@@ -2251,7 +2253,8 @@ RULES:
                 'pose_id' => $data['pose_id'],
                 'model_name' => $model['name'] ?? null,
                 'pose_name' => $pose['name'] ?? null,
-                'face_ref' => (bool) ($model['image'] ?? null),
+                'change_face' => $changeFace,
+                'face_ref' => $changeFace && (bool) ($model['image'] ?? null),
                 'pose_ref' => $poseRefUrl,
                 'background' => (string) ($data['background'] ?? ''),
                 'tone' => (string) ($data['tone'] ?? 'none'),
@@ -2272,21 +2275,23 @@ RULES:
     {
         $meta = (array) ($gen->meta ?? []);
         $svc = app(\App\Services\VirtualTryOnService::class);
-        $model = $svc->pickModel((string) ($meta['model_id'] ?? ''));
+        $changeFace = (bool) ($meta['change_face'] ?? false);
+        $model = $changeFace ? $svc->pickModel((string) ($meta['model_id'] ?? '')) : null;
         $pose = $svc->pickPose((string) ($meta['pose_id'] ?? ''));
-        if (! $model || ! $pose) {
-            $gen->update(['status' => 'failed', 'error' => 'Không tìm thấy người mẫu hoặc dáng.']);
+        if (($changeFace && ! $model) || ! $pose) {
+            $gen->update(['status' => 'failed', 'error' => $changeFace ? 'Không tìm thấy người mẫu hoặc dáng.' : 'Không tìm thấy dáng.']);
             return;
         }
 
         $fallback = $svc->fallbackEdit(
             (string) ($meta['image'] ?? ''),
-            $model['desc'] ?? ($model['ethnicity'] ?? 'a model'),
+            $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? 'a model')) : '',
             $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
             (string) ($meta['background'] ?? ''),
-            $model['image'] ?? null, // face reference image (custom/catalog)
+            $changeFace ? ($model['image'] ?? null) : null, // face reference only khi bật đổi khuôn mặt
             (string) ($meta['tone'] ?? 'none'),
             (string) ($meta['pose_ref'] ?? ''),
+            $changeFace,
         );
         if (! $fallback) {
             $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).']);
@@ -2338,7 +2343,7 @@ RULES:
         }
 
         // QA: score the result for quality tracking (qwen-vl-max, optional — skips if no key).
-        $garmentDesc = $model['desc'] ?? ($model['ethnicity'] ?? '');
+        $garmentDesc = $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? '')) : 'giữ nguyên khuôn mặt gốc';
         $qaScores = $this->scoreSwapResult($fallback, $garmentDesc);
 
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
@@ -2582,6 +2587,38 @@ RULES:
             }
         }
 
+        // Probe model CHAT/VISION ĐA PHƯƠNG THỨC (qwen3.8-flash/max, qwen-plus…) qua endpoint
+        // OpenAI-compatible — để nút Test phản ánh đúng model chat/vision bạn đang cấu hình
+        // (qwen3.8-max chẳng hạn), không chỉ model sinh ảnh như trước.
+        $chatProbe = array_values(array_unique(array_filter([
+            (string) studio_config('qwen_vision_model', ''),
+            (string) studio_config('qwen_prompt_model', ''),
+            'qwen3.8-flash', 'qwen3.8-max', 'qwen-plus', 'qwen-turbo',
+        ])));
+        foreach ($chatProbe as $cm) {
+            if (! is_qwen_vision_capable($cm)) {
+                continue;
+            }
+            foreach ($candidates as $host) {
+                try {
+                    $resp = Http::withToken($key)->timeout(20)
+                        ->post($host.'/compatible-mode/v1/chat/completions', [
+                            'model' => $cm,
+                            'messages' => [['role' => 'user', 'content' => 'hi']],
+                            'max_tokens' => 5,
+                        ]);
+                    if ($resp->successful()) {
+                        return ['ok' => true, 'message' => 'DashScope: khóa hợp lệ tại '.$host.' — model chat/vision “'.$cm.'” dùng được (đã test thử chat).'];
+                    }
+                    if ($resp->status() === 401) {
+                        break; // key không hợp lệ trên host này -> thử host kế tiếp
+                    }
+                } catch (Throwable $e) {
+                    // không phản hồi -> thử host/model khác
+                }
+            }
+        }
+
         return ['ok' => false, 'message' => 'DashScope: key chưa được chấp nhận (HTTP '.($last['status'] ?? '…').' tại '.($last['host'] ?? '…').'). Tạo key mới tại https://home.qwencloud.com/api-keys và dán đầy đủ. Gợi ý ổn định: dùng Gemini (Google AI Studio key) để tạo ảnh.'];
     }
 
@@ -2793,6 +2830,8 @@ RULES:
             'qwen_prompt_model' => setting('studio_qwen_prompt_model', config('studio.qwen_prompt_model', 'qwen3.8-flash')),
             'qwen_max_model' => setting('studio_qwen_max_model', config('studio.qwen_max_model', 'qwen3.8-max')),
             'qwen_vision_model' => setting('studio_qwen_vision_model', config('studio.qwen_vision_model', 'qwen3.8-flash')),
+            'qwen_vision_models' => setting('studio_qwen_vision_models', ''),
+            'qwen_text_models' => setting('studio_qwen_text_models', ''),
             'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
             'swap_model' => setting('studio_swap_model', config('studio.swap_model')),
             'stylist_model' => setting('studio_stylist_model', config('studio.stylist_model')),
@@ -3062,6 +3101,8 @@ RULES:
             'qwen_prompt_model' => ['nullable', 'string', 'max:255'],
             'qwen_max_model' => ['nullable', 'string', 'max:255'],
             'qwen_vision_model' => ['nullable', 'string', 'max:255'],
+            'qwen_vision_models' => ['nullable', 'string', 'max:1000'],
+            'qwen_text_models' => ['nullable', 'string', 'max:1000'],
             'translate_model' => ['nullable', 'string', 'max:255'],
             'swap_model' => ['nullable', 'string', 'max:255'],
             'stylist_model' => ['nullable', 'string', 'max:255'],
@@ -3097,6 +3138,8 @@ RULES:
         if (isset($data['qwen_prompt_model'])) set_setting('studio_qwen_prompt_model', $data['qwen_prompt_model']);
         if (isset($data['qwen_max_model'])) set_setting('studio_qwen_max_model', $data['qwen_max_model']);
         if (isset($data['qwen_vision_model'])) set_setting('studio_qwen_vision_model', $data['qwen_vision_model']);
+        if (isset($data['qwen_vision_models'])) set_setting('studio_qwen_vision_models', $data['qwen_vision_models']);
+        if (isset($data['qwen_text_models'])) set_setting('studio_qwen_text_models', $data['qwen_text_models']);
         if (isset($data['translate_model'])) set_setting('studio_translate_model', $data['translate_model']);
         if (isset($data['swap_model'])) set_setting('studio_swap_model', $data['swap_model']);
         if (isset($data['stylist_model'])) set_setting('studio_stylist_model', $data['stylist_model']);

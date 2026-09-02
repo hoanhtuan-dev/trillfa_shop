@@ -103,6 +103,11 @@
                 <div><label class="label">Prompt model</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-2.5-flash"></div>
                 <div><label class="label">Qwen Prompt model</label><input type="text" name="qwen_prompt_model" value="{{ old('qwen_prompt_model', $qwen_prompt_model ?? 'qwen3.8-flash') }}" class="input !py-2" placeholder="qwen3.8-flash / qwen3.8-max / qwen-plus" list="qwen-chat-models"></div>
                 <div><label class="label">Qwen Max model (cao cấp)</label><input type="text" name="qwen_max_model" value="{{ old('qwen_max_model', $qwen_max_model ?? 'qwen3.8-max') }}" class="input !py-2" placeholder="qwen3.8-max" list="qwen-chat-models"></div>
+                <div class="sm:col-span-2">
+                    <label class="label">Qwen Chat models — thứ tự ưu tiên (tùy biến)</label>
+                    <input type="text" name="qwen_text_models" value="{{ old('qwen_text_models', $qwen_text_models ?? '') }}" class="input !py-2" placeholder="VD: qwen3.8-max, qwen3.8-flash, qwen-plus (để trống = dùng mặc định)">
+                    <p class="mt-1 text-xs text-ink-500">Dùng cho <strong>Trợ lý thiết kế, Giám đốc sáng tạo, dịch prompt</strong> (endpoint chat). Model đầu = ưu tiên cao nhất; nhập model bất kỳ để nâng cấp mà không cần sửa code.</p>
+                </div>
                 <datalist id="qwen-chat-models">
                     <option value="qwen3.8-flash"></option>
                     <option value="qwen3.8-max"></option>
@@ -159,6 +164,11 @@
                         <option value="qwen-vl-plus"></option>
                     </datalist>
                     <p class="mt-1 text-xs text-ink-500">qwen3.8-flash / qwen3.8-max là model <strong>đa phương thức</strong> — tự đọc ảnh, video và text qua endpoint chat; dùng cho "Gợi ý từ ảnh" & phân tích khuôn mặt. qwen-vl-* giữ làm fallback.</p>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label">Qwen Vision models — thứ tự ưu tiên (tùy biến)</label>
+                    <input type="text" name="qwen_vision_models" value="{{ old('qwen_vision_models', $qwen_vision_models ?? '') }}" class="input !py-2" placeholder="VD: qwen3.8-max, qwen3.8-flash, qwen-vl-max (để trống = dùng mặc định)">
+                    <p class="mt-1 text-xs text-ink-500">Nhập danh sách model phân cách dấu phẩy — model <strong>đầu tiên được ưu tiên cao nhất</strong>; cho phép đổi/nâng cấp model bất kỳ (qwen3.8-max, qwen3.8-flash…) mà không cần sửa code. Để trống để dùng mặc định từ cấu hình.</p>
                 </div>
             </div>
         </div>

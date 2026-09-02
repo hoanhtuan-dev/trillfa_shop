@@ -9,6 +9,7 @@ const addType = ref('model'); const addName = ref(''); const addFile = ref(null)
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 const swapBg = ref('');
 const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
+const changeFace = ref(false); // MẶC ĐỊNH giữ nguyên khuôn mặt gốc; bật = đổi khuôn mặt theo người mẫu
 
 const toneOptions = [
   { v: 'auto', label: '🎨 Tự động (theo bối cảnh)' },
@@ -27,14 +28,15 @@ function loadSwapMemory() {
     const m = JSON.parse(localStorage.getItem(SWAP_KEY) || '{}');
     if (m.tone) swapTone.value = m.tone;
     if (typeof m.bg === 'string') swapBg.value = m.bg;
+    if (typeof m.changeFace === 'boolean') changeFace.value = m.changeFace;
   } catch (e) {}
 }
 function saveSwapMemory() {
   try {
-    localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value }));
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value, changeFace: changeFace.value }));
   } catch (e) {}
 }
-watch([swapBg, swapTone], saveSwapMemory);
+watch([swapBg, swapTone, changeFace], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; } catch(e){}
@@ -49,7 +51,7 @@ function selectOne(list, id, e) { e.stopPropagation(); if (list.length === 1 && 
 function toggle(list, id, e) { e.stopPropagation(); const i = list.indexOf(id); if (i >= 0) list.splice(i,1); else list.push(id); }
 const selFaceImgs = computed(() => faceList.value.filter(f => store.swapModelIds.includes(f.id)));
 const selPoseImgs = computed(() => poseList.value.filter(p => store.swapPoseIds.includes(p.id)));
-const canApply = computed(() => !store.swapLoading && store.swapModelIds.length > 0 && store.swapPoseIds.length > 0);
+const canApply = computed(() => !store.swapLoading && store.swapPoseIds.length > 0 && (changeFace.value ? store.swapModelIds.length > 0 : true));
 async function addAsset() {
   if (!addName.value || !addFile.value) { store.toast('Nhập tên + chọn file.', 'error'); return; }
   const fd = new FormData(); fd.append('type', addType.value); fd.append('name', addName.value); fd.append('image', addFile.value);
@@ -64,19 +66,30 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.12), rgba(74,122,144,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
-    <div v-if="store.swapModelIds.length || store.swapPoseIds.length || swapBg" class="scrollbar-hide mt-2 max-h-40 space-y-1.5 overflow-y-auto text-xs">
-      <div v-if="store.swapModelIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><img v-if="selFaceImgs[0]?.image" :src="selFaceImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">👩</span><span class="truncate text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') }}</span></div>
+    <div v-if="!changeFace || store.swapModelIds.length || store.swapPoseIds.length || swapBg" class="scrollbar-hide mt-2 max-h-40 space-y-1.5 overflow-y-auto text-xs">
+      <div v-if="!changeFace" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><span class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">👩</span><span class="truncate text-cream-100">Giữ nguyên khuôn mặt gốc</span></div>
+      <div v-if="changeFace && store.swapModelIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><img v-if="selFaceImgs[0]?.image" :src="selFaceImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">👩</span><span class="truncate text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') }}</span></div>
       <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img v-if="selPoseImgs[0]?.image" :src="selPoseImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">🧍</span><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
       <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, tone: swapTone })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
-    <p v-if="!store.swapModelIds.length || !store.swapPoseIds.length" class="mt-1 text-[10px] text-cream-300/60">Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.</p>
+    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
+    <p v-if="!canApply" class="mt-1 text-[10px] text-cream-300/60">{{ changeFace ? 'Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.' : 'Chọn ít nhất 1 dáng để Áp dụng (khuôn mặt gốc được giữ nguyên).' }}</p>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
+        <div class="mb-4 flex items-center gap-3 rounded-2xl border p-3" :class="changeFace ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-800/50'">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-cream-200">👩 Đổi khuôn mặt theo người mẫu</p>
+            <p class="mt-0.5 text-[10px] leading-snug text-cream-300/60">{{ changeFace ? 'Khuôn mặt sẽ được thay bằng khuôn mặt người mẫu đã chọn.' : 'Mặc định: giữ nguyên khuôn mặt gốc (bảo toàn đặc điểm khuôn mặt).' }}</p>
+          </div>
+          <button id="swap-change-face-toggle" type="button" @click="changeFace = !changeFace" class="relative h-6 w-11 shrink-0 rounded-full transition-colors" :class="changeFace ? 'bg-brand-500' : 'bg-ink-600'" :title="changeFace ? 'Bỏ đổi khuôn mặt' : 'Bật đổi khuôn mặt'"><span class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" :class="changeFace ? 'left-[22px]' : 'left-0.5'"></span></button>
+        </div>
         <!-- Khuôn mặt -->
+        <template v-if="changeFace">
         <p class="mb-2 text-xs font-semibold text-cream-200">👩 Khuôn mặt</p>
         <div class="flex flex-wrap gap-2">
           <button v-for="f in faceList" :key="f.id" @click="selectOne(store.swapModelIds, f.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-xl border-2" :class="store.swapModelIds.includes(f.id) ? 'border-brand-500' : 'border-ink-700'"><img v-if="f.image" :src="f.image" class="h-full w-full bg-ink-900 object-cover"><span v-else class="grid h-full w-full place-items-center bg-ink-800 text-xl">👩</span><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ f.name }}</span><button v-if="f.custom" @click.stop="delAsset({id:f.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
         </div>
+        </template>
+        <div v-else class="mb-px rounded-2xl border border-dashed border-ink-600 bg-ink-800/60 p-3 text-xs leading-relaxed text-cream-300/70">👩 Đang <b class="text-cream-100">giữ nguyên khuôn mặt gốc</b> — chỉ đổi dáng, hậu cảnh và tông màu. Bật nút phía trên để chọn khuôn mặt người mẫu khác.</div>
         <!-- Dáng -->
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🧍 Dáng</p>
         <div class="flex flex-wrap gap-2">

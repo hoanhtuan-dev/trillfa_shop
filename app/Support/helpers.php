@@ -588,22 +588,32 @@ if (! function_exists('studio_candidate_key')) {
 /**
  * Resolve a robust VISION model for describing a face / analyzing a reference image.
  *
- * Qwen 3.8 series (qwen3.8-flash / qwen3.8-max) are NATIVE multimodal models — they read
- * images, video and text through the standard OpenAI-compatible chat endpoint, so they are
- * preferred over the legacy qwen-vl-* vision models (faster, cheaper, 1M-token context).
- * Only models that are clearly NOT vision-capable (image/video GENERATION models such as
- * qwen-image-*, wanx*-image*, plus audio/embedding services) are rejected.
+ * Không hard-code model trong logic — mọi lựa chọn đi qua chuỗi cấu hình:
+ * Studio Settings (DB) -> .env -> config/studio.php. Qwen 3.8 series (qwen3.8-flash / qwen3.8-max)
+ * là model ĐA PHƯƠNG THỨC (đọc ảnh/video/text qua endpoint chat OpenAI-compatible) nên được
+ * ưu tiên hơn qwen-vl-* cũ. Chỉ model chắc chắn KHÔNG vision (sinh/chỉnh sửa ảnh qwen-image-*,
+ * wanx*-image*, dịch vụ audio/embedding) bị loại.
  */
 function studio_vision_model(?string $provider = null): string
 {
     $provider = $provider ?: (string) studio_config('vision_provider', 'gemini');
 
     if ($provider === 'qwen') {
-        $m = trim((string) studio_config('qwen_vision_model', 'qwen3.8-flash'));
+        $m = studio_qwen_vision_default();
+
         if (! is_qwen_vision_capable($m)) {
-            return 'qwen3.8-flash'; // generation/audio model -> multimodal default (qwen3.8-flash)
+            // Model đã cấu hình không phải chat-vision -> chọn model hợp lệ đầu tiên trong
+            // danh sách ưu tiên (config được), cuối cùng mới tới default mềm.
+            foreach (studio_qwen_vision_models() as $candidate) {
+                if (is_qwen_vision_capable($candidate)) {
+                    return $candidate;
+                }
+            }
+
+            return (string) config('studio.qwen_vision_model', 'qwen3.8-flash');
         }
-        return $m ?: 'qwen3.8-flash';
+
+        return $m;
     }
 
     $m = (string) studio_config('vision_model', 'gemini-2.5-flash');
@@ -614,10 +624,37 @@ function studio_vision_model(?string $provider = null): string
 }
 
 /**
+ * Qwen VISION model mặc định — đọc Settings (DB) -> env/config; không cứng trong logic.
+ */
+function studio_qwen_vision_default(): string
+{
+    $m = trim((string) studio_config('qwen_vision_model', ''));
+
+    if ($m === '') {
+        $m = (string) config('studio.qwen_vision_model', 'qwen3.8-flash');
+    }
+
+    return $m ?: 'qwen3.8-flash';
+}
+
+/**
+ * Qwen MAX model mặc định — đọc Settings (DB) -> env/config; không cứng trong logic.
+ */
+function studio_qwen_max_default(): string
+{
+    $m = trim((string) studio_config('qwen_max_model', ''));
+
+    if ($m === '') {
+        $m = (string) config('studio.qwen_max_model', 'qwen3.8-max');
+    }
+
+    return $m ?: 'qwen3.8-max';
+}
+
+/**
  * Whether a Qwen model can be used for vision/chat-multimodal calls.
- * qwen3.x-flash/max and the legacy qwen-vl-* / qwen2*-vl-* series are multimodal chat models;
- * image/video GENERATION & EDIT models (qwen-image-*, wanx*-image*…) and non-chat services
- * (embedding, TTS, ASR, rerank…) are excluded because they do not accept chat+image content.
+ * qwen3.x-flash/max và dòng qwen-vl (các phiên bản) là multimodal chat; model SINH/CHỈNH SỬA ẢNH
+ * (qwen-image-*, wanx*-image*) và dịch vụ không-chat (embedding, TTS, ASR, rerank…) bị loại.
  */
 function is_qwen_vision_capable(?string $model): bool
 {
@@ -626,8 +663,7 @@ function is_qwen_vision_capable(?string $model): bool
     }
     $m = strtolower(trim($model));
 
-    // Sinh / chỉnh sửa ảnh, sinh video, dịch vụ không-chat -> KHÔNG dùng được cho vision chat.
-    if (preg_match('/(^|[-_.])(image|img)(edit)?([-_.]|$)/', $m)
+    if (preg_match('/(^|[\-_.])(image|img)(edit)?([\-_.]|$)/', $m)
         || str_contains($m, 'wanx')
         || str_contains($m, 'videogen')
         || str_contains($m, 'taichu')
@@ -640,34 +676,54 @@ function is_qwen_vision_capable(?string $model): bool
         return false;
     }
 
-    return true; // qwen3.8-flash/max, qwen-plus/turbo, qwen-vl-* … đều chấp nhận chat multimodal
+    return true;
 }
 
 /**
- * Candidate Qwen (DashScope) VISION models to try in order. qwen3.8-flash (nhanh, rẻ, 1M context)
- * is the default; qwen3.8-max gives higher quality; the legacy qwen-vl-* series remain as
- * fallbacks for accounts that only expose them. Walking the list makes the vision call robust.
+ * Candidate Qwen VISION models to try in order (robust: host/account chỉ expose một subset).
+ *
+ * Ưu tiên 1: danh sách tùy biến qwen_vision_models (Settings, phân cách dấu phẩy) —
+ * model đầu là ưu tiên cao nhất, nhập được BẤT KỲ model nào (qwen3.8-max, qwen3.8-flash…).
+ * Ưu tiên 2: [qwen_vision_model đã cấu hình, qwen_max_model, qwen-vl-* fallback].
  */
 function studio_qwen_vision_models(): array
 {
-    $primary = studio_vision_model('qwen'); // qwen3.8-flash (hoặc model được cấu hình)
-    $max = trim((string) studio_config('qwen_max_model', 'qwen3.8-max'));
+    $custom = array_filter(array_map('trim', explode(',', (string) studio_config('qwen_vision_models', ''))));
+    if (! empty($custom)) {
+        return array_values(array_unique(array_filter($custom)));
+    }
+
+    $primary = studio_qwen_vision_default(); // model admin chọn qua Settings/env/config
+    $max = studio_qwen_max_default();
     $candidates = [$primary, $max, 'qwen-vl-max', 'qwen2.5-vl-72b-instruct', 'qwen-vl-plus', 'qwen2-vl-plus'];
+
     return array_values(array_unique(array_filter($candidates)));
 }
 
 /**
  * Candidate Qwen TEXT/chat models to try in order (OpenAI-compatible chat completions).
- * qwen3.8-flash is the fast multimodal default; qwen3.8-max gives higher quality; qwen-plus /
- * qwen-turbo are legacy fallbacks. Used by the stylist, the translate fallback and the
- * creative-director (Qwen) path.
+ *
+ * Ưu tiên 1: danh sách tùy biến qwen_text_models (Settings, phân cách dấu phẩy).
+ * Ưu tiên 2: [qwen_prompt_model, stylist_model, qwen_max_model, default mềm, qwen-plus, qwen-turbo].
+ * Dùng cho stylist, translate fallback và creative-director (Qwen) path.
  */
 function studio_qwen_text_models(): array
 {
-    $configured = trim((string) studio_config('qwen_prompt_model', 'qwen3.8-flash'));
-    $stylist = trim((string) studio_config('stylist_model', 'qwen3.8-flash'));
-    $max = trim((string) studio_config('qwen_max_model', 'qwen3.8-max'));
-    $candidates = [$configured, $stylist, $max, 'qwen3.8-flash', 'qwen-plus', 'qwen-turbo'];
+    $custom = array_filter(array_map('trim', explode(',', (string) studio_config('qwen_text_models', ''))));
+    if (! empty($custom)) {
+        return array_values(array_unique(array_filter($custom)));
+    }
+
+    $configured = trim((string) studio_config('qwen_prompt_model', ''));
+    if ($configured === '') {
+        $configured = (string) config('studio.qwen_prompt_model', 'qwen3.8-flash');
+    }
+    $stylist = trim((string) studio_config('stylist_model', ''));
+    $max = studio_qwen_max_default();
+    $candidates = [$configured, $stylist, $max];
+    $candidates[] = (string) config('studio.qwen_prompt_model', 'qwen3.8-flash'); // default mềm
+    $candidates[] = 'qwen-plus';
+    $candidates[] = 'qwen-turbo';
 
     return array_values(array_unique(array_filter($candidates)));
 }
