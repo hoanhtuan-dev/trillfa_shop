@@ -9,7 +9,7 @@ import PaletteTextureCard from './components/PaletteTextureCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
-import RegionTools from './components/RegionTools.vue';
+import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
@@ -25,18 +25,16 @@ watch(() => store.previewId, (id) => { store.loadPalette(id); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
 const canvasZoom = ref(null);
-const brushOverlay = ref(null);
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
-watch(brushOverlay, (el) => { store.setBrushCanvas(el); if (el && store.regionMode && store.regionMaskMode === 'brush') store._initBrushCanvas(); });
 // While crop mode is on: re-fit the box when the ratio changes, re-init when the image changes.
 watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
 watch(() => store.upscaleSrc, () => { if (store.cropMode) store.initCropBox(); });
 function onCanvasKey(e) {
-  if (!store.cropMode && !store.regionMode) return;
+  if (!store.cropMode && store.inpaintMaskMode === 'none') return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-  if (e.key === 'Escape') { if (store.regionMode) store.stopRegionSelect(); else store.toggleCrop(); }
-  else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON') && !store.regionMode) store.confirmCrop();
+  if (e.key === 'Escape') { if (store.inpaintMaskMode !== 'none') { store.inpaintMaskMode = 'none'; store.inpaintBrushData = ''; } else store.toggleCrop(); }
+  else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON') && store.inpaintMaskMode === 'none') store.confirmCrop();
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, UpscaleCard] : [DirectorCard]);
@@ -65,8 +63,8 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative h-full overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
-          <!-- Floating region tools (left edge icons + panel) -->
-          <RegionTools />
+          <!-- Inpaint mask overlay on canvas -->
+          <CanvasMaskTools />
           <!-- active image indicator + actions -->
           <div v-if="store.upscaleSrc" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
             <span class="text-[10px] text-cream-300/60">{{ store.editSource ? 'Nguồn:' : 'Kết quả:' }}</span>
@@ -93,31 +91,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
                 <div class="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-white shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.cropStart($event,'se')" @dblclick.stop></div>
               </div>
             </div>
-            <!-- Region selection overlay (xóa/thay vùng) -->
-            <div v-if="store.regionMode && store.upscaleSrc" class="absolute inset-0" style="z-index:31; cursor:crosshair" @pointerdown="store.regionStart($event)" @pointermove="store.regionMove($event)" @pointerup="store.regionStop()" @pointercancel="store.regionStop()">
-              <!-- Brush overlay: THẤY NÉT VẼ THẬT trên ảnh, neo theo zoom/pan (canvasMetrics) -->
-              <canvas v-show="store.regionMaskMode === 'brush'" ref="brushOverlay" class="pointer-events-none absolute z-[2]" :style="store.brushStyle()"></canvas>
-              <!-- Hint khi brush chưa vẽ: mời vẽ lên ảnh -->
-              <div v-if="store.regionMaskMode === 'brush' && !store.regionBrushData" class="pointer-events-none absolute inset-0 grid place-items-center">
-                <span class="rounded-full bg-ink-900/90 px-3 py-1 text-[11px] font-semibold text-brand-200">🖌 Vẽ lên ảnh · Esc để hủy</span>
-              </div>
-              <!-- Brush: CHỈ label % bbox, KHÔNG khung dashed, KHÔNG handles — nét đỏ đã hiển thị biên thật -->
-              <div v-if="store.regionMaskMode === 'brush' && store.regionBrushData" class="pointer-events-none absolute" :style="store.brushStyle()">
-                <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-100">{{ Math.round((store.regionBox.w || 0) * 100) }}% × {{ Math.round((store.regionBox.h || 0) * 100) }}%</div>
-              </div>
-              <!-- Rect: khung dashed + handles + label -->
-              <div v-if="store.regionMaskMode === 'rect'" class="pointer-events-none absolute" :style="store.regionStyle()">
-                <div class="absolute -inset-px border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
-                <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">Kéo chọn vùng · Esc để hủy</div>
-                <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-100">{{ Math.round((store.regionBox.w || 0) * 100) }}% × {{ Math.round((store.regionBox.h || 0) * 100) }}%</div>
-                <template v-if="(store.regionBox.w || 0) >= 0.03 && (store.regionBox.h || 0) >= 0.03">
-                  <div class="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.regionHandleDown($event, 'nw')" @dblclick.stop></div>
-                  <div class="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.regionHandleDown($event, 'ne')" @dblclick.stop></div>
-                  <div class="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.regionHandleDown($event, 'sw')" @dblclick.stop></div>
-                  <div class="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.regionHandleDown($event, 'se')" @dblclick.stop></div>
-                </template>
-              </div>
-            </div>
+
           </div>
           <!-- Canvas toolbar -->
           <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">

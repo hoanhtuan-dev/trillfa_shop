@@ -3,7 +3,6 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 const store = useStudioStore();
 
-// Live elapsed timer while an inpaint job is running.
 const now = ref(Date.now());
 let timer = null;
 onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
@@ -15,88 +14,24 @@ const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s 
 const activeGen = computed(() => store.inpaintGenId ? store.generations.find(g => g.id === Number(store.inpaintGenId)) : null);
 const canSubmit = computed(() => !!store.previewId && !!store.preview?.media_url && !store.inpainting && !!store.inpaintPrompt.trim());
 const running = computed(() => store.inpaintStage === 'send' || store.inpaintStage === 'processing');
-
-// Mask-related
 const maskActive = computed(() => store.inpaintMaskMode !== 'none');
-const maskBoxStyle = computed(() => {
-  const b = store.inpaintMaskBox || {};
-  return {
-    left: (b.x || 0) * 100 + '%',
-    top: (b.y || 0) * 100 + '%',
-    width: (b.w || 0) * 100 + '%',
-    height: (b.h || 0) * 100 + '%',
-  };
-});
-const hasMaskBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.inpaintMaskBox.h || 0) >= 0.02);
-
-// Refs cho ảnh preview (để tính toán pointer)
-const previewImgRef = ref(null);
-
-function onMaskPointerDown(e) {
-  store.inpaintMaskStart(e, previewImgRef.value);
-}
-function onMaskPointerMove(e) {
-  store.inpaintMaskMove(e, previewImgRef.value);
-}
-function onMaskPointerUp() {
-  store.inpaintMaskStop();
-}
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">✏️ Sửa ảnh (Inpaint)</h2>
-    <p class="text-[11px] text-ink-500">Chỉnh sửa vùng/phần tử trên ảnh đang chọn — AI sửa đúng ảnh, giữ phần còn lại.</p>
+    <p class="text-[11px] text-ink-500">Chỉnh sửa vùng/phần tử trên ảnh đang chọn — AI chỉ sửa đúng vùng được chọn, giữ phần còn lại.</p>
 
-    <!-- Ảnh sẽ được sửa + Mask overlay -->
-    <div v-if="store.preview?.media_url" class="mt-3">
-      <div class="relative mx-auto overflow-hidden rounded-2xl border border-white/10 bg-ink-900"
-           :class="maskActive ? 'cursor-crosshair' : ''"
-           :style="{ maxWidth: '100%', aspectRatio: '1 / 1' }"
-           @pointerdown="onMaskPointerDown"
-           @pointermove="onMaskPointerMove"
-           @pointerup="onMaskPointerUp"
-           @pointercancel="onMaskPointerUp"
-           @pointerleave="onMaskPointerUp">
-        <img ref="previewImgRef"
-             :src="store.preview.media_url"
-             class="h-full w-full object-contain"
-             :class="maskActive ? 'pointer-events-none' : ''"
-             draggable="false"
-             alt="Preview">
-        
-        <!-- Mask overlay: rect mode -->
-        <div v-if="store.inpaintMaskMode === 'rect'" class="pointer-events-none absolute inset-0">
-          <div class="absolute border-2 border-dashed border-brand-300" :style="maskBoxStyle"
-               style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);">
-            <!-- Handles -->
-            <template v-if="hasMaskBox">
-              <div class="absolute -left-1.5 -top-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._inpaintHandle='nw'; const d=store._inpaintDrag={x:0,y:0,box:{...store.inpaintMaskBox}};"></div>
-              <div class="absolute -right-1.5 -top-1.5 h-3 w-3 cursor-nesw-resize rounded-sm border border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._inpaintHandle='ne'; const d=store._inpaintDrag={x:0,y:0,box:{...store.inpaintMaskBox}};"></div>
-              <div class="absolute -bottom-1.5 -left-1.5 h-3 w-3 cursor-nesw-resize rounded-sm border border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._inpaintHandle='sw'; const d=store._inpaintDrag={x:0,y:0,box:{...store.inpaintMaskBox}};"></div>
-              <div class="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._inpaintHandle='se'; const d=store._inpaintDrag={x:0,y:0,box:{...store.inpaintMaskBox}};"></div>
-            </template>
-          </div>
-          <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">Kéo chọn vùng cần sửa</div>
-          <div v-if="hasMaskBox" class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-100">{{ Math.round((store.inpaintMaskBox.w || 0) * 100) }}% × {{ Math.round((store.inpaintMaskBox.h || 0) * 100) }}%</div>
-        </div>
-
-        <!-- Brush mode hint -->
-        <div v-if="store.inpaintMaskMode === 'brush'" class="pointer-events-none absolute inset-0 grid place-items-center">
-          <div class="rounded-full bg-ink-900/90 px-3 py-1 text-[11px] font-semibold text-brand-200">
-            <template v-if="!store.inpaintBrushData">🖌 Vẽ lên vùng cần sửa</template>
-            <template v-else>✅ Đã vẽ mask · {{ Math.round((store.inpaintMaskBox.w || 0) * 100) }}% × {{ Math.round((store.inpaintMaskBox.h || 0) * 100) }}%</template>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-1.5 flex items-center gap-2 text-xs text-cream-200">
-        <span class="truncate font-semibold">Ảnh kết quả #{{ store.preview.id }}</span>
-        <span class="text-cream-300/60">— Sẽ sửa trực tiếp trên ảnh này</span>
+    <!-- Ảnh đang chọn -->
+    <div v-if="store.preview?.media_url" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
+      <img :src="store.preview.media_url" class="h-14 w-14 rounded-xl bg-ink-900 object-cover">
+      <div class="min-w-0 text-xs text-cream-200">
+        <p class="truncate font-semibold">Ảnh kết quả #{{ store.preview.id }}</p>
+        <p class="text-cream-300/60">Sẽ sửa trực tiếp trên ảnh này</p>
       </div>
     </div>
     <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh kết quả trong <b>Outputs</b> để sửa.</div>
 
-    <!-- Mask mode toggle -->
+    <!-- Mask tools: chọn vùng trên canvas chính -->
     <div v-if="store.preview?.media_url" class="mt-2 flex gap-1.5">
       <button @click="store.toggleInpaintMask('rect')"
               :class="store.inpaintMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
@@ -112,6 +47,10 @@ function onMaskPointerUp() {
               class="rounded-full bg-red-600/25 px-2 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">
         ✕ Bỏ mask
       </button>
+    </div>
+    <div v-if="maskActive" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">
+      {{ store.inpaintMaskMode === 'rect' ? '▭ Kéo chọn vùng trên canvas — AI chỉ sửa trong vùng đã chọn' : '🖌 Vẽ mask trên canvas — AI chỉ sửa vùng đã vẽ' }}
+      <span v-if="(store.inpaintMaskBox.w || 0) >= 0.02" class="ml-1 font-semibold text-white">{{ Math.round(store.inpaintMaskBox.w * 100) }}% × {{ Math.round(store.inpaintMaskBox.h * 100) }}%</span>
     </div>
 
     <label class="label mt-3">Mô tả chỉnh sửa</label>
