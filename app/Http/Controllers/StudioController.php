@@ -229,32 +229,65 @@ class StudioController extends Controller
         $pw = max(8, min($w - $px, (int) round($rw * $w)));
         $ph = max(8, min($h - $py, (int) round($rh * $h)));
 
-        // Mask: TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa — NHỊ PHÂN + GIÃN RA NGOÀI (pad)
-        // để vật thể tạo ra không bị cắt xén ở mép vùng chọn. Feather mềm làm ở composite
-        // (theo khoảng cách tới mép vùng) — không gửi mask mờ cho AI (AI edit kém tin cậy hơn).
-        $pad = (int) max(6, round(min($w, $h) * 0.02)); // giãn ra ngoài ~2%
-        $mask = imagecreatetruecolor($w, $h);
-        imagefilledrectangle($mask, 0, 0, $w - 1, $h - 1, imagecolorallocate($mask, 255, 255, 255));
-        imagefilledrectangle($mask, max(0, $px - $pad), max(0, $py - $pad),
-            min($w - 1, $px + $pw - 1 + $pad), min($h - 1, $py + $ph - 1 + $pad),
-            imagecolorallocate($mask, 0, 0, 0));
-        $maskName = 'studio/mask-'.Str::uuid().'.png';
+        // === DEEP REDESIGN: CROP + INPAINT + PASTE ===
+        // Crop vùng chọn + ngữ cảnh quanh thành ảnh nhỏ tập trung → gửi AI sửa TRÊN CROP
+        // (đúng vùng + đúng ngữ cảnh → đáng tin cậy hơn gửi cả ảnh / mask toàn ảnh), rồi
+        // PASTE lại vào ảnh gốc ĐÚNG TỌA ĐỘ (không lệch vị trí; feather mềm ở composite).
+        $pad = (int) max(6, round(min($w, $h) * 0.02));    // giãn vùng ra ngoài (chống cắt mép)
+        $ctx = (int) max(72, round(max($pw, $ph) * 0.8)); // NHIỀU ngữ cảnh quanh vùng (vùng hẹp cần context dày)
+        $cropX = max(0, $px - $ctx); $cropY = max(0, $py - $ctx);
+        $cropX2 = min($w, $px + $pw + $ctx); $cropY2 = min($h, $py + $ph + $ctx);
+        $cropW = $cropX2 - $cropX; $cropH = $cropY2 - $cropY;
+        $origCropW = $cropW; $origCropH = $cropH; // kích thước gốc (dùng khi paste lại)
+
+        $cropImg = imagecreatetruecolor($cropW, $cropH);
+        imagecopy($cropImg, $src, 0, 0, $cropX, $cropY, $cropW, $cropH);
+
+        // Mask (tương đối CROP): TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa (đã giãn pad).
+        $cord_x = max(0, $px - $pad - $cropX); $cord_y = max(0, $py - $pad - $cropY);
+        $cord_x2 = min($cropW - 1, $px + $pw - 1 + $pad - $cropX);
+        $cord_y2 = min($cropH - 1, $py + $ph - 1 + $pad - $cropY);
+        $mask = imagecreatetruecolor($cropW, $cropH);
+        imagefilledrectangle($mask, 0, 0, $cropW - 1, $cropH - 1, imagecolorallocate($mask, 255, 255, 255));
+        imagefilledrectangle($mask, $cord_x, $cord_y, $cord_x2, $cord_y2, imagecolorallocate($mask, 0, 0, 0));
+
+        // UP-SCALE crop + mask lên tối thiểu ~512px để AI có đủ độ phân giải (vùng hẹp/phức tạp).
+        // Paste sẽ cover-crop về kích thước GỐC (origCropW/H) nên vị trí vẫn chính xác.
+        $minDim = 512;
+        if ($cropW < $minDim || $cropH < $minDim) {
+            $scale = max($minDim / $cropW, $minDim / $cropH);
+            $cropW2 = (int) round($cropW * $scale); $cropH2 = (int) round($cropH * $scale);
+            $tmp = imagecreatetruecolor($cropW2, $cropH2);
+            imagecopyresampled($tmp, $cropImg, 0, 0, 0, 0, $cropW2, $cropH2, $cropW, $cropH);
+            imagedestroy($cropImg); $cropImg = $tmp;
+            $tmp2 = imagecreatetruecolor($cropW2, $cropH2);
+            imagecopyresampled($tmp2, $mask, 0, 0, 0, 0, $cropW2, $cropH2, $cropW, $cropH);
+            imagedestroy($mask); $mask = $tmp2;
+        }
+
+        $cropName = 'studio/region-crop-'.Str::uuid().'.png';
+        $maskName = 'studio/region-mask-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($cropName, $this->pngBytes($cropImg));
         \Illuminate\Support\Facades\Storage::disk('public')->put($maskName, $this->pngBytes($mask));
-        imagedestroy($mask);
-        $maskUrl = '/storage/'.$maskName;
+        imagedestroy($cropImg); imagedestroy($mask);
+        $cropUrl = '/storage/'.$cropName; $maskUrl = '/storage/'.$maskName;
+        $regionMeta = [
+            'region_op' => $op, 'source' => $sourceUrl,
+            'crop_x' => $cropX, 'crop_y' => $cropY, 'crop_w' => $origCropW, 'crop_h' => $origCropH,
+            'reg_x' => $cord_x, 'reg_y' => $cord_y, 'reg_w' => $cord_x2 - $cord_x + 1, 'reg_h' => $cord_y2 - $cord_y + 1,
+        ];
 
         $cost = (int) studio_config('image_credits', 1);
 
-        // Cả "XÓA VÙNG" lẫn "THAY VÙNG" đều DÙNG AI (mask nhị phân + prompt hiệu quả) —
-        // vì AI tái tạo nền đúng ngữ cảnh. Composite feather mềm đảm bảo ngoài vùng giữ nguyên.
-        // Fallback tái tạo nền cục bộ khi chưa có key / AI thất bại.
+        // Cả XÓA lẫn THAY đều dùng AI trên CROP (đáng tin cậy); fallback local khi chưa có key.
         $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
         if ($hasAi) {
             return $this->queueGeneration('image', [
                 'prompt' => $this->regionPrompt($op, (string) ($data['prompt'] ?? '')),
-                'base_image' => $sourceUrl,
+                'base_image' => $cropUrl,
                 'mask_image' => $maskUrl,
                 'edit' => true,
+                'region_meta' => $regionMeta,
             ], $cost, $generation);
         }
 
@@ -613,7 +646,7 @@ RULES:
             'base_image' => $data['base_image'] ?? $source?->media_url,
             'mask_image' => $data['mask_image'] ?? null,
             'credits_cost' => $cost,
-            'meta' => ($type === 'video' && ! empty($data['camera'])) ? ['camera' => $data['camera']] : null,
+            'meta' => ($type === 'video' && ! empty($data['camera'])) ? ['camera' => $data['camera']] : ($data['region_meta'] ?? null),
         ]);
 
         // The job is processed lazily when the client polls this generation (show()), or via the

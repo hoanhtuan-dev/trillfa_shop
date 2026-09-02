@@ -20,16 +20,25 @@ const reframeOpen = ref(false);
 const reframeRatios = ['1:1','3:4','4:5','9:16','16:9','2:3'];
 </script>
 <template>
-  <!-- 2 icon công cụ nổi mép trái canvas -->
-  <div class="absolute left-2 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-1.5" v-if="store.upscaleSrc">
-    <button v-for="(op, key) in store.regionOps" :key="key" @click="store.startRegionSelect(key); reframeOpen = false"
-      :class="store.regionMode === key ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'bg-ink-900/85 text-cream-200 border-ink-700 hover:bg-ink-700'"
-      class="grid h-10 w-10 place-items-center rounded-full border text-lg shadow-lg transition-colors" :title="op.label + ' · ' + op.hint">
-      {{ op.icon }}
-    </button>
-    <button @click="reframeOpen = !reframeOpen; store.stopRegionSelect()"
-      :class="(reframeOpen || store.cropMode) ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'bg-ink-900/85 text-cream-200 border-ink-700 hover:bg-ink-700'"
-      class="grid h-10 w-10 place-items-center rounded-full border text-lg shadow-lg transition-colors" title="📐 Reframe / Crop · Cắt khung theo tỷ lệ / chọn vùng">📐</button>
+  <!-- Toolbar nổi: gom 3 công cụ vào 1 card (icon SVG chuẩn ngành, nút +10%) -->
+  <div class="absolute left-2 top-1/2 z-40 -translate-y-1/2" v-if="store.upscaleSrc">
+    <div class="flex flex-col items-center gap-1 rounded-2xl border border-ink-700 bg-ink-900/85 p-1.5 shadow-xl backdrop-blur">
+      <button v-for="(op, key) in store.regionOps" :key="key" @click="store.startRegionSelect(key); reframeOpen = false"
+        :class="store.regionMode === key ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'text-cream-200 border-transparent hover:bg-ink-700'"
+        class="grid h-11 w-11 place-items-center rounded-xl border transition-colors" :title="op.label + ' · ' + op.hint">
+        <!-- Xóa vùng (eraser) -->
+        <svg v-if="key === 'erase'" class="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+        <!-- Thay vùng (wand-sparkles) -->
+        <svg v-else class="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
+      </button>
+      <div class="h-px w-6 bg-ink-700"></div>
+      <button @click="reframeOpen = !reframeOpen; store.stopRegionSelect()"
+        :class="(reframeOpen || store.cropMode) ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'text-cream-200 border-transparent hover:bg-ink-700'"
+        class="grid h-11 w-11 place-items-center rounded-xl border transition-colors" title="Reframe / Crop · Cắt khung theo tỷ lệ / chọn vùng">
+        <!-- Reframe / Crop (crop) -->
+        <svg class="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+      </button>
+    </div>
   </div>
 
   <!-- Panel nổi trong vùng canvas (khi chọn công cụ / đang chạy) -->

@@ -71,7 +71,10 @@ class ImageAIService
                 // ảnh gốc, chỉ vùng TRONG mask lấy kết quả AI (biên hòa mượt) — phần còn lại
                 // của ảnh không bao giờ bị model đổi nhẹ.
                 if ($maskImage) {
-                    $edited = $this->compositeMaskedEdit($edited, $baseImage, $maskImage) ?: $edited;
+                    // Fallback tái tạo nền cục bộ CHỈ cho XÓA ("REMOVAL") — Thay vùng không
+                    // smear khi AI no-op (giữ nguyên để user biết AI chưa tạo).
+                    $eraseFallback = str_contains($prompt, 'REMOVAL');
+                    $edited = $this->compositeMaskedEdit($edited, $baseImage, $maskImage, $eraseFallback) ?: $edited;
                 }
                 return $edited;
             }
@@ -779,7 +782,7 @@ class ImageAIService
      * Đây là bước khép kín chuỗi "tách nền → xóa vật thể → gộp lại": phần ngoài vùng chọn
      * luôn giữ nguyên 100%, không bị model edit làm đổi nhẹ.
      */
-    protected function compositeMaskedEdit(string $editedUrl, string $sourceUrl, string $maskUrl): ?string
+    protected function compositeMaskedEdit(string $editedUrl, string $sourceUrl, string $maskUrl, bool $eraseFallback = false): ?string
     {
         try {
             $edited = @imagecreatefromstring((string) $this->resolveImageBinary($editedUrl));
@@ -848,7 +851,7 @@ class ImageAIService
                 $elum = (($ec >> 16) & 0xFF) + (($ec >> 8) & 0xFF) + ($ec & 0xFF);
                 $sc = imagecolorat($source, $cx, $cy);
                 $slum = (($sc >> 16) & 0xFF) + (($sc >> 8) & 0xFF) + ($sc & 0xFF);
-                if ($meanDiff < 3.0 || ($elum < 100 && $slum > 190)) {
+                if (($eraseFallback && $meanDiff < 3.0) || ($elum < 100 && $slum > 190)) {
                     imagedestroy($edited); imagedestroy($source); imagedestroy($mask); imagedestroy($out);
                     $fb = imagecreatetruecolor($w, $h);
                     imagecopy($fb, $source, 0, 0, 0, 0, $w, $h);
@@ -908,6 +911,46 @@ class ImageAIService
                     (int) round(($hg + $vg) / 2),
                     (int) round(($hb + $vb) / 2)));
             }
+        }
+    }
+
+    /**
+     * DEEP REDESIGN (region): AI đã sửa trên CROP → paste lại vào ẢNH GỐC đúng vị trí (crop_x/crop_y).
+     * Crop có feather ở composite nên biên vùng mượt sẵn; ngữ cảnh ngoài vùng trùng khớp ảnh gốc.
+     */
+    protected function pasteRegionEdit(string $editedCropUrl, array $meta): ?string
+    {
+        try {
+            $src = @imagecreatefromstring((string) $this->resolveImageBinary((string) ($meta['source'] ?? '')));
+            $crop = @imagecreatefromstring((string) $this->resolveImageBinary($editedCropUrl));
+            if (! $src || ! $crop) {
+                if ($src) { imagedestroy($src); }
+                if ($crop) { imagedestroy($crop); }
+                return null;
+            }
+            $cx = (int) $meta['crop_x']; $cy = (int) $meta['crop_y'];
+            $cw = (int) $meta['crop_w']; $ch = (int) $meta['crop_h'];
+            // Nếu model trả crop tỷ lệ khác → cover-crop về đúng crop_w x crop_h (không méo).
+            $ew = imagesx($crop); $eh = imagesy($crop);
+            if ($ew !== $cw || $eh !== $ch) {
+                $scale = max($cw / $ew, $ch / $eh);
+                $tw = (int) round($ew * $scale); $th = (int) round($eh * $scale);
+                $tmp = imagecreatetruecolor($tw, $th);
+                imagecopyresampled($tmp, $crop, 0, 0, 0, 0, $tw, $th, $ew, $eh);
+                $nw = imagecreatetruecolor($cw, $ch);
+                imagecopy($nw, $tmp, 0, 0, (int) (($tw - $cw) / 2), (int) (($th - $ch) / 2), $cw, $ch);
+                imagedestroy($tmp); imagedestroy($crop); $crop = $nw;
+            }
+            imagecopy($src, $crop, $cx, $cy, 0, 0, $cw, $ch);
+            imagedestroy($crop);
+            ob_start(); imagepng($src); $bytes = (string) ob_get_clean();
+            imagedestroy($src);
+            $name = 'studio/region-'.Str::uuid().'.png';
+            Storage::disk('public')->put($name, $bytes);
+            return '/storage/'.$name;
+        } catch (\Throwable $e) {
+            logger()->warning('pasteRegionEdit failed: '.$e->getMessage());
+            return null;
         }
     }
 

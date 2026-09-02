@@ -50,6 +50,14 @@ class RenderImageJob implements ShouldQueue
                 $generation->model,
             );
 
+            // DEEP REDESIGN (region): AI đã sửa trên CROP — paste lại vào ẢNH GỐC đúng vị trí
+            // (xóa/thay vùng chọn chính xác, không lệch tọa độ; feather đã làm trong composite).
+            $genMeta = (array) ($generation->meta ?? []);
+            if (isset($genMeta['region_op']) && $genMeta['region_op']) {
+                $pasted = $images->pasteRegionEdit($url, $genMeta);
+                if ($pasted) { $url = $pasted; }
+            }
+
             // NOTE: Face sync ("Đồng bộ khuôn mặt") was removed from the UI. We no longer do a second
             // applyFace edit pass here — it doubled the edit time (2 edits instead of 1). Keep the edit
             // a single pass so phẫu thuật ảnh is as fast as Thay Đổi Người Mẫu.
