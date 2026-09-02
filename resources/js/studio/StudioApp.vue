@@ -96,17 +96,22 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             <!-- Region selection overlay (xóa/thay vùng) -->
             <div v-if="store.regionMode && store.upscaleSrc" class="absolute inset-0" style="z-index:31; cursor:crosshair" @pointerdown="store.regionStart($event)" @pointermove="store.regionMove($event)" @pointerup="store.regionStop()" @pointercancel="store.regionStop()">
               <!-- Brush overlay: THẤY NÉT VẼ THẬT trên ảnh, neo theo zoom/pan (canvasMetrics) -->
-              <canvas v-show="store.regionMaskMode === 'brush'" ref="brushOverlay" class="pointer-events-none absolute z-[1]" :style="store.brushStyle()" style="mix-blend-mode:multiply"></canvas>
+              <canvas v-show="store.regionMaskMode === 'brush'" ref="brushOverlay" class="pointer-events-none absolute z-[2]" :style="store.brushStyle()" style="mix-blend-mode:multiply"></canvas>
               <div class="pointer-events-none absolute inset-0 bg-black/45"></div>
+              <!-- Hint khi brush chưa vẽ: mời vẽ lên ảnh -->
               <div v-if="store.regionMaskMode === 'brush' && !store.regionBrushData" class="pointer-events-none absolute inset-0 grid place-items-center">
-                <span class="rounded-full bg-ink-900/90 px-3 py-1 text-[11px] font-semibold text-brand-200">🖌 Vẽ mask lên ảnh · Esc để hủy</span>
+                <span class="rounded-full bg-ink-900/90 px-3 py-1 text-[11px] font-semibold text-brand-200">🖌 Vẽ lên ảnh · Esc để hủy</span>
               </div>
-              <div v-if="store.regionMaskMode !== 'brush' || store.regionBrushData" class="pointer-events-none absolute" :style="store.regionStyle()">
-                <div class="absolute -inset-px border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
-                <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">{{ store.regionMaskMode === 'brush' ? 'Vẽ mask · Esc để hủy' : 'Kéo chọn vùng · Esc để hủy' }}</div>
+              <!-- Brush: CHỈ label % bbox, KHÔNG khung dashed, KHÔNG handles — nét đỏ đã hiển thị biên thật -->
+              <div v-if="store.regionMaskMode === 'brush' && store.regionBrushData" class="pointer-events-none absolute" :style="store.brushStyle()">
                 <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-100">{{ Math.round((store.regionBox.w || 0) * 100) }}% × {{ Math.round((store.regionBox.h || 0) * 100) }}%</div>
-                <!-- Handles tinh chỉnh vùng (rect mode, vùng đủ lớn) -->
-                <template v-if="store.regionMaskMode === 'rect' && (store.regionBox.w || 0) >= 0.03 && (store.regionBox.h || 0) >= 0.03">
+              </div>
+              <!-- Rect: khung dashed + handles + label -->
+              <div v-if="store.regionMaskMode === 'rect'" class="pointer-events-none absolute" :style="store.regionStyle()">
+                <div class="absolute -inset-px border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
+                <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">Kéo chọn vùng · Esc để hủy</div>
+                <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-100">{{ Math.round((store.regionBox.w || 0) * 100) }}% × {{ Math.round((store.regionBox.h || 0) * 100) }}%</div>
+                <template v-if="(store.regionBox.w || 0) >= 0.03 && (store.regionBox.h || 0) >= 0.03">
                   <div class="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.regionHandleDown($event, 'nw')" @dblclick.stop></div>
                   <div class="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.regionHandleDown($event, 'ne')" @dblclick.stop></div>
                   <div class="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.regionHandleDown($event, 'sw')" @dblclick.stop></div>
