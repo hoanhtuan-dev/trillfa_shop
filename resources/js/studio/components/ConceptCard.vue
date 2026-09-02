@@ -7,6 +7,7 @@ const showAdvanced = ref(false);
 const promptLoading = ref(false);
 const showHistory = ref(false);
 const showTemplates = ref(false);
+const showEnrich = ref(false);
 const history = ref([]);
 const historyLoading = ref(false);
 const enrichPreview = ref('');
@@ -39,7 +40,6 @@ function undo() {
   const prev = undoStack.value[undoStack.value.length - 1];
   ignoreNextInput = true;
   store.imagePromptEn = prev;
-  scheduleEnrichPreview();
 }
 function redo() {
   if (!redoStack.value.length) return;
@@ -47,7 +47,6 @@ function redo() {
   undoStack.value.push(next);
   ignoreNextInput = true;
   store.imagePromptEn = next;
-  scheduleEnrichPreview();
 }
 function onPromptKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -200,7 +199,6 @@ function restoreDraft() {
   showDraftNotice.value = false;
   undoStack.value = [store.imagePromptEn || ''];
   redoStack.value = [];
-  scheduleEnrichPreview();
   store.toast('Đã khôi phục bản nháp.');
 }
 
@@ -249,9 +247,16 @@ function applyTemplate(tpl) {
 // ── Live Enrich Preview ──
 let enrichDebounce = null;
 let enrichAbort = null;
-function scheduleEnrichPreview() {
-  if (enrichDebounce) clearTimeout(enrichDebounce);
-  enrichDebounce = setTimeout(doEnrichPreview, 800);
+
+// Open the enrich preview popup — triggers immediately
+async function openEnrichPreview() {
+  if (!store.imagePromptEn?.trim()) {
+    store.toast('Nhập prompt trước khi preview enrich.', 'error');
+    return;
+  }
+  showEnrich.value = true;
+  // Immediately fetch enrich preview
+  await doEnrichPreview();
 }
 async function doEnrichPreview() {
   const p = store.imagePromptEn?.trim();
@@ -342,7 +347,7 @@ async function doEnrichPreview() {
 
         <!-- ── Prompt textarea + char counter + undo/redo ── -->
         <div class="relative">
-          <textarea v-model="store.imagePromptEn" @input="scheduleEnrichPreview" @keydown="onPromptKeydown" rows="6" class="input !text-sm !py-3 !pr-16" placeholder="Nhập ý tưởng / prompt (EN hoặc VI). Mô tả trang phục, phong cách, bối cảnh, ánh sáng…"></textarea>
+          <textarea v-model="store.imagePromptEn" @keydown="onPromptKeydown" rows="6" class="input !text-sm !py-3 !pr-16" placeholder="Nhập ý tưởng / prompt (EN hoặc VI). Mô tả trang phục, phong cách, bối cảnh, ánh sáng…"></textarea>
           <!-- Char counter + undo/redo -->
           <div class="absolute bottom-2 right-2 flex items-center gap-1">
             <button @click="undo" :disabled="undoStack.length < 2" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Undo (Ctrl+Z)">↩</button>
@@ -350,17 +355,6 @@ async function doEnrichPreview() {
             <span class="text-[10px] font-semibold" :class="charDanger ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-cream-300/50'">{{ charCount }}/{{ MAX_CHARS }}</span>
           </div>
         </div>
-
-        <!-- Live enrich preview -->
-        <div v-if="enrichPreview || enrichLoading" class="my-3 rounded-xl border border-emerald-500/30 bg-emerald-900/20 p-2.5">
-          <div class="flex items-center justify-between mb-1">
-            <p class="text-[11px] text-emerald-300/60">✨ Prompt sau khi enrich (gửi lên model):</p>
-            <button @click="doEnrichPreview" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200 hover:bg-brand-600" :disabled="enrichLoading">{{ enrichLoading ? '⏳' : '🔄 Làm mới' }}</button>
-          </div>
-          <p v-if="enrichPreview" class="max-h-24 overflow-y-auto text-[11px] leading-relaxed text-emerald-100 whitespace-pre-wrap">{{ enrichPreview }}</p>
-          <p v-else class="text-[11px] text-brand-300/60">⏳ Đang phân tích prompt…</p>
-        </div>
-        <div v-if="enrichError" class="my-1 text-[11px] text-red-300/60">{{ enrichError }}</div>
 
         <!-- ── Sáng tạo + Biến thể: chung 1 hàng 2 cột ── -->
         <div class="my-3 grid grid-cols-2 gap-3">
@@ -386,21 +380,54 @@ async function doEnrichPreview() {
           <input type="range" min="0" max="10" step="1" v-model.number="localTexture" class="w-full cursor-pointer accent-brand-500">
         </div>
 
-        <!-- ── Nâng cao + Templates: nút bấm rõ ràng ── -->
+        <!-- ── Nâng cao + Preview Enrich: nút bấm rõ ràng ── -->
         <div class="my-3 flex gap-2">
           <button @click="showAdvanced = !showAdvanced" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showAdvanced ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
             {{ showAdvanced ? '▾' : '▸' }} Nâng cao (negative prompt)
           </button>
-          <button @click="showTemplates = !showTemplates" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
-            📁 Templates
+          <button @click="openEnrichPreview" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showEnrich ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
+            ✨ Preview Enrich
           </button>
         </div>
 
         <!-- Advanced: Negative prompt -->
         <div v-if="showAdvanced" class="my-3 rounded-2xl border border-ink-700 bg-ink-800 p-3">
           <label class="label text-sm">Negative prompt (điều model KHÔNG nên tạo)</label>
-          <textarea v-model="store.negativePromptEn" @input="scheduleEnrichPreview" rows="2" class="input !text-sm !py-2" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..."></textarea>
+          <textarea v-model="store.negativePromptEn" rows="2" class="input !text-sm !py-2" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..."></textarea>
           <p class="mt-1 text-[10px] text-cream-300/50">Để trống để dùng negative prompt mặc định từ Cài đặt.</p>
+        </div>
+
+        <!-- Enrich Preview popup -->
+        <div v-if="showEnrich" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showEnrich = false">
+          <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-emerald-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+            <div class="mb-3 flex items-center justify-between">
+              <span class="text-sm font-semibold text-emerald-300">✨ Prompt Enrich Preview</span>
+              <div class="flex items-center gap-2">
+                <button @click="doEnrichPreview" :disabled="enrichLoading" class="rounded-full bg-ink-700 px-3 py-1 text-[10px] text-cream-200 hover:bg-brand-600">{{ enrichLoading ? '⏳ Đang xử lý…' : '🔄 Làm mới' }}</button>
+                <button @click="showEnrich = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white">✕</button>
+              </div>
+            </div>
+            <!-- Original prompt -->
+            <div class="mb-3 rounded-xl border border-ink-600 bg-ink-800 p-3">
+              <p class="mb-1 text-[10px] text-cream-300/40">📝 Prompt gốc:</p>
+              <p class="text-xs leading-relaxed text-cream-200 whitespace-pre-wrap">{{ store.imagePromptEn || '(chưa nhập prompt)' }}</p>
+            </div>
+            <!-- Enriched prompt -->
+            <div class="rounded-xl border border-emerald-500/30 bg-emerald-900/20 p-3">
+              <p class="mb-1 text-[10px] text-emerald-300/60">✨ Prompt sau khi enrich (gửi lên model):</p>
+              <div v-if="enrichLoading" class="py-4 text-center text-xs text-brand-300/60">⏳ Đang xử lý…</div>
+              <div v-else-if="enrichError" class="text-xs text-red-300/60">{{ enrichError }}</div>
+              <p v-else-if="enrichPreview" class="max-h-60 overflow-y-auto text-xs leading-relaxed text-emerald-100 whitespace-pre-wrap">{{ enrichPreview }}</p>
+              <p v-else class="text-xs text-cream-300/40">Bấm "🔄 Làm mới" để xem prompt đã enrich.</p>
+            </div>
+            <!-- Settings summary -->
+            <div class="mt-3 grid grid-cols-4 gap-2 text-[10px] text-cream-300/40">
+              <span>Sáng tạo: {{ store.creativeLevel }}/10</span>
+              <span>Texture: {{ textureLabel }}</span>
+              <span>Ratio: {{ store.imageRatio }}</span>
+              <span>Res: {{ store.imageRes }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- ── Draft restore notice ── -->
