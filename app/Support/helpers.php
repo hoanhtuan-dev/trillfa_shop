@@ -446,7 +446,7 @@ if (! function_exists('studio_model_catalog')) {
             ['group' => 'video', 'name' => 'Wan 2.1 i2v Turbo', 'provider' => 'wan', 'model_id' => 'wan2.1-i2v-turbo', 'api_key_ref' => 'wan', 'priority' => 5, 'note' => 'Nhanh'],
             ['group' => 'video', 'name' => 'Kling i2v', 'provider' => 'kling', 'model_id' => 'kling-v1-6-i2v', 'api_key_ref' => 'kling', 'priority' => 8, 'note' => 'Nếu có key Kling'],
             ['group' => 'inference', 'name' => 'Gemini (Giám đốc sáng tạo)', 'provider' => 'gemini', 'model_id' => 'gemini-2.5-flash', 'api_key_ref' => 'gemini', 'priority' => 9, 'note' => 'Suy luận prompt'],
-            ['group' => 'inference', 'name' => 'Qwen Chat', 'provider' => 'qwen', 'model_id' => 'qwen-max', 'api_key_ref' => 'qwen', 'priority' => 7, 'note' => 'Suy luận prompt'],
+            ['group' => 'inference', 'name' => 'Qwen Chat', 'provider' => 'qwen', 'model_id' => 'qwen-plus', 'api_key_ref' => 'qwen', 'priority' => 7, 'note' => 'Suy luận prompt'],
         ];
     }
 }

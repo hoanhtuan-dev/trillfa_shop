@@ -201,7 +201,7 @@ PROMPT;
     {
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
         $qwenModels = array_values(array_unique(array_filter([
-            (string) studio_config('stylist_model', 'qwen3.8-flash'), 'qwen3.8-flash', (string) studio_config('prompt_model', 'qwen-plus'), 'qwen-plus', 'qwen-max',
+            (string) studio_config('stylist_model', 'qwen3.8-flash'), 'qwen3.8-flash', (string) studio_config('qwen_prompt_model', 'qwen-plus'), 'qwen-plus', 'qwen-turbo',
         ])));
         if ($qwenKey) {
             foreach ($qwenModels as $qm) {
@@ -222,7 +222,7 @@ PROMPT;
 
         $geminiKey = studio_api_key('gemini');
         $gemModels = array_values(array_unique(array_filter([
-            (string) studio_config('translate_model', 'gemini-3.5-flash'), 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash',
+            (string) studio_config('translate_model', 'gemini-2.5-flash'), 'gemini-2.5-flash', 'gemini-2.0-flash',
         ])));
         if ($geminiKey) {
             foreach ($gemModels as $gm) {

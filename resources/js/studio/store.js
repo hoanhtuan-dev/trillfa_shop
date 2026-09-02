@@ -79,6 +79,16 @@ export const useStudioStore = defineStore('studio', {
     inpaintError: '',         // thông báo lỗi cuối
     inpaintPreserveBg: true,  // giữ nguyên nền
     inpaintPreserveFace: true,// giữ nguyên khuôn mặt
+    // ── Inpaint Mask (tích hợp region selection vào Inpaint) ──
+    inpaintMaskMode: 'none',   // 'none' | 'rect' | 'brush' — chọn vùng cần sửa
+    inpaintMaskBox: { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }, // vùng mask (normalized 0..1)
+    inpaintBrushData: '',      // base64 PNG của brush mask
+    _inpaintMaskCanvas: null,  // canvas DOM cho brush mask (tạm thời)
+    _inpaintMaskCtx: null,     // 2d context
+    _inpaintBrushDrawing: false,
+    _inpaintBrushLast: null,
+    _inpaintDrag: null,
+    _inpaintHandle: null,
     // ── Region Tools (xóa/thay vùng chọn trên canvas) — MỞ RỘNG: thêm op mới vào đây +
     //    backend StudioController::REGION_OPS (và regionPrompt) là đủ. ──
     regionOps: {
@@ -461,7 +471,16 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintStage = 'send';
       this.inpaintStartTs = Date.now();
       try {
-        const d = await this.api('/studio/generations/' + this.previewId + '/inpaint', { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace });
+        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace };
+        // Gửi mask nếu có chọn vùng (rect/brush)
+        if (this.inpaintMaskMode !== 'none') {
+          body.mask_mode = this.inpaintMaskMode;
+          body.region = this.inpaintMaskBox;
+          if (this.inpaintMaskMode === 'brush' && this.inpaintBrushData) {
+            body.mask_data = this.inpaintBrushData;
+          }
+        }
+        const d = await this.api('/studio/generations/' + this.previewId + '/inpaint', body);
         if (!d.generation_id) { throw new Error(d.message || 'Không tạo được yêu cầu sửa ảnh.'); }
         this.inpaintGenId = d.generation_id;
         this.inpaintStage = 'processing';
@@ -479,7 +498,128 @@ export const useStudioStore = defineStore('studio', {
       try { await this.api('/studio/generations/' + this.inpaintGenId + '/cancel', {}); this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
       catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
     },
-    clearInpaintStatus() { this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; },
+    clearInpaintStatus() { this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; },
+    // ── Inpaint Mask: chọn vùng trên ảnh preview (integrated into InpaintCard) ──
+    toggleInpaintMask(mode) {
+      if (this.inpaintMaskMode === mode) { this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; return; }
+      if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
+      this.inpaintMaskMode = mode;
+      this.inpaintBrushData = '';
+      if (mode === 'brush') this._initInpaintBrush();
+    },
+    // Pointer events cho mask trên ảnh preview (normalized 0..1)
+    inpaintMaskPointer(e, imgEl) {
+      if (!imgEl) return null;
+      const r = imgEl.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
+      return { nx: this._clamp((e.clientX - r.left) / r.width, 0, 1), ny: this._clamp((e.clientY - r.top) / r.height, 0, 1) };
+    },
+    inpaintMaskStart(e, imgEl) {
+      if (this.inpaintMaskMode === 'none') return;
+      e.stopPropagation();
+      const p = this.inpaintMaskPointer(e, imgEl); if (!p) return;
+      if (this.inpaintMaskMode === 'brush') {
+        this._inpaintBrushDrawing = true;
+        this._inpaintBrushLast = p;
+        this._drawInpaintBrushDot(p);
+        return;
+      }
+      // Rect mode
+      const b = this.inpaintMaskBox;
+      const hit = this._inpaintHitTest(p, b);
+      if (hit) {
+        this._inpaintHandle = hit;
+        this._inpaintDrag = { x: p.nx, y: p.ny, box: { ...b } };
+      } else {
+        this._inpaintHandle = null;
+        this._inpaintDrag = { x: p.nx, y: p.ny };
+        this.inpaintMaskBox = { x: p.nx, y: p.ny, w: 0.005, h: 0.005 };
+      }
+    },
+    inpaintMaskMove(e, imgEl) {
+      if (this.inpaintMaskMode === 'none') return;
+      if (this.inpaintMaskMode === 'brush' && this._inpaintBrushDrawing) {
+        const p = this.inpaintMaskPointer(e, imgEl); if (!p) return;
+        this._drawInpaintBrushLine(this._inpaintBrushLast, p);
+        this._inpaintBrushLast = p;
+        return;
+      }
+      const d = this._inpaintDrag; if (!d) return;
+      const p = this.inpaintMaskPointer(e, imgEl); if (!p) return;
+      if (this._inpaintHandle) {
+        const bx = (p.nx - d.x), by = (p.ny - d.y);
+        const b = { ...d.box }; const MIN = 0.02;
+        const h = this._inpaintHandle;
+        if (h === 'move') { b.x = this._clamp(b.x + bx, 0, 1 - b.w); b.y = this._clamp(b.y + by, 0, 1 - b.h); }
+        else if (h === 'se') { b.w = this._clamp(b.w + bx, MIN, 1 - b.x); b.h = this._clamp(b.h + by, MIN, 1 - b.y); }
+        else if (h === 'sw') { const nw = this._clamp(b.w - bx, MIN, b.x + b.w); b.x = b.x + b.w - nw; b.w = nw; b.h = this._clamp(b.h + by, MIN, 1 - b.y); }
+        else if (h === 'ne') { b.w = this._clamp(b.w + bx, MIN, 1 - b.x); const nh = this._clamp(b.h - by, MIN, b.y + b.h); b.y = b.y + b.h - nh; b.h = nh; }
+        else if (h === 'nw') { const nw = this._clamp(b.w - bx, MIN, b.x + b.w); b.x = b.x + b.w - nw; b.w = nw; const nh = this._clamp(b.h - by, MIN, b.y + b.h); b.y = b.y + b.h - nh; b.h = nh; }
+        this.inpaintMaskBox = b;
+      } else {
+        const x = Math.min(d.x, p.nx), y = Math.min(d.y, p.ny);
+        this.inpaintMaskBox = { x, y, w: Math.max(0.005, Math.abs(p.nx - d.x)), h: Math.max(0.005, Math.abs(p.ny - d.y)) };
+      }
+    },
+    inpaintMaskStop() {
+      this._inpaintDrag = null;
+      this._inpaintHandle = null;
+      if (this._inpaintBrushDrawing) {
+        this._inpaintBrushDrawing = false;
+        this._inpaintBrushLast = null;
+        this._finalizeInpaintBrush();
+      }
+    },
+    _inpaintHitTest(p, b) {
+      if (b.w < 0.02 || b.h < 0.02) return null;
+      const M = 0.05;
+      const corners = [['nw', b.x, b.y], ['ne', b.x + b.w, b.y], ['sw', b.x, b.y + b.h], ['se', b.x + b.w, b.y + b.h]];
+      for (const [k, cx, cy] of corners) { if (Math.abs(p.nx - cx) <= M && Math.abs(p.ny - cy) <= M) return k; }
+      if (p.nx >= b.x && p.nx <= b.x + b.w && p.ny >= b.y && p.ny <= b.y + b.h) return 'move';
+      return null;
+    },
+    // Brush helpers cho inpaint (dùng canvas tạm)
+    _initInpaintBrush() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      this._inpaintMaskCanvas = c;
+      this._inpaintMaskCtx = c.getContext('2d');
+    },
+    _drawInpaintBrushDot(p) {
+      const c = this._inpaintMaskCtx; if (!c) return;
+      const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
+      c.fillStyle = 'rgba(200,20,20,0.48)';
+      c.beginPath(); c.arc(p.nx * w, p.ny * h, 12, 0, Math.PI * 2); c.fill();
+    },
+    _drawInpaintBrushLine(from, to) {
+      const c = this._inpaintMaskCtx; if (!c) return;
+      const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
+      c.strokeStyle = 'rgba(200,20,20,0.48)';
+      c.lineWidth = 24; c.lineCap = 'round'; c.lineJoin = 'round';
+      c.beginPath(); c.moveTo(from.nx * w, from.ny * h); c.lineTo(to.nx * w, to.ny * h); c.stroke();
+    },
+    _finalizeInpaintBrush() {
+      const el = this._inpaintMaskCanvas; if (!el || !this._inpaintMaskCtx) return;
+      const w = el.width, h = el.height;
+      const ctx = this._inpaintMaskCtx;
+      const src = ctx.getImageData(0, 0, w, h);
+      const mask = document.createElement('canvas'); mask.width = w; mask.height = h;
+      const mctx = mask.getContext('2d');
+      const out = mctx.createImageData(w, h);
+      for (let i = 0; i < w * h; i++) {
+        const v = src.data[i * 4 + 3] > 40 ? 0 : 255;
+        out.data[i * 4] = v; out.data[i * 4 + 1] = v; out.data[i * 4 + 2] = v; out.data[i * 4 + 3] = 255;
+      }
+      mctx.putImageData(out, 0, 0);
+      this.inpaintBrushData = mask.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+      // Tính bbox từ brush
+      let minX = w, minY = h, maxX = 0, maxY = 0, found = false;
+      for (let y = 0; y < h; y++) { for (let x = 0; x < w; x++) {
+        if (src.data[(y * w + x) * 4 + 3] > 40) { found = true; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+      }}
+      if (found && minX <= maxX && minY <= maxY) this.inpaintMaskBox = { x: minX / w, y: minY / h, w: (maxX - minX + 1) / w, h: (maxY - minY + 1) / h };
+      this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null;
+    },
     // ── Region Tools: chọn vùng trên canvas (kéo-thả hình chữ nhật, normalized 0..1) ──
     startRegionSelect(op) {
       if (!this.regionOps[op]) return;

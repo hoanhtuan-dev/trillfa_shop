@@ -96,11 +96,12 @@
                     <label class="label">Prompt — nhà cung cấp</label>
                     <select name="prompt_provider" class="input !py-2">
                         <option value="gemini" @selected(old('prompt_provider', $prompt_provider) === 'gemini')>Gemini</option>
-                        <option value="qwen" @selected(old('prompt_provider', $prompt_provider) === 'qwen')>Qwen (qwen3.8-flash)</option>
+                        <option value="qwen" @selected(old('prompt_provider', $prompt_provider) === 'qwen')>Qwen</option>
                         <option value="deepseek" @selected(old('prompt_provider', $prompt_provider) === 'deepseek')>DeepSeek (deepseek-chat)</option>
                     </select>
                 </div>
-                <div><label class="label">Prompt model</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-1.5-flash / qwen3.8-flash"></div>
+                <div><label class="label">Prompt model</label><input type="text" name="prompt_model" value="{{ old('prompt_model', $prompt_model) }}" class="input !py-2" placeholder="gemini-2.5-flash"></div>
+                <div><label class="label">Qwen Prompt model</label><input type="text" name="qwen_prompt_model" value="{{ old('qwen_prompt_model', $qwen_prompt_model ?? 'qwen-plus') }}" class="input !py-2" placeholder="qwen-plus / qwen3.8-flash / qwen-turbo"></div>
                 <div><label class="label">Model dịch prompt (tiếng Việt)</label><input type="text" name="translate_model" value="{{ old('translate_model', $translate_model) }}" class="input !py-2" placeholder="gemini-3.6-flash-image"></div>
                 <div><label class="label">Model Thay Đổi Người Mẫu</label><input type="text" name="swap_model" value="{{ old('swap_model', $swap_model) }}" class="input !py-2" placeholder="qwen-image-edit-plus-2025-12-15"></div>
                 <div><label class="label">Model Thuật sỹ ảo</label><input type="text" name="stylist_model" value="{{ old('stylist_model', $stylist_model) }}" class="input !py-2" placeholder="qwen3.8-flash"></div>

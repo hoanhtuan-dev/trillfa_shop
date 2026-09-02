@@ -22,8 +22,9 @@ return [
     | the defaults and are also read from env.
     */
     'prompt_provider' => env('STUDIO_PROMPT_PROVIDER', 'gemini'), // gemini | qwen
-    'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-1.5-flash'),
-    'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-3.6-flash-image'),
+    'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-2.5-flash'),
+    'qwen_prompt_model' => env('STUDIO_QWEN_PROMPT_MODEL', 'qwen-plus'),
+    'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-2.5-flash'),
     'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen trước)
     'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtualmodel'), // Virtual Try-On (Thay đổi người mẫu) — Beijing-only, free-trial
     'swap_model' => env('STUDIO_SWAP_MODEL', 'qwen-image-edit-plus-2025-12-15'), // Model Thay Đổi Người Mẫu (qwen-image-edit)
@@ -37,7 +38,7 @@ return [
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
     'vision_provider' => env('STUDIO_VISION_PROVIDER', 'gemini'), // gemini | qwen
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-2.5-flash'),
-    'qwen_vision_model' => env('STUDIO_QWEN_VISION_MODEL', 'qwen3.8-flash'),
+    'qwen_vision_model' => env('STUDIO_QWEN_VISION_MODEL', 'qwen-vl-plus'),
     'image_resolution' => env('STUDIO_IMAGE_RESOLUTION', '2K'), // 1K | 2K
     'video_resolution' => env('STUDIO_VIDEO_RESOLUTION', '720'), // 480 | 720 | 1080
     'image_ratio' => env('STUDIO_IMAGE_RATIO', '1:1'), // 1:1 | 4:3 | 3:4 | 16:9 | 9:16 | 4:5 | 21:9 | 19:6

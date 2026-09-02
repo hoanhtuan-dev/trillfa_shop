@@ -15,24 +15,46 @@ class StyleSuggestService
 {
     public function suggest(string $imagePath, int $creativeLevel = 6): array
     {
-        if ((string) studio_config('vision_provider', 'gemini') === 'qwen') {
-            $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
-            if ($qwenKey) {
-                try {
-                    return $this->suggestViaQwenVision($imagePath, $creativeLevel);
-                } catch (\Throwable $e) {
-                    logger()->error('Qwen vision suggest failed: '.$e->getMessage());
-                }
+        $provider = (string) studio_config('vision_provider', 'gemini');
+        $geminiKey = studio_api_key('gemini');
+        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
+
+        // Determine the chain: try configured provider first, then fallback to the other, then GD color.
+        $primaryQwen = $provider === 'qwen' && $qwenKey;
+        $primaryGemini = $provider === 'gemini' && $geminiKey;
+
+        // Try primary provider
+        if ($primaryQwen) {
+            try {
+                return $this->suggestViaQwenVision($imagePath, $creativeLevel);
+            } catch (\Throwable $e) {
+                logger()->error('Qwen vision suggest failed: '.$e->getMessage());
             }
         }
 
-        $key = studio_api_key('gemini');
-
-        if ($key) {
+        if ($primaryGemini || $geminiKey) {
             try {
-                return $this->suggestViaVision($imagePath, $creativeLevel, $key);
+                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey);
             } catch (\Throwable $e) {
-                logger()->error('Vision suggest failed: '.$e->getMessage());
+                logger()->error('Gemini vision suggest failed: '.$e->getMessage());
+            }
+        }
+
+        // Fallback: if primary was Qwen and it failed, try Gemini next
+        if ($primaryQwen && $geminiKey) {
+            try {
+                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey);
+            } catch (\Throwable $e) {
+                logger()->error('Gemini fallback after Qwen failed: '.$e->getMessage());
+            }
+        }
+
+        // Fallback: if primary was Gemini and it failed, try Qwen next
+        if ($primaryGemini && $qwenKey && !$geminiKey) {
+            try {
+                return $this->suggestViaQwenVision($imagePath, $creativeLevel);
+            } catch (\Throwable $e) {
+                logger()->error('Qwen fallback after Gemini failed: '.$e->getMessage());
             }
         }
 
@@ -45,8 +67,9 @@ class StyleSuggestService
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
             .'Return ONLY valid JSON with keys: "styles", "background", "pose", "fabric", "silhouette", "camera", '
-            .'"image_prompt_en" (a detailed ready-to-use English image prompt), "video_prompt_en" (a matching '
-            .'English video-catwalk prompt for the SAME garment), "keywords" (array).';
+            .'"image_prompt_en" (a detailed ready-to-use English image prompt), '
+            .'"prompt_vi" (a Vietnamese translation of image_prompt_en — keep technical fashion terms like fabric, silhouette, pose, camera in English; translate only the descriptive parts naturally into Vietnamese), '
+            .'"video_prompt_en" (a matching English video-catwalk prompt for the SAME garment), "keywords" (array).';
 
         // Try several Qwen VISION models × keys (some accounts only expose qwen-vl-max, others only qwen-vl-plus).
         $last = null;
@@ -104,6 +127,7 @@ class StyleSuggestService
             .'Return ONLY valid JSON with keys: "styles" (1-3 style labels), "background" (one label), "pose" (one label), '
             .'"fabric" (one label), "silhouette" (one label), "camera" (one label), '
             .'"image_prompt_en" (a detailed, ready-to-use English image-generation prompt describing the outfit, fabric, colors, fit and setting), '
+            .'"prompt_vi" (a Vietnamese translation of image_prompt_en — keep technical fashion terms like fabric, silhouette, pose, camera in English; translate only the descriptive parts naturally into Vietnamese), '
             .'"video_prompt_en" (a matching English video-catwalk prompt for the SAME garment), "keywords" (array).';
 
         $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
@@ -162,6 +186,7 @@ class StyleSuggestService
 
         $raw = [
             'image_prompt_en' => (string) ($json['image_prompt_en'] ?? ''),
+            'prompt_vi' => (string) ($json['prompt_vi'] ?? ''),
             'video_prompt_en' => (string) ($json['video_prompt_en'] ?? ''),
             'keywords' => $json['keywords'] ?? [],
             'category' => $injections,
@@ -182,6 +207,7 @@ class StyleSuggestService
             'silhouette' => $silhouette,
             'camera' => $camera,
             'image_prompt_en' => $c['image_prompt_en'],
+            'prompt_vi' => (string) ($json['prompt_vi'] ?? ''),
             'video_prompt_en' => $c['video_prompt_en'],
             'creative_level' => $c['creative_level'],
             'adherence' => $c['adherence'],
@@ -252,26 +278,35 @@ class StyleSuggestService
         $styles = Preset::category('style')->get();
         $backgrounds = Preset::category('background')->get();
         $poses = Preset::category('pose')->get();
+        $fabrics = Preset::category('fabric')->get();
+        $silhouettes = Preset::category('silhouette')->get();
 
         [$warm, $brightness] = $this->analyzeImage($imagePath);
 
         $style = $styles->first(fn ($p) => $p->ui_label === $this->pickStyle($warm, $brightness, $styles));
         $bg = $backgrounds->first(fn ($p) => $p->ui_label === $this->pickBackground($brightness, $backgrounds));
         $pose = $poses->isEmpty() ? null : $poses->random();
+        $fabric = $fabrics->isEmpty() ? null : $fabrics->random();
+        $silhouette = $silhouettes->isEmpty() ? null : $silhouettes->random();
 
-        $presetIds = collect([$style, $bg, $pose])->filter()->map(fn ($p) => $p->id)->values()->all();
+        // Build a richer prompt by injecting ALL preset prompt_injections (not just style/background/pose).
+        $injections = collect([$style, $bg, $pose, $fabric, $silhouette])
+            ->filter()
+            ->map(fn ($p) => $p->prompt_injection)
+            ->filter()
+            ->implode(', ');
 
         $prompt = 'High-fashion editorial photo'
-            .($style && $style->prompt_injection ? ', '.$style->prompt_injection : '')
-            .($bg && $bg->prompt_injection ? ', '.$bg->prompt_injection : '')
-            .($pose && $pose->prompt_injection ? ', '.$pose->prompt_injection : '')
-            .', ultra detailed, 4k';
+            .($injections ? ', '.$injections : '')
+            .', soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus';
 
         return $this->finalize([
             'image_prompt_en' => $prompt,
             'styles' => $style ? [$style->ui_label] : [],
             'background' => $bg?->ui_label,
             'pose' => $pose?->ui_label,
+            'fabric' => $fabric?->ui_label,
+            'silhouette' => $silhouette?->ui_label,
         ], $creativeLevel);
     }
 

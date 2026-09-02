@@ -56,7 +56,7 @@ class GeminiService
 
     protected function callQwen(string $idea, array $injections, int $creativeLevel): array
     {
-        $model = (string) studio_config('prompt_model', 'qwen3.8-flash');
+        $model = (string) studio_config('qwen_prompt_model', 'qwen-plus');
         $system = $this->systemPrompt($creativeLevel);
         $prompt = 'Idea: '.$idea."
 Creative level: {$creativeLevel}/10
@@ -115,7 +115,7 @@ Tags: ".json_encode($injections, JSON_UNESCAPED_UNICODE);
         $raw = null;
 
         try {
-            $model = studio_config('prompt_model', 'gemini-1.5-flash');
+            $model = studio_config('prompt_model', 'gemini-2.5-flash');
 
             $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(60)
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [

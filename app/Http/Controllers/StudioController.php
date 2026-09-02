@@ -181,26 +181,114 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'preserve_background' => ['nullable', 'boolean'],
             'preserve_face' => ['nullable', 'boolean'],
+            // Mask (tích hợp region selection vào Inpaint)
+            'mask_mode' => ['nullable', 'string', 'in:rect,brush'],
+            'region' => ['nullable', 'array'],
+            'region.x' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'region.y' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'region.w' => ['nullable', 'numeric', 'min:0.005', 'max:1'],
+            'region.h' => ['nullable', 'numeric', 'min:0.005', 'max:1'],
+            'mask_data' => ['nullable', 'string', 'max:2000000'],
         ]);
 
         $preserveBg = ! empty($data['preserve_background']);
         $preserveFace = ! empty($data['preserve_face']);
 
-        $data['prompt'] = 'Using the provided image as the exact base, edit it surgically. Change ONLY: '.$request->input('prompt')
+        // Nếu có mask → tạo mask image và gửi kèm
+        $maskUrl = null;
+        $maskMode = (string) ($data['mask_mode'] ?? '');
+        if ($maskMode !== '' && ! empty($data['region']) && $generation->media_url) {
+            $maskUrl = $this->buildMaskImage($generation->media_url, $data['region'], $maskMode, $data['mask_data'] ?? null);
+        }
+
+        $promptInstruction = 'Using the provided image as the exact base, edit it surgically. Change ONLY: '.$request->input('prompt')
             .'. Preserve everything else exactly as in the original image — '
             .($preserveFace ? 'the model\'s face and identity, skin tone and hair, ' : '')
             .'pose, body proportions, garment structure and fit, fabric, all colours except the edited element, lighting, shadows, camera angle, composition'
             .($preserveBg ? ', and background' : '')
             .'. Do not restyle, do not add new elements, do not change the setting.';
 
+        if ($maskUrl) {
+            $promptInstruction .= ' A mask image is provided (same size as the base): its BLACK region is the exact area to edit — change ONLY that black region and keep every pixel outside it identical to the original image.';
+        }
+
+        $data['prompt'] = $promptInstruction;
+
         if ($generation->media_url) {
             $data['base_image'] = $generation->media_url;
+        }
+        if ($maskUrl) {
+            $data['mask_image'] = $maskUrl;
         }
         $data['edit'] = true;
 
         $cost = (int) studio_config('image_credits', 1);
 
         return $this->queueGeneration('image', $data, $cost, $generation);
+    }
+
+    /**
+     * Build a mask image (WHITE=keep, BLACK=edit) from normalized region coords.
+     * Same size as the source image. Supports rect and brush modes.
+     */
+    protected function buildMaskImage(string $sourceUrl, array $region, string $maskMode, ?string $brushData): ?string
+    {
+        $file = null;
+        foreach ([public_path(ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) return null;
+        $src = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $src) return null;
+
+        $w = imagesx($src); $h = imagesy($src);
+        imagedestroy($src);
+
+        $mask = imagecreatetruecolor($w, $h);
+        // Nền TRẮNG = giữ nguyên
+        imagefilledrectangle($mask, 0, 0, $w - 1, $h - 1, imagecolorallocate($mask, 255, 255, 255));
+
+        if ($maskMode === 'brush' && ! empty($brushData)) {
+            // Brush mode: frontend gửi mask_data (base64 PNG, nền TRẮNG + nét ĐEN)
+            $b64 = (string) $brushData;
+            if (str_starts_with($b64, 'data:')) {
+                $comma = strpos($b64, ',');
+                if ($comma !== false) $b64 = substr($b64, $comma + 1);
+            }
+            $brushRaw = base64_decode($b64, true);
+            if ($brushRaw !== false && $brushRaw !== '') {
+                $brushImg = @imagecreatefromstring($brushRaw);
+                if ($brushImg) {
+                    $bw = imagesx($brushImg); $bh = imagesy($brushImg);
+                    if ($bw > 0 && $bh > 0) {
+                        if ($bw !== $w || $bh !== $h) {
+                            $resized = imagecreatetruecolor($w, $h);
+                            imagecopyresampled($resized, $brushImg, 0, 0, 0, 0, $w, $h, $bw, $bh);
+                            imagedestroy($brushImg);
+                            $brushImg = $resized;
+                        }
+                        imagecopy($mask, $brushImg, 0, 0, 0, 0, $w, $h);
+                        imagedestroy($brushImg);
+                    }
+                }
+            }
+        } else {
+            // Rect mode: vẽ hình chữ nhật ĐEN
+            $rx = max(0.0, min(0.99, (float) ($region['x'] ?? 0)));
+            $ry = max(0.0, min(0.99, (float) ($region['y'] ?? 0)));
+            $rw = max(0.005, min(1 - $rx, (float) ($region['w'] ?? 0.5)));
+            $rh = max(0.005, min(1 - $ry, (float) ($region['h'] ?? 0.5)));
+            $px = (int) round($rx * $w); $py = (int) round($ry * $h);
+            $pw = max(8, min($w - $px, (int) round($rw * $w)));
+            $ph = max(8, min($h - $py, (int) round($rh * $h)));
+            imagefilledrectangle($mask, $px, $py, $px + $pw - 1, $py + $ph - 1, imagecolorallocate($mask, 0, 0, 0));
+        }
+
+        $name = 'studio/mask-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($mask));
+        imagedestroy($mask);
+
+        return '/storage/'.$name;
     }
 
     /**
@@ -2278,7 +2366,7 @@ RULES:
         $target = $data['direction'] === 'vi' ? 'Vietnamese' : 'English';
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
         $geminiKey = studio_api_key('gemini');
-        $qwenModel = (string) studio_config('prompt_model', 'qwen3.8-flash'); // Qwen chat (fallback)
+        $qwenModel = (string) studio_config('qwen_prompt_model', 'qwen-plus'); // Qwen chat (fallback)
         $translateModel = (string) studio_config('translate_model', 'gemini-3.6-flash-image'); // Model dịch chuyên dụng
         $instruction = 'You are a professional fashion prompt translator. Translate the following image-generation prompt to '.$target.'. '
             .'Keep all technical descriptors (fabric, silhouette, camera, lighting) precise. Return ONLY the translated prompt, nothing else.';
@@ -2702,6 +2790,7 @@ RULES:
             'prompt_provider' => setting('studio_prompt_provider', config('studio.prompt_provider')),
             'vision_provider' => setting('studio_vision_provider', config('studio.vision_provider')),
             'prompt_model' => setting('studio_prompt_model', config('studio.prompt_model')),
+            'qwen_prompt_model' => setting('studio_qwen_prompt_model', config('studio.qwen_prompt_model', 'qwen-plus')),
             'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
             'swap_model' => setting('studio_swap_model', config('studio.swap_model')),
             'stylist_model' => setting('studio_stylist_model', config('studio.stylist_model')),
@@ -2965,9 +3054,10 @@ RULES:
             'video_credits' => ['nullable', 'integer', 'min:0', 'max:1000'],
             'max_generations' => ['nullable', 'integer', 'min:1', 'max:500'],
             'image_provider' => ['required', 'string', 'in:flux,wan,qwen,gemini'],
-            'prompt_provider' => ['required', 'string', 'in:gemini,qwen'],
+            'prompt_provider' => ['required', 'string', 'in:gemini,qwen,deepseek'],
             'vision_provider' => ['required', 'string', 'in:gemini,qwen'],
             'prompt_model' => ['required', 'string', 'max:255'],
+            'qwen_prompt_model' => ['nullable', 'string', 'max:255'],
             'translate_model' => ['nullable', 'string', 'max:255'],
             'swap_model' => ['nullable', 'string', 'max:255'],
             'stylist_model' => ['nullable', 'string', 'max:255'],
@@ -3000,6 +3090,7 @@ RULES:
         set_setting('studio_prompt_provider', $data['prompt_provider']);
         set_setting('studio_vision_provider', $data['vision_provider']);
         set_setting('studio_prompt_model', $data['prompt_model']);
+        if (isset($data['qwen_prompt_model'])) set_setting('studio_qwen_prompt_model', $data['qwen_prompt_model']);
         if (isset($data['translate_model'])) set_setting('studio_translate_model', $data['translate_model']);
         if (isset($data['swap_model'])) set_setting('studio_swap_model', $data['swap_model']);
         if (isset($data['stylist_model'])) set_setting('studio_stylist_model', $data['stylist_model']);
