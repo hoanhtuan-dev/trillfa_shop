@@ -79,7 +79,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-D-x08cZH.css",
+    "file": "assets/app-zjh4qx6H.css",
     "name": "app",
     "names": [
       "app.css"
@@ -94,7 +94,7 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DDJbq2-X.js",
+    "file": "assets/app-BOBOma2u.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -103,7 +103,7 @@
       "_GalleryModal-ChF9BMEX.js"
     ],
     "css": [
-      "assets/app-6dyiW60N.css"
+      "assets/app-CiMpIVC7.css"
     ]
   },
   "resources/js/studio/library.js": {

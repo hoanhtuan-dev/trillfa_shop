@@ -9,6 +9,7 @@ import PaletteTextureCard from './components/PaletteTextureCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
+import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
@@ -63,6 +64,8 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative h-full overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
+          <!-- Floating tools (Reframe + Film Look) -->
+          <RegionTools />
           <!-- Inpaint mask overlay on canvas -->
           <CanvasMaskTools />
           <!-- active image indicator + actions -->
