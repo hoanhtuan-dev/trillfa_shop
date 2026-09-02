@@ -3243,6 +3243,7 @@ RULES:
         }
 
         return response()->json(['processed' => $n, 'message' => 'Đã xử lý '.$n.' công việc đang chờ.']);
+    }
 
     /**
      * Return the last 5 unique image prompts for the user (prompt history).
