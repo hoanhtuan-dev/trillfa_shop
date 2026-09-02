@@ -269,17 +269,81 @@ class ImageAIService
     {
         try {
             $model = $modelOverride ?: (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
-            $imageData = $this->imageDataUri($imageUrl);
-            $maskData = $this->imageDataUri($maskUrl);
-            if (! $imageData || ! $maskData) {
-                logger()->warning('Gemini edit: cannot read source/mask image');
+
+            // Image: downscale + JPEG (chấp nhận được cho ảnh nền), strip data-URI prefix —
+            // Gemini inline_data.data expects RAW base64, NOT a "data:image/...;base64," string.
+            $raw = $this->resolveImageBinary($imageUrl);
+            if (! $raw) {
+                logger()->warning('Gemini edit: cannot read source image', ['url' => $imageUrl]);
+                return null;
+            }
+            $tmpPath = storage_path('app/studio-gemini-src-'.Str::uuid().'.bin');
+            @file_put_contents($tmpPath, $raw);
+            [$imgB64, $imgMime] = $this->downscaleImageBase64($tmpPath, 1600);
+            @unlink($tmpPath);
+            if ($imgB64 === '') {
+                logger()->warning('Gemini edit: image decode failed');
                 return null;
             }
 
+            // Mask: must stay LOSSLESS (binary black/white) → raw PNG bytes, no JPEG re-encode.
+            $maskBytes = $this->resolveImageBinary($maskUrl);
+            if (! $maskBytes) {
+                logger()->warning('Gemini edit: cannot read mask image', ['url' => $maskUrl]);
+                return null;
+            }
+
+            // Gemini mask convention is INVERTED vs our/Qwen's: WHITE = editable region,
+            // BLACK = preserved. Our mask is BLACK=edit on WHITE=keep → invert pixel values.
+            $maskImg = @imagecreatefromstring($maskBytes);
+            if (! $maskImg) {
+                logger()->warning('Gemini edit: mask decode failed');
+                return null;
+            }
+
+            // Base image dimensions AFTER downscale — Gemini requires the mask to be the SAME size
+            // as the base image; if they differ (crop > 1600 shrank the base but not the mask),
+            // resample the mask to match exactly.
+            $baseCheck = @imagecreatefromstring(base64_decode($imgB64, true));
+            $bw = $baseCheck ? imagesx($baseCheck) : imagesx($maskImg);
+            $bh = $baseCheck ? imagesy($baseCheck) : imagesy($maskImg);
+            if ($baseCheck) { imagedestroy($baseCheck); }
+
+            $mw = imagesx($maskImg); $mh = imagesy($maskImg);
+            if ($mw !== $bw || $mh !== $bh) {
+                $tmp = imagecreatetruecolor($bw, $bh);
+                imagecopyresampled($tmp, $maskImg, 0, 0, 0, 0, $bw, $bh, $mw, $mh);
+                imagedestroy($maskImg);
+                $maskImg = $tmp;
+                $mw = $bw; $mh = $bh;
+            }
+
+            $inv = imagecreatetruecolor($mw, $mh);
+            for ($y = 0; $y < $mh; $y++) {
+                for ($x = 0; $x < $mw; $x++) {
+                    $c = imagecolorat($maskImg, $x, $y);
+                    $lum = (($c >> 16) & 0xFF) + (($c >> 8) & 0xFF) + ($c & 0xFF);
+                    // Lum < 384 (~128 avg): dark → becomes white (editable). Else black (kept).
+                    $v = $lum < 384 ? 255 : 0;
+                    imagesetpixel($inv, $x, $y, imagecolorallocate($inv, $v, $v, $v));
+                }
+            }
+            ob_start();
+            imagepng($inv);
+            $maskB64 = base64_encode((string) ob_get_clean());
+            imagedestroy($maskImg); imagedestroy($inv);
+            if ($maskB64 === '') {
+                logger()->warning('Gemini edit: mask encode failed');
+                return null;
+            }
+
+            // Text hướng dẫn rõ ràng cho Gemini: WHITE = chỉ được sửa vùng trắng.
+            $gemPrompt = $prompt."\n\nA mask image is provided (same size as the base image). In the mask, the WHITE region is the ONLY area you may edit — change only the white region and keep every pixel outside it EXACTLY identical to the original image.";
+
             $parts = [
-                ['inlineData' => ['mimeType' => 'image/png', 'data' => $imageData]],
-                ['inlineData' => ['mimeType' => 'image/png', 'data' => $maskData]],
-                ['text' => $prompt],
+                ['inlineData' => ['mimeType' => $imgMime, 'data' => $imgB64]],
+                ['inlineData' => ['mimeType' => 'image/png', 'data' => $maskB64]],
+                ['text' => $gemPrompt],
             ];
 
             $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(180)
@@ -289,7 +353,7 @@ class ImageAIService
                 ]);
 
             if (! $resp->successful()) {
-                logger()->warning('Gemini edit failed', ['status' => $resp->status(), 'body' => Str::limit((string) $resp->body(), 240)]);
+                logger()->warning('Gemini edit failed', ['status' => $resp->status(), 'body' => Str::limit((string) $resp->body(), 400)]);
                 return null;
             }
 
@@ -308,7 +372,7 @@ class ImageAIService
 
             logger()->warning('Gemini edit: no image in response');
             return null;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             logger()->warning('Gemini edit threw: '.$e->getMessage());
             return null;
         }
@@ -637,13 +701,23 @@ class ImageAIService
         }
 
         // Qwen Edit failed across all keys — try Gemini edit as fallback (multi-provider chain).
+        // Also translate common billing/account errors into a friendly Vietnamese message so the
+        // raw JSON (e.g. Arrearage/overdue payment) never leaks to the user.
+        $lowErr = strtolower((string) $last);
+        if (str_contains($lowErr, 'arrearage') || str_contains($lowErr, 'overdue')) {
+            $last = $this->dashscopeError = 'Tài khoản QwenCloud hết hạn thanh toán (Arrearage) — nạp tiền/thanh toán công nợ tại https://home.qwencloud.com rồi thử lại.';
+        } elseif (str_contains($lowErr, 'quota') || str_contains($lowErr, 'throttling')) {
+            $last = $this->dashscopeError = 'Hạn mức tài khoản QwenCloud đã hết (Throttling/Quota). Vào https://home.qwencloud.com gia hạn hạn mức rồi thử lại.';
+        }
         if ($maskImage && ($geminiKey = studio_api_key('gemini'))) {
             logger()->info('Edit: Qwen failed, falling back to Gemini edit');
             $geminiResult = $this->geminiImageEdit($prompt, $imageUrl, $maskImage, $geminiKey);
             if ($geminiResult) {
                 $this->lastModel = 'gemini';
                 $this->lastProvider = 'gemini';
-                return $this->storeRemoteImage($geminiResult);
+                // geminiImageEdit already stored the result locally (/storage/...) — pass it through
+                // directly; storeRemoteImage only works for http(s) URLs.
+                return str_starts_with($geminiResult, '/storage/') ? $geminiResult : $this->storeRemoteImage($geminiResult);
             }
         }
 
