@@ -89,8 +89,9 @@ export const useStudioStore = defineStore('studio', {
     regionBox: { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, // vùng chọn (normalized 0..1)
     _regionDrag: null,
     _regionHandle: null,     // null | 'move' | 'nw' | 'ne' | 'sw' | 'se' — handle đang kéo
-    _brushCanvas: null,       // canvas ảo để vẽ brush mask
+    _brushCanvas: null,       // canvas HIỂN THỊ trên canvas (DOM element) — nét vẽ thấy ngay
     _brushCtx: null,          // 2d context của brush canvas
+    brushOverlay: null,       // DOM <canvas> overlay do StudioApp cung cấp (markRaw)
     _brushDrawing: false,     // đang vẽ brush
     _brushLast: null,         // vị trí brush cuối (để vẽ liên tục)
     regionBrushData: '',      // base64 PNG của brush mask
@@ -196,6 +197,7 @@ export const useStudioStore = defineStore('studio', {
     wheelZoom(delta) { const f = delta > 0 ? 0.9 : 1.1; const nz = Math.max(0.25, Math.min(4, +(this.zoom * f).toFixed(2))); this.zoom = nz; },
     // ── Canvas refs (set by StudioApp template refs; markRaw so Vue never proxies DOM nodes) ──
     setCanvasRefs(img, zoom) { this.cvImg = img ? markRaw(img) : null; this.canvasZoom = zoom ? markRaw(zoom) : null; },
+    setBrushCanvas(el) { this.brushOverlay = el ? markRaw(el) : null; },
     // ── Reframe / Crop ──
     _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); },
     ratioAspect() { const p = (this.reframeRatio || '3:4').split(':').map(Number); return p[1] ? p[0] / p[1] : 0.75; },
@@ -251,7 +253,7 @@ export const useStudioStore = defineStore('studio', {
       if (this.cropMode) this.initCropBox();
       else this._cropStop(null);
     },
-    onCanvasImgLoad() { if (this.cropMode) this.initCropBox(); },
+    onCanvasImgLoad() { if (this.cropMode) this.initCropBox(); if (this.regionMode && this.regionMaskMode === 'brush') this._initBrushCanvas(); },
     cropStart(e, key) {
       if (!this.cropMode) return;
       // NOTE: no preventDefault() here — canceling pointerdown would also suppress the
@@ -471,7 +473,13 @@ export const useStudioStore = defineStore('studio', {
         this.regionBrushData = '';
       }
     },
+    // Brush canvas HIỂN THỊ (DOM <canvas> overlay do StudioApp render, neo theo canvasMetrics →
+    // tự bám zoom/pan của ảnh). Kích thước pixel theo ĐÚNG tỉ lệ ảnh gốc (mask không méo),
+    // cạnh dài tối đa ~1024px để payload PNG không quá lớn. Tọa độ vẽ dùng normalized (0..1)
+    // nhân với canvas size nên luôn khớp ảnh gốc; NỀN TRONG SUỐT + nét ĐỎ → nhìn rõ trên ảnh.
     _initBrushCanvas() {
+      const el = this.brushOverlay;
+      if (!el) { this._brushCanvas = null; this._brushCtx = null; return; }
       const img = this.cvImg;
       const iw = img && img.naturalWidth ? img.naturalWidth : 1;
       const ih = img && img.naturalHeight ? img.naturalHeight : 1;
@@ -479,16 +487,16 @@ export const useStudioStore = defineStore('studio', {
       const scale = Math.min(1, MAX / Math.max(iw, ih));
       const cw = Math.max(1, Math.round(iw * scale));
       const ch = Math.max(1, Math.round(ih * scale));
-      if (!this._brushCanvas) { this._brushCanvas = document.createElement('canvas'); }
-      if (this._brushCanvas.width !== cw || this._brushCanvas.height !== ch) {
-        this._brushCanvas.width = cw; this._brushCanvas.height = ch;
-      }
-      this._brushCtx = this._brushCanvas.getContext('2d');
-      if (this._brushCtx) {
-        this._brushCtx.fillStyle = 'rgba(255,255,255,1)';
-        this._brushCtx.fillRect(0, 0, cw, ch);
-      }
+      if (el.width !== cw || el.height !== ch) { el.width = cw; el.height = ch; }
+      this._brushCanvas = el;
+      this._brushCtx = el.getContext('2d');
+      if (this._brushCtx) { this._brushCtx.clearRect(0, 0, cw, ch); }
       this.regionBrushData = '';
+    },
+    // Vị trí/kích thước overlay brush trên canvas — neo theo ảnh ĐANG HIỂN THỊ (đã gồm zoom/pan).
+    brushStyle() {
+      const m = this.canvasMetrics(); if (!m) return { display: 'none' };
+      return { left: (m.vx / m.crW * 100) + '%', top: (m.vy / m.crH * 100) + '%', width: (m.vw / m.crW * 100) + '%', height: (m.vh / m.crH * 100) + '%' };
     },
     stopRegionSelect() { this.regionMode = ''; this._regionDrag = null; this._regionHandle = null; this.regionSrc = ''; this._brushDrawing = false; this._brushLast = null; },
     // Geometry: vùng chọn (normalized) -> style % overlay trên canvas (dùng canvasMetrics của crop).
@@ -623,7 +631,7 @@ export const useStudioStore = defineStore('studio', {
     _drawBrushDot(p) {
       if (!this._brushCtx) return;
       const c = this._brushCtx;
-      c.fillStyle = 'rgba(0,0,0,1)';
+      c.fillStyle = 'rgba(220,38,38,0.65)';
       c.beginPath();
       c.arc(p.nx * this._brushCanvas.width, p.ny * this._brushCanvas.height, 12, 0, Math.PI * 2);
       c.fill();
@@ -632,7 +640,7 @@ export const useStudioStore = defineStore('studio', {
       if (!this._brushCtx) return;
       const c = this._brushCtx;
       const w = this._brushCanvas.width, h = this._brushCanvas.height;
-      c.strokeStyle = 'rgba(0,0,0,1)';
+      c.strokeStyle = 'rgba(220,38,38,0.65)';
       c.lineWidth = 24;
       c.lineCap = 'round';
       c.lineJoin = 'round';
@@ -642,19 +650,28 @@ export const useStudioStore = defineStore('studio', {
       c.stroke();
     },
     _finalizeBrushMask() {
-      if (!this._brushCanvas) return;
-      this.regionBrushData = this._brushCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
-      // Cập nhật regionBox từ bounding box của VÙNG VẼ (pixel ĐEN — nền canvas là TRẮNG a=255,
-      // nên không thể dùng alpha; chỉ những pixel nét cọ mới là vùng cần sửa).
+      if (!this._brushCanvas || !this._brushCtx) return;
+      const el = this._brushCanvas;
+      const w = el.width, h = el.height;
       const ctx = this._brushCtx;
-      const w = this._brushCanvas.width, h = this._brushCanvas.height;
-      const imgData = ctx.getImageData(0, 0, w, h).data;
+      const src = ctx.getImageData(0, 0, w, h);
+      // 1) Mask backend: nền TRẮNG (255) + nét ĐEN (0) — alpha > 40 = có nét vẽ → đen, ngược lại trắng.
+      const mask = document.createElement('canvas');
+      mask.width = w; mask.height = h;
+      const mctx = mask.getContext('2d');
+      const out = mctx.createImageData(w, h);
+      for (let i = 0; i < w * h; i++) {
+        const a = src.data[i * 4 + 3];
+        const v = a > 40 ? 0 : 255;
+        out.data[i * 4] = v; out.data[i * 4 + 1] = v; out.data[i * 4 + 2] = v; out.data[i * 4 + 3] = 255;
+      }
+      mctx.putImageData(out, 0, 0);
+      this.regionBrushData = mask.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+      // 2) regionBox từ VÙNG NÉT VẼ (alpha > 40) — nền trong suốt nên dùng alpha là chuẩn.
       let minX = w, minY = h, maxX = 0, maxY = 0, found = false;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-          const i = (y * w + x) * 4;
-          const lum = imgData[i] + imgData[i + 1] + imgData[i + 2];
-          if (lum < 300) { // đủ tối = thuộc nét vẽ
+          if (src.data[(y * w + x) * 4 + 3] > 40) {
             found = true;
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;

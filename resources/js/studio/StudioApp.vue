@@ -25,7 +25,9 @@ watch(() => store.previewId, (id) => { store.loadPalette(id); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
 const canvasZoom = ref(null);
+const brushOverlay = ref(null);
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
+watch(brushOverlay, (el) => { store.setBrushCanvas(el); if (el && store.regionMode && store.regionMaskMode === 'brush') store._initBrushCanvas(); });
 // While crop mode is on: re-fit the box when the ratio changes, re-init when the image changes.
 watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
 watch(() => store.upscaleSrc, () => { if (store.cropMode) store.initCropBox(); });
@@ -93,6 +95,8 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             </div>
             <!-- Region selection overlay (xóa/thay vùng) -->
             <div v-if="store.regionMode && store.upscaleSrc" class="absolute inset-0" style="z-index:31; cursor:crosshair" @pointerdown="store.regionStart($event)" @pointermove="store.regionMove($event)" @pointerup="store.regionStop()" @pointercancel="store.regionStop()">
+              <!-- Brush overlay: THẤY NÉT VẼ THẬT trên ảnh, neo theo zoom/pan (canvasMetrics) -->
+              <canvas v-show="store.regionMaskMode === 'brush'" ref="brushOverlay" class="pointer-events-none absolute z-[1]" :style="store.brushStyle()" style="mix-blend-mode:multiply"></canvas>
               <div class="pointer-events-none absolute inset-0 bg-black/45"></div>
               <div v-if="store.regionMaskMode === 'brush' && !store.regionBrushData" class="pointer-events-none absolute inset-0 grid place-items-center">
                 <span class="rounded-full bg-ink-900/90 px-3 py-1 text-[11px] font-semibold text-brand-200">🖌 Vẽ mask lên ảnh · Esc để hủy</span>
