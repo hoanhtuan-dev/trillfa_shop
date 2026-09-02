@@ -1816,6 +1816,93 @@ RULES:
     }
 
     /**
+     * Upscale the swap result via DashScope image-super-resolution (2x or 4x).
+     * Falls back gracefully when no key is configured or the API call fails.
+     */
+    protected function applySuperResolution(string $url, int $scale = 2): ?string
+    {
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return null; }
+
+        $key = studio_api_key('dashscope') ?: studio_api_key('qwen') ?: studio_api_key('qwen_edit');
+        if (! $key) { return null; }
+
+        $base = dashscope_base_url($key).'/api/v1';
+        try {
+            $resp = Http::withToken($key)->timeout(120)
+                ->post($base.'/services/aigc/image-enhancement/image-super-resolution', [
+                    'model' => 'image-super-resolution',
+                    'input' => ['image' => 'data:image/png;base64,'.base64_encode((string) file_get_contents($file))],
+                    'parameters' => ['scale' => $scale],
+                ]);
+            if ($resp->successful()) {
+                $upscaledUrl = data_get($resp->json(), 'output.results.0.url');
+                if ($upscaledUrl) {
+                    $imgSvc = app(\App\Services\ImageAIService::class);
+                    // storeRemoteImage is protected — use a direct store via file_get_contents
+                    $contents = @file_get_contents($upscaledUrl);
+                    if ($contents) {
+                        $name = 'studio/sr-'.Str::uuid().'.png';
+                        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $contents);
+                        logger()->info('Super-resolution upscaled '.$scale.'x', ['src' => $url, 'dst' => '/storage/'.$name]);
+                        return '/storage/'.$name;
+                    }
+                }
+            }
+            logger()->warning('Super-resolution failed', ['status' => $resp->status(), 'body' => substr((string) $resp->body(), 0, 200)]);
+        } catch (\Throwable $e) {
+            logger()->warning('Super-resolution error: '.$e->getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Enhance the face in the swap result via DashScope face-image-enhance.
+     * Fixes blurry/low-res faces that the edit model sometimes produces.
+     */
+    protected function applyFaceEnhance(string $url): ?string
+    {
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return null; }
+
+        $key = studio_api_key('dashscope') ?: studio_api_key('qwen') ?: studio_api_key('qwen_edit');
+        if (! $key) { return null; }
+
+        $base = dashscope_base_url($key).'/api/v1';
+        try {
+            $resp = Http::withToken($key)->timeout(60)
+                ->post($base.'/services/aigc/image-enhancement/face-image-enhance', [
+                    'model' => 'face-image-enhance',
+                    'input' => ['image' => 'data:image/png;base64,'.base64_encode((string) file_get_contents($file))],
+                ]);
+            if ($resp->successful()) {
+                $enhancedUrl = data_get($resp->json(), 'output.results.0.url');
+                if ($enhancedUrl) {
+                    $contents = @file_get_contents($enhancedUrl);
+                    if ($contents) {
+                        $name = 'studio/fe-'.Str::uuid().'.png';
+                        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $contents);
+                        logger()->info('Face enhanced', ['src' => $url, 'dst' => '/storage/'.$name]);
+                        return '/storage/'.$name;
+                    }
+                }
+            }
+            logger()->warning('Face-enhance failed', ['status' => $resp->status(), 'body' => substr((string) $resp->body(), 0, 200)]);
+        } catch (\Throwable $e) {
+            logger()->warning('Face-enhance error: '.$e->getMessage());
+        }
+        return null;
+    }
+
+    /**
      * Safety net: if the edit model darkened the subject against a dark background (silhouette),
      * lift the exposure of the central subject band with a soft falloff. Only applies when the
      * subject region is genuinely dark — an already-lit result (e.g. a good composite) is untouched.
@@ -1979,9 +2066,17 @@ RULES:
             if ($scaled) { $fallback = $scaled; }
         }
 
+        // Post-process: upscale the result for higher resolution (DashScope image-super-resolution).
+        $upscaled = $this->applySuperResolution($fallback, 2);
+        if ($upscaled) { $fallback = $upscaled; }
+
+        // Post-process: enhance the face if it came out blurry (DashScope face-image-enhance).
+        $enhanced = $this->applyFaceEnhance($fallback);
+        if ($enhanced) { $fallback = $enhanced; }
+
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
         $actualModel = $svc->lastModel() ?: $swapModel;
-        $credits = max(1, $svc->calls()); // 2 for the try-on + face-swap passes, 1 otherwise
+        $credits = max(1, $svc->calls()); // 2-3 for the try-on + face-swap + background passes, 1 otherwise
 
         $gen->update([
             'status' => 'completed', 'media_url' => $fallback,

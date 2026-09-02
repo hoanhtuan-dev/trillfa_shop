@@ -248,11 +248,34 @@ class VirtualTryOnService
             .($wantBg ? '' : $toneS).' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
 
         $imageSvc = app(ImageAIService::class);
+
+        // PASS 1 — replace the person (garment kept, face described in text, pose from text).
         $url = $imageSvc->swapEdit($instr, $designImage, $swapModel, null, null);
         if (! $url) {
             return null;
         }
         $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+
+        // PASS 1b (NEW) — dedicated face-swap: replace ONLY the face with the reference image.
+        // A separate pass prevents the edit model from ignoring the face reference (the original
+        // evaluation found that sending a full-body ref alongside the garment image confuses the
+        // model). With face-only as the sole instruction, fidelity is much higher.
+        if ($faceRefUrl) {
+            $faceInstr = 'Replace ONLY the face of this person with the face from the reference image. '
+                .'Keep the hairstyle, head shape, body, pose, garment and background 100% unchanged. '
+                .'Match the skin tone of the reference face exactly. '
+                .'Blend the new face seamlessly into the head — no visible seam, no color mismatch, no hard edge. '
+                .'Photorealistic, studio quality.';
+            $withFace = $imageSvc->swapFace($faceInstr, $url, $swapModel, $faceRefUrl);
+            if ($withFace) {
+                $url = $withFace;
+                $this->calls = 2;
+                $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+                logger()->info('Swap face-ref pass succeeded');
+            } else {
+                logger()->warning('Swap face-ref pass failed; keeping text-described face');
+            }
+        }
 
         // PASS 2 — replace ONLY the background (person / pose / garment untouched). CRITICAL: never
         // say "consistent lighting" here — with a dark background the model darkens the person into a
