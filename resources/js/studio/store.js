@@ -274,8 +274,16 @@ export const useStudioStore = defineStore('studio', {
     },
     toggleCrop() {
       this.cropMode = !this.cropMode;
-      if (this.cropMode) this.initCropBox();
-      else this._cropStop(null);
+      if (this.cropMode) {
+        // Nếu mask đang active → lấy luôn vùng mask làm crop box
+        if (this.inpaintMaskMode !== 'none' && (this.inpaintMaskBox.w || 0) >= 0.02) {
+          this.cropBox = { ...this.inpaintMaskBox };
+        } else {
+          this.initCropBox();
+        }
+      } else {
+        this._cropStop(null);
+      }
     },
     onCanvasImgLoad() { if (this.cropMode) this.initCropBox(); },
     cropStart(e, key) {
