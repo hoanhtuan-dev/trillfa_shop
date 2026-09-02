@@ -1494,6 +1494,56 @@ RULES:
     }
 
     /**
+     * Scale the subject down slightly (~$scale of the frame) to leave more background visible around
+     * them. The extended border is a cover-fit stretch of the scene (NOT mirrored) + a soft blur, and
+     * the frame edge is crossfaded into it (no hard seam). Subject stays pixel-sharp.
+     */
+    protected function applyScaleDown(string $url, float $scale = 0.90): ?string
+    {
+        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return null; }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return null; }
+        $w = imagesx($img); $h = imagesy($img);
+        $cw = (int) round($w / $scale); $ch = (int) round($h / $scale);
+        $ox = (int) (($cw - $w) / 2); $oy = (int) (($ch - $h) / 2);
+
+        // Border: cover-fit stretch of the scene (plausible continuation) then soften.
+        $back = imagecreatetruecolor($cw, $ch);
+        imagecopyresampled($back, $img, 0, 0, 0, 0, $cw, $ch, $w, $h);
+        for ($i = 0; $i < 3; $i++) { @imagefilter($back, IMG_FILTER_GAUSSIAN_BLUR); }
+        // Sharp original centered.
+        imagecopy($back, $img, $ox, $oy, 0, 0, $w, $h);
+        // Crossfade the frame edge into the blurred backdrop (no hard seam).
+        $blend = (int) (min($w, $h) * 0.035);
+        for ($y = 0; $y < $ch; $y++) {
+            $sy = $y - $oy;
+            for ($x = 0; $x < $cw; $x++) {
+                $sx = $x - $ox;
+                $inFrame = ($sx >= 0 && $sx < $w && $sy >= 0 && $sy < $h);
+                if (! $inFrame) { continue; }
+                $edge = min($sx, $w - 1 - $sx, $sy, $h - 1 - $sy);
+                if ($edge >= $blend) { continue; }   // interior -> keep sharp
+                $wg = max(0.0, min(1.0, $edge / $blend));
+                $c = imagecolorat($img, $sx, $sy);
+                $b = imagecolorat($back, $x, $y);
+                $r = (int) round((($c >> 16) & 255) * $wg + (($b >> 16) & 255) * (1 - $wg));
+                $g = (int) round((($c >> 8) & 255) * $wg + (($b >> 8) & 255) * (1 - $wg));
+                $bb = (int) round(($c & 255) * $wg + ($b & 255) * (1 - $wg));
+                imagesetpixel($back, $x, $y, imagecolorallocate($back, $r, $g, $bb));
+            }
+        }
+        $name = 'studio/scale-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($back));
+        imagedestroy($back); imagedestroy($img);
+        return '/storage/'.$name;
+    }
+
+    /**
      * "Tách nền lần 2" (2-pass background separation): ask the edit model to REMOVE the person and
      * fill the background naturally -> a clean scene with no person. We can then apply effects
      * (blur / depth-of-field) to that background SAFELY (there is no person to blur), build an alpha
@@ -1737,9 +1787,9 @@ RULES:
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 255; $g = ($c >> 8) & 255; $b = $c & 255;
                 $lum = 0.299 * $r + 0.587 * $g + 0.114 * $b;
-                if ($lum >= 78) { continue; }   // already bright (lantern / wall / lit subject) -> skip
-                $lift = (78 - $lum) / 78;
-                $boost = 1 + 0.6 * $lift * $wgt;
+                if ($lum >= 74) { continue; }   // already bright (lantern / wall / lit subject) -> skip
+                $lift = (74 - $lum) / 74;
+                $boost = 1 + 0.35 * $lift * $wgt;   // gentler lift -> balanced, not overexposed
                 imagesetpixel($img, $x, $y, imagecolorallocate($img,
                     max(0, min(255, (int) round($r * $boost))),
                     max(0, min(255, (int) round($g * $boost))),
@@ -1858,6 +1908,14 @@ RULES:
         } elseif ($mode === 'bokeh') {
             $portrait = $this->applyPortraitDepth($fallback);
             if ($portrait) { $fallback = $portrait; }
+        }
+
+        // Làm nhỏ nhân vật một chút (mặc định ~10%) — mở rộng nền nhẹ (không mirror), người giữ nét.
+        // Config swap_scale: 0.90 = nhỏ hơn 10%, 1 = tắt.
+        $scale = (float) studio_config('swap_scale', 0.90);
+        if ($scale > 0.05 && $scale < 1.0) {
+            $scaled = $this->applyScaleDown($fallback, $scale);
+            if ($scaled) { $fallback = $scaled; }
         }
 
         $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
