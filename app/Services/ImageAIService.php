@@ -260,6 +260,60 @@ class ImageAIService
         return null;
     }
 
+    /**
+     * Gemini image edit via generateContent with MULTIPLE parts (image + mask + text).
+     * Gemini 2.5 Flash Image supports inpainting when given a base image + mask + instruction.
+     * Returns the edited image URL or null.
+     */
+    protected function geminiImageEdit(string $prompt, string $imageUrl, string $maskUrl, string $key, ?string $modelOverride = null): ?string
+    {
+        try {
+            $model = $modelOverride ?: (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image');
+            $imageData = $this->imageDataUri($imageUrl);
+            $maskData = $this->imageDataUri($maskUrl);
+            if (! $imageData || ! $maskData) {
+                logger()->warning('Gemini edit: cannot read source/mask image');
+                return null;
+            }
+
+            $parts = [
+                ['inlineData' => ['mimeType' => 'image/png', 'data' => $imageData]],
+                ['inlineData' => ['mimeType' => 'image/png', 'data' => $maskData]],
+                ['text' => $prompt],
+            ];
+
+            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(180)
+                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
+                    'contents' => [['parts' => $parts]],
+                    'generationConfig' => ['responseModalities' => ['TEXT', 'IMAGE']],
+                ]);
+
+            if (! $resp->successful()) {
+                logger()->warning('Gemini edit failed', ['status' => $resp->status(), 'body' => Str::limit((string) $resp->body(), 240)]);
+                return null;
+            }
+
+            $partsOut = collect(data_get($resp->json(), 'candidates.0.content.parts', []));
+            foreach ($partsOut as $part) {
+                $inline = $part['inlineData'] ?? null;
+                if (! is_array($inline) || empty($inline['data'])) { continue; }
+                $data = base64_decode((string) $inline['data'], true);
+                if ($data === false) { continue; }
+                $mime = $inline['mimeType'] ?? 'image/png';
+                $ext = str_contains($mime, 'jpeg') ? 'jpg' : (str_contains($mime, 'webp') ? 'webp' : 'png');
+                $name = Str::uuid().'.'.$ext;
+                Storage::disk('public')->put('studio/'.$name, $data);
+                return '/storage/studio/'.$name;
+            }
+
+            logger()->warning('Gemini edit: no image in response');
+            return null;
+        } catch (Throwable $e) {
+            logger()->warning('Gemini edit threw: '.$e->getMessage());
+            return null;
+        }
+    }
+
     protected function geminiGenerate(string $model, string $prompt, string $key, array $config): Response
     {
         return Http::withHeaders(['x-goog-api-key' => $key])->timeout(180)
@@ -580,6 +634,17 @@ class ImageAIService
                 continue; // invalid key -> try the next one
             }
             break; // 429/… are host/model-level -> don't hammer other keys
+        }
+
+        // Qwen Edit failed across all keys — try Gemini edit as fallback (multi-provider chain).
+        if ($maskImage && ($geminiKey = studio_api_key('gemini'))) {
+            logger()->info('Edit: Qwen failed, falling back to Gemini edit');
+            $geminiResult = $this->geminiImageEdit($prompt, $imageUrl, $maskImage, $geminiKey);
+            if ($geminiResult) {
+                $this->lastModel = 'gemini';
+                $this->lastProvider = 'gemini';
+                return $this->storeRemoteImage($geminiResult);
+            }
         }
 
         logger()->warning('Edit model ultimately failed', ['model' => $model, 'err' => $last]);

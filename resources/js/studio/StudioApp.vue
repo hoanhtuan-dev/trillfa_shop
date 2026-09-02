@@ -96,8 +96,15 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
               <div class="pointer-events-none absolute inset-0 bg-black/45"></div>
               <div class="pointer-events-none absolute" :style="store.regionStyle()">
                 <div class="absolute -inset-px border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);"></div>
-                <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">Kéo để chọn vùng · Esc để hủy</div>
+                <div class="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-brand-200">{{ store.regionMaskMode === 'brush' ? 'Vẽ mask · Esc để hủy' : 'Kéo chọn vùng · Esc để hủy' }}</div>
                 <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-100">{{ Math.round((store.regionBox.w || 0) * 100) }}% × {{ Math.round((store.regionBox.h || 0) * 100) }}%</div>
+                <!-- Handles tinh chỉnh vùng (rect mode, vùng đủ lớn) -->
+                <template v-if="store.regionMaskMode === 'rect' && (store.regionBox.w || 0) >= 0.03 && (store.regionBox.h || 0) >= 0.03">
+                  <div class="absolute -left-1.5 -top-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._regionHandle='nw'; store._regionDrag={x:$event.clientX/$event.target.getBoundingClientRect().width,y:$event.clientY/$event.target.getBoundingClientRect().height,box:{...store.regionBox}}" @dblclick.stop></div>
+                  <div class="absolute -right-1.5 -top-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._regionHandle='ne'; store._regionDrag={x:$event.clientX/$event.target.getBoundingClientRect().width,y:$event.clientY/$event.target.getBoundingClientRect().height,box:{...store.regionBox}}" @dblclick.stop></div>
+                  <div class="absolute -bottom-1.5 -left-1.5 h-3 w-3 cursor-nesw-resize rounded-sm bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._regionHandle='sw'; store._regionDrag={x:$event.clientX/$event.target.getBoundingClientRect().width,y:$event.clientY/$event.target.getBoundingClientRect().height,box:{...store.regionBox}}" @dblclick.stop></div>
+                  <div class="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store._regionHandle='se'; store._regionDrag={x:$event.clientX/$event.target.getBoundingClientRect().width,y:$event.clientY/$event.target.getBoundingClientRect().height,box:{...store.regionBox}}" @dblclick.stop></div>
+                </template>
               </div>
             </div>
           </div>
@@ -107,10 +114,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             <button @click="store.zoomFit()" class="rounded-full px-2 py-1 text-xs text-cream-200 hover:bg-ink-700">Vừa</button>
             <button @click="store.zoomIn()" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700">+</button>
             <span class="px-1 text-xs text-cream-200">{{ Math.round(store.zoom * 100) }}%</span>
-            <template v-if="store.upscaleSrc">
-              <span class="mx-0.5 h-4 w-px bg-ink-700"></span>
-              <button v-for="(op, key) in store.regionOps" :key="key" @click="store.startRegionSelect(key)" class="rounded-full px-2 py-1 text-[11px] font-semibold transition-colors" :class="store.regionMode === key ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'" :title="op.hint">{{ op.label }}</button>
-            </template>
+
           </div>
           <!-- right column: layers (top) + floating palette (below, same width) -->
           <div class="absolute right-3 top-3 z-20 flex w-40 flex-col gap-1.5">

@@ -65,16 +65,31 @@ async function applyFilmLook() {
     </div>
     <p class="mt-1 text-[11px] text-cream-200/80">{{ activeMeta?.hint }}</p>
 
+    <!-- Toggle Rect / Brush (chỉ cho erase) -->
+    <div v-if="store.regionMode === 'erase'" class="mt-2 flex gap-1">
+      <button @click="store.regionMaskMode = 'rect'" class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors" :class="store.regionMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700 bg-ink-800'">▭ Rect</button>
+      <button @click="store.regionMaskMode = 'brush'" class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors" :class="store.regionMaskMode === 'brush' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700 bg-ink-800'">🖌 Brush</button>
+    </div>
+
     <!-- Vùng đã chọn + nút áp dụng -->
-    <div v-if="store.regionMode && hasRegion" class="mt-2 rounded-xl border border-white/10 bg-white/5 p-2 text-[11px] text-cream-200">
-      Vùng: <b>{{ Math.round((store.regionBox.w || 0) * 100) }}%</b> × <b>{{ Math.round((store.regionBox.h || 0) * 100) }}%</b> của ảnh
-      <textarea v-if="activeMeta?.needsPrompt" v-model="store.regionPrompt" rows="2" maxlength="2000" class="input mt-2 !text-xs" placeholder="VD: thay bằng túi xách da đen…"></textarea>
+    <div v-if="store.regionMode && (hasRegion || store.regionMaskMode === 'brush')" class="mt-2 rounded-xl border border-white/10 bg-white/5 p-2 text-[11px] text-cream-200">
+      <template v-if="store.regionMaskMode === 'rect'">
+        Vùng: <b>{{ Math.round((store.regionBox.w || 0) * 100) }}%</b> × <b>{{ Math.round((store.regionBox.h || 0) * 100) }}%</b> của ảnh
+      </template>
+      <template v-else>
+        Vẽ mask tự do trên canvas
+      </template>
+      <textarea v-if="activeMeta?.needsPrompt" v-model="store.regionPrompt" rows="2" maxlength="2000" class="input mt-2 !text-xs" :placeholder="store.regionTranslating ? 'Đang dịch prompt…' : 'VD: thay bằng túi xách da đen…'" :disabled="store.regionTranslating"></textarea>
+      <div v-if="store.regionTranslating" class="mt-1 flex items-center gap-1 text-[10px] text-brand-300"><span class="h-2.5 w-2.5 animate-spin rounded-full border border-brand-300 border-t-transparent"></span> Đang dịch prompt sang tiếng Anh…</div>
       <div class="mt-2 flex gap-2">
-        <button @click="store.applyRegion()" :disabled="running" class="btn-brand btn-sm whitespace-nowrap">{{ activeOp === 'erase' ? '🗑 Xóa vùng chọn' : '🪄 Thay vùng chọn' }}</button>
+        <button @click="store.applyRegion()" :disabled="running || store.regionTranslating" class="btn-brand btn-sm whitespace-nowrap">
+          <template v-if="store.regionTranslating">⏳ Đang dịch…</template>
+          <template v-else>{{ activeOp === 'erase' ? '🗑 Xóa vùng chọn' : '🪄 Thay vùng chọn' }}</template>
+        </button>
         <button @click="store.stopRegionSelect()" class="btn-ghost btn-sm">Hủy chọn</button>
       </div>
     </div>
-    <p v-else-if="store.regionMode" class="mt-2 text-[11px] text-brand-200">👉 Kéo chọn vùng trên canvas (Esc để hủy).</p>
+    <p v-else-if="store.regionMode" class="mt-2 text-[11px] text-brand-200">{{ store.regionMaskMode === 'brush' ? '👉 Vẽ mask trên canvas (Esc để hủy).' : '👉 Kéo chọn vùng trên canvas (Esc để hủy).' }}</p>
 
     <!-- Tiến độ -->
     <div v-if="running" class="mt-3 rounded-xl border border-brand-500/30 bg-brand-900/30 p-2.5">

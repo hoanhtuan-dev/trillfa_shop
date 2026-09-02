@@ -85,8 +85,17 @@ export const useStudioStore = defineStore('studio', {
     },
     regionMode: '',           // '' | 'erase' | 'replace' (đang chọn vùng trên canvas)
     regionOp: null,           // op đang chạy (lưu khi bấm Áp dụng)
+    regionMaskMode: 'rect',   // 'rect' | 'brush' — chế độ chọn vùng
     regionBox: { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, // vùng chọn (normalized 0..1)
     _regionDrag: null,
+    _regionHandle: null,     // null | 'move' | 'nw' | 'ne' | 'sw' | 'se' — handle đang kéo
+    _brushCanvas: null,       // canvas ảo để vẽ brush mask
+    _brushCtx: null,          // 2d context của brush canvas
+    _brushDrawing: false,     // đang vẽ brush
+    _brushLast: null,         // vị trí brush cuối (để vẽ liên tục)
+    regionBrushData: '',      // base64 PNG của brush mask
+    regionPromptEn: '',       // bản dịch prompt (dùng cho replace)
+    regionTranslating: false, // đang dịch prompt
     regionPrompt: '',
     regionSrc: '',            // ảnh nguồn bị khóa khi chọn vùng (tránh lệch vị trí)
     regionStage: '',          // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled'
@@ -439,15 +448,29 @@ export const useStudioStore = defineStore('studio', {
     startRegionSelect(op) {
       if (!this.regionOps[op]) return;
       if (this.regionStage === 'send' || this.regionStage === 'processing') { this.toast('Đang xử lý thao tác vùng — chờ xong rồi chọn vùng mới.', 'error'); return; }
-      if (this.cropMode) { this.cropMode = false; this._cropStop(null); } // không dùng chung crop
+      if (this.cropMode) { this.cropMode = false; this._cropStop(null); }
+      this.regionOp = null;
       this.regionMode = op;
-      // Khóa ảnh nguồn ĐANG HIỂN THỊ tại lúc chọn vùng → tọa độ + ảnh sửa luôn trùng khớp.
       this.regionSrc = this.upscaleSrc || '';
       this.regionBox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
       this.regionError = '';
+      this.regionBrushData = '';
+      this.regionPromptEn = '';
+      // Khởi tạo brush canvas nếu ở rect mode (để sẵn sàng khi chuyển sang brush)
+      if (!this._brushCanvas) {
+        const c = document.createElement('canvas');
+        c.width = 512; c.height = 512;
+        this._brushCanvas = c;
+        this._brushCtx = c.getContext('2d');
+      }
+      // Reset brush canvas về trắng
+      if (this._brushCtx) {
+        this._brushCtx.fillStyle = 'rgba(255,255,255,1)';
+        this._brushCtx.fillRect(0, 0, 512, 512);
+      }
       this.toast(this.regionOps[op].hint);
     },
-    stopRegionSelect() { this.regionMode = ''; this._regionDrag = null; this.regionSrc = ''; },
+    stopRegionSelect() { this.regionMode = ''; this._regionDrag = null; this._regionHandle = null; this.regionSrc = ''; this._brushDrawing = false; this._brushLast = null; },
     // Geometry: vùng chọn (normalized) -> style % overlay trên canvas (dùng canvasMetrics của crop).
     regionStyle() {
       const m = this.canvasMetrics(); if (!m) return { display: 'none' };
@@ -465,43 +488,193 @@ export const useStudioStore = defineStore('studio', {
       const ny = this._clamp((e.clientY - ir.top) / ir.height, 0, 1);
       return { nx, ny };
     },
+    // Hit-test: pointer có nằm trong vùng chữ nhật hiện tại không (và gần handle nào).
+    _regionHit(p) {
+      const b = this.regionBox || { x: 0, y: 0, w: 0, h: 0 };
+      if (b.w < 0.02 || b.h < 0.02) return null; // vùng quá nhỏ → kéo mới
+      const margin = 0.025; // khoảng cách hit handle
+      const inBox = p.nx >= b.x && p.nx <= b.x + b.w && p.ny >= b.y && p.ny <= b.y + b.h;
+      if (!inBox) return null;
+      // Xác định góc gần nhất
+      const dl = p.nx - b.x, dr = (b.x + b.w) - p.nx;
+      const dt = p.ny - b.y, db = (b.y + b.h) - p.ny;
+      const nearLeft = dl < margin, nearRight = dr < margin;
+      const nearTop = dt < margin, nearBottom = db < margin;
+      if (nearLeft && nearTop) return 'nw';
+      if (nearRight && nearTop) return 'ne';
+      if (nearLeft && nearBottom) return 'sw';
+      if (nearRight && nearBottom) return 'se';
+      return 'move';
+    },
     regionStart(e) {
       if (!this.regionMode) return;
+      if (this.regionMaskMode === 'brush') {
+        // Brush mode: bắt đầu vẽ
+        e.stopPropagation();
+        const el = e.currentTarget;
+        if (el && e.pointerId != null && el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
+        const p = this.regionPointer(e); if (!p) return;
+        this._brushDrawing = true;
+        this._brushLast = p;
+        this._drawBrushDot(p);
+        return;
+      }
+      // Rect mode: kiểm tra handle hoặc kéo mới
       e.stopPropagation();
       const el = e.currentTarget;
       if (el && e.pointerId != null && el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
       const p = this.regionPointer(e); if (!p) return;
-      this._regionDrag = { x: p.nx, y: p.ny };
-      this.regionBox = { x: p.nx, y: p.ny, w: 0.005, h: 0.005 };
+      const hit = this._regionHit(p);
+      if (hit) {
+        this._regionHandle = hit;
+        this._regionDrag = { x: p.nx, y: p.ny, box: { ...this.regionBox } };
+      } else {
+        this._regionHandle = null;
+        this._regionDrag = { x: p.nx, y: p.ny };
+        this.regionBox = { x: p.nx, y: p.ny, w: 0.005, h: 0.005 };
+      }
     },
     regionMove(e) {
-      const d = this._regionDrag; if (!d || !this.regionMode) return;
+      if (!this.regionMode) return;
+      if (this.regionMaskMode === 'brush' && this._brushDrawing) {
+        const p = this.regionPointer(e); if (!p) return;
+        this._drawBrushLine(this._brushLast, p);
+        this._brushLast = p;
+        return;
+      }
+      const d = this._regionDrag; if (!d) return;
       const p = this.regionPointer(e); if (!p) return;
-      const x = Math.min(d.x, p.nx), y = Math.min(d.y, p.ny);
-      this.regionBox = { x, y, w: Math.max(0.005, Math.abs(p.nx - d.x)), h: Math.max(0.005, Math.abs(p.ny - d.y)) };
+      if (this._regionHandle) {
+        // Kéo handle hoặc di chuyển
+        const bx = (p.nx - d.x), by = (p.ny - d.y);
+        const b = { ...d.box };
+        const MIN = 0.02;
+        const h = this._regionHandle;
+        if (h === 'move') {
+          b.x = this._clamp(b.x + bx, 0, 1 - b.w);
+          b.y = this._clamp(b.y + by, 0, 1 - b.h);
+        } else if (h === 'se') {
+          b.w = this._clamp(b.w + bx, MIN, 1 - b.x);
+          b.h = this._clamp(b.h + by, MIN, 1 - b.y);
+        } else if (h === 'sw') {
+          const nw = this._clamp(b.w - bx, MIN, b.x + b.w);
+          b.x = b.x + b.w - nw;
+          b.w = nw;
+          b.h = this._clamp(b.h + by, MIN, 1 - b.y);
+        } else if (h === 'ne') {
+          b.w = this._clamp(b.w + bx, MIN, 1 - b.x);
+          const nh = this._clamp(b.h - by, MIN, b.y + b.h);
+          b.y = b.y + b.h - nh;
+          b.h = nh;
+        } else if (h === 'nw') {
+          const nw = this._clamp(b.w - bx, MIN, b.x + b.w);
+          b.x = b.x + b.w - nw;
+          b.w = nw;
+          const nh = this._clamp(b.h - by, MIN, b.y + b.h);
+          b.y = b.y + b.h - nh;
+          b.h = nh;
+        }
+        this.regionBox = b;
+      } else {
+        // Kéo vùng mới
+        const x = Math.min(d.x, p.nx), y = Math.min(d.y, p.ny);
+        this.regionBox = { x, y, w: Math.max(0.005, Math.abs(p.nx - d.x)), h: Math.max(0.005, Math.abs(p.ny - d.y)) };
+      }
     },
-    regionStop() { this._regionDrag = null; },
+    regionStop() {
+      this._regionDrag = null;
+      this._regionHandle = null;
+      if (this._brushDrawing) {
+        this._brushDrawing = false;
+        this._brushLast = null;
+        this._finalizeBrushMask();
+      }
+    },
+    // ── Brush helpers ──
+    _drawBrushDot(p) {
+      if (!this._brushCtx) return;
+      const c = this._brushCtx;
+      c.fillStyle = 'rgba(0,0,0,1)';
+      c.beginPath();
+      c.arc(p.nx * this._brushCanvas.width, p.ny * this._brushCanvas.height, 12, 0, Math.PI * 2);
+      c.fill();
+    },
+    _drawBrushLine(from, to) {
+      if (!this._brushCtx) return;
+      const c = this._brushCtx;
+      const w = this._brushCanvas.width, h = this._brushCanvas.height;
+      c.strokeStyle = 'rgba(0,0,0,1)';
+      c.lineWidth = 24;
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      c.beginPath();
+      c.moveTo(from.nx * w, from.ny * h);
+      c.lineTo(to.nx * w, to.ny * h);
+      c.stroke();
+    },
+    _finalizeBrushMask() {
+      if (!this._brushCanvas) return;
+      this.regionBrushData = this._brushCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+      // Cập nhật regionBox từ bounding box của brush mask
+      const ctx = this._brushCtx;
+      const w = this._brushCanvas.width, h = this._brushCanvas.height;
+      const imgData = ctx.getImageData(0, 0, w, h).data;
+      let minX = w, minY = h, maxX = 0, maxY = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const a = imgData[(y * w + x) * 4 + 3];
+          if (a > 0) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (minX <= maxX && minY <= maxY) {
+        this.regionBox = { x: minX / w, y: minY / h, w: (maxX - minX + 1) / w, h: (maxY - minY + 1) / h };
+      }
+    },
     // Gửi thao tác vùng -> backend /generations/{id}/region (mask + AI/local) -> poll.
     async applyRegion() {
       const op = this.regionOp || this.regionMode;
       if (!op || !this.regionOps[op]) { this.toast('Chọn thao tác vùng trước.', 'error'); return; }
-      // Vùng chọn được tính theo ẢNH ĐANG HIỂN THỊ (upscaleSrc) — gửi chính URL đó làm source_url
-      // để backend sửa đúng ảnh này, vị trí tái tạo khớp vùng đã chọn trên canvas.
       const src = this.regionSrc || this.upscaleSrc;
       if (!this.previewId || !src) { this.toast('Chọn ảnh kết quả để chỉnh vùng.', 'error'); return; }
-      if (this.regionOps[op].needsPrompt && !this.regionPrompt.trim()) { this.toast('Nhập mô tả nội dung thay thế cho vùng.', 'error'); return; }
       const b = this.regionBox || {}; const w = b.w || 0, h = b.h || 0;
-      if (w < 0.02 || h < 0.02) { this.toast('Vùng chọn quá nhỏ — kéo chọn lại trên canvas.', 'error'); return; }
+      if (this.regionMaskMode === 'rect' && (w < 0.02 || h < 0.02)) { this.toast('Vùng chọn quá nhỏ — kéo chọn lại trên canvas.', 'error'); return; }
+
+      // Prompt translation: nếu replace + prompt có ký tự tiếng Việt → dịch tự động
+      let finalPrompt = this.regionPrompt;
+      if (op === 'replace' && finalPrompt.trim() && /[àáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ]/.test(finalPrompt)) {
+        if (!this.regionTranslating && !this.regionPromptEn) {
+          this.regionTranslating = true;
+          try {
+            const d = await this.api('/studio/translate', { text: finalPrompt, direction: 'en' });
+            this.regionPromptEn = d.text || finalPrompt;
+          } catch (e) {
+            this.regionPromptEn = finalPrompt; // fallback: giữ nguyên
+          }
+          this.regionTranslating = false;
+        }
+        finalPrompt = this.regionPromptEn || finalPrompt;
+      }
+
+      if (this.regionOps[op].needsPrompt && !finalPrompt.trim()) { this.toast('Nhập mô tả nội dung thay thế cho vùng.', 'error'); return; }
+
       this.regionOp = op;
       this.regionStage = 'send';
       this.regionError = '';
       this.regionStartTs = Date.now();
+      const body = { op, region: { x: b.x, y: b.y, w, h }, prompt: finalPrompt, source_url: src, mask_mode: this.regionMaskMode };
+      if (this.regionMaskMode === 'brush' && this.regionBrushData) {
+        body.mask_data = this.regionBrushData;
+      }
       try {
-        const d = await this.api('/studio/generations/' + this.previewId + '/region', { op, region: { x: b.x, y: b.y, w, h }, prompt: this.regionPrompt, source_url: src });
+        const d = await this.api('/studio/generations/' + this.previewId + '/region', body);
         if (!d.generation_id) { throw new Error(d.message || 'Không tạo được yêu cầu.'); }
         this.regionGenId = d.generation_id;
         if (d.status === 'completed') {
-          // Không có key AI → backend lấp cục bộ, trả completed ngay.
           this.regionStage = 'done';
           this.regionMode = '';
           this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: d.model || 'erase', provider: d.provider || 'local', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa xóa vùng' });
@@ -523,7 +696,7 @@ export const useStudioStore = defineStore('studio', {
       try { await this.api('/studio/generations/' + this.regionGenId + '/cancel', {}); this.regionStage = 'cancelled'; this.regionMode = ''; this.toast('Đã hủy thao tác vùng.'); }
       catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
     },
-    clearRegionStatus() { this.regionStage = ''; this.regionError = ''; this.regionGenId = null; this.regionStartTs = 0; this.regionOp = null; this.regionMode = ''; this.regionSrc = ''; },
+    clearRegionStatus() { this.regionStage = ''; this.regionError = ''; this.regionGenId = null; this.regionStartTs = 0; this.regionOp = null; this.regionMode = ''; this.regionSrc = ''; this.regionMaskMode = 'rect'; this.regionBrushData = ''; this.regionPromptEn = ''; this.regionTranslating = false; },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
       // 1 face reference + 1 or MORE poses -> one result per pose.

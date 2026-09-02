@@ -194,6 +194,9 @@ class StudioController extends Controller
             'region.w' => ['required', 'numeric', 'min:0.005', 'max:1'],
             'region.h' => ['required', 'numeric', 'min:0.005', 'max:1'],
             'prompt' => ['nullable', 'string', 'max:2000'],
+            'mask_mode' => ['nullable', 'string', 'in:rect,brush'],
+            // Brush mode: frontend vẽ mask tự do → gửi mask_data (base64 PNG).
+            'mask_data' => ['nullable', 'string', 'max:2000000'],
             // Ảnh ĐANG HIỂN THỊ trên canvas (upscaleSrc) — backend sửa đúng ảnh này để vùng
             // chọn khớp vị trí tái tạo (tránh lệch do layer/scale/aspect khác preview.media_url).
             'source_url' => ['nullable', 'string', 'max:2048'],
@@ -279,8 +282,29 @@ class StudioController extends Controller
 
         $cost = (int) studio_config('image_credits', 1);
 
+        // Giới hạn crop tối đa ~2048px để không vượt quá giới hạn model AI.
+        $maxDim = 2048;
+        if ($cropW > $maxDim || $cropH > $maxDim) {
+            $scale = min($maxDim / $cropW, $maxDim / $cropH);
+            $cropW2 = (int) round($cropW * $scale); $cropH2 = (int) round($cropH * $scale);
+            $tmp = imagecreatetruecolor($cropW2, $cropH2);
+            imagecopyresampled($tmp, $cropImg, 0, 0, 0, 0, $cropW2, $cropH2, $cropW, $cropH);
+            imagedestroy($cropImg); $cropImg = $tmp;
+            $tmp2 = imagecreatetruecolor($cropW2, $cropH2);
+            imagecopyresampled($tmp2, $mask, 0, 0, 0, 0, $cropW2, $cropH2, $cropW, $cropH);
+            imagedestroy($mask); $mask = $tmp2;
+            // Cập nhật crop dimensions để pasteRegionEdit paste đúng
+            $origCropW = $cropW2; $origCropH = $cropH2;
+            $regionMeta['crop_w'] = $origCropW; $regionMeta['crop_h'] = $origCropH;
+            // Scale region_meta coordinates to match
+            $regionMeta['reg_x'] = (int) round($regionMeta['reg_x'] * $scale);
+            $regionMeta['reg_y'] = (int) round($regionMeta['reg_y'] * $scale);
+            $regionMeta['reg_w'] = (int) round($regionMeta['reg_w'] * $scale);
+            $regionMeta['reg_h'] = (int) round($regionMeta['reg_h'] * $scale);
+        }
+
         // Cả XÓA lẫn THAY đều dùng AI trên CROP (đáng tin cậy); fallback local khi chưa có key.
-        $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen'));
+        $hasAi = (bool) (studio_api_key('qwen_edit') ?: studio_api_key('dashscope') ?: studio_api_key('qwen') ?: studio_api_key('gemini'));
         if ($hasAi) {
             return $this->queueGeneration('image', [
                 'prompt' => $this->regionPrompt($op, (string) ($data['prompt'] ?? '')),
@@ -291,7 +315,11 @@ class StudioController extends Controller
             ], $cost, $generation);
         }
 
-        // Chưa có key AI → tái tạo nền cục bộ (degrade)
+        // Chưa có key AI → erase: tái tạo nền cục bộ; replace: trả 422 (tránh P1: thay vùng thành xóa vùng).
+        if ($op === 'replace') {
+            imagedestroy($src);
+            return response()->json(['message' => 'Tính năng Thay vùng cần key AI (Qwen Edit / DashScope). Vui lòng cấu hình API key.'], 422);
+        }
         $this->localEraseFill($src, $px, $py, $pw, $ph);
         $name = 'studio/erase-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($src));
