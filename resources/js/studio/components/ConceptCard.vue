@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
@@ -12,6 +12,103 @@ const historyLoading = ref(false);
 const enrichPreview = ref('');
 const enrichLoading = ref(false);
 const enrichError = ref('');
+
+// ── 7. Character counter ──
+const MAX_CHARS = 4000;
+const charCount = computed(() => (store.imagePromptEn || '').length);
+const charWarning = computed(() => charCount.value > MAX_CHARS * 0.85);
+const charDanger = computed(() => charCount.value >= MAX_CHARS);
+
+// ── 8. Undo/Redo ──
+const undoStack = ref([]);
+const redoStack = ref([]);
+const MAX_UNDO = 30;
+let ignoreNextInput = false;
+function pushUndo(text) {
+  if (ignoreNextInput) { ignoreNextInput = false; return; }
+  const last = undoStack.value[undoStack.value.length - 1];
+  if (last === text) return; // no change
+  undoStack.value.push(text);
+  if (undoStack.value.length > MAX_UNDO) undoStack.value.shift();
+  redoStack.value = []; // clear redo on new input
+}
+function undo() {
+  if (undoStack.value.length < 2) return;
+  const current = undoStack.value.pop();
+  redoStack.value.push(current);
+  const prev = undoStack.value[undoStack.value.length - 1];
+  ignoreNextInput = true;
+  store.imagePromptEn = prev;
+  scheduleEnrichPreview();
+}
+function redo() {
+  if (!redoStack.value.length) return;
+  const next = redoStack.value.pop();
+  undoStack.value.push(next);
+  ignoreNextInput = true;
+  store.imagePromptEn = next;
+  scheduleEnrichPreview();
+}
+function onPromptKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+}
+// Watch for text changes → push to undo stack (debounced)
+let undoPushTimer = null;
+watch(() => store.imagePromptEn, (val) => {
+  if (undoPushTimer) clearTimeout(undoPushTimer);
+  undoPushTimer = setTimeout(() => pushUndo(val || ''), 500);
+});
+
+// ── 12. Auto-save draft ──
+const DRAFT_KEY = 'trillfa.prompt-draft';
+function saveDraft() {
+  try {
+    const draft = {
+      prompt: store.imagePromptEn || '',
+      creativeLevel: store.creativeLevel,
+      texture: store.texture,
+      variantCount: store.variantCount,
+      imageRatio: store.imageRatio,
+      imageRes: store.imageRes,
+      negativePrompt: store.negativePromptEn || '',
+      timestamp: Date.now()
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch (e) {}
+}
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return false;
+    const draft = JSON.parse(raw);
+    if (!draft.prompt) return false;
+    store.imagePromptEn = draft.prompt;
+    if (draft.creativeLevel != null) { store.creativeLevel = draft.creativeLevel; localCreative.value = draft.creativeLevel; }
+    if (draft.texture != null) { store.texture = draft.texture; localTexture.value = draft.texture; }
+    if (draft.variantCount != null) { store.variantCount = draft.variantCount; localVariant.value = draft.variantCount; }
+    if (draft.imageRatio) store.imageRatio = draft.imageRatio;
+    if (draft.imageRes) store.imageRes = draft.imageRes;
+    if (draft.negativePrompt) store.negativePromptEn = draft.negativePrompt;
+    return true;
+  } catch (e) { return false; }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+}
+// Auto-save on changes (debounced)
+let draftSaveTimer = null;
+watch(() => [store.imagePromptEn, store.creativeLevel, store.texture, store.variantCount, store.imageRatio, store.imageRes, store.negativePromptEn], () => {
+  if (draftSaveTimer) clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveDraft, 1000);
+}, { deep: true });
+
+// Save draft on generate
+const origGenerate = store.generateImage.bind(store);
+store.generateImage = function() {
+  clearDraft();
+  return origGenerate();
+};
 
 // ── Prompt templates ──
 const templates = ref([
@@ -66,6 +163,10 @@ watch(localCreative, (v) => { debouncedSet('creativeLevel', v); });
 watch(localTexture, (v) => { debouncedSet('texture', v); });
 watch(localVariant, (v) => { debouncedSet('variantCount', v); });
 
+// ── Draft state ──
+const showDraftNotice = ref(false);
+const draftTime = ref('');
+
 async function openPrompt() {
   if (!store.defaultsLoaded) {
     promptLoading.value = true;
@@ -77,7 +178,35 @@ async function openPrompt() {
   localTexture.value = store.texture;
   localVariant.value = store.variantCount;
   enrichPreview.value = '';
+  
+  // Check for saved draft
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      const draft = JSON.parse(raw);
+      if (draft.prompt) {
+        showDraftNotice.value = true;
+        const d = new Date(draft.timestamp);
+        draftTime.value = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+      }
+    }
+  } catch (e) {}
+  
   store.promptOpen = true;
+}
+
+function restoreDraft() {
+  loadDraft();
+  showDraftNotice.value = false;
+  undoStack.value = [store.imagePromptEn || ''];
+  redoStack.value = [];
+  scheduleEnrichPreview();
+  store.toast('Đã khôi phục bản nháp.');
+}
+
+function dismissDraft() {
+  showDraftNotice.value = false;
+  clearDraft();
 }
 
 function resetToDefaults() {
@@ -85,6 +214,9 @@ function resetToDefaults() {
   localCreative.value = store.creativeLevel;
   localTexture.value = store.texture;
   localVariant.value = store.variantCount;
+  clearDraft();
+  undoStack.value = [];
+  redoStack.value = [];
   store.toast('Đã đặt lại về mặc định hệ thống.');
 }
 
@@ -208,8 +340,16 @@ async function doEnrichPreview() {
           </div>
         </div>
 
-        <!-- ── Prompt textarea (cao hơn 30%: rows 4→6) ── -->
-        <textarea v-model="store.imagePromptEn" @input="scheduleEnrichPreview" rows="6" class="input !text-sm !py-3" placeholder="Nhập ý tưởng / prompt (EN hoặc VI). Mô tả trang phục, phong cách, bối cảnh, ánh sáng…"></textarea>
+        <!-- ── Prompt textarea + char counter + undo/redo ── -->
+        <div class="relative">
+          <textarea v-model="store.imagePromptEn" @input="scheduleEnrichPreview" @keydown="onPromptKeydown" rows="6" class="input !text-sm !py-3 !pr-16" placeholder="Nhập ý tưởng / prompt (EN hoặc VI). Mô tả trang phục, phong cách, bối cảnh, ánh sáng…"></textarea>
+          <!-- Char counter + undo/redo -->
+          <div class="absolute bottom-2 right-2 flex items-center gap-1">
+            <button @click="undo" :disabled="undoStack.length < 2" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Undo (Ctrl+Z)">↩</button>
+            <button @click="redo" :disabled="!redoStack.length" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Redo (Ctrl+Y)">↪</button>
+            <span class="text-[10px] font-semibold" :class="charDanger ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-cream-300/50'">{{ charCount }}/{{ MAX_CHARS }}</span>
+          </div>
+        </div>
 
         <!-- Live enrich preview -->
         <div v-if="enrichPreview || enrichLoading" class="my-3 rounded-xl border border-emerald-500/30 bg-emerald-900/20 p-2.5">
@@ -261,6 +401,17 @@ async function doEnrichPreview() {
           <label class="label text-sm">Negative prompt (điều model KHÔNG nên tạo)</label>
           <textarea v-model="store.negativePromptEn" @input="scheduleEnrichPreview" rows="2" class="input !text-sm !py-2" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..."></textarea>
           <p class="mt-1 text-[10px] text-cream-300/50">Để trống để dùng negative prompt mặc định từ Cài đặt.</p>
+        </div>
+
+        <!-- ── Draft restore notice ── -->
+        <div v-if="showDraftNotice" class="my-3 rounded-xl border border-amber-500/30 bg-amber-900/20 p-2.5">
+          <div class="flex items-center justify-between">
+            <p class="text-[11px] text-amber-300/80">📝 Có bản nháp chưa gửi từ lúc {{ draftTime }}</p>
+            <div class="flex gap-1.5">
+              <button @click="restoreDraft" class="rounded-lg bg-amber-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-amber-500">Khôi phục</button>
+              <button @click="dismissDraft" class="rounded-lg bg-ink-700 px-2 py-1 text-[10px] text-cream-200 hover:bg-red-600">Bỏ qua</button>
+            </div>
+          </div>
         </div>
 
         <!-- ── Reset + Generate ── -->
