@@ -165,6 +165,8 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::delete('/ref-images/{name}', [StudioController::class, 'refImageDelete'])->name('ref-images.delete');
     Route::post('/translate', [StudioController::class, 'translate'])->name('translate');
     Route::get('/defaults', [StudioController::class, 'defaults'])->name('defaults');
+    Route::get('/prompt-history', [StudioController::class, 'promptHistory'])->name('prompt-history');
+    Route::post('/preview-enrich', [StudioController::class, 'previewEnrich'])->name('preview-enrich');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');
     Route::post('/settings/save', [StudioController::class, 'settingsSave'])->name('settings.save');

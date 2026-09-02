@@ -3243,5 +3243,69 @@ RULES:
         }
 
         return response()->json(['processed' => $n, 'message' => 'Đã xử lý '.$n.' công việc đang chờ.']);
+
+    /**
+     * Return the last 5 unique image prompts for the user (prompt history).
+     */
+    public function promptHistory(): \Illuminate\Http\JsonResponse
+    {
+        $items = auth()->user()->prompts()
+            ->whereNotNull('image_prompt_en')
+            ->where('image_prompt_en', '!=', '')
+            ->latest()
+            ->limit(20)
+            ->get(['id', 'image_prompt_en', 'json_response', 'created_at'])
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'prompt' => $p->image_prompt_en,
+                'creative_level' => $p->json_response['creative_level'] ?? null,
+                'texture' => $p->json_response['texture'] ?? null,
+                'negative_prompt' => $p->json_response['negative_prompt'] ?? null,
+                'created_at' => $p->created_at?->format('d/m H:i'),
+            ]);
+
+        // Deduplicate by prompt text, keep most recent
+        $seen = [];
+        $unique = [];
+        foreach ($items as $item) {
+            $key = md5($item['prompt']);
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $unique[] = $item;
+            }
+        }
+
+        return response()->json(['items' => array_slice($unique, 0, 5)]);
+    }
+
+    /**
+     * Preview the enriched prompt (prefix + suffix + texture + directive) without generating.
+     */
+    public function previewEnrich(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'prompt' => ['required', 'string', 'max:4000'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'negative_prompt' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $userPrompt = (string) $data['prompt'];
+        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
+        $texture = (int) ($data['texture'] ?? studio_config('texture', 5));
+        $customNegative = $data['negative_prompt'] ?? null;
+
+        $direction = app(\App\Services\CreativeDirectionService::class);
+        $enriched = $direction->enrichGeneratePrompt($userPrompt, $creativeLevel, $texture, $customNegative);
+
+        return response()->json([
+            'original' => $userPrompt,
+            'enriched' => $enriched['prompt'],
+            'negative_prompt' => $enriched['negative_prompt'],
+            'prefix' => $enriched['prefix'],
+            'suffix' => $enriched['suffix'],
+            'texture_descriptor' => $enriched['texture_descriptor'],
+            'creativity_directive' => $enriched['creativity_directive'],
+        ]);
     }
 }
