@@ -149,6 +149,18 @@ export const useStudioStore = defineStore('studio', {
     },
     async load() {
       this.loadUpscaleMemory();
+      // Load settings defaults from backend (set in Studio Settings page)
+      try {
+        const cfg = await fetch('/studio/defaults', { headers: { Accept: 'application/json' } });
+        const defaults = await cfg.json();
+        if (defaults.creative_level != null) this.creativeLevel = Number(defaults.creative_level);
+        if (defaults.texture != null) this.texture = Number(defaults.texture);
+        if (defaults.image_resolution) this.imageRes = defaults.image_resolution;
+        if (defaults.image_ratio) this.imageRatio = defaults.image_ratio;
+        if (defaults.video_duration) this.videoDuration = defaults.video_duration;
+        if (defaults.video_resolution) this.videoRes = defaults.video_resolution;
+        if (defaults.negative_prompt) this.negativePromptEn = defaults.negative_prompt;
+      } catch (e) { /* defaults not available — keep hardcoded fallbacks */ }
       try {
         const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
         const d = await res.json();

@@ -3180,6 +3180,23 @@ RULES:
     /**
      * Latest generations (JSON) — used to re-sync the Studio output grid reliably.
      */
+    /**
+     * Return studio config defaults so the frontend can initialise its sliders/fields.
+     */
+    public function defaults(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'creative_level' => (int) studio_config('creative_level', 6),
+            'texture' => (int) studio_config('texture', 5),
+            'image_resolution' => (string) studio_config('image_resolution', '1K'),
+            'image_ratio' => (string) studio_config('image_ratio', '1:1'),
+            'video_duration' => (string) studio_config('video_duration', '10'),
+            'video_resolution' => (string) studio_config('video_resolution', '720'),
+            'enrich_prompt' => (bool) studio_config('enrich_prompt', true),
+            'negative_prompt' => (string) studio_config('negative_prompt', ''),
+        ]);
+    }
+
     public function latest()
     {
         $items = auth()->user()->generations()->with('project')->latest()->limit(30)->get()
