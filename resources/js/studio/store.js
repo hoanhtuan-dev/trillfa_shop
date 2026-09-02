@@ -44,6 +44,7 @@ export const useStudioStore = defineStore('studio', {
     _drag: null,
     // concept
     imagePromptEn: '',
+    negativePromptEn: '',
     creativeLevel: 6,
     variantCount: 1,
     imageRatio: '1:1',
@@ -168,8 +169,15 @@ export const useStudioStore = defineStore('studio', {
       if (!this.imagePromptEn || this.generating) return;
       this.generating = true;
       try {
-        const finalPrompt = (this.imagePromptEn || '') + (this.texture > 0 ? ', fabric/knit texture detail ' + this.texture + '/10' : '');
-        const d = await this.api('/studio/generate', { prompt: finalPrompt, resolution: this.imageRes, ratio: this.imageRatio, variants: Number(this.variantCount) || 1 });
+        const d = await this.api('/studio/generate', {
+          prompt: this.imagePromptEn,
+          creative_level: this.creativeLevel,
+          texture: this.texture,
+          negative_prompt: this.negativePromptEn || '',
+          resolution: this.imageRes,
+          ratio: this.imageRatio,
+          variants: Number(this.variantCount) || 1
+        });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
         this.setBatch(items.map(it => it.generation_id));
@@ -631,7 +639,7 @@ export const useStudioStore = defineStore('studio', {
     _drawBrushDot(p) {
       if (!this._brushCtx) return;
       const c = this._brushCtx;
-      c.fillStyle = 'rgba(220,38,38,0.65)';
+      c.fillStyle = 'rgba(200,20,20,0.48)';
       c.beginPath();
       c.arc(p.nx * this._brushCanvas.width, p.ny * this._brushCanvas.height, 12, 0, Math.PI * 2);
       c.fill();
@@ -640,7 +648,7 @@ export const useStudioStore = defineStore('studio', {
       if (!this._brushCtx) return;
       const c = this._brushCtx;
       const w = this._brushCanvas.width, h = this._brushCanvas.height;
-      c.strokeStyle = 'rgba(220,38,38,0.65)';
+      c.strokeStyle = 'rgba(200,20,20,0.48)';
       c.lineWidth = 24;
       c.lineCap = 'round';
       c.lineJoin = 'round';

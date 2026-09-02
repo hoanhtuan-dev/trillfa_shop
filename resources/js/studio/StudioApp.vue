@@ -96,7 +96,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             <!-- Region selection overlay (xóa/thay vùng) -->
             <div v-if="store.regionMode && store.upscaleSrc" class="absolute inset-0" style="z-index:31; cursor:crosshair" @pointerdown="store.regionStart($event)" @pointermove="store.regionMove($event)" @pointerup="store.regionStop()" @pointercancel="store.regionStop()">
               <!-- Brush overlay: THẤY NÉT VẼ THẬT trên ảnh, neo theo zoom/pan (canvasMetrics) -->
-              <canvas v-show="store.regionMaskMode === 'brush'" ref="brushOverlay" class="pointer-events-none absolute z-[2]" :style="store.brushStyle()" style="mix-blend-mode:multiply"></canvas>
+              <canvas v-show="store.regionMaskMode === 'brush'" ref="brushOverlay" class="pointer-events-none absolute z-[2]" :style="store.brushStyle()"></canvas>
               <div class="pointer-events-none absolute inset-0 bg-black/45"></div>
               <!-- Hint khi brush chưa vẽ: mời vẽ lên ảnh -->
               <div v-if="store.regionMaskMode === 'brush' && !store.regionBrushData" class="pointer-events-none absolute inset-0 grid place-items-center">

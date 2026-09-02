@@ -48,6 +48,7 @@ class RenderImageJob implements ShouldQueue
                 null,
                 $generation->provider,
                 $generation->model,
+                $generation->meta['negative_prompt'] ?? null,
             );
 
             // DEEP REDESIGN (region): AI đã sửa trên CROP — paste lại vào ẢNH GỐC đúng vị trí

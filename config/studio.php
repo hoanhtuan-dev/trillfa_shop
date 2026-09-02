@@ -43,6 +43,11 @@ return [
     'image_ratio' => env('STUDIO_IMAGE_RATIO', '1:1'), // 1:1 | 4:3 | 3:4 | 16:9 | 9:16 | 4:5 | 21:9 | 19:6
     'video_duration' => env('STUDIO_VIDEO_DURATION', '10'), // 5 | 8 | 10 | 15 | 20 (giây)
     'creative_level' => (int) env('STUDIO_CREATIVE_LEVEL', 6), // 1 (bám sát brief) .. 10 (sáng tạo tự do)
+    'texture' => (int) env('STUDIO_TEXTURE', 5), // 0 (mịn phẳng) .. 10 (siêu chi tiết sợi vải)
+    'negative_prompt' => env('STUDIO_NEGATIVE_PROMPT', 'blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo, oversaturated, overexposed, cropped garment, inconsistent face'),
+    'prompt_prefix' => env('STUDIO_PROMPT_PREFIX', 'High-fashion editorial photograph, professional fashion photography'),
+    'prompt_suffix' => env('STUDIO_PROMPT_SUFFIX', 'soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus'),
+    'enrich_prompt' => (bool) env('STUDIO_ENRICH_PROMPT', true), // tự động làm giàu prompt với prefix/suffix/negative
 
     /*
     |--------------------------------------------------------------------------

@@ -1,9 +1,19 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
+const showAdvanced = ref(false);
 const promptPreview = computed(() => { const t = store.imagePromptEn || ''; return t.length > 54 ? t.slice(0, 54) + '…' : (t || 'Nhập/áp dụng prompt…'); });
+const textureLabel = computed(() => {
+  const t = store.texture;
+  if (t <= 0) return 'Không';
+  if (t <= 2) return 'Mịn phẳng';
+  if (t <= 4) return 'Dệt nhẹ';
+  if (t <= 6) return 'Rõ vừa';
+  if (t <= 8) return 'Chi tiết cao';
+  return 'Siêu chi tiết';
+});
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
@@ -23,8 +33,17 @@ const promptPreview = computed(() => { const t = store.imagePromptEn || ''; retu
         </div>
         <label class="label mt-2">Số biến thể / lần tạo</label>
         <div class="flex items-center gap-3 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs"><span class="shrink-0 font-medium text-cream-200">Biến thể</span><input type="range" min="1" max="4" step="1" v-model.number="store.variantCount" class="h-2 w-full cursor-pointer accent-brand-500"><span class="shrink-0 font-semibold text-cream-50">{{ store.variantCount }}</span></div>
-        <label class="label mt-2">🧵 Texture (nhúng vào prompt)</label>
+        <label class="label mt-2">🧵 Texture: <span class="font-semibold text-brand-300">{{ textureLabel }}</span></label>
         <div class="flex items-center gap-3 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2 text-xs"><span class="shrink-0 font-medium text-cream-200">Texture</span><input type="range" min="0" max="10" step="1" v-model.number="store.texture" class="h-2 w-full cursor-pointer accent-brand-500"><span class="shrink-0 font-semibold text-cream-50">{{ store.texture }}</span></div>
+        <!-- Advanced: Negative prompt -->
+        <button @click="showAdvanced = !showAdvanced" class="mt-2 flex w-full items-center gap-1 text-xs text-cream-300/60 hover:text-cream-200">
+          <span>{{ showAdvanced ? '▾' : '▸' }}</span> Nâng cao (negative prompt)
+        </button>
+        <div v-if="showAdvanced" class="mt-2 rounded-2xl border border-ink-700 bg-ink-800 p-3">
+          <label class="label">Negative prompt (điều model KHÔNG nên tạo)</label>
+          <textarea v-model="store.negativePromptEn" rows="2" class="input !text-xs" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..."></textarea>
+          <p class="mt-1 text-[10px] text-cream-300/50">Để trống để dùng negative prompt mặc định từ Cài đặt.</p>
+        </div>
         <button @click="store.promptOpen = false; store.generateImage()" :disabled="store.generating || !store.imagePromptEn" class="btn-brand mt-3 w-full whitespace-nowrap">{{ store.generating ? 'Đang gửi…' : '🎨 Tạo Ảnh 2D' }}</button>
     </BaseModal>
   </div>

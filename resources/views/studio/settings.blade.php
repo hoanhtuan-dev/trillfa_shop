@@ -144,6 +144,41 @@
             </div>
         </div>
         <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
+            <h3 class="mb-3 font-display text-sm font-semibold text-ink-900">Prompt mặc định</h3>
+            <p class="mb-2 text-xs text-ink-500">Các cài đặt này được dùng làm giá trị mặc định trong <b>Prompt Tạo Ảnh</b> — người dùng có thể ghi đè trong giao diện.</p>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="label">Mức sáng tạo mặc định (1-10)</label>
+                    <input type="number" name="creative_level" min="1" max="10" value="{{ old('creative_level', $creative_level) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">1 = bám sát brief · 10 = sáng tạo tự do</p>
+                </div>
+                <div>
+                    <label class="label">Texture mặc định (0-10)</label>
+                    <input type="number" name="texture" min="0" max="10" value="{{ old('texture', $texture) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">0 = không có texture · 10 = siêu chi tiết sợi vải</p>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label">Prompt prefix (tự động thêm vào đầu)</label>
+                    <input type="text" name="prompt_prefix" value="{{ old('prompt_prefix', $prompt_prefix) }}" class="input !py-2" placeholder="High-fashion editorial photograph, professional fashion photography">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label">Prompt suffix (tự động thêm vào cuối)</label>
+                    <input type="text" name="prompt_suffix" value="{{ old('prompt_suffix', $prompt_suffix) }}" class="input !py-2" placeholder="soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label">Negative prompt (điều model KHÔNG được tạo)</label>
+                    <textarea name="negative_prompt" rows="2" class="input !py-2" placeholder="blurry, low quality, distorted proportions...">{{ old('negative_prompt', $negative_prompt) }}</textarea>
+                </div>
+                <div>
+                    <label class="flex items-center gap-2 text-ink-700">
+                        <input type="checkbox" name="enrich_prompt" value="1" @if(old('enrich_prompt', $enrich_prompt)) checked @endif class="h-4 w-4 accent-brand-600">
+                        Tự động làm giàu prompt (prefix + suffix + negative)
+                    </label>
+                    <p class="mt-1 text-xs text-ink-500">Bật: tự động thêm prefix/suffix/negative vào mọi prompt. Tắt: dùng prompt thô từ người dùng.</p>
+                </div>
+            </div>
+        </div>
+        <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
             <h3 class="mb-2 font-display text-sm font-semibold text-ink-900">Worker tự động (Hàng đợi)</h3>
             <p class="text-xs text-ink-500">Studio <strong>tự động chạy job ngay</strong> khi bạn bấm Tạo ảnh / Video — <strong>không cần SSH, không cần cron, không cần <code class="rounded bg-white px-1">php artisan queue:work</code></strong>. Kết quả cập nhật ngay trên Canvas / Outputs.</p>
             <p class="mt-2 text-xs text-ink-500">Các việc <strong>rất dài</strong> (video AI thật) có thể đưa sang worker nền để không chờ trong trang — chỉ dành cho người dùng nâng cao:</p>

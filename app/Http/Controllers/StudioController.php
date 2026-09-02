@@ -77,20 +77,48 @@ class StudioController extends Controller
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
-            'base_image' => ['nullable', 'string', 'max:2048'], // edit path: change bg/pose keeping exact pixels
+            'base_image' => ['nullable', 'string', 'max:2048'],
             'edit' => ['nullable', 'string', 'in:1,true'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'negative_prompt' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        $userPrompt = (string) $data['prompt'];
+        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
+        $texture = (int) ($data['texture'] ?? studio_config('texture', 5));
+        $customNegative = $data['negative_prompt'] ?? null;
+        $shouldEnrich = (bool) studio_config('enrich_prompt', true);
+
+        // Enrich the prompt with CreativeDirectionService
+        $direction = app(\App\Services\CreativeDirectionService::class);
+        if ($shouldEnrich) {
+            $enriched = $direction->enrichGeneratePrompt($userPrompt, $creativeLevel, $texture, $customNegative);
+            $finalPrompt = $enriched['prompt'];
+            $negativePrompt = $enriched['negative_prompt'];
+        } else {
+            $finalPrompt = $userPrompt;
+            $negativePrompt = $customNegative ?: $direction->negativePrompt([], $creativeLevel);
+        }
 
         // Ensure a shared prompt-history so all variants group as one "generation run".
         if (empty($data['history_id'])) {
             $history = auth()->user()->prompts()->create([
                 'idea' => null,
-                'image_prompt_en' => $data['prompt'],
+                'image_prompt_en' => $finalPrompt,
                 'video_prompt_en' => null,
-                'json_response' => ['image_prompt_en' => $data['prompt']],
+                'json_response' => [
+                    'image_prompt_en' => $finalPrompt,
+                    'creative_level' => $creativeLevel,
+                    'texture' => $texture,
+                    'negative_prompt' => $negativePrompt,
+                ],
             ]);
             $data['history_id'] = $history->id;
         }
+
+        $data['prompt'] = $finalPrompt;
+        $data['negative_prompt'] = $negativePrompt;
 
         $cost = (int) studio_config('image_credits', 1);
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
@@ -706,7 +734,20 @@ RULES:
             'base_image' => $data['base_image'] ?? $source?->media_url,
             'mask_image' => $data['mask_image'] ?? null,
             'credits_cost' => $cost,
-            'meta' => ($type === 'video' && ! empty($data['camera'])) ? ['camera' => $data['camera']] : ($data['region_meta'] ?? null),
+            'meta' => array_filter([
+                'camera' => ($type === 'video' && ! empty($data['camera'])) ? $data['camera'] : null,
+                'region_op' => $data['region_meta']['region_op'] ?? null,
+                'source' => $data['region_meta']['source'] ?? null,
+                'crop_x' => $data['region_meta']['crop_x'] ?? null,
+                'crop_y' => $data['region_meta']['crop_y'] ?? null,
+                'crop_w' => $data['region_meta']['crop_w'] ?? null,
+                'crop_h' => $data['region_meta']['crop_h'] ?? null,
+                'reg_x' => $data['region_meta']['reg_x'] ?? null,
+                'reg_y' => $data['region_meta']['reg_y'] ?? null,
+                'reg_w' => $data['region_meta']['reg_w'] ?? null,
+                'reg_h' => $data['region_meta']['reg_h'] ?? null,
+                'negative_prompt' => $data['negative_prompt'] ?? null,
+            ], fn ($v) => $v !== null && $v !== ''),
         ]);
 
         // The job is processed lazily when the client polls this generation (show()), or via the
@@ -2678,6 +2719,12 @@ RULES:
             'video_resolution' => setting('studio_video_resolution', config('studio.video_resolution')),
             'image_ratio' => setting('studio_image_ratio', config('studio.image_ratio')),
             'video_duration' => setting('studio_video_duration', config('studio.video_duration')),
+            'creative_level' => setting('studio_creative_level', config('studio.creative_level', 6)),
+            'texture' => setting('studio_texture', config('studio.texture', 5)),
+            'prompt_prefix' => setting('studio_prompt_prefix', config('studio.prompt_prefix', '')),
+            'prompt_suffix' => setting('studio_prompt_suffix', config('studio.prompt_suffix', '')),
+            'negative_prompt' => setting('studio_negative_prompt', config('studio.negative_prompt', '')),
+            'enrich_prompt' => filter_var(setting('studio_enrich_prompt', config('studio.enrich_prompt', true)), FILTER_VALIDATE_BOOLEAN),
             'pending_count' => auth()->user()->generations()->whereIn('status', ['pending', 'processing'])->count(),
             'queue_driver' => config('queue.default'),
             'usage' => studio_usage(auth()->user()),
@@ -2938,6 +2985,12 @@ RULES:
             'video_resolution' => ['required', 'string', 'in:480,720,1080'],
             'image_ratio' => ['required', 'string', 'in:1:1,4:3,3:4,16:9,9:16,4:5,21:9,19:6'],
             'video_duration' => ['required', 'string', 'in:5,8,10,15,20'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'prompt_prefix' => ['nullable', 'string', 'max:500'],
+            'prompt_suffix' => ['nullable', 'string', 'max:500'],
+            'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            'enrich_prompt' => ['nullable', 'string', 'in:1'],
         ]);
 
         if (isset($data['image_credits'])) set_setting('studio_image_credits', (string) $data['image_credits']);
@@ -2964,7 +3017,12 @@ RULES:
         set_setting('studio_video_resolution', $data['video_resolution']);
         set_setting('studio_image_ratio', $data['image_ratio']);
         set_setting('studio_video_duration', $data['video_duration']);
-
+        if (isset($data['creative_level'])) set_setting('studio_creative_level', (string) $data['creative_level']);
+        if (isset($data['texture'])) set_setting('studio_texture', (string) $data['texture']);
+        if (isset($data['prompt_prefix'])) set_setting('studio_prompt_prefix', $data['prompt_prefix']);
+        if (isset($data['prompt_suffix'])) set_setting('studio_prompt_suffix', $data['prompt_suffix']);
+        if (isset($data['negative_prompt'])) set_setting('studio_negative_prompt', $data['negative_prompt']);
+        set_setting('studio_enrich_prompt', ! empty($data['enrich_prompt']) ? '1' : '0');
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }

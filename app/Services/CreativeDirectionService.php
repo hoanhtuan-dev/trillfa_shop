@@ -263,4 +263,63 @@ class CreativeDirectionService
     {
         return max($min, min($max, $value));
     }
+
+    /**
+     * Map texture slider (0-10) to a semantic English descriptor that image models understand.
+     */
+    public function textureDescriptor(int $texture): string
+    {
+        return match (true) {
+            $texture <= 0 => '',
+            $texture <= 2 => 'smooth flat fabric surface, minimal texture',
+            $texture <= 4 => 'light fabric weave, subtle surface texture',
+            $texture <= 6 => 'visible fabric texture, medium knit detail',
+            $texture <= 8 => 'rich pronounced fabric texture, detailed weave',
+            default => 'hyper-detailed fabric texture, individual threads visible, extreme close-up fabric detail',
+        };
+    }
+
+    /**
+     * Enrich a raw user prompt into a production-ready image generation prompt.
+     * Applies: prefix, suffix, texture descriptor, creativity directive, and negative prompt.
+     * All values come from studio_config defaults (settable in Settings).
+     */
+    public function enrichGeneratePrompt(string $userPrompt, int $creativeLevel, int $texture, ?string $negativePrompt = null, ?string $customPrefix = null, ?string $customSuffix = null): array
+    {
+        $creativeLevel = $this->clamp($creativeLevel, 1, 10);
+        $texture = max(0, min(10, $texture));
+
+        $prefix = $customPrefix !== null ? $customPrefix : (string) studio_config('prompt_prefix', 'High-fashion editorial photograph, professional fashion photography');
+        $suffix = $customSuffix !== null ? $customSuffix : (string) studio_config('prompt_suffix', 'soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus');
+        $textureDesc = $this->textureDescriptor($texture);
+        $directive = $this->creativityDirective($creativeLevel);
+
+        // Build enriched prompt
+        $parts = [];
+        if ($prefix !== '') {
+            $parts[] = $prefix;
+        }
+        $parts[] = $userPrompt;
+        if ($textureDesc !== '') {
+            $parts[] = $textureDesc;
+        }
+        if ($suffix !== '') {
+            $parts[] = $suffix;
+        }
+
+        $enriched = $this->clean(implode(', ', $parts));
+        $enriched .= '. '.$directive;
+
+        // Negative prompt
+        $neg = $negativePrompt !== null ? $negativePrompt : $this->negativePrompt([], $creativeLevel);
+
+        return [
+            'prompt' => $enriched,
+            'negative_prompt' => $this->clean($neg),
+            'prefix' => $prefix,
+            'suffix' => $suffix,
+            'texture_descriptor' => $textureDesc,
+            'creativity_directive' => $directive,
+        ];
+    }
 }

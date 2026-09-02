@@ -55,7 +55,7 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null): string
     {
         $dashscopeKey = studio_api_key('dashscope');
 
@@ -120,7 +120,7 @@ class ImageAIService
             $triedReal = true;
 
             foreach ($keys as $key) {
-                $url = $this->attemptProvider($provider, $model, $prompt, $key, $resolution, $ratio, $faceRef);
+                $url = $this->attemptProvider($provider, $model, $prompt, $key, $resolution, $ratio, $faceRef, $negativePrompt);
                 if ($url) {
                     $this->lastProvider = $provider;
                     if (! $this->lastModel) {
@@ -143,14 +143,14 @@ class ImageAIService
     /**
      * Call ONE (provider, model) candidate with its resolved key. Returns the image URL or null.
      */
-    protected function attemptProvider(string $provider, string $model, string $prompt, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
+    protected function attemptProvider(string $provider, string $model, string $prompt, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $negativePrompt = null): ?string
     {
         if ($provider === 'gemini') {
             return $this->tryGeminiImage($prompt, $key, $resolution, $ratio, $model);
         }
 
         if (in_array($provider, ['qwen', 'wan', 'dashscope'], true)) {
-            return $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef);
+            return $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef, $negativePrompt);
         }
 
         // 'fal' / 'replicate' are not wired into this service (no Fal client), so skip them.
@@ -402,10 +402,10 @@ class ImageAIService
         };
     }
 
-    protected function tryDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
+    protected function tryDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $negativePrompt = null): ?string
     {
         try {
-            $url = $this->callDashscope($prompt, $model, $key, $resolution, $ratio);
+            $url = $this->callDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef, $negativePrompt);
             if ($url) {
                 $this->lastModel = $model;
                 return $url;
@@ -455,11 +455,11 @@ class ImageAIService
         return dashscope_base_url($key);
     }
 
-    protected function callDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null): ?string
+    protected function callDashscope(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $negativePrompt = null): ?string
     {
         // qwen-image / qwen-image-plus are async-only (submit a task, then poll).
         if (in_array($model, ['qwen-image', 'qwen-image-plus'], true)) {
-            return $this->callDashscopeAsync($prompt, $model, $key, $resolution, $ratio);
+            return $this->callDashscopeAsync($prompt, $model, $key, $resolution, $ratio, $negativePrompt);
         }
 
         $base = $base = rtrim($this->dashscopeBase($key), '/').'/api/v1';
@@ -470,7 +470,7 @@ class ImageAIService
                 'model' => $model,
                 'input' => ['messages' => [['role' => 'user', 'content' => [['text' => $prompt]]]]],
                 'parameters' => [
-                    'negative_prompt' => '',
+                    'negative_prompt' => $negativePrompt ?? '',
                     'prompt_extend' => true,
                     'watermark' => false,
                     'size' => $size,
@@ -496,7 +496,7 @@ class ImageAIService
         return $parts;
     }
 
-    protected function callDashscopeAsync(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null): ?string
+    protected function callDashscopeAsync(string $prompt, string $model, string $key, ?string $resolution = null, ?string $ratio = null, ?string $negativePrompt = null): ?string
     {
         $base = $base = rtrim($this->dashscopeBase($key), '/').'/api/v1';
         $size = $this->sizeFor($resolution, $ratio);
@@ -505,7 +505,7 @@ class ImageAIService
             ->post($base.'/services/aigc/text2image/image-synthesis', [
                 'model' => $model,
                 'input' => ['prompt' => $prompt],
-                'parameters' => ['negative_prompt' => '', 'size' => $size, 'n' => 1, 'prompt_extend' => true, 'watermark' => false],
+                'parameters' => ['negative_prompt' => $negativePrompt ?? '', 'size' => $size, 'n' => 1, 'prompt_extend' => true, 'watermark' => false],
             ]);
 
         if (! $submit->successful()) {
