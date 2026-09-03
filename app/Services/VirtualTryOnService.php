@@ -268,11 +268,7 @@ class VirtualTryOnService
 
         if ($inlineFace) {
             // 1 pass: dress model + apply face from reference, giữ nguyên trang phục/phụ kiện/mũ.
-            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', reproduce this pose EXACTLY: '.$pose.' — body posture, stance, arm/leg placement and facing direction must match this pose precisely. '
-                .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
-                .'Do NOT redesign, replace, or omit any garment or accessory. '
-                .'The face in the result MUST be EXACTLY the face from '.$facePos.' (the reference face) — do NOT generate a different face, do NOT change the identity, do NOT use any other face. Apply the face from '.$facePos.' onto the model: match the facial features, skin tone and head angle of the reference face; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
-                .'Keep the hairstyle and head shape of '.$srcPos.'. ';
+            $personClause = 'Dress a full-body model in the EXACT clothing and accessories shown in '.$srcPos.'. The face MUST be the face from '.$facePos.' (reference face) — do NOT change or generate a different face. Pose EXACTLY: '.$pose.'. ';
         } else {
             $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', reproduce this pose EXACTLY: '.$pose.' — body posture, stance, arm/leg placement and facing direction must match this pose precisely. '
                 .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
@@ -285,17 +281,12 @@ class VirtualTryOnService
         }
 
         // KHÔNG có bất kỳ prompt/hậu kỳ "vân vải/texture" nào — model chỉ cần sao chép nguyên bản vải từ ảnh nguồn.
-        $garmentLock = 'The clothing and ACCESSORIES shown in the image are the PRODUCT of this edit: they must appear in the result EXACTLY as they are — identical garment, same colors (exact hue, saturation and brightness; do NOT shift, tint, darken or re-grade any color), silhouette, length, seams, folds and fabric type. '
-            .'Compose the outfit correctly on the model: tops on the torso, bottoms/dress/skirt on the lower body, jacket/coat over the top — matching the source garment(s) exactly. '
-            .'Keep every print, pattern, embroidery, logo, button and zipper exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
-            .'If the fabric is PLAIN or SOLID color, keep it PLAIN and SOLID — do NOT invent or add any pattern, print, motif, embroidery or logo that is not in the source image. '
-            .'ALL accessories must be worn/carried in their EXACT anatomical position — watch STRICTLY on the wrist (never on the shoulder, arm or anywhere else), handbag held in hand or on shoulder, shoes STRICTLY on the feet, earrings on the ears, belt at the waist, hat on the head. Do NOT omit, move, or swap the position of ANY accessory. '
-            .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern; do NOT ADD any garment, accessory or item that is NOT present in the source image. ';
+        $garmentLock = 'Wear the EXACT garment and every accessory shown in the source image — identical colors, prints, patterns and silhouette. Do NOT change, add, remove, or redesign any garment or accessory. ';
 
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
         // sắc nét, tránh mặt méo/lệch tỷ lệ và vải bị "airbrush" mất vân.
-        $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, invented or added patterns on plain fabric, altered prints or motifs, extra embroidery or logos not in the source, misplaced or missing accessories, accessories on the wrong body part (e.g. watch on the shoulder or arm instead of the wrist, handbag on the wrong side), airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
-        $fullBodyClause = 'FULL BODY SHOT from head to toe — the ENTIRE model (head, hair, torso, arms, legs, feet and shoes) must be fully visible inside the frame. Frame the model vertically at about 75-80% of the image HEIGHT, centered, with clear headroom above the head and footroom below the feet. NEVER crop, cut off, or zoom into the model; never show only the upper body or cut off the legs/feet; do NOT make the model oversized (dominating the frame) or too small. ';
+        $negativeClause = 'Avoid: cropped body, wrong face, wrong pose, extra garments or accessories not in the source, wrong colors, deformed hands, blurry, low quality.';
+        $fullBodyClause = 'FULL BODY from head to toe, not cropped; model occupies about 75-80% of frame height with headroom above and footroom below. ';
 
         $instr = $garmentLock
             .$personClause
