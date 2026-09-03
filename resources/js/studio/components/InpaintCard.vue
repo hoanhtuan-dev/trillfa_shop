@@ -11,6 +11,15 @@ function submitInpaint() {
   store.inpaint(store.inpaintPrompt);
 }
 
+// Chip nhanh: render nhiều góc chụp từ 1 ảnh (thời trang) — bảo tồn chi tiết gốc
+function renderMultiView() {
+  const img = store.upscaleSrc || store.preview?.media_url;
+  if (!img) { store.toast('Chọn một ảnh để render đa góc.', 'error'); return; }
+  store.reimagine(img,
+    'tạo nhiều góc chụp khác nhau của sản phẩm thời trang (chính diện, mặt sau, nghiêng 45°, cận cảnh chi tiết chất liệu), giữ nguyên sản phẩm, màu sắc, chất liệu, tỷ lệ và mọi chi tiết — không mất chi tiết, nét căng, ánh sáng studio chuyên nghiệp',
+    85, 4);
+}
+
 const now = ref(Date.now());
 let timer = null;
 onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
@@ -82,6 +91,17 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
           <p class="mt-0.5 text-emerald-200/70">AI sẽ chỉ sửa trong vùng tô đen bên cạnh.</p>
         </div>
         <button @click="store.toggleInpaintMask(store._inpaintMaskKind)" class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
+      </div>
+    </div>
+
+    <!-- Chip nhanh -->
+    <div class="mt-3">
+      <p class="text-[10px] font-semibold text-cream-300/70">✨ Gợi ý nhanh</p>
+      <div class="mt-1.5 flex flex-wrap gap-1.5">
+        <button @click="renderMultiView"
+                class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
+          📐 Render đa góc
+        </button>
       </div>
     </div>
 

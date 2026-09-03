@@ -86,7 +86,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DlHVTydZ.css",
+    "file": "assets/app-DG8yJ5_b.css",
     "name": "app",
     "names": [
       "app.css"
@@ -101,7 +101,7 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-CRr0hYZv.js",
+    "file": "assets/app-CoH8edKy.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
