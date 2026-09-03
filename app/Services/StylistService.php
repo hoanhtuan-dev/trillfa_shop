@@ -29,7 +29,18 @@ class StylistService
 
     public function garmentTypes(): array
     {
-        return app(\App\Services\StylistCatalog::class)->garmentTypes();
+        $types = app(\App\Services\StylistCatalog::class)->garmentTypes();
+        foreach ($types as &$t) {
+            $t['prompt'] = $this->basePrompt((string) $t['name']);
+        }
+        unset($t);
+        return $types;
+    }
+
+    /** Prompt EN cơ bản cho một loại trang phục — dùng cho nút Preset trong popup Prompt. */
+    protected function basePrompt(string $name): string
+    {
+        return 'A high-fashion editorial photo of a women\'s '.$name.', an elegant contemporary design, worn by a young Vietnamese woman (slim, fair skin, long black hair), styled for an elegant occasion, refined editorial aesthetic, set in a clean minimal studio, premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, ultra detailed, 4k';
     }
 
     public function nameOf(string $id): string

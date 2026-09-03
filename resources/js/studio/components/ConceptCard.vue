@@ -7,6 +7,9 @@ const showAdvanced = ref(false);
 const promptLoading = ref(false);
 const showHistory = ref(false);
 const showTemplates = ref(false);
+const showPresets = ref(false);
+const presets = ref([]);
+const presetsLoading = ref(false);
 const showEnrich = ref(false);
 const history = ref([]);
 const historyLoading = ref(false);
@@ -244,6 +247,22 @@ function applyTemplate(tpl) {
   store.toast('Đã áp dụng template: ' + tpl.name);
 }
 
+// ── Preset (danh sách loại trang phục từ Trợ lý thiết kế) ──
+async function loadPresets() {
+  presetsLoading.value = true;
+  try {
+    const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } });
+    const d = await r.json();
+    presets.value = d.types || d.items || [];
+  } catch (e) { presets.value = []; }
+  finally { presetsLoading.value = false; }
+}
+function applyPreset(p) {
+  if (p.prompt) store.imagePromptEn = p.prompt;
+  showPresets.value = false;
+  store.toast('Đã áp dụng preset: ' + (p.name || p.id));
+}
+
 // ── Live Enrich Preview ──
 let enrichDebounce = null;
 let enrichAbort = null;
@@ -313,8 +332,9 @@ async function doEnrichPreview() {
       <template v-else>
         <!-- ── Top bar: History + Templates + Credit ── -->
         <div class="mb-3 flex items-center gap-2">
-          <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false }" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showHistory ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">📋 Lịch sử</button>
-          <button @click="showTemplates = !showTemplates; if (showTemplates) showHistory = false" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">📁 Templates</button>
+          <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showHistory ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">📋 Lịch sử</button>
+          <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">📁 Templates</button>
+          <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showPresets ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">✨ Preset</button>
           <span class="ml-auto text-xs text-cream-300/40">💰 ~{{ creditEstimate }} credit</span>
         </div>
 
@@ -342,6 +362,24 @@ async function doEnrichPreview() {
               </button>
             </div>
             <p class="mt-3 text-[10px] text-cream-300/30">Template giúp bạn bắt đầu nhanh. Chọn 1 template để đưa vào ô prompt.</p>
+          </div>
+        </div>
+
+        <!-- Preset popup (danh sách loại trang phục từ Trợ lý thiết kế) -->
+        <div v-if="showPresets" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
+          <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+            <div class="mb-3 flex items-center justify-between">
+              <span class="text-sm font-semibold text-brand-300">✨ Preset — Loại trang phục</span>
+              <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white">✕</button>
+            </div>
+            <p v-if="presetsLoading" class="py-6 text-center text-xs text-cream-300/60">⏳ Đang tải preset…</p>
+            <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <button v-for="p in presets" :key="p.id" @click="applyPreset(p)" class="group relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 bg-ink-900 transition hover:border-brand-400">
+                <img :src="p.thumb || p.img" :alt="p.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-200 group-hover:scale-105">
+                <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-[10px] font-medium leading-tight text-white">{{ p.name }}</span>
+              </button>
+            </div>
+            <p class="mt-3 text-[10px] text-cream-300/40">Chọn 1 loại trang phục để điền prompt gốc vào ô Prompt Tạo Ảnh.</p>
           </div>
         </div>
 
