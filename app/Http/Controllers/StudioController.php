@@ -2376,6 +2376,10 @@ RULES:
      */
     public function swapModel(Request $request)
     {
+        if (! studio_config('swap_enabled', false)) {
+            return response()->json(['message' => 'Tính năng Thay Đổi Người Mẫu đang tạm tắt.'], 403);
+        }
+
         $data = $request->validate([
             'image' => ['required', 'string', 'max:2048'],   // design image URL (generation media_url or /storage)
             'model_id' => ['nullable', 'string', 'max:80'],   // bắt buộc khi change_face=true

@@ -16,6 +16,8 @@ class StudioSwapTest extends TestCase
     {
         parent::setUp();
         $this->seed();
+        // Bật tính năng swap (mặc định tắt ở production) để test các luồng swap.
+        config(['studio.swap_enabled' => true]);
     }
 
     public function test_pick_model_pose_support_custom_assets(): void
