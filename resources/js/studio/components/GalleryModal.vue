@@ -37,40 +37,25 @@ async function doDelete() {
   resetZoom();
 }
 
-// ── Zoom / pan (local, không đụng zoom của canvas) ──
-// ZOOM_MIN = 1 → ảnh luôn hiển thị ĐẦY ĐỦ (fit) trong khung khi mở / khi thu nhỏ nhất.
-// Zoom giữ nguyên điểm ảnh ngay dưới con trỏ (zoom-to-cursor), pan bị chặn ở biên để
-// không kéo ảnh ra khỏi khung / không tạo khoảng trống khi ảnh còn nhỏ hơn khung.
-// ── Zoom / pan theo KÍCH THƯỚC THẬT của ảnh (natural px) ──
-// viewerZoom = hệ số SO VỚI FIT: 100% (zoom=1) = ảnh vừa TRỌN khung theo cả 2 chiều
-// (thu ảnh lớn xuống / phóng ảnh nhỏ lên cho tới khi 1 chiều chạm khung — không bao giờ crop).
-// DI CHUYỂN TỰ DO: pan không bị giới hạn ở bất kỳ mức zoom nào; chỉ tự về giữa khi
-// thu nhỏ về ≤ fit (zoom ≤ 1) để ảnh không "lạc" khỏi khung.
-// Thu nhỏ tùy ý (min rất thấp để xem bố cục), phóng to tối đa 8×.
-// Scale hiển thị thực = viewerZoom × fitScale (fitScale = min(khung_w/natW, khung_h/natH)).
+// ── Zoom / pan ──
+// Ảnh luôn được CSS "contain" (max-w/max-h 100%) → khi mở / đổi ảnh nó tự VỪA TRỌN khung
+// theo cả 2 chiều, không phụ thuộc thời điểm load hay kích thước pixel của ảnh.
+// viewerZoom: 100% = ảnh fit trọn khung (đây là "mặc định khi mở").
+//  - zoom-to-cursor: điểm ảnh dưới con trỏ không trôi khi phóng/thu.
+//  - DI CHUYỂN TỰ DO: kéo thoải mái ở mọi mức zoom; chỉ tự về giữa khi thu về ≤ 100%.
+//  - Thu nhỏ tùy ý (tối thiểu 10%), phóng to tối đa 8×.
 const viewerZoom = ref(1);
 const viewerPan = ref({ x: 0, y: 0 });
 const zoomArea = ref(null);
 const imgEl = ref(null);
 const dragging = ref(false);
-const loadedTick = ref(0); // buộc render lại khi ảnh load xong (biết kích thước tự nhiên)
 let drag = null;
-const ZOOM_MIN = 0.1;  // 10% — thu nhỏ tùy ý, không ép
+const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 8;
 
 function resetZoom() { viewerZoom.value = 1; viewerPan.value = { x: 0, y: 0 }; }
 
-// Hệ số để ảnh (kích thước tự nhiên) vừa trọn khung: min(ngang, dọc) — đảm bảo không crop.
-function fitScale() {
-  const area = zoomArea.value, img = imgEl.value;
-  if (!area || !img || !img.naturalWidth || !img.naturalHeight) return 1;
-  return Math.min(area.clientWidth / img.naturalWidth, area.clientHeight / img.naturalHeight);
-}
-// Scale hiển thị thực (được dùng trong transform).
-function renderScale() { return viewerZoom.value * fitScale(); }
-
-// Không chặn pan. Chỉ "kéo về giữa" khi ảnh đang ở ≤ fit (zoom ≤ 1) — vì lúc đó ảnh
-// đã trọn khung, kéo chỉ tạo khoảng trống vô nghĩa; mọi mức zoom > 1 đều tự do.
+// Kéo về giữa khi ảnh đang ≤ 100% (đã trọn khung — kéo chỉ tạo khoảng trống vô nghĩa).
 function clampPan() {
   if (viewerZoom.value <= 1.0001) { viewerPan.value = { x: 0, y: 0 }; return; }
 }
@@ -107,12 +92,7 @@ function panStart(e) {
 function panMove(e) { if (drag) { viewerPan.value = { x: drag.px + (e.clientX - drag.x), y: drag.py + (e.clientY - drag.y) }; } } // không giới hạn
 function panEnd() { drag = null; dragging.value = false; }
 function toggleZoom() { zoomTo(0, 0, viewerZoom.value <= 1.0001 ? 2 : 1 / 2); }
-function onImgLoad() {
-  imgError.value = false;
-  loadedTick.value++; // biết naturalWidth/Height → render lại để fit đúng
-  resetZoom();        // luôn mở/đổi ảnh ở chế độ fit vừa khung
-  nextTick(() => clampPan());
-}
+function onImgLoad() { imgError.value = false; resetZoom(); }
 
 // ── Dải thumbnail: wheel + kéo để cuộn ngang ──
 const stripEl = ref(null);
@@ -197,21 +177,22 @@ onBeforeUnmount(() => {
 
     <div class="flex h-full w-full max-w-7xl flex-col gap-2 lg:flex-row">
       <!-- ══ Khu vực ảnh ══ -->
-      <div class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-900/40">
-        <!-- Video: phát trực tiếp, không zoom/pan -->
+      <div class="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-900/40">
+        <!-- Video: phát trực tiếp, không zoom/pan (fit trọn khung, centered) -->
         <video v-if="isVideo && current?.media_url" :src="current.media_url" controls autoplay loop muted playsinline
-               class="max-h-full max-w-full rounded-xl object-contain"></video>
-        <!-- Ảnh: zoom / pan -->
-        <div ref="zoomArea" v-else-if="current?.media_url && !imgError" class="grid h-full w-full cursor-grab place-items-center overflow-hidden active:cursor-grabbing" style="touch-action:none"
+               class="absolute inset-0 m-auto max-h-full max-w-full rounded-xl object-contain"></video>
+        <!-- Ảnh: zoom / pan. absolute inset-0 m-auto + max-w/max-h 100% => LUÔN fit trọn
+             khung & canh giữa khi mở (không phụ thuộc flex/grid). Scale quanh tâm ảnh. -->
+        <div ref="zoomArea" v-else-if="current?.media_url && !imgError" class="absolute inset-0 cursor-grab overflow-hidden active:cursor-grabbing" style="touch-action:none"
              @wheel.prevent="onWheel"
              @pointerdown="panStart" @pointermove="panMove" @pointerup="panEnd" @pointerleave="panEnd">
           <img ref="imgEl" :src="current.media_url" :key="'img-' + current.id"
-               class="select-none"
+               class="absolute inset-0 m-auto max-h-full max-w-full select-none object-contain"
                :class="dragging ? 'transition-none' : 'transition-transform duration-100 ease-out'"
-               :style="{ width: imgEl && imgEl.naturalWidth ? imgEl.naturalWidth + 'px' : 'auto', transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + renderScale() + ')' }"
+               :style="{ transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + viewerZoom + ')' }"
                draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="onImgLoad" />
         </div>
-        <p v-else class="text-sm text-cream-300/60">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
+        <p v-else class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
         <!-- Badge trạng thái -->
         <span v-if="current" class="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold" :class="statusMeta.cls">
           <span v-if="['pending','processing'].includes(current.status)" class="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent"></span>
