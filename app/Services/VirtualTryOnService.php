@@ -246,22 +246,29 @@ class VirtualTryOnService
         // Mặc định GỘP đổi mặt vào 1 pass (swap_face_inline=true) để NHANH: PASS 1 nhận faceRef + source,
         // bỏ PASS 1b riêng. Đặt false để quay lại 2-pass (chất lượng mặt có thể tốt hơn nhưng chậm gấp đôi).
         $inlineFace = $changeFace && (bool) studio_config('swap_face_inline', true) && $faceRefUrl !== '';
-        // Ảnh dáng toàn thân dễ gây nhiễu (deep-eval: "vài người trong 1 request") + chậm → mặc định TẮT.
-        $sendPoseImg = ! $inlineFace && (bool) studio_config('swap_pose_image', false) && $poseRefUrl !== '';
-        $srcRef = $sendPoseImg ? 'the SECOND image' : 'the image';
+        // Gửi kèm ảnh dáng tham chiếu (pose ref) để TƯ THẾ được áp dụng thực sự.
+        $sendPoseImg = (bool) studio_config('swap_pose_image', true) && $poseRefUrl !== '';
+
+        // Vị trí các ảnh trong content editImage: [faceRef?, poseRef?, source]
+        $facePos = $inlineFace ? 'the FIRST image' : '';
+        $posePos = $sendPoseImg ? ($inlineFace ? 'the SECOND image' : 'the FIRST image') : '';
+        $srcPos = 'the image';
+        if ($inlineFace && $sendPoseImg) { $srcPos = 'the THIRD image'; }
+        elseif ($inlineFace || $sendPoseImg) { $srcPos = 'the SECOND image'; }
+
         $poseHint = $sendPoseImg
-            ? 'A pose reference image is the FIRST image (a model demonstrating the target pose). The garment and accessories to be worn are in the SECOND image. Reproduce the EXACT body pose, stance and limb placement from the FIRST image, while wearing the garment/accessories from the SECOND image — do NOT copy the garment or the person from the FIRST image. '
+            ? 'A pose reference image is '.$posePos.' (a model demonstrating the target pose). Reproduce the EXACT body pose, stance, arm/leg placement and posture from '.$posePos.', while wearing the garment/accessories from '.$srcPos.' — do NOT copy the garment or the person from the pose image. '
             : '';
 
         if ($inlineFace) {
             // 1 pass: dress model + apply face from reference, giữ nguyên trang phục/phụ kiện/mũ.
-            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in the SECOND image, in the pose: '.$pose.'. '
+            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', in the pose: '.$pose.'. '
                 .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
-                .'The FIRST image is the reference face to apply. Apply the face from the FIRST image onto the model: match the facial features, skin tone and head angle of the FIRST image; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
-                .'Keep the hairstyle and head shape of the SECOND image. ';
+                .'The '.$facePos.' is the reference face to apply. Apply the face from '.$facePos.' onto the model: match the facial features, skin tone and head angle of the reference face; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
+                .'Keep the hairstyle and head shape of '.$srcPos.'. ';
         } else {
-            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcRef.', in the pose: '.$pose.'. '
+            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', in the pose: '.$pose.'. '
                 .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'Keep the face of the person in the image unchanged (facial features, hairstyle); do NOT swap or restyle the face. ';
