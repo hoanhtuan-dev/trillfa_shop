@@ -430,7 +430,7 @@ class StudioController extends Controller
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
             $finalPrompt = 'Face swap (NOT a photo overlay): replace the face of @image1 with the face in @image2. '
                 .'Generate a NEW natural face that matches @image2\'s identity, hairstyle, facial features, ears and head proportions — do NOT paste, stamp, overlay or collage the @image2 photo on top of the image. '
-                .'Make the new head slightly SMALLER than the original head — keep it compact, small and naturally proportionate to the body; never enlarged, never stretched or distorted. '
+                .'Make the new head about 80% the size of the original head — clearly smaller and naturally proportionate to the body; never enlarged, never stretched or distorted. '
                 .'Blend skin tone, hairline, neck and lighting seamlessly so there is NO visible seam, border or patch edge. '
                 .'Keep garment, pose, body, background and composition exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
         } else {
