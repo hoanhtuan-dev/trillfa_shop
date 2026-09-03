@@ -1000,8 +1000,17 @@ export const useStudioStore = defineStore('studio', {
       return null;
     },
     _initInpaintBrush() {
+      // Canvas theo TỈ LỆ ẢNH GỐC (không vuông 512×512) — nếu vuông thì mask bị ép méo & lệch vị trí.
+      const m = this.canvasMetrics();
+      const base = 512;
+      let w = base, h = base;
+      if (m && m.iw && m.ih) {
+        const ia = m.iw / m.ih;
+        if (ia >= 1) { w = base; h = Math.max(1, Math.round(base / ia)); }
+        else { w = Math.max(1, Math.round(base * ia)); h = base; }
+      }
       const c = document.createElement('canvas');
-      c.width = 512; c.height = 512;
+      c.width = w; c.height = h;
       this._inpaintMaskCanvas = c;
       this._inpaintMaskCtx = c.getContext('2d');
       this._inpaintUndoStack = [];

@@ -33,6 +33,19 @@ const fullImageStyle = computed(() => {
 
 const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.inpaintMaskBox.h || 0) >= 0.02);
 
+// Kích thước canvas brush theo TỈ LỆ ẢNH GỐC (natural iw:ih), scale về cạnh dài 512.
+// Quan trọng: KHÔNG vuông cứng 512×512 — nếu ảnh dọc/ngang thì mask bị ép méo và lệch vị trí.
+const brushCanvasSize = computed(() => {
+  const m = store.canvasMetrics();
+  const base = 512;
+  if (m && m.iw && m.ih) {
+    const ia = m.iw / m.ih;
+    if (ia >= 1) return { width: base, height: Math.max(1, Math.round(base / ia)) };
+    return { width: Math.max(1, Math.round(base * ia)), height: base };
+  }
+  return { width: base, height: base };
+});
+
 // Bấm ngoài box (container) → tạo vùng mới; brush → vẽ mask. Chỉ khi ĐANG chỉnh.
 function onPointerDown(e) {
   if (!editing.value) return;
@@ -70,6 +83,11 @@ watch(() => store.upscaleSrc, () => {
   store.inpaintBrushData = '';
   nextTick(() => { metricsTick.value++; attachBrush(true); });
 });
+// Khi kích thước canvas brush đổi (ảnh load xong có naturalWidth/Height) → re-attach đúng tỉ lệ
+watch(brushCanvasSize, () => {
+  if (store.inpaintMaskMode !== 'brush') return;
+  nextTick(() => attachBrush(true));
+});
 watch([() => store.zoom, () => store.pan], () => { nextTick(() => { metricsTick.value++; }); });
 
 function onKeyDown(e) {
@@ -86,7 +104,7 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
        @pointerdown="onPointerDown" @contextmenu.prevent @dragstart.prevent>
     <!-- Brush overlay canvas: hiển thị nét vẽ mask (đỏ 60%) ngay trên ảnh khi ĐANG vẽ -->
     <canvas v-if="store.inpaintMaskMode === 'brush' && store.upscaleSrc" ref="brushCanvas"
-            :width="512" :height="512"
+            :width="brushCanvasSize.width" :height="brushCanvasSize.height"
             class="pointer-events-none absolute z-10 rounded-lg"
             :style="brushOverlayStyle"></canvas>
 
