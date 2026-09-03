@@ -2341,11 +2341,12 @@ RULES:
             return;
         }
 
-        // Safety net: never let the subject become a black silhouette against a dark background.
-        // The edit model is non-deterministic — a "keep bright" prompt usually works but not always,
-        // so this lifts a genuinely-dark subject band (an already-lit result is left untouched).
-        $bright = $this->brightenDarkSubject($fallback);
-        if ($bright) { $fallback = $bright; }
+        // Safety net (TẮT mặc định): kéo sáng chủ thể tối. Có thể làm lệch màu trang phục nên chỉ bật
+        // khi cần chống hiện tượng silhouette đen — cấu hình STUDIO_SWAP_BRIGHTEN=true.
+        if (studio_config('swap_brighten', false)) {
+            $bright = $this->brightenDarkSubject($fallback);
+            if ($bright) { $fallback = $bright; }
+        }
 
         // "Tách nền + hiệu ứng + gộp": mode = removebg | bokeh | off (default removebg).
         //  removebg: segment the person with remove.bg (accurate alpha), blur the background, then

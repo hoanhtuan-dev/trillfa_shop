@@ -259,13 +259,13 @@ class VirtualTryOnService
         if ($inlineFace) {
             // 1 pass: dress model + apply face from reference, giữ nguyên trang phục/phụ kiện/mũ.
             $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in the SECOND image, in the pose: '.$pose.'. '
-                .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors, prints, patterns, fabric texture, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head). '
+                .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'The FIRST image is the reference face to apply. Apply the face from the FIRST image onto the model: match the facial features, skin tone and head angle of the FIRST image; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
                 .'Keep the hairstyle and head shape of the SECOND image. ';
         } else {
             $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcRef.', in the pose: '.$pose.'. '
-                .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors, prints, patterns, fabric weave/texture, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head). '
+                .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'Keep the face of the person in the image unchanged (facial features, hairstyle); do NOT swap or restyle the face. ';
             if ($changeFace && ! $faceRefUrl && $modelDesc !== '') {
@@ -274,11 +274,11 @@ class VirtualTryOnService
             }
         }
 
-        // KHÔNG đưa prompt "render fabric texture" vào luồng — vân vải lấy NGUYÊN BẢN từ ảnh nguồn.
-        $garmentLock = 'The clothing and ACCESSORIES shown in the image are the PRODUCT of this edit: they must appear in the result EXACTLY as they are — identical garment, same colors, silhouette, length, seams, folds and fabric. '
-            .'PRESERVE every print, pattern, embroidery, logo, button, zipper, and the fabric texture exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
-            .'If the fabric is PLAIN or SOLID color, keep it PLAIN and SOLID — do NOT invent, add, or alter any pattern, print, motif, embroidery, logo or texture that is not already in the source image; never add new patterns to a plain fabric. '
-            .'ALL accessories must be worn/carried correctly and exactly as shown: shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head — matching their color, style, material and placement precisely; do NOT omit, add or redesign any accessory. '
+        // KHÔNG có bất kỳ prompt/hậu kỳ "vân vải/texture" nào — model chỉ cần sao chép nguyên bản vải từ ảnh nguồn.
+        $garmentLock = 'The clothing and ACCESSORIES shown in the image are the PRODUCT of this edit: they must appear in the result EXACTLY as they are — identical garment, same colors (exact hue, saturation and brightness; do NOT shift, tint, darken or re-grade any color), silhouette, length, seams, folds and fabric type. '
+            .'Keep every print, pattern, embroidery, logo, button and zipper exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
+            .'If the fabric is PLAIN or SOLID color, keep it PLAIN and SOLID — do NOT invent or add any pattern, print, motif, embroidery or logo that is not in the source image. '
+            .'ALL accessories must be worn/carried correctly and EXACTLY as shown — do NOT omit ANY accessory: watch on wrist, handbag on shoulder or in hand, shoes on feet, earrings on ears, belt at waist, hat on head — matching their color, style and material. '
             .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. ';
 
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
