@@ -588,8 +588,12 @@ class ImageAIService
     protected function imageDataUri(string $url): ?string
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        // URL route /studio/image/{path} (studio_image_url) → {path} nằm trong storage/app/public
+        if (str_starts_with($path, 'studio/image/')) {
+            $path = substr($path, strlen('studio/image/'));
+        }
         $file = null;
-        foreach ([public_path($path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
+        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
             if (is_file($c)) {
                 $file = $c;
                 break;
