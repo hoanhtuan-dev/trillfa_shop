@@ -32,7 +32,7 @@ class VirtualTryOnService
     {
         // Manageable face presets (DB) — the swap picker + backend both read from here, so presets can
         // be added/edited in Studio Settings. When the table is empty we fall back to built-in presets.
-        $db = \App\Models\FacePreset::where('enabled', true)->orderBy('sort')->orderBy('id')->get();
+        $db = \App\Models\FacePreset::orderBy('sort')->orderBy('id')->get(); // hiện mọi preset (khớp Settings)
         if ($db->isNotEmpty()) {
             return $db->map(function ($p) {
                 return [
@@ -88,7 +88,7 @@ class VirtualTryOnService
     public function poseCatalog(): array
     {
         // Manageable pose presets (DB) — read by the swap picker + backend. Falls back to built-ins.
-        $db = \App\Models\PosePreset::where('enabled', true)->orderBy('sort')->orderBy('id')->get();
+        $db = \App\Models\PosePreset::orderBy('sort')->orderBy('id')->get(); // hiện mọi preset (khớp Settings)
         if ($db->isNotEmpty()) {
             return $db->map(function ($p) {
                 return [
