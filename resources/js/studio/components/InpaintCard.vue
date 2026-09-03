@@ -61,11 +61,20 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       </template>
       <span v-else>🖌 Vẽ mask trên canvas — AI chỉ sửa vùng đã vẽ</span>
     </div>
-    <!-- Trạng thái mask ĐÃ LƯU (bấm Xong, overlay tắt): hiển thị vùng sẽ xử lý -->
-    <div v-else-if="store.inpaintMaskDone" class="mt-1.5 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-1.5 text-[10px] text-emerald-200">
-      <span v-if="store._inpaintMaskKind === 'rect'">✅ Đã chọn vùng {{ Math.round((store.inpaintMaskBox.w || 0) * 100) }}% × {{ Math.round((store.inpaintMaskBox.h || 0) * 100) }}% — AI sẽ chỉ sửa trong vùng này.</span>
-      <span v-else>✅ Đã vẽ mask — AI sẽ chỉ sửa vùng đã vẽ.</span>
-      <button @click="store.toggleInpaintMask(store._inpaintMaskKind)" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
+    <!-- Trạng thái mask ĐÃ LƯU (bấm Xong, overlay tắt): hiển thị vùng sẽ xử lý + thumbnail -->
+    <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-xl border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-2 text-[10px] text-emerald-200">
+      <div class="flex items-center gap-2.5">
+        <!-- Thumbnail vùng đã chọn: rect (ô đen trên nền trắng) / brush (mask đen-trắng) -->
+        <div v-if="store._inpaintMaskKind === 'rect'" class="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/20 bg-white">
+          <div class="absolute bg-black/85" :style="{ left: (store.inpaintMaskBox.x || 0) * 100 + '%', top: (store.inpaintMaskBox.y || 0) * 100 + '%', width: (store.inpaintMaskBox.w || 0) * 100 + '%', height: (store.inpaintMaskBox.h || 0) * 100 + '%' }"></div>
+        </div>
+        <img v-else-if="store.inpaintBrushData" :src="'data:image/png;base64,' + store.inpaintBrushData" class="h-12 w-12 shrink-0 rounded-lg border border-white/20 bg-white object-contain" alt="Mask" />
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold">{{ store._inpaintMaskKind === 'rect' ? '✅ Đã chọn vùng ' + Math.round((store.inpaintMaskBox.w || 0) * 100) + '% × ' + Math.round((store.inpaintMaskBox.h || 0) * 100) + '%' : '✅ Đã vẽ mask' }}</p>
+          <p class="mt-0.5 text-emerald-200/70">AI sẽ chỉ sửa trong vùng tô đen bên cạnh.</p>
+        </div>
+        <button @click="store.toggleInpaintMask(store._inpaintMaskKind)" class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
+      </div>
     </div>
 
     <label class="label mt-3">Mô tả chỉnh sửa</label>

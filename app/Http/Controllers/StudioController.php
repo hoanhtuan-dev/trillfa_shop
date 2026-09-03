@@ -2263,6 +2263,7 @@ RULES:
             'pose_id' => ['required', 'string', 'max:80'],
             'background' => ['nullable', 'string', 'max:400'],
             'tone' => ['nullable', 'string', 'max:20'],     // Hiệu ứng tông màu (auto/warm/cool/film/cinematic/dramatic/mono/none)
+            'texture' => ['nullable', 'integer', 'min:0', 'max:10'], // Mức chi tiết vân vải (mặc định 2)
             'pose_ref' => ['nullable', 'string', 'max:2048'], // pose reference image URL (picker thumbnail; not sent to the model)
         ]);
 
@@ -2301,6 +2302,7 @@ RULES:
                 'pose_ref' => $poseRefUrl,
                 'background' => (string) ($data['background'] ?? ''),
                 'tone' => (string) ($data['tone'] ?? 'none'),
+                'texture' => (int) ($data['texture'] ?? 2),
             ],
         ]);
 
@@ -2335,6 +2337,7 @@ RULES:
             (string) ($meta['tone'] ?? 'none'),
             (string) ($meta['pose_ref'] ?? ''),
             $changeFace,
+            (int) ($meta['texture'] ?? 2),
         );
         if (! $fallback) {
             $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.studio_swap_model().'” và key Qwen Edit (Pay-As-You-Go).']);

@@ -223,11 +223,10 @@ class VirtualTryOnService
      * Pose được mô tả bằng văn bản ($pose skeleton); ảnh pose ref không gửi vì từng làm model bỏ
      * qua pose. $tone là hiệu ứng màu ở mức prompt.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null, bool $changeFace = false): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null, bool $changeFace = false, int $texture = 2): ?string
     {
-        // $changeFace=false (mặc định): GIỮ NGUYÊN khuôn mặt gốc — prompt chỉ đổi dáng/cơ thể/hậu cảnh,
-        // không dùng mô tả mặt người mẫu, không gửi ảnh mặt tham chiếu, bỏ qua pass face-swap riêng.
-        // $changeFace=true: thay người bằng khuôn mặt người mẫu (mô tả văn bản + ảnh ref + pass 1b).
+        // $changeFace=false: GIỮ NGUYÊN khuôn mặt gốc. $changeFace=true: đổi mặt theo người mẫu (PASS 1b).
+        // $texture: mức chi tiết vân vải 0-10 (mặc định 2) — điều khiển qua thanh trượt, đính vào PROMPT.
         $swapModel = studio_swap_model();
         $this->calls = 0; // bộ đếm cộng dồn: PASS1 candidates + face + background
         $this->lastModel = null;
@@ -247,21 +246,40 @@ class VirtualTryOnService
         // CỐT LÕI "Mặc thử đồ": PASS 1 LUÔN giữ nguyên khuôn mặt gốc + trang phục, chỉ đổi dáng/cơ thể.
         // Việc đổi khuôn mặt làm RIÊNG ở PASS 1b bằng ẢNH tham chiếu — không nhét mô tả "cả người" vào
         // PASS 1, vì điều đó khiến model vẽ lại cả người + trang phục (thành "tạo ảnh mới" thay vì mặc thử đồ).
-        $personClause = 'Replace the person in the image with a full-body model figure in the pose: '.$pose.', keeping the ORIGINAL person\'s face and hair 100% unchanged — the face, facial features, identity and hairstyle must stay exactly like the original person; do NOT swap, alter or restyle the face. Keep the EXACT garment unchanged. ';
+        // Gửi kèm ảnh dáng tham chiếu (pose reference) nếu có — giúp model bám dáng + cách đặt phụ kiện.
+        $sendPoseImg = (bool) studio_config('swap_pose_image', true) && $poseRefUrl !== '';
+        $srcRef = $sendPoseImg ? 'the SECOND image' : 'the image';
+        $poseHint = $sendPoseImg
+            ? 'A pose reference image is the FIRST image (a model demonstrating the target pose). The garment and accessories to be worn are in the SECOND image. Reproduce the EXACT body pose, stance and limb placement from the FIRST image, while wearing the garment/accessories from the SECOND image — do NOT copy the garment or the person from the FIRST image. '
+            : '';
+
+        $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcRef.', in the pose: '.$pose.'. '
+            .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors, prints, patterns, fabric weave/texture, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head). '
+            .'Do NOT redesign, replace, or omit any garment or accessory. '
+            .'Keep the face of the person in the image unchanged (facial features, hairstyle); do NOT swap or restyle the face. ';
         if ($changeFace && ! $faceRefUrl && $modelDesc !== '') {
             // Preset mặt không có ảnh: đổi mặt NHẸ bằng văn bản (chỉ mặt, giữ mọi thứ khác).
-            $personClause .= 'Change ONLY the person\'s face to match this description: '.$modelDesc.'. Keep the hairstyle, head shape, body, pose and the EXACT garment unchanged. ';
+            $personClause .= 'Change ONLY the person\'s face to match this description: '.$modelDesc.'. Keep the hairstyle, head shape, body, pose, and the EXACT outfit + accessories unchanged. ';
         }
 
-        $garmentLock = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, silhouette, length, seams, folds and fabric. '
+        $fabricTexture = $this->fabricTextureInstruction($texture);
+        $garmentLock = 'The clothing and ACCESSORIES shown in the image are the PRODUCT of this edit: they must appear in the result EXACTLY as they are — identical garment, same colors, silhouette, length, seams, folds and fabric. '
             .'PRESERVE every print, pattern, embroidery, logo, button, zipper, and the fabric weave/texture exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
+            .$fabricTexture
+            .'ALL accessories must be worn/carried correctly and exactly as shown: shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head — matching their color, style, material and placement precisely; do NOT omit, add or redesign any accessory. '
             .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. ';
+
+        // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
+        // sắc nét, tránh mặt méo/lệch tỷ lệ và vải bị "airbrush" mất vân.
+        $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, flat textureless fabric, airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
 
         $instr = $garmentLock
             .$personClause
+            .$poseHint
             .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
             .'Keep the background of the original image unchanged. '
-            .($wantBg ? '' : $toneS).' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
+            .($wantBg ? '' : $toneS).' '.$negativeClause
+            .' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
 
         $imageSvc = app(ImageAIService::class);
 
@@ -271,14 +289,14 @@ class VirtualTryOnService
             $instr,
             // Variant 2: emphasise garment preservation first, then person replacement
             'PRESERVE the garment EXACTLY: keep every detail of the clothing — colors, patterns, prints, seams, folds, silhouette, length and fabric — 100% unchanged. '
-                .'Change ONLY the person wearing it: '.$personClause
+                .'Change ONLY the person wearing it: '.$personClause.$poseHint
                 .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions. '
                 .'Keep the background of the original image unchanged. '
-                .($wantBg ? '' : $toneS).' Photorealistic, full body, studio quality, high fashion.',
+                .($wantBg ? '' : $toneS).' '.$negativeClause.' Photorealistic, full body, studio quality, high fashion.',
             // Variant 3: direct instruction style
-            'Keep the outfit identical. '.$personClause
+            'Keep the outfit identical. '.$personClause.$poseHint
                 .$proportion.'. Do not change the background. '
-                .($wantBg ? '' : $toneS).' Photorealistic fashion editorial.',
+                .($wantBg ? '' : $toneS).' '.$negativeClause.' Photorealistic fashion editorial.',
         ];
 
         // Best-of-N: model edit không deterministic — sinh tối đa N candidates rồi chọn bản đẹp
@@ -290,7 +308,7 @@ class VirtualTryOnService
         $calls = 0;
         foreach ($variants as $vi => $variant) {
             if (count($urls) >= $candidates) { break; }
-            $url = $imageSvc->swapEdit($variant, $designImage, $swapModel, null, null);
+            $url = $imageSvc->swapEdit($variant, $designImage, $swapModel, null, $sendPoseImg ? $poseRefUrl : null);
             if ($url) {
                 $urls[] = $url;
                 $calls++;
@@ -315,10 +333,13 @@ class VirtualTryOnService
         // model). With face-only as the sole instruction, fidelity is much higher.
         if ($changeFace && $faceRefUrl) {
             $faceInstr = 'The FIRST image is the reference face; the SECOND image is the person to edit. Replace ONLY the face in the SECOND image with the face from the FIRST image. '
-                .'Keep the hairstyle, head shape, body, pose, background, and the EXACT garment (colors, prints, patterns, seams, fabric texture) 100% unchanged — do NOT redraw or restyle the outfit. '
-                .'Match the skin tone of the reference face exactly. '
-                .'Blend the new face seamlessly into the head — no visible seam, no color mismatch, no hard edge. '
-                .'Photorealistic, studio quality.';
+                .'Scale the reference face DOWN to match the natural head size of the person exactly — the face must NOT be enlarged or magnified beyond the original head; keep the face at the correct anatomical proportion of the head (about 1/7 of the body height, never larger). '
+                .'If the reference face is angled, tilted or turned, match the head angle, direction and perspective of the SECOND image exactly — do NOT paste a frontal or mismatched-angle face onto a turned head. '
+                .'Keep the hairstyle, hairline, head shape, body, pose, background, and the EXACT garment (colors, prints, patterns, seams, fabric weave and texture) 100% unchanged — do NOT redraw or restyle the outfit. '
+                .'Match the skin tone and lighting of the reference face to the original body exactly. '
+                .'Blend the new face seamlessly into the head — no visible seam, no color mismatch, no hard edge, natural jawline and cheek contour. '
+                .$negativeClause
+                .' Photorealistic, studio quality.';
             $withFace = $imageSvc->swapFace($faceInstr, $url, $swapModel, $faceRefUrl);
             if ($withFace) {
                 $url = $withFace;
@@ -340,7 +361,7 @@ class VirtualTryOnService
                 .'Frame the person at about 75-80% of the image height, with the background clearly visible all around them: pull the camera back a little and place the person slightly deeper into the scene so they are naturally scaled, not oversized or dominating the frame. '
                 .'Blend the person into the scene: the HAIR and its edges, the clothing silhouette and the body outline must merge naturally with the background — NO hard cut-out outline, halo, white fringe or aliasing around the hair; soften the hair edge so it melts into the flowers, wall and light behind it. '
                 .'Unify the color grading, warmth and lighting of the person and the new background so they blend into ONE cohesive photograph with no visible seam, halo or separation between the person and the scene. '
-                .$toneS.' Photorealistic.';
+                .$toneS.' '.$negativeClause.' Photorealistic.';
             $final = $imageSvc->swapEdit($bgInstr, $url, $swapModel, null, null);
             if ($final) {
                 $this->calls += 1;
@@ -426,6 +447,21 @@ class VirtualTryOnService
         return ((float) ($s['garment_preservation'] ?? 5) * 0.5)
             + ((float) ($s['pose_accuracy'] ?? 5) * 0.3)
             + ((float) ($s['overall_aesthetic'] ?? 5) * 0.2);
+    }
+
+    /**
+     * Mức chi tiết vân vải (0-10) điều khiển qua thanh trượt (mặc định 2). Đính vào PROMPT,
+     * không dùng hậu kỳ — để model vẽ vân vải tự nhiên theo mức chi tiết mong muốn.
+     */
+    protected function fabricTextureInstruction(int $v): string
+    {
+        return match (true) {
+            $v >= 8 => 'Render the fabric with EXTREME detail: visible fiber weave, stitches, texture and micro-reflections; ultra-sharp fabric surface. ',
+            $v >= 5 => 'Render the fabric with HIGH detail: clear weave, knit/denim grain, visible stitches and realistic drape. ',
+            $v >= 2 => 'Render the fabric with MODERATE detail: visible weave and texture, natural drape, not flat. ',
+            $v >= 1 => 'Render the fabric with light detail: keep it natural and slightly textured, avoid a flat plastic look. ',
+            default => 'Keep the fabric simple but natural; avoid a flat or airbrushed look. ',
+        };
     }
 
     /**
