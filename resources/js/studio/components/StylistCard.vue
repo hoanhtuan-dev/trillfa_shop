@@ -12,7 +12,7 @@ const customNotes = ref({});
 const loading = ref(false);
 const promptLang = ref('en');
 const promptEn = ref(''), promptVi = ref('');
-onMounted(async () => { try { const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }); const d = await r.json(); types.value = d.items || d || []; } catch(e){} });
+onMounted(async () => { try { const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }); const d = await r.json(); types.value = d.types || d.items || []; } catch(e){} });
 function pickType(t) { type.value = t.id; step.value = 'survey'; answers.value = {}; customNotes.value = {}; loadCluster(); }
 async function loadCluster() {
   loading.value = true;
