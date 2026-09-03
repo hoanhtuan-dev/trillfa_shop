@@ -75,6 +75,11 @@ export const useStudioStore = defineStore('studio', {
     swapError: '',        // lỗi cuối của swap
     swapStartTs: 0,       // timestamp bắt đầu (đếm thời gian)
     swapGenIds: [],       // generation ids của lần chạy hiện tại
+    // Compose progress (giống Inpaint)
+    composeStage: '',     // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled'
+    composeError: '',
+    composeStartTs: 0,
+    composeGenIds: [],    // generation ids của lần ghép hiện tại
     inpainting: false,
     inpaintPrompt: '',
     // Inpaint progress/status state (rõ ràng cho người dùng)
@@ -267,16 +272,51 @@ export const useStudioStore = defineStore('studio', {
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend)
     async compose(images, prompt, variants = 1, mode = 'compose') {
       if (!Array.isArray(images) || images.length < 2 || !(prompt || '').trim()) { this.toast('Chọn ít nhất 2 ảnh + nhập mô tả.', 'error'); return null; }
+      this.composeStage = 'send';
+      this.composeError = '';
+      this.composeStartTs = Date.now();
       try {
         const d = await this.api('/studio/compose', { images, prompt, variants: Number(variants) || 1, mode });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: it.credits_cost ?? 1, created_at: 'Vừa ghép ảnh' }));
-        if (items.length) this.setBatch(items.map(it => it.generation_id));
+        const ids = items.map(it => it.generation_id).filter(Boolean);
+        this.composeGenIds = ids;
+        this.composeStage = 'processing';
+        if (items.length) this.setBatch(ids);
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
-        this.processQueue();
+        ids.forEach((id) => this.pollGeneration(id));
         return items;
-      } catch (e) { this.toast(e.message || 'Lỗi ghép ảnh.', 'error'); return null; }
+      } catch (e) {
+        this.composeError = e.message || 'Lỗi ghép ảnh.';
+        this.composeStage = 'error';
+        this.toast(this.composeError, 'error');
+        return null;
+      }
     },
+    // Kiểm tra khi mọi biến thể compose đã về trạng thái cuối → chuyển stage done/error.
+    _checkComposeDone() {
+      if (!this.composeGenIds.length || this.composeStage !== 'processing') return;
+      const gens = this.composeGenIds.map(id => this.generations.find(g => g.id === Number(id))).filter(Boolean);
+      if (gens.length < this.composeGenIds.length) return; // chưa đủ thông tin
+      if (!gens.every(g => ['completed', 'failed', 'cancelled'].includes(g.status))) return;
+      const done = gens.filter(g => g.status === 'completed').length;
+      if (done > 0) {
+        this.composeStage = 'done';
+        this.toast('✅ Đã ghép xong ' + done + ' biến thể.');
+      } else {
+        this.composeStage = 'error';
+        this.composeError = gens.find(g => g.error)?.error || 'Ghép ảnh thất bại.';
+        this.toast(this.composeError, 'error');
+      }
+    },
+    async cancelCompose() {
+      for (const id of this.composeGenIds) {
+        try { await this.api('/studio/generations/' + id + '/cancel', {}); } catch (e) {}
+      }
+      this.composeStage = 'cancelled';
+      this.toast('Đã hủy ghép ảnh.');
+    },
+    clearComposeStatus() { this.composeStage = ''; this.composeError = ''; this.composeGenIds = []; this.composeStartTs = 0; },
     async loadPalette(id) {
       if (!id) { this.palette = []; return; }
       try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
@@ -601,6 +641,7 @@ export const useStudioStore = defineStore('studio', {
           if (['completed', 'failed', 'cancelled'].includes(g.status)) {
             delete this._pollTimers[id];
             const isInpaint = String(id) === String(this.inpaintGenId);
+            const isCompose = this.composeGenIds.length && this.composeGenIds.includes(Number(id));
             if (g.status === 'completed' && g.media_url) {
               if (isInpaint) { this.inpaintStage = 'done'; this.toast('✅ Đã sửa xong ảnh.'); }
               this.select({ id: g.id, media_url: g.media_url, type: 'image', status: 'completed' });
@@ -609,6 +650,7 @@ export const useStudioStore = defineStore('studio', {
             } else {
               if (isInpaint) { this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
             }
+            if (isCompose) this._checkComposeDone();
             return;
           }
         } catch (e) { delete this._pollTimers[id]; return; }

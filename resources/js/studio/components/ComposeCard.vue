@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import CompareSlider from './CompareSlider.vue';
@@ -21,6 +21,14 @@ const baseUrl = ref('');
 const lastIds = ref([]);
 const compareOpen = ref(false);
 const afterUrl = computed(() => store.generations.find(g => lastIds.value.includes(g.id) && g.status === 'completed')?.media_url || '');
+
+// Tiến trình (giống Inpaint)
+const now = ref(Date.now());
+let timer = null;
+const elapsedSec = computed(() => store.composeStartTs ? Math.max(0, Math.floor((now.value - store.composeStartTs) / 1000)) : 0);
+const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+const running = computed(() => store.composeStage === 'send' || store.composeStage === 'processing');
+const doneCount = computed(() => store.composeGenIds.filter(id => store.generations.find(g => g.id === Number(id))?.status === 'completed').length);
 
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
@@ -85,12 +93,14 @@ function insertTag(tag) {
 }
 
 onMounted(async () => {
+  timer = setInterval(() => { now.value = Date.now(); }, 1000);
   try {
     const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } });
     const d = await r.json();
     poses.value = d.items || [];
   } catch (e) { poses.value = []; }
 });
+onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 
 async function uploadImage(e) {
   const file = e.target.files?.[0];
@@ -186,6 +196,42 @@ async function run() {
     <button @click="run" :disabled="busy || selectedCount < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
       {{ busy ? 'Đang ghép…' : '🧩 Ghép ảnh' }} <span v-if="!busy" class="opacity-70">· {{ store.imageCreditCost }} credit</span>
     </button>
+
+    <!-- Tiến độ (giống Inpaint) -->
+    <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
+      <div class="flex items-center gap-2 text-xs text-brand-100">
+        <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-300 border-t-transparent"></span>
+        <span class="font-semibold">{{ store.composeStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang ghép ảnh…' }}</span>
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-cream-200/80">
+        <span>⏱ <b>{{ fmt(elapsedSec) }}</b></span>
+        <span>{{ doneCount }}/{{ store.composeGenIds.length }} biến thể</span>
+        <button @click="store.cancelCompose()" class="ml-auto rounded-full bg-red-600/25 px-2.5 py-1 font-semibold text-red-200 hover:bg-red-600">✕ Hủy</button>
+      </div>
+      <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full animate-pulse rounded-full bg-brand-400" :style="{ width: (doneCount / Math.max(1, store.composeGenIds.length) * 100) + '%' }"></div></div>
+    </div>
+
+    <!-- Thành công -->
+    <div v-if="store.composeStage === 'done'" class="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
+      ✅ Đã ghép xong — kết quả đã được chọn trong Outputs.
+      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+    </div>
+
+    <!-- Lỗi -->
+    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-2xl border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
+      <p class="font-semibold">⚠️ Ghép ảnh thất bại</p>
+      <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.composeError }}</p>
+      <div class="mt-2 flex gap-2">
+        <button @click="run" class="btn-brand btn-sm">🔄 Thử lại</button>
+        <button @click="store.clearComposeStatus()" class="btn-ghost btn-sm">Đóng</button>
+      </div>
+    </div>
+
+    <!-- Đã hủy -->
+    <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
+      🛑 Đã hủy yêu cầu ghép ảnh.
+      <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+    </div>
 
     <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
 
