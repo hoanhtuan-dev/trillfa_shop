@@ -91,6 +91,8 @@ export const useStudioStore = defineStore('studio', {
     _inpaintHandle: null,
     _inpaintRaf: null,           // rAF id cho drag batching (mượt như crop)
     _inpaintPending: null,       // pointermove chờ flush
+    _inpaintPrevBox: null,       // box trước khi bắt đầu vẽ vùng mới (để khôi phục nếu click nhầm)
+    _inpaintDrew: false,         // đã kéo thật (>4px) khi vẽ vùng mới?
     // Canvas mask overlay (dùng chung cho Inpaint brush trên canvas chính)
     brushOverlay: null,
     _brushCanvas: null,
@@ -403,7 +405,25 @@ export const useStudioStore = defineStore('studio', {
     zoomOut() { this.zoom = Math.max(0.25, +(this.zoom - 0.25)); },
     zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
     panStart(e) { if (this._cropDrag) return; this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
-    panMove(e) { if (this._drag) { this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); } },
+    panMove(e) {
+      if (!this._drag) return;
+      let x = this._drag.px + (e.clientX - this._drag.x);
+      let y = this._drag.py + (e.clientY - this._drag.y);
+      const m = this.canvasMetrics();
+      if (m) {
+        if (this.zoom <= 1) {
+          // Ảnh đã fit trọn khung → không cho kéo ra ngoài
+          x = 0; y = 0;
+        } else {
+          // Clamp để ảnh không bao giờ trượt hẳn khỏi khung (luôn thấy được toàn bộ khi kéo về biên)
+          const mx = Math.max(0, (m.vw * this.zoom - m.vw) / 2);
+          const my = Math.max(0, (m.vh * this.zoom - m.vh) / 2);
+          x = this._clamp(x, -mx, mx);
+          y = this._clamp(y, -my, my);
+        }
+      }
+      this.pan.x = x; this.pan.y = y;
+    },
     panEnd() { this._drag = null; },
     async deleteGen(g) {
       try { const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || 'Lỗi xóa.'); this.generations = this.generations.filter(x => x.id !== g.id); if (this.previewId === g.id) { this.previewId = null; this.preview = null; } this.toast('Đã xóa.'); return true; }
@@ -553,7 +573,10 @@ export const useStudioStore = defineStore('studio', {
         this._inpaintDrag = { key: 'brush', sx: e.clientX, sy: e.clientY, last: p, handlers };
         this._drawInpaintBrushDot(p);
       } else if (key === 'draw') {
-        // Kéo tạo vùng mới từ điểm nhấn (chỉ khi bấm ngoài box cũ)
+        // Kéo tạo vùng mới từ điểm nhấn. Lưu box cũ để khôi phục nếu chỉ click nhầm.
+        const prev = this.inpaintMaskBox;
+        this._inpaintPrevBox = (prev && prev.w >= 0.02 && prev.h >= 0.02) ? { ...prev } : null;
+        this._inpaintDrew = false;
         this._inpaintDrag = { key: 'draw', sx: e.clientX, sy: e.clientY, box: { x: p.nx, y: p.ny, w: 0, h: 0 }, handlers };
         this.inpaintMaskBox = { x: p.nx, y: p.ny, w: 0, h: 0 };
       } else {
@@ -565,16 +588,19 @@ export const useStudioStore = defineStore('studio', {
       window.addEventListener('pointerup', handlers.up);
       window.addEventListener('pointercancel', handlers.up);
     },
-    // Container overlay: bấm ngoài box. Nếu CHƯA có box → kéo tạo vùng mới.
-    // Nếu ĐÃ có box → bấm ngoài không làm gì (tránh mất vùng đang chọn vô tình;
-    // muốn chọn vùng khác thì bấm "✕ Bỏ mask" trong InpaintCard trước).
+    // Container overlay: bấm ngoài box → bắt đầu vẽ vùng mới. Box cũ được lưu lại
+    // (_inpaintPrevBox); nếu chỉ click nhầm (không kéo) thì khôi phục — không mất vùng.
     inpaintMaskStart(e) {
       if (this.inpaintMaskMode === 'none') return;
-      if (this.inpaintMaskMode === 'rect') {
-        const b = this.inpaintMaskBox;
-        if (b && b.w >= 0.02 && b.h >= 0.02) return;
-      }
       this.beginInpaintDrag(this.inpaintMaskMode === 'brush' ? 'brush' : 'draw', e);
+    },
+    // Reset về chế độ vẽ vùng mới (gọi từ nút "🔄 Vẽ lại" hoặc double-click trên box)
+    resetInpaintMaskBox() {
+      if (this._inpaintDrag) this._inpaintStopDrag();
+      this.inpaintMaskBox = { x: 0, y: 0, w: 0, h: 0 };
+      this._inpaintPrevBox = null;
+      this._inpaintDrew = false;
+      this.toast?.('Kéo chọn vùng mới trên ảnh.');
     },
     // Batch pointermoves qua rAF — kéo không giật, không đọc layout mỗi event.
     _inpaintQueue(e) {
@@ -592,6 +618,10 @@ export const useStudioStore = defineStore('studio', {
     _inpaintDragMove(e) {
       const d = this._inpaintDrag; if (!d) return;
       const m = this.canvasMetrics(); if (!m) return;
+      // Đánh dấu đã kéo thật (ngưỡng 4px) — phân biệt với click nhầm
+      if (d.key === 'draw' && (Math.abs(e.clientX - d.sx) > 4 || Math.abs(e.clientY - d.sy) > 4)) {
+        this._inpaintDrew = true;
+      }
       if (d.key === 'brush') {
         const p = this.inpaintMaskPointer(e); if (!p) return;
         this._drawInpaintBrushLine(d.last || p, p);
@@ -644,10 +674,18 @@ export const useStudioStore = defineStore('studio', {
         this._inpaintBrushLast = null;
         this._finalizeInpaintBrush();
       } else if (this.inpaintMaskMode === 'rect') {
-        // Vùng vừa vẽ quá nhỏ (click nhầm) → reset để không còn khung lơ lửng
+        const wasDraw = d && d.key === 'draw';
         const b = this.inpaintMaskBox;
-        if (!b || b.w < 0.02 || b.h < 0.02) this.inpaintMaskBox = { x: 0, y: 0, w: 0, h: 0 };
+        if (wasDraw && !this._inpaintDrew && this._inpaintPrevBox) {
+          // Bấm ngoài box nhưng KHÔNG kéo (click nhầm) → khôi phục vùng cũ
+          this.inpaintMaskBox = this._inpaintPrevBox;
+        } else if (!b || b.w < 0.02 || b.h < 0.02) {
+          // Vùng quá nhỏ và không có gì để khôi phục → reset trống
+          this.inpaintMaskBox = { x: 0, y: 0, w: 0, h: 0 };
+        }
       }
+      this._inpaintPrevBox = null;
+      this._inpaintDrew = false;
     },
     // Alias cho pointerup fallback nếu template vẫn gọi
     inpaintMaskStop() { this._inpaintStopDrag(); },

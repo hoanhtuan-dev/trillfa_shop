@@ -43,14 +43,23 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
               class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
         🖌 Vẽ mask
       </button>
-      <button v-if="maskActive" @click="store.inpaintMaskMode = 'none'; store.inpaintBrushData = ''"
+      <button v-if="maskActive && store.inpaintMaskMode === 'rect' && (store.inpaintMaskBox.w || 0) >= 0.02"
+              @click="store.resetInpaintMaskBox()"
+              class="rounded-full bg-amber-600/30 px-2 py-1 text-[10px] font-semibold text-amber-200 hover:bg-amber-600"
+              title="Bỏ vùng hiện tại để kéo chọn vùng mới">
+        🔄 Vẽ lại
+      </button>
+      <button v-if="maskActive" @click="store.inpaintMaskMode = 'none'; store.inpaintBrushData = ''; store._inpaintStopDrag && store._inpaintStopDrag()"
               class="rounded-full bg-red-600/25 px-2 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">
         ✕ Bỏ mask
       </button>
     </div>
     <div v-if="maskActive" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">
-      {{ store.inpaintMaskMode === 'rect' ? '▭ Kéo chọn vùng trên canvas — AI chỉ sửa trong vùng đã chọn' : '🖌 Vẽ mask trên canvas — AI chỉ sửa vùng đã vẽ' }}
-      <span v-if="(store.inpaintMaskBox.w || 0) >= 0.02" class="ml-1 font-semibold text-white">{{ Math.round(store.inpaintMaskBox.w * 100) }}% × {{ Math.round(store.inpaintMaskBox.h * 100) }}%</span>
+      <template v-if="store.inpaintMaskMode === 'rect'">
+        <span v-if="(store.inpaintMaskBox.w || 0) >= 0.02">▭ Vùng {{ Math.round(store.inpaintMaskBox.w * 100) }}% × {{ Math.round(store.inpaintMaskBox.h * 100) }}% — kéo để di chuyển · đúp chuột để vẽ lại</span>
+        <span v-else>▭ Kéo chọn vùng trên canvas — AI chỉ sửa trong vùng đã chọn</span>
+      </template>
+      <span v-else>🖌 Vẽ mask trên canvas — AI chỉ sửa vùng đã vẽ</span>
     </div>
 
     <label class="label mt-3">Mô tả chỉnh sửa</label>

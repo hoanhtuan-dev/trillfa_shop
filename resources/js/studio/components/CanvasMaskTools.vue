@@ -34,7 +34,8 @@ function onPointerDown(e) { store.inpaintMaskStart(e); }
         <div class="absolute cursor-move select-none" style="pointer-events:auto; touch-action:none"
              :style="maskBoxStyle"
              @pointerdown.stop="store.beginInpaintDrag('move', $event)"
-             title="Kéo để di chuyển vùng">
+             @dblclick.stop="store.resetInpaintMaskBox()"
+             title="Kéo để di chuyển · đúp chuột để vẽ lại vùng">
           <!-- Viền dashed (con của box, pointer-events none → không chặn move) -->
           <div class="pointer-events-none absolute -inset-px border-2 border-dashed border-brand-300"></div>
           <!-- Shadow tối bên ngoài -->

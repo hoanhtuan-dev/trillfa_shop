@@ -29,7 +29,12 @@ const canvasZoom = ref(null);
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
 // While crop mode is on: re-fit the box when the ratio changes, re-init when the image changes.
 watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
-watch(() => store.upscaleSrc, () => { if (store.cropMode) store.initCropBox(); });
+// Khi ảnh hiển thị ĐỔI (chọn ảnh khác / ảnh mới sinh ra / đổi layer) → reset zoom+pan
+// về mặc định để ảnh LUÔN fit trọn khung, hiển thị đầy đủ cả chiều ngang lẫn dọc.
+watch(() => store.upscaleSrc, (src, old) => {
+  if (src && src !== old) { store.zoom = 1; store.pan = { x: 0, y: 0 }; }
+  if (store.cropMode) store.initCropBox();
+});
 function onCanvasKey(e) {
   if (!store.cropMode && store.inpaintMaskMode === 'none') return;
   const t = e.target;

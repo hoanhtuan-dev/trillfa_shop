@@ -44,7 +44,9 @@ async function doDelete() {
 // ── Zoom / pan theo KÍCH THƯỚC THẬT của ảnh (natural px) ──
 // viewerZoom = hệ số SO VỚI FIT: 100% (zoom=1) = ảnh vừa TRỌN khung theo cả 2 chiều
 // (thu ảnh lớn xuống / phóng ảnh nhỏ lên cho tới khi 1 chiều chạm khung — không bao giờ crop).
-// Zoom nhỏ nhất = 80% (ảnh nhỏ hơn khung một chút), lớn nhất = 6×.
+// DI CHUYỂN TỰ DO: pan không bị giới hạn ở bất kỳ mức zoom nào; chỉ tự về giữa khi
+// thu nhỏ về ≤ fit (zoom ≤ 1) để ảnh không "lạc" khỏi khung.
+// Thu nhỏ tùy ý (min rất thấp để xem bố cục), phóng to tối đa 8×.
 // Scale hiển thị thực = viewerZoom × fitScale (fitScale = min(khung_w/natW, khung_h/natH)).
 const viewerZoom = ref(1);
 const viewerPan = ref({ x: 0, y: 0 });
@@ -53,8 +55,8 @@ const imgEl = ref(null);
 const dragging = ref(false);
 const loadedTick = ref(0); // buộc render lại khi ảnh load xong (biết kích thước tự nhiên)
 let drag = null;
-const ZOOM_MIN = 0.8;  // 80% — không cho thu nhỏ hơn
-const ZOOM_MAX = 6;
+const ZOOM_MIN = 0.1;  // 10% — thu nhỏ tùy ý, không ép
+const ZOOM_MAX = 8;
 
 function resetZoom() { viewerZoom.value = 1; viewerPan.value = { x: 0, y: 0 }; }
 
@@ -67,20 +69,10 @@ function fitScale() {
 // Scale hiển thị thực (được dùng trong transform).
 function renderScale() { return viewerZoom.value * fitScale(); }
 
-// Chặn pan tại biên theo kích thước HIỂN THỊ thực; khi ảnh ≤ khung → ép về giữa.
+// Không chặn pan. Chỉ "kéo về giữa" khi ảnh đang ở ≤ fit (zoom ≤ 1) — vì lúc đó ảnh
+// đã trọn khung, kéo chỉ tạo khoảng trống vô nghĩa; mọi mức zoom > 1 đều tự do.
 function clampPan() {
-  const area = zoomArea.value, img = imgEl.value;
-  if (!area || !img || !img.naturalWidth || !img.naturalHeight) return;
-  const z = viewerZoom.value;
-  const fit = fitScale();
-  const iw = img.naturalWidth * fit * z;
-  const ih = img.naturalHeight * fit * z;
-  const mx = Math.max(0, (iw - area.clientWidth) / 2);
-  const my = Math.max(0, (ih - area.clientHeight) / 2);
-  const p = viewerPan.value;
-  const nx = Math.min(mx, Math.max(-mx, p.x));
-  const ny = Math.min(my, Math.max(-my, p.y));
-  if (nx !== p.x || ny !== p.y) viewerPan.value = { x: nx, y: ny };
+  if (viewerZoom.value <= 1.0001) { viewerPan.value = { x: 0, y: 0 }; return; }
 }
 
 // cx, cy = toạ độ con trỏ so với TÂM vùng zoom. Sau scale k lần, dịch pan để điểm
@@ -108,14 +100,13 @@ function onWheel(e) {
 function zoomIn() { zoomTo(0, 0, 1.5); }
 function zoomOut() { zoomTo(0, 0, 1 / 1.5); }
 function panStart(e) {
-  if (viewerZoom.value <= ZOOM_MIN) return; // chưa phóng to thì không cần kéo
-  dragging.value = true;
+  dragging.value = true; // kéo tự do ở mọi mức zoom
   drag = { x: e.clientX, y: e.clientY, px: viewerPan.value.x, py: viewerPan.value.y };
   if (e.currentTarget.setPointerCapture) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} }
 }
-function panMove(e) { if (drag) { viewerPan.value = { x: drag.px + (e.clientX - drag.x), y: drag.py + (e.clientY - drag.y) }; clampPan(); } }
+function panMove(e) { if (drag) { viewerPan.value = { x: drag.px + (e.clientX - drag.x), y: drag.py + (e.clientY - drag.y) }; } } // không giới hạn
 function panEnd() { drag = null; dragging.value = false; }
-function toggleZoom() { zoomTo(0, 0, viewerZoom.value <= ZOOM_MIN + 0.01 ? 2 : 1 / 2); }
+function toggleZoom() { zoomTo(0, 0, viewerZoom.value <= 1.0001 ? 2 : 1 / 2); }
 function onImgLoad() {
   imgError.value = false;
   loadedTick.value++; // biết naturalWidth/Height → render lại để fit đúng
