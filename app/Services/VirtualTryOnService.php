@@ -15,6 +15,9 @@ class VirtualTryOnService
     /** The image model that actually produced the last swap (may differ from the configured swap_model). */
     public ?string $lastModel = null;
 
+    /** Mô tả trang phục do vision (qwen3.8-flash) tạo trong chế độ generation — lưu để hiển thị/QA. */
+    public ?string $lastGarmentDesc = null;
+
     /** Number of real model calls made for the last swap (2 for a face-ref 2-step swap, 1 otherwise). */
     protected int $calls = 0;
 
@@ -227,6 +230,8 @@ class VirtualTryOnService
             $garmentDesc = 'the outfit and accessories exactly as shown in the source image (same colors, prints, patterns and every accessory)';
         }
         $this->calls += 1; // 1 vision call
+        $this->lastGarmentDesc = $garmentDesc;
+        logger()->info('Swap generation: garment description', ['desc' => $garmentDesc]);
 
         // PASS 2 — text-to-image bằng model sinh ảnh.
         $physique = 'a stylish, edgy young Vietnamese fashion model with a slim figure, slim waist, long toned legs and a beautiful delicate face';
@@ -273,34 +278,46 @@ class VirtualTryOnService
      */
     protected function describeGarment(string $imageUrl): ?string
     {
-        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if (! $key) { return null; }
-        $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
+        // Dùng base64 data-URI (giống edit model) — provider ngoài KHÔNG fetch được URL localhost.
+        $imageUri = studio_vision_image_data_uri($imageUrl, 1600);
+        $keys = studio_qwen_credentials('vision');
+        if (! $imageUri || empty($keys)) { return null; }
+
         $instruction = 'Describe the clothing and accessories in this flat-lay image as a precise, literal fashion text-to-image prompt. '
             .'List every garment and accessory with its EXACT color, pattern/print, material, and where it should be worn on a model: top, bottom/dress, jacket, shoes, handbag, watch, jewelry/earrings, belt, hat. '
             .'Do NOT invent items that are not visible. Output ONLY the descriptive text, no commentary.';
 
-        foreach (studio_qwen_vision_models() as $model) {
-            try {
-                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(60)
-                    ->post($base, [
-                        'model' => $model,
-                        'messages' => [['role' => 'user', 'content' => [
-                            ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($imageUrl)]],
-                            ['type' => 'text', 'text' => $instruction],
-                        ]]],
-                        'temperature' => 0.2,
-                    ]);
-                if ($resp->successful()) {
-                    $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                    if ($text !== '') {
-                        logger()->info('Swap generation: garment described', ['model' => $model, 'len' => strlen($text)]);
-                        return $text;
+        $lastErr = '';
+        foreach ($keys as $key) {
+            $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
+            foreach (studio_qwen_vision_models() as $model) {
+                try {
+                    $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(60)
+                        ->post($base, [
+                            'model' => $model,
+                            'messages' => [['role' => 'user', 'content' => [
+                                ['type' => 'image_url', 'image_url' => ['url' => $imageUri]],
+                                ['type' => 'text', 'text' => $instruction],
+                            ]]],
+                            'temperature' => 0.2,
+                        ]);
+                    if ($resp->successful()) {
+                        $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                        if ($text !== '') {
+                            logger()->info('Swap generation: garment described', ['model' => $model, 'len' => strlen($text)]);
+                            return $text;
+                        }
+                        $lastErr = 'HTTP 200 but empty content ('.$model.')';
+                    } else {
+                        $lastErr = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 200);
+                        if (in_array($resp->status(), [404, 429]) || $resp->status() >= 500) { continue; }
                     }
+                } catch (\Throwable $e) {
+                    $lastErr = $e->getMessage();
                 }
-                if ($resp->status() === 404 || $resp->status() === 429 || $resp->status() >= 500) { continue; }
-            } catch (\Throwable $e) { /* next model */ }
+            }
         }
+        logger()->warning('describeGarment: all vision attempts failed', ['err' => substr((string) $lastErr, 0, 300)]);
         return null;
     }
 
@@ -511,6 +528,8 @@ class VirtualTryOnService
         $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
         if (! $key) { return null; }
         $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
+        $designUri = studio_vision_image_data_uri($designImage, 1600) ?: studio_vision_image_url($designImage);
+        $candUri = studio_vision_image_data_uri($imageUrl, 1600) ?: studio_vision_image_url($imageUrl);
         $instruction = 'You are a fashion photography evaluator. The FIRST image is the ORIGINAL design (its garment is the product and must be preserved). The SECOND image is a virtual try-on result. Rate the result 1-10 on:'
             .'\n1. garment_preservation: how identical is the garment in image 2 to image 1 (colors, patterns, silhouette, length)'
             .'\n2. face_quality: sharp, natural, photorealistic face'
@@ -526,8 +545,8 @@ class VirtualTryOnService
                         'messages' => [[
                             'role' => 'user',
                             'content' => [
-                                ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($designImage)]],
-                                ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($imageUrl)]],
+                                ['type' => 'image_url', 'image_url' => ['url' => $designUri]],
+                                ['type' => 'image_url', 'image_url' => ['url' => $candUri]],
                                 ['type' => 'text', 'text' => $instruction],
                             ],
                         ]],

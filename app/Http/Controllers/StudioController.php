@@ -2426,6 +2426,7 @@ RULES:
                 'type' => 'image', 'provider' => 'qwen', 'model' => $actualModel, 'config_model' => $swapModel,
                 'steps' => $credits,
                 'qa' => $qaScores,
+                'garment_desc' => $svc->lastGarmentDesc,
             ]),
         ]);
     }
