@@ -775,7 +775,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintStage = 'send';
       this.inpaintStartTs = Date.now();
       try {
-        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace };
+        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: this.upscaleSrc || src };
         // Gửi mask đã LƯU (bấm "Xong") — dù overlay công cụ đã tắt vẫn xử lý đúng vùng.
         if (this.inpaintMaskDone && this._inpaintMaskKind) {
           body.mask_mode = this._inpaintMaskKind;

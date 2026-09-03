@@ -1,6 +1,6 @@
 {
-  "_GalleryModal-BpF5CM35.js": {
-    "file": "assets/GalleryModal-BpF5CM35.js",
+  "_GalleryModal-aLt25X1V.js": {
+    "file": "assets/GalleryModal-aLt25X1V.js",
     "name": "GalleryModal",
     "imports": [
       "_pinia-CAT5I3kk.js"
@@ -94,26 +94,26 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DL7hhvS3.js",
+    "file": "assets/app-BgTCnsLR.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CAT5I3kk.js",
-      "_GalleryModal-BpF5CM35.js"
+      "_GalleryModal-aLt25X1V.js"
     ],
     "css": [
       "assets/app-Cpc30Rd3.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-BkeSopHn.js",
+    "file": "assets/library-CjYDN0PI.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
       "_pinia-CAT5I3kk.js",
-      "_GalleryModal-BpF5CM35.js"
+      "_GalleryModal-aLt25X1V.js"
     ]
   },
   "resources/js/studio/settings.js": {

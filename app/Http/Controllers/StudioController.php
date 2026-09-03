@@ -189,16 +189,22 @@ class StudioController extends Controller
             'region.w' => ['nullable', 'numeric', 'min:0.005', 'max:1'],
             'region.h' => ['nullable', 'numeric', 'min:0.005', 'max:1'],
             'mask_data' => ['nullable', 'string', 'max:2000000'],
+            // Ảnh ĐANG HIỂN THỊ trên canvas (upscaleSrc) — mask được vẽ theo ảnh này,
+            // nên build mask & base phải dùng ĐÚNG ảnh này (không phải generation.media_url).
+            'source_url' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $preserveBg = ! empty($data['preserve_background']);
         $preserveFace = ! empty($data['preserve_face']);
 
-        // Nếu có mask → tạo mask image và gửi kèm
+        $sourceUrl = trim((string) ($data['source_url'] ?? ''));
+        if ($sourceUrl === '') { $sourceUrl = (string) $generation->media_url; }
+
+        // Nếu có mask → tạo mask image và gửi kèm (dùng ĐÚNG ảnh đang hiển thị)
         $maskUrl = null;
         $maskMode = (string) ($data['mask_mode'] ?? '');
-        if ($maskMode !== '' && ! empty($data['region']) && $generation->media_url) {
-            $maskUrl = $this->buildMaskImage($generation->media_url, $data['region'], $maskMode, $data['mask_data'] ?? null);
+        if ($maskMode !== '' && ! empty($data['region']) && $sourceUrl) {
+            $maskUrl = $this->buildMaskImage($sourceUrl, $data['region'], $maskMode, $data['mask_data'] ?? null);
         }
 
         $promptInstruction = 'Using the provided image as the exact base, edit it surgically. Change ONLY: '.$request->input('prompt')
@@ -214,9 +220,7 @@ class StudioController extends Controller
 
         $data['prompt'] = $promptInstruction;
 
-        if ($generation->media_url) {
-            $data['base_image'] = $generation->media_url;
-        }
+        $data['base_image'] = $sourceUrl;
         if ($maskUrl) {
             $data['mask_image'] = $maskUrl;
         }
