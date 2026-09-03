@@ -541,6 +541,29 @@ export const useStudioStore = defineStore('studio', {
         else { this.editSource = null; this.previewId = null; this.preview = null; }
       }
     },
+    // Bỏ ảnh nguồn khỏi canvas (không xóa file/output).
+    clearSource() {
+      this.editSource = null;
+      this.canvasLayers = this.canvasLayers.filter((l) => l.id !== 'source');
+      if (this.activeLayerId === 'source') {
+        const next = this.canvasLayers[0];
+        if (next) this.selectLayer(next);
+        else { this.activeLayerId = ''; this.previewId = null; this.preview = null; }
+      }
+    },
+    // Dọn sạch canvas + toàn bộ layer (chỉ xóa trạng thái hiển thị — KHÔNG xóa output/ảnh kết quả).
+    cleanCanvas() {
+      this.previewId = null;
+      this.preview = null;
+      this.editSource = null;
+      this.canvasImg = '';
+      this.canvasLayers = [];
+      this.activeLayerId = '';
+      this.palette = [];
+      this.pan = { x: 0, y: 0 };
+      this.zoom = 1;
+      this.toast('Đã dọn canvas — ảnh kết quả vẫn còn trong Kết quả/Thư viện.');
+    },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
     setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.pushCanvasLayer('source', 'source', this.editSource.name, url); this.setActiveLayer('source'); this.toast('Đã chọn ảnh nguồn.'); },

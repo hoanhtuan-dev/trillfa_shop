@@ -186,30 +186,33 @@ async function run() {
         <input ref="fileEl" type="file" accept="image/*" class="hidden" @change="uploadImage">
       </label>
 
-      <!-- Pose presets -->
-      <template v-if="poseImages.length">
-        <p class="mb-1.5 text-xs font-semibold text-cream-200">🕺 Pose (dáng)</p>
-        <div class="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-          <button v-for="p in poseImages" :key="p.key" @click="pick(p)"
-                  class="relative overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
-            <img :src="p.url" class="h-20 w-full bg-ink-900 object-cover" loading="lazy">
-            <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.label }}</span>
-          </button>
-        </div>
-      </template>
+      <!-- Vùng cuộn: pose + ảnh, lưới vuông -->
+      <div class="max-h-[52vh] overflow-y-auto pr-1">
+        <!-- Pose presets -->
+        <template v-if="poseImages.length">
+          <p class="mb-1.5 text-xs font-semibold text-cream-200">🕺 Pose (dáng)</p>
+          <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <button v-for="p in poseImages" :key="p.key" @click="pick(p)"
+                    class="relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
+              <img :src="p.url" class="h-full w-full bg-ink-900 object-cover" loading="lazy">
+              <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.label }}</span>
+            </button>
+          </div>
+        </template>
 
-      <!-- Ảnh của bạn (Outputs + đã tải lên) -->
-      <template v-if="genImages.length || upImages.length">
-        <p class="mb-1.5 text-xs font-semibold text-cream-200">🖼 Ảnh của bạn</p>
-        <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          <button v-for="g in [...genImages, ...upImages]" :key="g.key" @click="pick(g)"
-                  class="relative overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
-            <img :src="g.url" class="h-20 w-full bg-ink-900 object-cover" loading="lazy">
-            <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ g.label }}</span>
-          </button>
-        </div>
-      </template>
-      <p v-if="!poseImages.length && !genImages.length && !upImages.length" class="rounded-2xl border border-dashed border-ink-600 p-4 text-center text-xs text-cream-300/60">Chưa có ảnh — hãy tải lên từ máy.</p>
+        <!-- Ảnh của bạn (Outputs + đã tải lên) -->
+        <template v-if="genImages.length || upImages.length">
+          <p class="mb-1.5 mt-3 text-xs font-semibold text-cream-200">🖼 Ảnh của bạn</p>
+          <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <button v-for="g in [...genImages, ...upImages]" :key="g.key" @click="pick(g)"
+                    class="relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
+              <img :src="g.url" class="h-full w-full bg-ink-900 object-cover" loading="lazy">
+              <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ g.label }}</span>
+            </button>
+          </div>
+        </template>
+        <p v-if="!poseImages.length && !genImages.length && !upImages.length" class="rounded-2xl border border-dashed border-ink-600 p-4 text-center text-xs text-cream-300/60">Chưa có ảnh — hãy tải lên từ máy.</p>
+      </div>
     </BaseModal>
 
     <!-- So sánh Trước/Sau -->
