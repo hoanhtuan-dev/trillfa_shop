@@ -12,7 +12,6 @@ const addType = ref('model'); const addName = ref(''); const addFile = ref(null)
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 const swapBg = ref('');
 const swapTone = ref('none'); // Hiệu ứng tông màu mặc định: không áp dụng
-const swapTexture = ref(2); // Mức chi tiết vân vải (0-10), mặc định 2
 const changeFace = ref(true); // MẶC ĐỊNH ĐỔI khuôn mặt theo người mẫu; tắt = giữ nguyên khuôn mặt gốc
 
 const toneOptions = [
@@ -32,16 +31,15 @@ function loadSwapMemory() {
     const m = JSON.parse(localStorage.getItem(SWAP_KEY) || '{}');
     if (m.tone) swapTone.value = m.tone;
     if (typeof m.bg === 'string') swapBg.value = m.bg;
-    if (typeof m.texture === 'number') swapTexture.value = m.texture;
     // changeFace KHÔNG persist — luôn mặc định BẬT mỗi phiên.
   } catch (e) {}
 }
 function saveSwapMemory() {
   try {
-    localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value, texture: swapTexture.value }));
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value }));
   } catch (e) {}
 }
-watch([swapBg, swapTone, swapTexture], saveSwapMemory);
+watch([swapBg, swapTone], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; if (changeFace.value && !store.swapModelIds.length && models.value.length) store.swapModelIds = [String(models.value[0].id)]; } catch(e){}
@@ -100,13 +98,6 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <button type="button" @click="changeFace = !changeFace" class="relative h-6 w-11 shrink-0 rounded-full transition-colors" :class="changeFace ? 'bg-brand-500' : 'bg-ink-600'" :title="changeFace ? 'Bỏ đổi khuôn mặt' : 'Bật đổi khuôn mặt'"><span class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" :class="changeFace ? 'left-[22px]' : 'left-0.5'"></span></button>
     </div>
 
-    <!-- 🧵 Vân vải (mặc định 2) -->
-    <div class="mt-2 flex items-center gap-3 rounded-2xl border border-ink-700 bg-ink-800/40 px-3 py-2 text-xs">
-      <span class="shrink-0 text-cream-300/60">🧵 Vân vải</span>
-      <input type="range" min="0" max="10" v-model.number="swapTexture" class="h-1.5 w-full cursor-pointer accent-brand-500" :title="'Mức chi tiết vân vải: ' + swapTexture">
-      <span class="shrink-0 font-semibold text-cream-200">{{ swapTexture }}</span>
-    </div>
-
     <div v-if="!changeFace || store.swapModelIds.length || store.swapPoseIds.length || swapBg" class="mt-2 flex flex-wrap gap-1.5 text-[10px]">
       <span v-if="!changeFace" class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-300/80">👩 Giữ nguyên khuôn mặt</span>
       <span v-if="changeFace && selFaceImgs[0]" class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-300/80">👩 {{ selFaceImgs[0].name }}</span>
@@ -117,7 +108,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
     <div class="mt-3 grid grid-cols-2 gap-1.5">
       <button @click="open=true" class="btn-outline btn-sm">🪄 Chọn</button>
       <button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal) : '⏳ Đang xử lý' }}</button>
-      <button v-else @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace, texture: swapTexture })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button>
+      <button v-else @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button>
     </div>
     <p v-if="!canApply && !running" class="mt-1 text-[10px] text-cream-300/50">{{ changeFace ? 'Chọn 1 khuôn mặt + ít nhất 1 dáng.' : 'Chọn ít nhất 1 dáng.' }}</p>
 
@@ -145,7 +136,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <p class="font-semibold">⚠️ Thay đổi người mẫu thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.swapError }}</p>
       <div class="mt-2 flex gap-2">
-        <button @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace, texture: swapTexture })" class="btn-brand btn-sm">🔄 Thử lại</button>
+        <button @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace })" class="btn-brand btn-sm">🔄 Thử lại</button>
         <button @click="store.clearSwapStatus()" class="btn-ghost btn-sm">Đóng</button>
       </div>
     </div>

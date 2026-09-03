@@ -223,10 +223,9 @@ class VirtualTryOnService
      * Pose được mô tả bằng văn bản ($pose skeleton); ảnh pose ref không gửi vì từng làm model bỏ
      * qua pose. $tone là hiệu ứng màu ở mức prompt.
      */
-    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null, bool $changeFace = false, int $texture = 2): ?string
+    public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null, bool $changeFace = false): ?string
     {
         // $changeFace=false: GIỮ NGUYÊN khuôn mặt gốc. $changeFace=true: đổi mặt theo người mẫu (PASS 1b).
-        // $texture: mức chi tiết vân vải 0-10 (mặc định 2) — điều khiển qua thanh trượt, đính vào PROMPT.
         $swapModel = studio_swap_model();
         $this->calls = 0; // bộ đếm cộng dồn: PASS1 candidates + face + background
         $this->lastModel = null;
@@ -262,10 +261,9 @@ class VirtualTryOnService
             $personClause .= 'Change ONLY the person\'s face to match this description: '.$modelDesc.'. Keep the hairstyle, head shape, body, pose, and the EXACT outfit + accessories unchanged. ';
         }
 
-        $fabricTexture = $this->fabricTextureInstruction($texture);
+        // KHÔNG đưa prompt "render fabric texture" vào luồng — vân vải lấy NGUYÊN BẢN từ ảnh nguồn.
         $garmentLock = 'The clothing and ACCESSORIES shown in the image are the PRODUCT of this edit: they must appear in the result EXACTLY as they are — identical garment, same colors, silhouette, length, seams, folds and fabric. '
-            .'PRESERVE every print, pattern, embroidery, logo, button, zipper, and the fabric weave/texture exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
-            .$fabricTexture
+            .'PRESERVE every print, pattern, embroidery, logo, button, zipper, and the fabric texture exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
             .'ALL accessories must be worn/carried correctly and exactly as shown: shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head — matching their color, style, material and placement precisely; do NOT omit, add or redesign any accessory. '
             .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. ';
 
@@ -335,8 +333,9 @@ class VirtualTryOnService
             $faceInstr = 'The FIRST image is the reference face; the SECOND image is the person to edit. Replace ONLY the face in the SECOND image with the face from the FIRST image. '
                 .'Scale the reference face DOWN to match the natural head size of the person exactly — the face must NOT be enlarged or magnified beyond the original head; keep the face at the correct anatomical proportion of the head (about 1/7 of the body height, never larger). '
                 .'If the reference face is angled, tilted or turned, match the head angle, direction and perspective of the SECOND image exactly — do NOT paste a frontal or mismatched-angle face onto a turned head. '
-                .'Keep the hairstyle, hairline, head shape, body, pose, background, and the EXACT garment (colors, prints, patterns, seams, fabric weave and texture) 100% unchanged — do NOT redraw or restyle the outfit. '
-                .'Match the skin tone and lighting of the reference face to the original body exactly. '
+                .'If the person wears a hat, headband, scarf or other headwear, KEEP the hat, brim, headband and the hairline/hair EXACTLY as in the SECOND image — blend the new face naturally around the hat and bangs; do NOT remove, replace, resize or distort the headwear. '
+                .'Keep the hairstyle, hairline, head shape, body, pose, background, and the EXACT garment (colors, prints, patterns, seams) 100% unchanged — do NOT redraw or restyle the outfit. '
+                .'Match the skin tone and lighting of the reference face to the original body exactly; soften the face edges so the new face looks like a natural, fully-lit part of the head (not a pasted sticker). '
                 .'Blend the new face seamlessly into the head — no visible seam, no color mismatch, no hard edge, natural jawline and cheek contour. '
                 .$negativeClause
                 .' Photorealistic, studio quality.';
@@ -447,21 +446,6 @@ class VirtualTryOnService
         return ((float) ($s['garment_preservation'] ?? 5) * 0.5)
             + ((float) ($s['pose_accuracy'] ?? 5) * 0.3)
             + ((float) ($s['overall_aesthetic'] ?? 5) * 0.2);
-    }
-
-    /**
-     * Mức chi tiết vân vải (0-10) điều khiển qua thanh trượt (mặc định 2). Đính vào PROMPT,
-     * không dùng hậu kỳ — để model vẽ vân vải tự nhiên theo mức chi tiết mong muốn.
-     */
-    protected function fabricTextureInstruction(int $v): string
-    {
-        return match (true) {
-            $v >= 8 => 'Render the fabric with EXTREME detail: visible fiber weave, stitches, texture and micro-reflections; ultra-sharp fabric surface. ',
-            $v >= 5 => 'Render the fabric with HIGH detail: clear weave, knit/denim grain, visible stitches and realistic drape. ',
-            $v >= 2 => 'Render the fabric with MODERATE detail: visible weave and texture, natural drape, not flat. ',
-            $v >= 1 => 'Render the fabric with light detail: keep it natural and slightly textured, avoid a flat plastic look. ',
-            default => 'Keep the fabric simple but natural; avoid a flat or airbrushed look. ',
-        };
     }
 
     /**
