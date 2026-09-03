@@ -6,6 +6,13 @@
       "_pinia-CAT5I3kk.js"
     ]
   },
+  "_StylistDataManager-DvGNXWVd.js": {
+    "file": "assets/StylistDataManager-DvGNXWVd.js",
+    "name": "StylistDataManager",
+    "imports": [
+      "_pinia-CAT5I3kk.js"
+    ]
+  },
   "_fonts-BRD9E1vz.css": {
     "file": "assets/fonts-BRD9E1vz.css",
     "src": "_fonts-BRD9E1vz.css"
@@ -79,7 +86,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CgwItRiV.css",
+    "file": "assets/app-CSoIpDRu.css",
     "name": "app",
     "names": [
       "app.css"
@@ -94,13 +101,14 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-BgTCnsLR.js",
+    "file": "assets/app-CRm3SoKc.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CAT5I3kk.js",
-      "_GalleryModal-aLt25X1V.js"
+      "_GalleryModal-aLt25X1V.js",
+      "_StylistDataManager-DvGNXWVd.js"
     ],
     "css": [
       "assets/app-Cpc30Rd3.css"
@@ -126,12 +134,13 @@
     ]
   },
   "resources/js/studio/stylist-data.js": {
-    "file": "assets/stylist-data-DMomdFSk.js",
+    "file": "assets/stylist-data-B2SlrP3N.js",
     "name": "stylist-data",
     "src": "resources/js/studio/stylist-data.js",
     "isEntry": true,
     "imports": [
-      "_pinia-CAT5I3kk.js"
+      "_pinia-CAT5I3kk.js",
+      "_StylistDataManager-DvGNXWVd.js"
     ]
   }
 }

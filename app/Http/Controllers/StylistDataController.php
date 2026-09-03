@@ -19,14 +19,23 @@ class StylistDataController extends Controller
 
     public function data(): \Illuminate\Http\JsonResponse
     {
-        return response()->json([
-            'types' => StylistGarmentType::orderBy('sort_order')->orderBy('id')->get()
+        try {
+            $types = StylistGarmentType::orderBy('sort_order')->orderBy('id')->get()
                 ->map(fn ($r) => ['id' => $r->id, 'slug' => $r->slug, 'name' => $r->name, 'emoji' => $r->emoji, 'color' => $r->color, 'sort_order' => $r->sort_order])
-                ->values(),
-            'questions' => StylistQuestion::orderBy('sort_order')->orderBy('id')->get()
+                ->values();
+        } catch (\Throwable $e) {
+            $types = collect();
+        }
+
+        try {
+            $questions = StylistQuestion::orderBy('sort_order')->orderBy('id')->get()
                 ->map(fn ($r) => ['id' => $r->id, 'key' => $r->key, 'q' => $r->question, 'opts' => $r->options ?? [], 'sort_order' => $r->sort_order])
-                ->values(),
-        ]);
+                ->values();
+        } catch (\Throwable $e) {
+            $questions = collect();
+        }
+
+        return response()->json(['types' => $types, 'questions' => $questions]);
     }
 
     public function saveType(Request $request): \Illuminate\Http\JsonResponse

@@ -13,7 +13,11 @@ class StylistCatalog
 {
     public function garmentTypes(): array
     {
-        $rows = StylistGarmentType::orderBy('sort_order')->orderBy('id')->get();
+        try {
+            $rows = StylistGarmentType::orderBy('sort_order')->orderBy('id')->get();
+        } catch (\Throwable $e) {
+            $rows = collect(); // bảng chưa migrate -> dùng dữ liệu mặc định
+        }
 
         if ($rows->isEmpty()) {
             $items = collect($this->defaultGarmentTypes());
@@ -53,7 +57,11 @@ class StylistCatalog
     public function questions(string $type): array
     {
         $g = $this->nameOf($type);
-        $rows = StylistQuestion::orderBy('sort_order')->orderBy('id')->get();
+        try {
+            $rows = StylistQuestion::orderBy('sort_order')->orderBy('id')->get();
+        } catch (\Throwable $e) {
+            $rows = collect(); // bảng chưa migrate -> dùng dữ liệu mặc định
+        }
 
         if ($rows->isEmpty()) {
             $items = collect($this->defaultQuestions());

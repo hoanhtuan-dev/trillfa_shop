@@ -2,8 +2,10 @@
 import { ref, onMounted, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
+import StylistDataManager from './StylistDataManager.vue';
 const store = useStudioStore();
 const open = ref(false);
+const settingsOpen = ref(false);
 const types = ref([]);
 const step = ref('type'); // type | survey | result
 const type = ref('');
@@ -47,7 +49,7 @@ function applyToGenerate() {
   store.promptOpen = true; // mở popup Prompt Tạo Ảnh (ConceptCard)
   open.value = false;      // thoát Trợ lý thiết kế
 }
-function openSettings() { window.open('/studio/stylist-data', '_blank'); }
+function openSettings() { settingsOpen.value = true; }
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
@@ -108,6 +110,10 @@ function openSettings() { window.open('/studio/stylist-data', '_blank'); }
         <button @click="refine" :disabled="loading" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : '✨ Tinh chỉnh & nâng cấp' }}</button>
         <button @click="applyToGenerate" class="btn-brand mt-2 w-full">➡ Đưa vào Tạo Ảnh</button>
       </template>
+    </BaseModal>
+
+    <BaseModal v-model="settingsOpen" title="⚙ Quản lý data Trợ lý thiết kế" wide>
+      <StylistDataManager />
     </BaseModal>
   </div>
 </template>
