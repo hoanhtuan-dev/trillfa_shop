@@ -228,7 +228,7 @@ class VirtualTryOnService
         // $changeFace=false (mặc định): GIỮ NGUYÊN khuôn mặt gốc — prompt chỉ đổi dáng/cơ thể/hậu cảnh,
         // không dùng mô tả mặt người mẫu, không gửi ảnh mặt tham chiếu, bỏ qua pass face-swap riêng.
         // $changeFace=true: thay người bằng khuôn mặt người mẫu (mô tả văn bản + ảnh ref + pass 1b).
-        $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
+        $swapModel = studio_swap_model();
         $this->calls = 1;
         $this->lastModel = null;
 

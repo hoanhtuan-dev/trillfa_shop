@@ -115,7 +115,7 @@
                     <option value="qwen-turbo"></option>
                 </datalist>
                 <div><label class="label">Model dịch prompt (tiếng Việt)</label><input type="text" name="translate_model" value="{{ old('translate_model', $translate_model) }}" class="input !py-2" placeholder="gemini-3.6-flash-image"></div>
-                <div><label class="label">Model Thay Đổi Người Mẫu</label><input type="text" name="swap_model" value="{{ old('swap_model', $swap_model) }}" class="input !py-2" placeholder="qwen-image-edit-plus-2025-12-15"></div>
+                <div><label class="label">Model Thay Đổi Người Mẫu</label><input type="text" name="swap_model" value="{{ old('swap_model', $swap_model) }}" class="input !py-2" placeholder="để trống = dùng model Inpaint (qwen-image-edit-max)"></div>
                 <div><label class="label">Model Thuật sỹ ảo</label><input type="text" name="stylist_model" value="{{ old('stylist_model', $stylist_model) }}" class="input !py-2" placeholder="qwen3.8-flash" list="qwen-chat-models"></div>
                 <div class="sm:col-span-2">
                     <label class="label">Model tạo ảnh</label>

@@ -1,8 +1,11 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
+const now = ref(Date.now()); let _timer = null;
+onMounted(() => { _timer = setInterval(() => { now.value = Date.now(); }, 1000); });
+onBeforeUnmount(() => { if (_timer) clearInterval(_timer); });
 const open = ref(false);
 const models = ref([]), poses = ref([]), bgs = ref([]), assets = ref([]);
 const addType = ref('model'); const addName = ref(''); const addFile = ref(null); const addFileEl = ref(null);
@@ -52,6 +55,11 @@ function toggle(list, id, e) { e.stopPropagation(); const i = list.indexOf(id); 
 const selFaceImgs = computed(() => faceList.value.filter(f => store.swapModelIds.includes(f.id)));
 const selPoseImgs = computed(() => poseList.value.filter(p => store.swapPoseIds.includes(p.id)));
 const canApply = computed(() => !store.swapLoading && store.swapPoseIds.length > 0 && (changeFace.value ? store.swapModelIds.length > 0 : true));
+const elapsedSec = computed(() => store.swapStartTs ? Math.max(0, Math.floor((now.value - store.swapStartTs) / 1000)) : 0);
+const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+const running = computed(() => store.swapStage === 'send' || store.swapStage === 'processing');
+const activeModel = computed(() => { const id = store.swapGenIds[0]; const g = id != null ? store.generations.find((x) => String(x.id) === String(id)) : null; return g ? g.model : ''; });
+const doneCount = computed(() => store.swapGenIds.filter((id) => { const g = store.generations.find((x) => String(x.id) === String(id)); return g && g.status === 'completed'; }).length);
 const hasSelection = computed(() => store.swapModelIds.length > 0 || store.swapPoseIds.length > 0 || !!swapBg.value);
 function resetSelections() {
   store.swapModelIds = [];
@@ -72,17 +80,60 @@ async function addAsset() {
 async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); if (r.ok) { assets.value = assets.value.filter(x => x.id !== a.id); const id = String(a.id); if (store.swapModelIds.includes(id)) { store.swapModelIds = store.swapModelIds.filter(x => x !== id); } if (store.swapPoseIds.includes(id)) { store.swapPoseIds = store.swapPoseIds.filter(x => x !== id); } store.toast('Đã xóa.'); } }
 </script>
 <template>
-  <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.12), rgba(74,122,144,.06));">
-    <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
-    <div v-if="!changeFace || store.swapModelIds.length || store.swapPoseIds.length || swapBg" class="scrollbar-hide mt-2 max-h-40 space-y-1.5 overflow-y-auto text-xs">
-      <div v-if="!changeFace" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><span class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">👩</span><span class="truncate text-cream-100">Giữ nguyên khuôn mặt gốc</span></div>
-      <div v-if="changeFace && store.swapModelIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Khuôn mặt:</span><img v-if="selFaceImgs[0]?.image" :src="selFaceImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">👩</span><span class="truncate text-cream-100">{{ selFaceImgs.map(f=>f.name).join(', ') }}</span></div>
-      <div v-if="store.swapPoseIds.length" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Dáng:</span><img v-if="selPoseImgs[0]?.image" :src="selPoseImgs[0].image" class="h-10 w-8 shrink-0 rounded bg-ink-900 object-cover"><span v-else class="grid h-10 w-8 shrink-0 place-items-center rounded bg-ink-800 text-base">🧍</span><span class="truncate text-cream-100">{{ selPoseImgs.map(p=>p.name).join(', ') }}</span></div>
-      <div v-if="swapBg" class="flex items-center gap-2"><span class="shrink-0 text-cream-300/60">Bối cảnh:</span><span class="truncate text-cream-100">{{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span></div>
+  <div class="card p-4" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.08), rgba(74,122,144,.05));">
+    <div class="flex items-center justify-between gap-2">
+      <div class="min-w-0">
+        <h2 class="font-display text-sm font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>
+        <p class="mt-0.5 text-[11px] text-cream-300/60">{{ changeFace ? 'Thay khuôn mặt + dáng' : 'Giữ nguyên khuôn mặt · chỉ đổi dáng' }}</p>
+      </div>
+      <button v-if="hasSelection && !store.swapLoading && !store.swapProcessing" type="button" @click="resetSelections" class="shrink-0 rounded-full bg-ink-800 px-2.5 py-1 text-[10px] text-cream-300/70 hover:text-red-300" title="Bỏ lựa chọn khuôn mặt / dáng / bối cảnh">↺ Bỏ chọn</button>
     </div>
-    <div class="mt-3 grid grid-cols-2 gap-1.5"><button @click="open=true" class="btn-outline btn-sm">🪄 Đổi người mẫu</button><button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm" title="Bấm để hủy">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal + ' · Hủy') : '⏳ Đang xử lý nền… · Hủy' }}</button><button v-else @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button></div>
-    <div v-if="hasSelection && !store.swapLoading && !store.swapProcessing" class="mt-1.5 flex justify-end"><button type="button" @click="resetSelections" class="text-[11px] text-cream-300/60 underline-offset-2 transition hover:text-red-300 hover:underline" title="Bỏ lựa chọn khuôn mặt / dáng / bối cảnh đã chọn">↺ Bỏ chọn lựa</button></div>
-    <p v-if="!canApply" class="mt-1 text-[10px] text-cream-300/60">{{ changeFace ? 'Chọn 1 khuôn mặt + ít nhất 1 dáng để Áp dụng.' : 'Chọn ít nhất 1 dáng để Áp dụng (khuôn mặt gốc được giữ nguyên).' }}</p>
+    <div v-if="!changeFace || store.swapModelIds.length || store.swapPoseIds.length || swapBg" class="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+      <span v-if="!changeFace" class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-300/80">👩 Giữ nguyên khuôn mặt</span>
+      <span v-if="changeFace && selFaceImgs[0]" class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-300/80">👩 {{ selFaceImgs[0].name }}</span>
+      <span v-for="p in selPoseImgs" :key="p.id" class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-300/80">🧍 {{ p.name }}</span>
+      <span v-if="swapBg" class="rounded-full bg-ink-800 px-2 py-0.5 text-cream-300/80">🖼 {{ bgs.find(b=>b.value===swapBg)?.label || swapBg }}</span>
+    </div>
+    <div class="mt-3 grid grid-cols-2 gap-1.5">
+      <button @click="open=true" class="btn-outline btn-sm">🪄 Chọn</button>
+      <button v-if="store.swapLoading || store.swapProcessing" @click="store.cancelSwap()" class="btn-brand btn-sm">{{ store.swapLoading ? ('⏳ ' + store.swapDone + '/' + store.swapTotal) : '⏳ Đang xử lý' }}</button>
+      <button v-else @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace })" :disabled="!canApply" class="btn-brand btn-sm">Áp dụng</button>
+    </div>
+    <p v-if="!canApply && !running" class="mt-1 text-[10px] text-cream-300/50">{{ changeFace ? 'Chọn 1 khuôn mặt + ít nhất 1 dáng.' : 'Chọn ít nhất 1 dáng.' }}</p>
+
+    <!-- Trạng thái hoạt động (giống Inpaint) -->
+    <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
+      <div class="flex items-center gap-2 text-xs text-brand-100">
+        <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-300 border-t-transparent"></span>
+        <span class="font-semibold">{{ store.swapStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang đổi người mẫu…' }}</span>
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-cream-200/80">
+        <span>⏱ <b>{{ fmt(elapsedSec) }}</b></span>
+        <span>{{ doneCount }}/{{ store.swapGenIds.length || store.swapTotal }} dáng</span>
+        <span v-if="activeModel">Model: {{ activeModel }}</span>
+        <button @click="store.cancelSwap()" class="ml-auto rounded-full bg-red-600/25 px-2.5 py-1 font-semibold text-red-200 hover:bg-red-600">✕ Hủy</button>
+      </div>
+      <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full animate-pulse rounded-full bg-brand-400" style="width:60%"></div></div>
+    </div>
+
+    <div v-if="store.swapStage === 'done'" class="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
+      ✅ Đã đổi xong — kết quả đã được in vào layer canvas.
+      <button @click="store.clearSwapStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+    </div>
+
+    <div v-if="store.swapStage === 'error' && store.swapError" class="mt-3 rounded-2xl border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
+      <p class="font-semibold">⚠️ Thay đổi người mẫu thất bại</p>
+      <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.swapError }}</p>
+      <div class="mt-2 flex gap-2">
+        <button @click="store.runSwap({ background: swapBg, tone: swapTone, change_face: changeFace })" class="btn-brand btn-sm">🔄 Thử lại</button>
+        <button @click="store.clearSwapStatus()" class="btn-ghost btn-sm">Đóng</button>
+      </div>
+    </div>
+
+    <div v-if="store.swapStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
+      🛑 Đã hủy yêu cầu đổi người mẫu.
+      <button @click="store.clearSwapStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
+    </div>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
         <div class="mb-4 flex items-center gap-3 rounded-2xl border p-3" :class="changeFace ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700 bg-ink-800/50'">
           <div class="min-w-0 flex-1">

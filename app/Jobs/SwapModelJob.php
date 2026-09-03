@@ -32,13 +32,17 @@ class SwapModelJob implements ShouldQueue
             return;
         }
 
-        $generation->update(['status' => 'processing']);
+        // CAS: chỉ người đầu tiên chuyển pending->processing được xử lý — tránh chạy đúp giữa
+        // queue worker và đường xử lý lazy trong show() (khi worker không chạy).
+        $claimed = Generation::where('id', $this->generationId)
+            ->where('status', 'pending')
+            ->update(['status' => 'processing']);
+
+        if (! $claimed) {
+            return;
+        }
 
         try {
-            if ($generation->fresh()->status === 'cancelled') {
-                return;
-            }
-
             app(StudioController::class)->executeSwapFromGeneration($generation);
 
             logger()->info('Swap job completed', [

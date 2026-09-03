@@ -175,6 +175,17 @@ if (! function_exists('studio_config')) {
     }
 }
 
+if (! function_exists('studio_swap_model')) {
+    function studio_swap_model(): string
+    {
+        // "Thay Đổi Người Mẫu" dùng CHUNG model edit với Inpaint (qwen_edit_model) khi chưa cấu hình
+        // swap_model riêng — tránh fallback sang model không tồn tại (vd qwen-image-edit-plus-2025-12-15).
+        $explicit = studio_config('swap_model', '');
+
+        return $explicit !== '' ? (string) $explicit : (string) studio_config('qwen_edit_model', 'qwen-image-edit-max');
+    }
+}
+
 if (! function_exists('studio_api_key')) {
     /**
      * Read a provider API key. Prefers the encrypted DB value managed from the

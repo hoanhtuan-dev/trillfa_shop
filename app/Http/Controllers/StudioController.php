@@ -618,16 +618,29 @@ RULES:
             // polling client disconnects (ignore_user_abort) so a slow provider isn't killed mid-run.
             set_time_limit(600);
             ignore_user_abort(true);
-            $generation->update(['status' => 'processing']);
-            try {
-                if ($generation->type === 'video') {
-                    RenderVideoJob::dispatchSync($generation->id);
-                } else {
-                    RenderImageJob::dispatchSync($generation->id);
+            if (($generation->meta['swap'] ?? false) === true) {
+                // Swap: CAS claim pending->processing rồi chạy pipeline inline — không phụ thuộc queue worker.
+                $claimed = \App\Models\Generation::where('id', $generation->id)->where('status', 'pending')->update(['status' => 'processing']);
+                if ($claimed) {
+                    try {
+                        app(StudioController::class)->executeSwapFromGeneration($generation);
+                    } catch (\Throwable $e) {
+                        logger()->error('Lazy swap failed for generation #'.$generation->id.': '.$e->getMessage());
+                        $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
+                    }
                 }
-            } catch (\Throwable $e) {
-                logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
-                $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
+            } else {
+                $generation->update(['status' => 'processing']);
+                try {
+                    if ($generation->type === 'video') {
+                        RenderVideoJob::dispatchSync($generation->id);
+                    } else {
+                        RenderImageJob::dispatchSync($generation->id);
+                    }
+                } catch (\Throwable $e) {
+                    logger()->error('Lazy process failed for generation #'.$generation->id.': '.$e->getMessage());
+                    $generation->update(['status' => 'failed', 'error' => $e->getMessage()]);
+                }
             }
         }
 
@@ -1851,7 +1864,7 @@ RULES:
             return app(\App\Services\ImageAIService::class)->swapEdit(
                 $prompt,
                 $url,
-                (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'),
+                studio_swap_model(),
                 null,
                 null
             );
@@ -1900,7 +1913,7 @@ RULES:
             $out = app(\App\Services\ImageAIService::class)->swapEdit(
                 $prompt,
                 '/storage/'.$tmp,
-                (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15'),
+                studio_swap_model(),
                 null,
                 null
             );
@@ -2237,7 +2250,7 @@ RULES:
         // Pose reference image: prefer the client-sent one, fall back to the pose catalog image
         // (custom asset / DB preset / built-in sample) so the model can actually replicate the pose.
         $poseRefUrl = (string) ($data['pose_ref'] ?? '') ?: (string) ($pose['image'] ?? '');
-        $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
+        $swapModel = studio_swap_model();
 
         // The long AI pipeline (try-on + optional face-swap, ~1-3 min per pose) runs in the background
         // queue (SwapModelJob) so this request returns immediately — a synchronous 2-pass swap gets
@@ -2294,7 +2307,7 @@ RULES:
             $changeFace,
         );
         if (! $fallback) {
-            $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.(string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15').'” và key Qwen Edit (Pay-As-You-Go).']);
+            $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.studio_swap_model().'” và key Qwen Edit (Pay-As-You-Go).']);
             return;
         }
 
@@ -2346,7 +2359,7 @@ RULES:
         $garmentDesc = $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? '')) : 'giữ nguyên khuôn mặt gốc';
         $qaScores = $this->scoreSwapResult($fallback, $garmentDesc);
 
-        $swapModel = (string) studio_config('swap_model', 'qwen-image-edit-plus-2025-12-15');
+        $swapModel = studio_swap_model();
         $actualModel = $svc->lastModel() ?: $swapModel;
         $credits = max(1, $svc->calls()); // 2-3 for the try-on + face-swap + background passes, 1 otherwise
 
@@ -2833,7 +2846,7 @@ RULES:
             'qwen_vision_models' => setting('studio_qwen_vision_models', ''),
             'qwen_text_models' => setting('studio_qwen_text_models', ''),
             'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
-            'swap_model' => setting('studio_swap_model', config('studio.swap_model')),
+            'swap_model' => setting('studio_swap_model', ''), // '' = dùng chung qwen_edit_model
             'stylist_model' => setting('studio_stylist_model', config('studio.stylist_model')),
             'image_model' => setting('studio_image_model', config('studio.image_model')),
             'wan_model' => setting('studio_wan_model', config('studio.wan_model')),

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 const store = useStudioStore();
 
@@ -21,10 +21,54 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
 
 // Bấm ngoài box (container) → tạo vùng mới; brush → vẽ mask.
 function onPointerDown(e) { store.inpaintMaskStart(e); }
+
+// ── Brush: canvas overlay THẬT phủ đúng vùng ảnh hiển thị (nét vẽ hiện ngay, đỏ 70%) ──
+// canvasMetrics đọc DOM rect → không tự reactive theo zoom/pan. metricsTick là "cái neo"
+// reactive: mỗi lần zoom/pan/đổi ảnh, sau khi Vue render xong ta bump → computed chạy lại
+// với rect mới → overlay luôn bám đúng vùng ảnh hiển thị.
+const metricsTick = ref(0);
+const brushCanvas = ref(null);
+const brushOverlayStyle = computed(() => {
+  void metricsTick.value; // neo reactive
+  const m = store.canvasMetrics();
+  if (!m || store.inpaintMaskMode !== 'brush') return { display: 'none' };
+  return {
+    left: (m.vx / m.crW * 100) + '%',
+    top: (m.vy / m.crH * 100) + '%',
+    width: (m.vw / m.crW * 100) + '%',
+    height: (m.vh / m.crH * 100) + '%',
+  };
+});
+
+let attachedEl = null; // canvas hiện đang gắn — tránh clearRect xoá nét đã vẽ khi re-attach
+function attachBrush(forceClear = false) {
+  const el = store.inpaintMaskMode === 'brush' ? (brushCanvas.value || null) : null;
+  if (el && el === attachedEl && !forceClear) return; // cùng canvas → giữ nét đã vẽ
+  store.attachBrushCanvas(el);
+  attachedEl = el; // attachBrushCanvas luôn clearRect trên element mới
+}
+
+// Bật/tắt brush mode → gắn / gỡ canvas
+watch(() => store.inpaintMaskMode, () => { metricsTick.value++; nextTick(() => attachBrush()); });
+// Đổi ảnh nguồn → canvas giữ element nhưng phải XOÁ nét cũ (mask cũ không còn hợp lệ)
+watch(() => store.upscaleSrc, () => {
+  if (store.inpaintMaskMode !== 'brush') return;
+  store.attachBrushCanvas(null); attachedEl = null;
+  store.inpaintBrushData = '';
+  nextTick(() => { metricsTick.value++; attachBrush(true); });
+});
+// Zoom/pan → chỉ cập nhật vị trí overlay (KHÔNG clear nét)
+watch([() => store.zoom, () => store.pan], () => { nextTick(() => { metricsTick.value++; }); });
+onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; });
 </script>
 <template>
   <div v-if="visible" class="absolute inset-0 z-31 cursor-crosshair" style="touch-action:none"
        @pointerdown="onPointerDown">
+    <!-- Brush overlay canvas: hiển thị nét vẽ mask (đỏ 70%) ngay trên ảnh -->
+    <canvas v-if="store.inpaintMaskMode === 'brush' && store.upscaleSrc" ref="brushCanvas"
+            :width="512" :height="512"
+            class="pointer-events-none absolute z-10 rounded-lg"
+            :style="brushOverlayStyle"></canvas>
 
     <!-- Rect: box + handles tự bắt pointerdown với KEY TƯỜNG MINH (.stop) — giống crop,
          kéo/di chuyển không bao giờ nhầm lẫn hay mất vùng -->

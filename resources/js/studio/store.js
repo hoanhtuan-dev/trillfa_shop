@@ -70,6 +70,10 @@ export const useStudioStore = defineStore('studio', {
     swapAbort: null,  // AbortController for cancel
     swapProcessing: false, // true while polling the background queue results
     _swapStop: false,     // flag to stop the background-result polling
+    swapStage: '',        // '' | 'send' | 'processing' | 'done' | 'error' | 'cancelled' (giống Inpaint)
+    swapError: '',        // lỗi cuối của swap
+    swapStartTs: 0,       // timestamp bắt đầu (đếm thời gian)
+    swapGenIds: [],       // generation ids của lần chạy hiện tại
     inpainting: false,
     inpaintPrompt: '',
     // Inpaint progress/status state (rõ ràng cho người dùng)
@@ -717,16 +721,26 @@ export const useStudioStore = defineStore('studio', {
       this._inpaintMaskCanvas = c;
       this._inpaintMaskCtx = c.getContext('2d');
     },
+    // Gắn canvas DOM thật (overlay trên ảnh) làm nơi vẽ mask → nét vẽ HIỂN THỊ realtime.
+    // Khi tắt brush (el = null) → gỡ tham chiếu để không vẽ vào element đã unmount.
+    attachBrushCanvas(el) {
+      if (!el) { this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; return; }
+      const c = markRaw(el);
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      this._inpaintMaskCanvas = c;
+      this._inpaintMaskCtx = ctx;
+    },
     _drawInpaintBrushDot(p) {
       const c = this._inpaintMaskCtx; if (!c) return;
       const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
-      c.fillStyle = 'rgba(200,20,20,0.48)';
+      c.fillStyle = 'rgba(220,38,38,0.7)'; // đỏ, opacity 70% — nhìn rõ vùng mask trên ảnh
       c.beginPath(); c.arc(p.nx * w, p.ny * h, 12, 0, Math.PI * 2); c.fill();
     },
     _drawInpaintBrushLine(from, to) {
       const c = this._inpaintMaskCtx; if (!c) return;
       const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
-      c.strokeStyle = 'rgba(200,20,20,0.48)';
+      c.strokeStyle = 'rgba(220,38,38,0.7)';
       c.lineWidth = 24; c.lineCap = 'round'; c.lineJoin = 'round';
       c.beginPath(); c.moveTo(from.nx * w, from.ny * h); c.lineTo(to.nx * w, to.ny * h); c.stroke();
     },
@@ -760,6 +774,11 @@ export const useStudioStore = defineStore('studio', {
       if (!this.swapPoseIds.length) { this.toast('Chọn ít nhất 1 dáng trước.', 'error'); return; }
       const face = changeFace ? this.swapModelIds[0] : '';
       const poses = [...this.swapPoseIds];
+      // Trạng thái hoạt động (giống Inpaint) — hiển thị tiến trình trong card.
+      this.swapStage = 'send';
+      this.swapError = '';
+      this.swapStartTs = Date.now();
+      this.swapGenIds = [];
       // P0: keep explicit 0 values (slider minimums) — never coerce 0 back into a default.
       const toInt = (v, dflt) => (v != null && Number.isFinite(Number(v)) ? Number(v) : dflt);
 
@@ -791,56 +810,67 @@ export const useStudioStore = defineStore('studio', {
       this.swapLoading = false;
       this.swapAbort = null;
       this.swapDone = 0; this.swapTotal = 0;
-      if (n > 0) { this.toast('Đã gửi ' + n + ' dáng vào hàng đợi xử lý…'); this.refreshSwapResults(createdIds); }
-      else { this.toast(lastErr || 'Lỗi thay đổi người mẫu.', 'error'); }
+      if (abort.signal.aborted) {
+        this.swapStage = 'cancelled';
+      } else if (n > 0) {
+        this.swapGenIds = createdIds;
+        this.swapStage = 'processing';
+        this.toast('Đã gửi ' + n + ' dáng vào hàng đợi xử lý…');
+        this.refreshSwapResults(createdIds);
+      } else {
+        this.swapStage = 'error';
+        this.swapError = lastErr || 'Lỗi thay đổi người mẫu.';
+        this.toast(this.swapError, 'error');
+      }
     },
-    // Poll /studio/latest until the just-submitted swap generations finish (the queue worker fills them in).
+    // Poll từng generation qua /studio/generations/{id} (show) — GIỐNG Inpaint: vừa trả trạng thái
+    // vừa kích lazy xử lý nếu còn pending, nên swap không còn phụ thuộc duy nhất vào queue worker.
     async refreshSwapResults(ids) {
       this.swapProcessing = true;
       this._swapStop = false;
-      const deadline = Date.now() + 300000; // wait up to 5 min
-      while (Date.now() < deadline) {
-        if (this._swapStop) { break; }
-        await new Promise((r) => setTimeout(r, 5000));
-        try {
-          const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
-          const d = await res.json();
-          const items = Array.isArray(d.items) ? d.items : [];
-          items.forEach((it) => {
-            const idx = this.generations.findIndex((g) => String(g.id) === String(it.id));
-            if (idx >= 0 && it.status) {
-              const g = this.generations[idx];
-              if (g.status !== it.status || (it.media_url && g.media_url !== it.media_url)) {
-                this.generations[idx] = { ...g, status: it.status, media_url: it.media_url || g.media_url, error: it.error, model: it.model || g.model };
-                if (it.status === 'completed' && it.media_url) {
-                  this.previewId = it.id;
-                  this.preview = { id: it.id, media_url: it.media_url, type: 'image', status: 'completed' };
-                  this.syncLayerForGen(it.id, it.media_url, 'Ảnh #' + it.id, true);
-                }
-              }
+      this.swapStage = 'processing';
+      const pending = new Set(ids.map(String));
+      const deadline = Date.now() + 300000; // tối đa 5 phút
+      while (pending.size > 0 && Date.now() < deadline) {
+        if (this._swapStop) break;
+        await new Promise((r) => setTimeout(r, 3000));
+        for (const id of [...pending]) {
+          if (this._swapStop) break;
+          try {
+            const res = await fetch('/studio/generations/' + id, { headers: { Accept: 'application/json' } });
+            if (!res.ok) continue;
+            const g = await res.json();
+            const idx = this.generations.findIndex((x) => String(x.id) === String(id));
+            if (idx >= 0) {
+              this.generations[idx] = { ...this.generations[idx], status: g.status, media_url: g.media_url, error: g.error, model: g.model || this.generations[idx].model };
             }
-          });
-        } catch (e) { /* transient — keep polling */ }
-        const done = ids.every((id) => {
-          const g = this.generations.find((x) => String(x.id) === String(id));
-          return !g || g.status === 'completed' || g.status === 'failed' || g.status === 'cancelled';
-        });
-        if (done) { this.toast('Đã xong thay đổi người mẫu.'); break; }
+            if (g.status === 'completed' && g.media_url) {
+              this.previewId = g.id;
+              this.preview = { id: g.id, media_url: g.media_url, type: 'image', status: 'completed' };
+              this.syncLayerForGen(g.id, g.media_url, 'Ảnh #' + g.id, true);
+              pending.delete(id);
+            } else if (['failed', 'cancelled'].includes(g.status)) {
+              pending.delete(id);
+              if (g.status === 'failed' && g.error && !this.swapError) this.swapError = g.error;
+            }
+          } catch (e) { /* transient */ }
+        }
       }
-      // Pass cuối: kết quả hoàn tất sau deadline (queue lâu) vẫn được in vào layer canvas
-      // (trừ khi người dùng đã bấm Hủy).
-      const stopped = this._swapStop;
-      if (!stopped) {
-        try {
-          const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
-          const d = await res.json();
-          const items = Array.isArray(d.items) ? d.items : [];
-          items.forEach((it) => {
-            if (it.status === 'completed' && it.media_url && ids.some((x) => String(x) === String(it.id))) {
-              this.syncLayerForGen(it.id, it.media_url, 'Ảnh #' + it.id, false);
-            }
-          });
-        } catch (e) { /* bỏ qua */ }
+      const statusOf = (id) => { const g = this.generations.find((x) => String(x.id) === String(id)); return g ? g.status : null; };
+      const allDone = ids.every((id) => { const s = statusOf(id); return !s || ['completed', 'failed', 'cancelled'].includes(s); });
+      const anyOk = ids.some((id) => statusOf(id) === 'completed');
+      if (allDone) {
+        if (anyOk) {
+          this.swapStage = 'done';
+          this.toast('Đã xong thay đổi người mẫu.');
+        } else {
+          this.swapStage = 'error';
+          if (!this.swapError) this.swapError = 'Không tạo được phiên bản người mẫu nào.';
+          this.toast(this.swapError, 'error');
+        }
+      } else if (!this._swapStop) {
+        // Hết thời gian poll nhưng vẫn còn chạy → không ép lỗi, kết quả sẽ về qua load()/click Output.
+        this.toast('Còn dáng đang xử lý — theo dõi trong Outputs.');
       }
       this.swapProcessing = false;
       this._swapStop = false;
@@ -849,7 +879,9 @@ export const useStudioStore = defineStore('studio', {
       if (this.swapAbort) { this.swapAbort.abort(); }
       if (this.swapProcessing) { this._swapStop = true; this.swapProcessing = false; }
       this.swapLoading = false;
+      this.swapStage = 'cancelled';
       this.toast('Đã hủy.');
     },
+    clearSwapStatus() { this.swapStage = ''; this.swapError = ''; this.swapGenIds = []; this.swapStartTs = 0; },
   },
 });
