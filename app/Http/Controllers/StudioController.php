@@ -428,10 +428,10 @@ class StudioController extends Controller
             $finalPrompt .= ' '.$userPrompt;
         } elseif ($isFaceSwap) {
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
-            $finalPrompt = 'Swap ONLY the facial features of the person in @image1 to match the face in @image2 — take ONLY @image2\'s facial features, hairstyle, ears and identity, and do NOT copy @image2\'s head size, neck, shoulders or background. '
-                .'Keep the head size IDENTICAL to the original head in @image1 — do NOT enlarge, do NOT shrink, do NOT change the head size at all. '
+            $finalPrompt = 'Swap the ENTIRE head of @image1 — face, hairstyle, ears, forehead, jawline, head shape and neck — to match @image2\'s identity and hairstyle. '
+                .'Keep the head SIZE and POSITION exactly the same as @image1 — do NOT copy @image2\'s head size, do NOT enlarge or shrink. '
                 .'Do NOT paste, stamp, overlay or collage the @image2 photo on top. Blend skin tone, hairline and lighting seamlessly with no visible seam, border or patch edge. '
-                .'Keep the neck, shoulders, body, garment, pose, background and composition of @image1 exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
+                .'Keep the body, garment, pose, background and composition of @image1 exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
                 .'The FIRST image is the main base (keep its subject and overall layout). '
