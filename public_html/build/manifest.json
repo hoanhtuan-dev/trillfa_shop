@@ -6,8 +6,8 @@
       "_pinia-CAT5I3kk.js"
     ]
   },
-  "_StylistDataManager-C-5M_G4t.js": {
-    "file": "assets/StylistDataManager-C-5M_G4t.js",
+  "_StylistDataManager-BIPdcled.js": {
+    "file": "assets/StylistDataManager-BIPdcled.js",
     "name": "StylistDataManager",
     "imports": [
       "_pinia-CAT5I3kk.js"
@@ -101,14 +101,14 @@
     "isEntry": true
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DBdQxcJL.js",
+    "file": "assets/app-CkT3-n6w.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CAT5I3kk.js",
       "_GalleryModal-BRXedV67.js",
-      "_StylistDataManager-C-5M_G4t.js"
+      "_StylistDataManager-BIPdcled.js"
     ],
     "css": [
       "assets/app-BuljbeZw.css"
@@ -134,13 +134,13 @@
     ]
   },
   "resources/js/studio/stylist-data.js": {
-    "file": "assets/stylist-data-BkCVb651.js",
+    "file": "assets/stylist-data-CUh4J3p2.js",
     "name": "stylist-data",
     "src": "resources/js/studio/stylist-data.js",
     "isEntry": true,
     "imports": [
       "_pinia-CAT5I3kk.js",
-      "_StylistDataManager-C-5M_G4t.js"
+      "_StylistDataManager-BIPdcled.js"
     ]
   }
 }

@@ -15,6 +15,9 @@ const typeForm = ref({ id: null, slug: '', name: '', emoji: '', color: '#4a7a90'
 const editingType = ref(false);
 const qForm = ref({ id: null, key: '', q: '', optsText: '' });
 const editingQuestion = ref(false);
+const confirmOpen = ref(false);
+const confirmMsg = ref('');
+const confirmAction = ref(null);
 
 function flash(msg, type = 'info') { toast.value = msg; toastType.value = type; setTimeout(() => { toast.value = ''; }, 2400); }
 
@@ -41,6 +44,9 @@ async function del(url) {
   const r = await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } });
   if (!r.ok) throw new Error('Lỗi xóa.');
 }
+function askConfirm(msg, action) { confirmMsg.value = msg; confirmAction.value = action; confirmOpen.value = true; }
+function doConfirm() { confirmOpen.value = false; const fn = confirmAction.value; confirmAction.value = null; if (typeof fn === 'function') fn(); }
+function cancelConfirm() { confirmOpen.value = false; confirmAction.value = null; }
 
 function newType() { typeForm.value = { id: null, slug: '', name: '', emoji: '', color: '#4a7a90' }; editingType.value = true; tab.value = 'types'; }
 function editType(t) { typeForm.value = { id: t.id, slug: t.slug, name: t.name, emoji: t.emoji || '', color: t.color || '#4a7a90' }; editingType.value = true; tab.value = 'types'; }
@@ -53,9 +59,10 @@ async function saveType() {
   } catch (e) { flash(e.message, 'error'); }
   finally { saving.value = false; }
 }
-async function deleteType(t) {
-  if (!window.confirm('Xóa loại "' + t.name + '"?')) return;
-  try { await del('/studio/stylist-data/types/' + t.id); flash('Đã xóa.'); await load(); } catch (e) { flash(e.message, 'error'); }
+function deleteType(t) {
+  askConfirm('Xóa loại trang phục "' + t.name + '"? Thao tác này không thể hoàn tác.', async () => {
+    try { await del('/studio/stylist-data/types/' + t.id); flash('Đã xóa.'); await load(); } catch (e) { flash(e.message, 'error'); }
+  });
 }
 
 function newQuestion() { qForm.value = { id: null, key: '', q: '', optsText: '' }; editingQuestion.value = true; tab.value = 'questions'; }
@@ -70,9 +77,10 @@ async function saveQuestion() {
   } catch (e) { flash(e.message, 'error'); }
   finally { saving.value = false; }
 }
-async function deleteQuestion(q) {
-  if (!window.confirm('Xóa câu hỏi "' + q.key + '"?')) return;
-  try { await del('/studio/stylist-data/questions/' + q.id); flash('Đã xóa.'); await load(); } catch (e) { flash(e.message, 'error'); }
+function deleteQuestion(q) {
+  askConfirm('Xóa câu hỏi "' + q.key + '"? Thao tác này không thể hoàn tác.', async () => {
+    try { await del('/studio/stylist-data/questions/' + q.id); flash('Đã xóa.'); await load(); } catch (e) { flash(e.message, 'error'); }
+  });
 }
 </script>
 <template>
@@ -151,6 +159,18 @@ Chiffon mỏng nhẹ"></textarea></div>
         <div class="mt-3 flex justify-end gap-2">
           <button @click="cancelQuestion" class="btn-outline btn-sm">Huỷ</button>
           <button @click="saveQuestion" :disabled="saving" class="btn-brand btn-sm">{{ saving ? 'Đang lưu…' : '💾 Lưu' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm xóa (modal riêng, không dùng window.confirm) -->
+    <div v-if="confirmOpen" class="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" @click.self="cancelConfirm">
+      <div class="w-full max-w-sm rounded-2xl border border-red-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+        <p class="mb-2 text-sm font-semibold text-cream-100">⚠️ Xác nhận xóa</p>
+        <p class="mb-4 text-xs leading-relaxed text-cream-200">{{ confirmMsg }}</p>
+        <div class="flex justify-end gap-2">
+          <button @click="cancelConfirm" class="btn-outline btn-sm">Huỷ</button>
+          <button @click="doConfirm" class="rounded-xl bg-red-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500">🗑 Xóa</button>
         </div>
       </div>
     </div>

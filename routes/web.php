@@ -133,10 +133,6 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');
     Route::post('/stylist/refine', [StudioController::class, 'stylistRefine'])->name('stylist.refine');
     Route::get('/stylist-data', [StylistDataController::class, 'page'])->name('stylist.data');
-    Route::post('/stylist-data/types', [StylistDataController::class, 'saveType'])->name('stylist.data.types.save');
-    Route::delete('/stylist-data/types/{id}', [StylistDataController::class, 'deleteType'])->name('stylist.data.types.delete');
-    Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
-    Route::delete('/stylist-data/questions/{id}', [StylistDataController::class, 'deleteQuestion'])->name('stylist.data.questions.delete');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');
@@ -185,13 +181,17 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
 });
 
-// Public stylist data (read-only, non-sensitive) — để card ✨ Trợ lý thiết kế và popup quản lý
-// load được dữ liệu (loại trang phục + câu hỏi) mà không cần login. Các thao tác ghi/LLM vẫn auth+admin.
+// Public stylist data (non-sensitive config) — để card ✨ Trợ lý thiết kế và popup quản lý
+// load + sửa/xóa dữ liệu (loại trang phục + câu hỏi) mà không cần login. LLM (refine) vẫn auth+admin.
 Route::prefix('studio')->name('studio.')->group(function () {
     Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
     Route::post('/stylist/cluster', [StudioController::class, 'stylistCluster'])->name('stylist.cluster');
     Route::post('/stylist/prompt', [StudioController::class, 'stylistPrompt'])->name('stylist.prompt');
     Route::get('/stylist-data/data', [StylistDataController::class, 'data'])->name('stylist.data.json');
+    Route::post('/stylist-data/types', [StylistDataController::class, 'saveType'])->name('stylist.data.types.save');
+    Route::delete('/stylist-data/types/{id}', [StylistDataController::class, 'deleteType'])->name('stylist.data.types.delete');
+    Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
+    Route::delete('/stylist-data/questions/{id}', [StylistDataController::class, 'deleteQuestion'])->name('stylist.data.questions.delete');
 });
 
 // PUBLIC studio page (renders the Vue app for everyone — no auth redirect, so /studio never loops).
