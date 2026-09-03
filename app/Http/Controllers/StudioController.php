@@ -2102,8 +2102,10 @@ RULES:
                         }
                     }
                 }
-                // 404/not-found -> try next vision model
-                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')) {
+                // 404/429/5xx -> thử model vision kế tiếp (backoff nhẹ khi rate-limit, không bỏ cuộc ngay).
+                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')
+                    || $resp->status() === 429 || $resp->status() >= 500) {
+                    if ($resp->status() === 429) { sleep(2); }
                     continue;
                 }
                 logger()->warning('QA scoring failed', ['model' => $model, 'status' => $resp->status()]);

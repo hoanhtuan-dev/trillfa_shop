@@ -276,9 +276,10 @@ class VirtualTryOnService
 
         // KHÔNG có bất kỳ prompt/hậu kỳ "vân vải/texture" nào — model chỉ cần sao chép nguyên bản vải từ ảnh nguồn.
         $garmentLock = 'The clothing and ACCESSORIES shown in the image are the PRODUCT of this edit: they must appear in the result EXACTLY as they are — identical garment, same colors (exact hue, saturation and brightness; do NOT shift, tint, darken or re-grade any color), silhouette, length, seams, folds and fabric type. '
+            .'Compose the outfit correctly on the model: tops on the torso, bottoms/dress/skirt on the lower body, jacket/coat over the top — matching the source garment(s) exactly. '
             .'Keep every print, pattern, embroidery, logo, button and zipper exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
             .'If the fabric is PLAIN or SOLID color, keep it PLAIN and SOLID — do NOT invent or add any pattern, print, motif, embroidery or logo that is not in the source image. '
-            .'ALL accessories must be worn/carried correctly and EXACTLY as shown — do NOT omit ANY accessory: watch on wrist, handbag on shoulder or in hand, shoes on feet, earrings on ears, belt at waist, hat on head — matching their color, style and material. '
+            .'ALL accessories must be worn/carried in their EXACT anatomical position — watch STRICTLY on the wrist (never on the shoulder, arm or anywhere else), handbag held in hand or on shoulder, shoes STRICTLY on the feet, earrings on the ears, belt at the waist, hat on the head. Do NOT omit, move, or swap the position of ANY accessory. '
             .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. ';
 
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
@@ -449,7 +450,11 @@ class VirtualTryOnService
                         }
                     }
                 }
-                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')) { continue; }
+                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')
+                    || $resp->status() === 429 || $resp->status() >= 500) {
+                    if ($resp->status() === 429) { sleep(2); }
+                    continue;
+                }
             } catch (\Throwable $e) { /* next model */ }
         }
         return null;
