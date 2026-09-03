@@ -10,6 +10,8 @@ const showTemplates = ref(false);
 const showPresets = ref(false);
 const presets = ref([]);
 const presetsLoading = ref(false);
+const presetTypes = ref([]);
+const presetType = ref('');
 const showEnrich = ref(false);
 const history = ref([]);
 const historyLoading = ref(false);
@@ -251,12 +253,21 @@ function applyTemplate(tpl) {
 async function loadPresets() {
   presetsLoading.value = true;
   try {
-    const r = await fetch('/studio/stylist/presets', { headers: { Accept: 'application/json' } });
-    const d = await r.json();
-    presets.value = d.presets || d.items || [];
-  } catch (e) { presets.value = []; }
+    const [tRes, pRes] = await Promise.all([
+      fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }),
+      fetch('/studio/stylist/presets', { headers: { Accept: 'application/json' } }),
+    ]);
+    const tD = await tRes.json();
+    const pD = await pRes.json();
+    presetTypes.value = tD.types || tD.items || [];
+    presets.value = pD.presets || pD.items || [];
+  } catch (e) { presets.value = []; presetTypes.value = []; }
   finally { presetsLoading.value = false; }
 }
+const filteredPresets = computed(() => {
+  if (!presetType.value) return presets.value;
+  return presets.value.filter((p) => p.type === presetType.value);
+});
 function applyPreset(p) {
   if (p.prompt) store.imagePromptEn = p.prompt;
   showPresets.value = false;
@@ -372,15 +383,20 @@ async function doEnrichPreview() {
               <span class="text-sm font-semibold text-brand-300">✨ Preset — Prompt đã lưu</span>
               <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white">✕</button>
             </div>
+            <!-- Lọc theo loại trang phục -->
+            <div class="mb-3 flex flex-wrap gap-1.5">
+              <button @click="presetType = ''" :class="presetType === '' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition">Tất cả</button>
+              <button v-for="t in presetTypes" :key="t.id" @click="presetType = t.id" :class="presetType === t.id ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition">{{ t.emoji }} {{ t.name }}</button>
+            </div>
             <p v-if="presetsLoading" class="py-6 text-center text-xs text-cream-300/60">⏳ Đang tải preset…</p>
-            <div v-else-if="!presets.length" class="py-6 text-center text-xs text-cream-300/50">Chưa có preset — dùng ✨ Trợ lý thiết kế để tạo prompt, nó sẽ tự lưu tại đây.</div>
+            <div v-else-if="!filteredPresets.length" class="py-6 text-center text-xs text-cream-300/50">Chưa có preset cho lựa chọn này — dùng ✨ Trợ lý thiết kế để tạo prompt, nó sẽ tự lưu tại đây.</div>
             <div v-else class="space-y-2">
-              <button v-for="p in presets" :key="p.id" @click="applyPreset(p)" class="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
+              <button v-for="p in filteredPresets" :key="p.id" @click="applyPreset(p)" class="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
                 <span class="block text-sm font-semibold text-cream-100">{{ p.name }}</span>
                 <span class="mt-1 block text-[11px] leading-snug text-cream-300/50 line-clamp-2">{{ p.prompt }}</span>
               </button>
             </div>
-            <p class="mt-3 text-[10px] text-cream-300/40">Prompt tạo bằng ✨ Trợ lý thiết kế sẽ được lưu tự động; chọn 1 preset để điền vào ô prompt.</p>
+            <p class="mt-3 text-[10px] text-cream-300/40">Prompt tạo bằng ✨ Trợ lý thiết kế được lưu tự động theo loại trang phục; chọn 1 preset để điền vào ô prompt.</p>
           </div>
         </div>
 

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 import CompareSlider from './CompareSlider.vue';
+import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
 
 const beforeUrl = ref('');   // ảnh gốc trước khi sửa (để so sánh)
@@ -11,13 +12,32 @@ function submitInpaint() {
   store.inpaint(store.inpaintPrompt);
 }
 
-// Chip nhanh: render nhiều góc chụp từ 1 ảnh (thời trang) — bảo tồn chi tiết gốc
-function renderMultiView() {
-  const img = store.upscaleSrc || store.preview?.media_url;
+// ── Render đa góc: 4 slot tương ứng 4 góc chụp, người dùng bật/tắt + chỉnh prompt từng góc ──
+const mvOpen = ref(false);
+const mvBusy = ref(false);
+const mvViews = ref([
+  { id: 'front', icon: '🧍', label: 'Chính diện', enabled: true, prompt: 'full-body front view, facing straight ahead' },
+  { id: 'back', icon: '🔙', label: 'Mặt sau', enabled: true, prompt: 'full-body back view' },
+  { id: 'side', icon: '↔️', label: 'Nghiêng 45°', enabled: true, prompt: '45-degree side view, three-quarter angle' },
+  { id: 'detail', icon: '🔍', label: 'Cận cảnh chi tiết', enabled: true, prompt: 'close-up detail of the fabric texture and stitching' },
+]);
+const mvCount = computed(() => mvViews.value.filter(v => v.enabled).length);
+const srcImg = computed(() => store.upscaleSrc || store.preview?.media_url || '');
+
+async function runMultiView() {
+  const img = srcImg.value;
   if (!img) { store.toast('Chọn một ảnh để render đa góc.', 'error'); return; }
-  store.reimagine(img,
-    'tạo nhiều góc chụp khác nhau của sản phẩm thời trang (chính diện, mặt sau, nghiêng 45°, cận cảnh chi tiết chất liệu), giữ nguyên sản phẩm, màu sắc, chất liệu, tỷ lệ và mọi chi tiết — không mất chi tiết, nét căng, ánh sáng studio chuyên nghiệp',
-    85, 4);
+  const enabled = mvViews.value.filter(v => v.enabled);
+  if (!enabled.length) { store.toast('Chọn ít nhất 1 góc chụp.', 'error'); return; }
+  mvBusy.value = true;
+  for (const v of enabled) {
+    await store.reimagine(img,
+      'render this fashion product at a new camera angle — ' + v.prompt + '. Keep the product, color, material, proportions and every detail exactly unchanged, no detail loss, crisp sharp, professional studio lighting',
+      85, 1);
+  }
+  mvBusy.value = false;
+  mvOpen.value = false;
+  store.toast('Đã render ' + enabled.length + ' góc chụp.');
 }
 
 const now = ref(Date.now());
@@ -98,12 +118,44 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <div class="mt-3">
       <p class="text-[10px] font-semibold text-cream-300/70">✨ Gợi ý nhanh</p>
       <div class="mt-1.5 flex flex-wrap gap-1.5">
-        <button @click="renderMultiView"
+        <button @click="mvOpen = true"
                 class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
           📐 Render đa góc
         </button>
       </div>
     </div>
+
+    <!-- Modal render đa góc: 4 slot + hướng dẫn + kiểm soát -->
+    <BaseModal v-model="mvOpen" title="📐 Render đa góc từ 1 ảnh" wide>
+      <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
+        <p class="font-semibold">💡 Cách dùng (3 bước):</p>
+        <p class="mt-1 text-brand-100/80">① Chọn ảnh sản phẩm ở canvas · ② Bật/tắt các góc bạn muốn · ③ Bấm "Render N góc". AI giữ nguyên sản phẩm, chỉ đổi góc chụp.</p>
+      </div>
+
+      <div class="space-y-2">
+        <div v-for="(v, i) in mvViews" :key="v.id"
+             class="rounded-2xl border p-2.5 transition"
+             :class="v.enabled ? 'border-brand-500/50 bg-brand-900/20' : 'border-ink-700 bg-ink-800/40 opacity-60'">
+          <div class="flex items-center gap-2">
+            <button @click="v.enabled = !v.enabled"
+                    class="grid h-5 w-5 shrink-0 place-items-center rounded border text-xs"
+                    :class="v.enabled ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-300'">
+              {{ v.enabled ? '✓' : '' }}
+            </button>
+            <span class="font-semibold text-cream-100">{{ v.icon }} {{ v.label }}</span>
+            <span class="ml-auto text-[10px] text-cream-300/60">Slot {{ i + 1 }}</span>
+          </div>
+          <input v-if="v.enabled" v-model="v.prompt" class="input mt-2 !py-1.5 !text-xs" placeholder="Mô tả góc chụp…">
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between">
+        <span class="text-xs text-cream-300/70">Đã chọn: <b class="text-brand-300">{{ mvCount }}/4 góc</b></span>
+        <button @click="runMultiView" :disabled="mvBusy || !mvCount" class="btn-brand whitespace-nowrap">
+          {{ mvBusy ? 'Đang render…' : '📐 Render ' + mvCount + ' góc' }}
+        </button>
+      </div>
+    </BaseModal>
 
     <label class="label mt-3">Mô tả chỉnh sửa</label>
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước…"></textarea>
