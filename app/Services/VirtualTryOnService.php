@@ -295,7 +295,7 @@ class VirtualTryOnService
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
         // sắc nét, tránh mặt méo/lệch tỷ lệ và vải bị "airbrush" mất vân.
         $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, invented or added patterns on plain fabric, altered prints or motifs, extra embroidery or logos not in the source, misplaced or missing accessories, accessories on the wrong body part (e.g. watch on the shoulder or arm instead of the wrist, handbag on the wrong side), airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
-        $fullBodyClause = 'FULL BODY from head to toe — the entire body including head, torso, legs and feet must be visible inside the frame; do NOT crop, cut off or zoom into the model; leave a little space above the head and below the feet. ';
+        $fullBodyClause = 'FULL BODY SHOT from head to toe — the ENTIRE model (head, hair, torso, arms, legs, feet and shoes) must be fully visible inside the frame. Frame the model vertically at about 75-80% of the image HEIGHT, centered, with clear headroom above the head and footroom below the feet. NEVER crop, cut off, or zoom into the model; never show only the upper body or cut off the legs/feet; do NOT make the model oversized (dominating the frame) or too small. ';
 
         $instr = $garmentLock
             .$personClause
