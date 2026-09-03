@@ -38,6 +38,7 @@ return [
     'swap_moderation' => (bool) env('STUDIO_SWAP_MODERATION', false),      // image-moderation (mặc định tắt)
     'swap_qa' => (bool) env('STUDIO_SWAP_QA', true),                        // QA scoring (qwen3.8-flash — bật mặc định, fail êm khi rate-limit)
     'swap_enabled' => (bool) env('STUDIO_SWAP_ENABLED', false),          // TẠM ẨN tính năng Thay Đổi Người Mẫu (chưa hiệu quả, tốn nguồn lực)
+    'faceswap_prompt' => env('STUDIO_FACESWAP_PROMPT', 'Face swap (NOT a photo overlay): replace the face of @image1 with the face in @image2. Generate a NEW natural face matching @image2 identity, hairstyle, facial features, ears and head proportions — do NOT paste/overlay the photo. Make the new head about 80% the size of the original head — smaller and naturally proportionate, never enlarged or distorted. Blend skin tone, hairline and lighting seamlessly. Keep garment, pose, body, background unchanged.'),
     'swap_brighten' => (bool) env('STUDIO_SWAP_BRIGHTEN', false),          // kéo sáng chủ thể tối (có thể lệch màu đồ) → mặc định TẮT
     'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),

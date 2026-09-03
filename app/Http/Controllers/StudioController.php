@@ -428,11 +428,8 @@ class StudioController extends Controller
             $finalPrompt .= ' '.$userPrompt;
         } elseif ($isFaceSwap) {
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
-            $finalPrompt = 'Face swap (NOT a photo overlay): replace the face of @image1 with the face in @image2. '
-                .'Generate a NEW natural face that matches @image2\'s identity, hairstyle, facial features, ears and head proportions — do NOT paste, stamp, overlay or collage the @image2 photo on top of the image. '
-                .'Make the new head about 80% the size of the original head — clearly smaller and naturally proportionate to the body; never enlarged, never stretched or distorted. '
-                .'Blend skin tone, hairline, neck and lighting seamlessly so there is NO visible seam, border or patch edge. '
-                .'Keep garment, pose, body, background and composition exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
+            // Prompt kiểm soát tại Settings → Studio → "Prompt thay khuôn mặt".
+            $finalPrompt = (string) studio_config('faceswap_prompt', 'Face swap: replace the face of @image1 with the face in @image2, matching identity, hairstyle, ears and proportions. Keep garment, pose, body, background unchanged.').' '.$userPrompt;
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
                 .'The FIRST image is the main base (keep its subject and overall layout). '
@@ -3174,6 +3171,7 @@ RULES:
             'prompt_prefix' => setting('studio_prompt_prefix', config('studio.prompt_prefix', '')),
             'prompt_suffix' => setting('studio_prompt_suffix', config('studio.prompt_suffix', '')),
             'negative_prompt' => setting('studio_negative_prompt', config('studio.negative_prompt', '')),
+            'faceswap_prompt' => setting('studio_faceswap_prompt', config('studio.faceswap_prompt', '')),
             'enrich_prompt' => filter_var(setting('studio_enrich_prompt', config('studio.enrich_prompt', true)), FILTER_VALIDATE_BOOLEAN),
             // Cấu hình RIÊNG cho "💡 Gợi ý từ ảnh" (tách khỏi Vision chung).
             'suggest_enabled' => studio_suggest_enabled(),
@@ -3509,6 +3507,7 @@ RULES:
             'prompt_prefix' => ['nullable', 'string', 'max:500'],
             'prompt_suffix' => ['nullable', 'string', 'max:500'],
             'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            'faceswap_prompt' => ['nullable', 'string', 'max:2000'],
             'enrich_prompt' => ['nullable', 'string', 'in:1'],
         ]);
 
@@ -3546,6 +3545,7 @@ RULES:
         if (isset($data['prompt_prefix'])) set_setting('studio_prompt_prefix', $data['prompt_prefix']);
         if (isset($data['prompt_suffix'])) set_setting('studio_prompt_suffix', $data['prompt_suffix']);
         if (isset($data['negative_prompt'])) set_setting('studio_negative_prompt', $data['negative_prompt']);
+        if (isset($data['faceswap_prompt'])) set_setting('studio_faceswap_prompt', $data['faceswap_prompt']);
         set_setting('studio_enrich_prompt', ! empty($data['enrich_prompt']) ? '1' : '0');
 
         return back()->with('success', 'Đã lưu cài đặt Studio.');

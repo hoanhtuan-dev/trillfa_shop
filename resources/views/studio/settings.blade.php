@@ -199,6 +199,11 @@
                     <label class="label">Negative prompt (điều model KHÔNG được tạo)</label>
                     <textarea name="negative_prompt" rows="2" class="input !py-2" placeholder="blurry, low quality, distorted proportions...">{{ old('negative_prompt', $negative_prompt) }}</textarea>
                 </div>
+                <div class="sm:col-span-2">
+                    <label class="label">Prompt thay khuôn mặt (Compose → 👤 Thay khuôn mặt)</label>
+                    <textarea name="faceswap_prompt" rows="3" class="input !py-2" placeholder="Face swap...">{{ old('faceswap_prompt', $faceswap_prompt) }}</textarea>
+                    <p class="mt-1 text-xs text-ink-500">Dùng <b>@image1</b> = người mẫu, <b>@image2</b> = khuôn mặt tham chiếu. VD tỷ lệ đầu: "Make the new head about 80% the size of the original head".</p>
+                </div>
                 <div>
                     <label class="flex items-center gap-2 text-ink-700">
                         <input type="checkbox" name="enrich_prompt" value="1" @if(old('enrich_prompt', $enrich_prompt)) checked @endif class="h-4 w-4 accent-brand-600">
