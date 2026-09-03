@@ -490,8 +490,11 @@ export const useStudioStore = defineStore('studio', {
     async deleteGen(g) {
       try {
         const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.message || 'Lỗi xóa.');
+        const ct = (r.headers.get('content-type') || '');
+        const d = ct.includes('application/json') ? await r.json().catch(() => ({})) : {};
+        // Redirect về trang login (chưa đăng nhập/hết phiên) trả HTML 200 — phải coi là THẤT BẠI
+        // để không báo "Đã xóa" trong khi server thực tế chưa xóa.
+        if (!r.ok || r.redirected || !ct.includes('application/json')) throw new Error(d.message || 'Không xóa được — hãy tải lại trang và thử lại.');
         this.generations = this.generations.filter(x => x.id !== g.id);
         // Gỡ luôn layer canvas trỏ tới ảnh vừa xóa, nếu không canvas vẫn hiển thị ảnh cũ
         // (upscaleSrc ưu tiên active layer hơn preview).
@@ -528,8 +531,22 @@ export const useStudioStore = defineStore('studio', {
     pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) this.canvasLayers.push({ id, kind, name, image, genId }); },
     setActiveLayer(id) { if (!id) return; this.activeLayerId = id; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
-    // Remove a layer from the CANVAS ONLY (never deletes the output image or the source file).
-    deleteLayer(item) { if (!item) return; this.canvasLayers = this.canvasLayers.filter(l => l.id !== item.id); if (this.activeLayerId === item.id) { const next = this.canvasLayers[0]; if (next) this.selectLayer(next); else { this.editSource = null; this.previewId = null; this.preview = null; } } },
+    // Xóa layer trên canvas. Với layer ảnh kết quả (gen) cũng xóa luôn generation trên
+    // server để sau khi reset ảnh KHÔNG quay lại; layer 'source' chỉ là ảnh tham chiếu nên chỉ gỡ khỏi canvas.
+    deleteLayer(item) {
+      if (!item) return;
+      if (item.kind === 'gen' && item.genId) {
+        const g = this.generations.find((x) => x.id === item.genId) || { id: item.genId };
+        this.deleteGen(g);
+        return;
+      }
+      this.canvasLayers = this.canvasLayers.filter((l) => l.id !== item.id);
+      if (this.activeLayerId === item.id) {
+        const next = this.canvasLayers[0];
+        if (next) this.selectLayer(next);
+        else { this.editSource = null; this.previewId = null; this.preview = null; }
+      }
+    },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
     setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.pushCanvasLayer('source', 'source', this.editSource.name, url); this.setActiveLayer('source'); this.toast('Đã chọn ảnh nguồn.'); },

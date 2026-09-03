@@ -59,6 +59,15 @@ function insertTag(tag) {
   prompt.value = (prompt.value ? prompt.value + ' ' : '') + tag + ' ';
 }
 
+// Chip nhanh: mẫu prompt 1-click dùng định danh @imageN
+const quickTemplates = [
+  { icon: '👗', label: 'Thay trang phục', prompt: 'thay trang phục của @image1 bằng trang phục trong @image2' },
+  { icon: '👤', label: 'Thay nhân vật', prompt: 'xóa nhân vật trong @image1, thay bằng nhân vật trong @image2' },
+  { icon: '🌅', label: 'Đổi nền', prompt: 'giữ nguyên @image1, đổi nền theo @image2' },
+  { icon: '🎨', label: 'Phối style', prompt: 'áp dụng phong cách của @image2 vào @image1' },
+];
+function applyTemplate(t) { prompt.value = t.prompt; }
+
 const step = computed(() => {
   if (!selected.value.length) return 1;
   if (!prompt.value.trim()) return 2;
@@ -99,19 +108,15 @@ async function run() {
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
-    <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🧩 Ghép ảnh (Compose)</h2>
-    <p class="text-[11px] text-ink-500">Hòa trộn 2–3 ảnh thành 1 ảnh thương mại hoàn chỉnh.</p>
+    <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🧩 Ghép ảnh</h2>
+    <p class="text-[11px] text-ink-500">Hòa trộn 2–3 ảnh thành 1.</p>
 
-    <!-- Hướng dẫn 3 bước cho người mới -->
-    <div class="mt-3 flex items-center gap-1.5 text-[10px]">
-      <span :class="step === 1 ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" class="grid h-5 w-5 place-items-center rounded-full font-bold">1</span>
-      <span :class="step >= 2 ? 'text-brand-300' : 'text-cream-300/50'">Chọn ảnh</span>
-      <span class="text-ink-600">—</span>
-      <span :class="step === 2 ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" class="grid h-5 w-5 place-items-center rounded-full font-bold">2</span>
-      <span :class="step >= 3 ? 'text-brand-300' : 'text-cream-300/50'">Mô tả</span>
-      <span class="text-ink-600">—</span>
-      <span :class="step === 3 ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" class="grid h-5 w-5 place-items-center rounded-full font-bold">3</span>
-      <span :class="step === 3 ? 'text-brand-300' : 'text-cream-300/50'">Ghép</span>
+    <!-- Chip nhanh (template 1-click) -->
+    <div class="mt-2.5 flex flex-wrap gap-1.5">
+      <button v-for="t in quickTemplates" :key="t.label" @click="applyTemplate(t)"
+              class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
+        {{ t.icon }} {{ t.label }}
+      </button>
     </div>
 
     <!-- Ảnh đã chọn (3 slot) -->
