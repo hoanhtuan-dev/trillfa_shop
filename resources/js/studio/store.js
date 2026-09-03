@@ -134,7 +134,7 @@ export const useStudioStore = defineStore('studio', {
     activeLayerId: '',
   }),
   getters: {
-    upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
+    upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
     upscaleName() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; } return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
 
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
@@ -209,8 +209,8 @@ export const useStudioStore = defineStore('studio', {
         const items = d.items || d.generations || [];
         if (Array.isArray(items)) this.generations = items;
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
-        // KHÔNG tự chọn/khôi phục ảnh kết quả mới nhất lên canvas khi tải lại trang — canvas bắt đầu sạch;
-        // chỉ khôi phục khi có deep-link ?id= (từ Studio Library → Chỉnh sửa/Tạo video).
+        // Khôi phục bố cục layer đã lưu (chỉ giữ layer còn hợp lệ) — thay cho việc tự chọn ảnh kết quả cũ.
+        this.restoreLayerLayout();
         // In các kết quả Đổi người mẫu đã hoàn tất vào layer canvas (không cưỡng chế active).
         (this.generations || []).forEach((g) => { if (g.status === 'completed' && g.media_url && g.meta && g.meta.swap) this.syncLayerForGen(g.id, g.media_url, 'Ảnh #' + g.id, false); });
         // Deep-link từ Studio Library: /studio?step=2|3&id=<genId> — khôi phục đúng bước + ảnh.
@@ -545,10 +545,11 @@ export const useStudioStore = defineStore('studio', {
         const lid = String(g.id);
         if (this.canvasLayers.some((l) => l.id === lid)) this.canvasLayers = this.canvasLayers.filter((l) => l.id !== lid);
         if (this.activeLayerId === lid || this.previewId === g.id) {
-          const next = this.canvasLayers[0];
+          const next = this.canvasLayers.find((x) => x.visible !== false);
           if (next) this.selectLayer(next);
           else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
         }
+        this.saveLayerLayout();
         this.toast('Đã xóa.');
         return true;
       }
@@ -572,28 +573,31 @@ export const useStudioStore = defineStore('studio', {
     },
     goEdit(g) { this.goEditor(g, 2); },
     goVideo(g) { this.goEditor(g, 3); },
-    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) this.canvasLayers.push({ id, kind, name, image, genId }); },
-    setActiveLayer(id) { if (!id) return; this.activeLayerId = id; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } },
+    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false }); this.saveLayerLayout(); } },
+    setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
     deleteLayer(item) {
       if (!item) return;
+      if (item.locked) { this.toast('Layer đang khóa — mở khóa trước khi gỡ.', 'error'); return; }
       this.canvasLayers = this.canvasLayers.filter((l) => l.id !== item.id);
       if (this.activeLayerId === item.id) {
-        const next = this.canvasLayers[0];
+        const next = this.canvasLayers.find((x) => x.visible !== false);
         if (next) this.selectLayer(next);
-        else { this.editSource = null; this.previewId = null; this.preview = null; }
+        else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
       }
+      this.saveLayerLayout();
     },
     // Bỏ ảnh nguồn khỏi canvas (không xóa file/output).
     clearSource() {
       this.editSource = null;
       this.canvasLayers = this.canvasLayers.filter((l) => l.id !== 'source');
       if (this.activeLayerId === 'source') {
-        const next = this.canvasLayers[0];
+        const next = this.canvasLayers.find((x) => x.visible !== false);
         if (next) this.selectLayer(next);
         else { this.activeLayerId = ''; this.previewId = null; this.preview = null; }
       }
+      this.saveLayerLayout();
     },
     // Dọn sạch canvas + toàn bộ layer (chỉ xóa trạng thái hiển thị — KHÔNG xóa output/ảnh kết quả).
     cleanCanvas() {
@@ -606,26 +610,71 @@ export const useStudioStore = defineStore('studio', {
       this.palette = [];
       this.pan = { x: 0, y: 0 };
       this.zoom = 1;
+      this.saveLayerLayout();
       this.toast('Đã dọn canvas — ảnh kết quả vẫn còn trong Kết quả/Thư viện.');
     },
     // Đổi tên layer (chỉ tên hiển thị, không đổi dữ liệu/output).
     renameLayer(id, name) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l) return;
+      if (l.locked) { this.toast('Layer đang khóa.', 'error'); return; }
       const n = (name || '').trim();
       if (!n) return;
       l.name = n;
       if (l.kind === 'source' && this.editSource) this.editSource.name = n;
+      this.saveLayerLayout();
       this.toast('Đã đổi tên layer.');
     },
     // Di chuyển layer lên/xuống trong danh sách (không ảnh hưởng output).
     moveLayer(id, dir) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l || l.locked) return;
       const i = this.canvasLayers.findIndex((x) => x.id === id);
       const j = i + (dir === 'up' ? -1 : 1);
       if (i < 0 || j < 0 || j >= this.canvasLayers.length) return;
       const arr = this.canvasLayers.slice();
       const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
       this.canvasLayers = arr;
+      this.saveLayerLayout();
+    },
+    // Ẩn/hiện layer (eye toggle). Ẩn layer đang active thì chuyển sang layer hiển thị kế tiếp.
+    toggleLayerVisible(id) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l) return;
+      l.visible = !l.visible;
+      if (!l.visible && this.activeLayerId === id) {
+        const next = this.canvasLayers.find((x) => x.visible !== false && x.id !== id);
+        if (next) this.setActiveLayer(next.id);
+        else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
+      }
+      this.saveLayerLayout();
+    },
+    // Khóa/mở khóa layer (chống xóa/đổi tên/di chuyển nhầm).
+    toggleLayerLock(id) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l) return;
+      l.locked = !l.locked;
+      this.saveLayerLayout();
+    },
+    // Lưu bố cục layer (danh sách + layer active) để khôi phục khi tải lại trang.
+    saveLayerLayout() {
+      try { localStorage.setItem('trillfa.layers', JSON.stringify({ layers: this.canvasLayers, activeLayerId: this.activeLayerId })); } catch (e) {}
+    },
+    // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).
+    restoreLayerLayout() {
+      try {
+        const raw = localStorage.getItem('trillfa.layers');
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        const genIds = new Set((this.generations || []).map((g) => g.id));
+        this.canvasLayers = (Array.isArray(d.layers) ? d.layers : [])
+          .filter((l) => l && l.image)
+          .filter((l) => l.kind !== 'gen' || (l.genId != null && genIds.has(Number(l.genId))))
+          .map((l) => ({ id: l.id, kind: l.kind, name: l.name, image: l.image, genId: l.genId, visible: l.visible !== false, locked: !!l.locked }));
+        const active = this.canvasLayers.find((l) => l.id === d.activeLayerId && l.visible !== false);
+        if (active) this.setActiveLayer(active.id);
+        else { this.activeLayerId = ''; this.saveLayerLayout(); }
+      } catch (e) { this.canvasLayers = []; this.activeLayerId = ''; this.saveLayerLayout(); }
     },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
