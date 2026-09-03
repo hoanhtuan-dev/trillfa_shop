@@ -9,7 +9,6 @@ import PaletteTextureCard from './components/PaletteTextureCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
-import ReimagineCard from './components/ReimagineCard.vue';
 import ComposeCard from './components/ComposeCard.vue';
 import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
@@ -45,7 +44,7 @@ function onCanvasKey(e) {
   else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON') && store.inpaintMaskMode === 'none') store.confirmCrop();
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ReimagineCard, ComposeCard, SwapCard, InpaintCard, UpscaleCard] : [DirectorCard]);
+const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [SwapCard, InpaintCard, UpscaleCard, ComposeCard] : [DirectorCard]);
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">

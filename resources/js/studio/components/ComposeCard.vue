@@ -1,14 +1,16 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
+import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
 
 const prompt = ref('');
 const busy = ref(false);
-const selected = ref([]); // array of generation ids, thứ tự chọn = thứ tự (ảnh đầu làm base)
+const open = ref(false);
+const selected = ref([]); // generation ids — thứ tự chọn = thứ tự (ảnh đầu = nền chính)
 
-// Các ảnh có thể ghép: mọi generation có media_url và không phải video
 const images = computed(() => store.generations.filter(g => g.media_url && g.type !== 'video' && g.status !== 'failed'));
+const selectedImgs = computed(() => selected.value.map(id => store.generations.find(g => g.id === id)).filter(Boolean));
 
 function toggle(g) {
   const i = selected.value.indexOf(g.id);
@@ -21,15 +23,30 @@ function toggle(g) {
   }
 }
 
-function roleLabel(idx) {
-  return idx === 0 ? 'Nền chính' : ('Ghép ' + (idx + 1));
+function remove(id) {
+  const i = selected.value.indexOf(id);
+  if (i >= 0) selected.value.splice(i, 1);
 }
+
+// Đưa ảnh lên làm nền chính (vị trí 1)
+function makeBase(id) {
+  const i = selected.value.indexOf(id);
+  if (i <= 0) return;
+  selected.value.splice(i, 1);
+  selected.value.unshift(id);
+}
+
+function roleLabel(i) { return i === 0 ? 'Nền chính' : 'Ảnh ghép ' + (i + 1); }
+
+const step = computed(() => {
+  if (!selected.value.length) return 1;
+  if (!prompt.value.trim()) return 2;
+  return 3;
+});
 
 async function run() {
   if (selected.value.length < 2 || busy.value) return;
-  const urls = selected.value
-    .map(id => store.generations.find(g => g.id === id)?.media_url)
-    .filter(Boolean);
+  const urls = selectedImgs.value.map(g => g.media_url).filter(Boolean);
   busy.value = true;
   await store.compose(urls, prompt.value);
   busy.value = false;
@@ -38,34 +55,76 @@ async function run() {
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🧩 Ghép ảnh (Compose)</h2>
-    <p class="text-[11px] text-ink-500">Chọn 2–3 ảnh — ảnh đầu là nền chính, AI hòa trộn thành 1 ảnh thương mại.</p>
+    <p class="text-[11px] text-ink-500">Hòa trộn 2–3 ảnh thành 1 ảnh thương mại hoàn chỉnh.</p>
 
-    <!-- Chọn ảnh -->
-    <div v-if="images.length" class="mt-3 grid grid-cols-4 gap-1.5">
-      <button v-for="(g, i) in images" :key="g.id" @click="toggle(g)"
-              class="relative overflow-hidden rounded-lg border-2 transition"
-              :class="selected.includes(g.id) ? 'border-brand-500' : 'border-ink-700 hover:border-ink-500'">
-        <img :src="g.media_url" class="h-16 w-full bg-ink-900 object-cover">
-        <span v-if="selected.includes(g.id)"
-              class="absolute left-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-[10px] font-bold text-white">
-          {{ selected.indexOf(g.id) + 1 }}
-        </span>
-      </button>
+    <!-- Hướng dẫn 3 bước cho người mới -->
+    <div class="mt-3 flex items-center gap-1.5 text-[10px]">
+      <span :class="step === 1 ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" class="grid h-5 w-5 place-items-center rounded-full font-bold">1</span>
+      <span :class="step >= 2 ? 'text-brand-300' : 'text-cream-300/50'">Chọn ảnh</span>
+      <span class="text-ink-600">—</span>
+      <span :class="step === 2 ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" class="grid h-5 w-5 place-items-center rounded-full font-bold">2</span>
+      <span :class="step >= 3 ? 'text-brand-300' : 'text-cream-300/50'">Mô tả</span>
+      <span class="text-ink-600">—</span>
+      <span :class="step === 3 ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" class="grid h-5 w-5 place-items-center rounded-full font-bold">3</span>
+      <span :class="step === 3 ? 'text-brand-300' : 'text-cream-300/50'">Ghép</span>
     </div>
-    <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chưa có ảnh — hãy tạo ảnh trước trong <b>Concept</b> hoặc <b>Outputs</b>.</div>
 
-    <!-- Danh sách vai trò đã chọn -->
-    <div v-if="selected.length" class="mt-2 flex flex-wrap gap-1.5">
-      <span v-for="(id, i) in selected" :key="id" class="rounded-full bg-ink-800 px-2 py-0.5 text-[10px] text-cream-200">
-        {{ i + 1 }}. {{ roleLabel(i) }}
-      </span>
+    <!-- Ảnh đã chọn (3 slot) -->
+    <div class="mt-3 grid grid-cols-3 gap-1.5">
+      <div v-for="i in 3" :key="i"
+           class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-xl border"
+           :class="selectedImgs[i-1] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-700 bg-ink-900/40'">
+        <template v-if="selectedImgs[i-1]">
+          <img :src="selectedImgs[i-1].media_url" class="h-full w-full object-cover">
+          <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ i }}</span>
+          <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ roleLabel(i-1) }}</span>
+          <button @click="remove(selectedImgs[i-1].id)" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">✕</button>
+          <button v-if="i > 1" @click="makeBase(selectedImgs[i-1].id)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm nền chính">⤴</button>
+        </template>
+        <template v-else>
+          <span class="text-2xl text-ink-600">{{ i === 1 ? '🖼' : '＋' }}</span>
+          <span class="px-1 text-center text-[9px] text-cream-300/50">{{ i === 1 ? 'Nền chính' : 'Ảnh ghép' }}</span>
+        </template>
+      </div>
     </div>
+
+    <button @click="open = true" class="btn-outline mt-2 w-full">
+      {{ selected.length ? '🖼 Chọn lại ảnh' : '🖼 Chọn ảnh (2–3)' }} <span v-if="selected.length" class="text-cream-300/60">· {{ selected.length }}/3</span>
+    </button>
+    <p v-if="selected.length < 2" class="mt-1 text-center text-[10px] text-cream-300/50">Mẹo: bấm ảnh muốn làm <b class="text-cream-200">nền chính</b> trước.</p>
 
     <label class="label mt-3">Mô tả ghép</label>
-    <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đặt sản phẩm lên bàn studio, hòa ánh sáng tự nhiên…"></textarea>
+    <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đặt sản phẩm lên bàn studio gỗ, hòa ánh sáng tự nhiên…"></textarea>
 
     <button @click="run" :disabled="busy || selected.length < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
       {{ busy ? 'Đang ghép…' : '🧩 Ghép ảnh' }}
     </button>
+
+    <!-- Popup chọn ảnh -->
+    <BaseModal v-model="open" title="🖼 Chọn 2–3 ảnh để ghép" wide>
+      <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
+        <p class="font-semibold">💡 Cách chọn:</p>
+        <p class="mt-1 text-brand-100/80">• Bấm ảnh muốn làm <b>nền chính / bố cục</b> trước (số 1).<br>• Bấm thêm 1–2 ảnh làm thành phần ghép vào (số 2, 3).<br>• Bấm lại để bỏ chọn.</p>
+      </div>
+
+      <div v-if="images.length" class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        <button v-for="g in images" :key="g.id" @click="toggle(g)"
+                class="relative overflow-hidden rounded-xl border-2 transition"
+                :class="selected.includes(g.id) ? 'border-brand-500 ring-2 ring-brand-500/40' : 'border-ink-700 hover:border-ink-500'">
+          <img :src="g.media_url" class="h-24 w-full bg-ink-900 object-cover" loading="lazy">
+          <span v-if="selected.includes(g.id)"
+                class="absolute left-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-brand-500 text-xs font-bold text-white shadow">
+            {{ selected.indexOf(g.id) + 1 }}
+          </span>
+          <span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 truncate text-[9px] text-cream-200">#{{ g.id }}</span>
+        </button>
+      </div>
+      <p v-else class="rounded-2xl border border-dashed border-ink-600 p-4 text-center text-xs text-cream-300/60">Chưa có ảnh — hãy tạo ảnh trong <b>Concept</b> hoặc <b>Outputs</b> trước.</p>
+
+      <div class="mt-4 flex items-center justify-between">
+        <span class="text-xs text-cream-300/70">Đã chọn: <b class="text-brand-300">{{ selected.length }}/3</b></span>
+        <button @click="open = false" class="btn-brand">✅ Xong</button>
+      </div>
+    </BaseModal>
   </div>
 </template>
