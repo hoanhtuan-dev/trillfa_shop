@@ -21,6 +21,12 @@ function copyColor(c) { try { navigator.clipboard.writeText(c); store.toast('Đ�
 const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 const menuOpen = ref(false);
 const outputOpen = ref(false);
+// Layer rename (inline edit)
+const renamingId = ref(null);
+const renameValue = ref('');
+function startRename(l) { renamingId.value = l.id; renameValue.value = l.name || ''; }
+function commitRename() { if (!renamingId.value) return; store.renameLayer(renamingId.value, renameValue.value); renamingId.value = null; }
+function cancelRename() { renamingId.value = null; }
 onMounted(async () => { store.load(); store.loadPalette(store.previewId); window.addEventListener('keydown', onCanvasKey); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); });
 watch(() => store.previewId, (id) => { store.loadPalette(id); });
@@ -111,16 +117,29 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
 
           </div>
           <!-- right column: layers (top) + floating palette (below, same width) -->
-          <div class="absolute right-3 top-3 z-20 flex w-40 flex-col gap-1.5">
+          <div class="absolute right-3 top-3 z-20 flex w-52 flex-col gap-1.5">
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1.5 rounded-2xl bg-ink-900/85 p-2 shadow-lg">
-              <p class="px-0.5 text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
-              <div class="scrollbar-hide flex max-h-40 flex-col gap-1.5 overflow-y-auto">
-                <div v-for="l in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1.5 rounded-lg border p-1" :class="store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60'">
-                  <button @click="store.selectLayer(l)" class="flex min-w-0 items-center gap-1.5"><img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover"><span class="truncate text-[10px] text-cream-100">{{ l.name }}</span></button>
-                  <button @click="store.deleteLayer(l)" class="ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-full bg-red-600/25 text-red-200 opacity-0 hover:bg-red-600 group-hover:opacity-100">🗑</button>
+              <div class="flex items-center justify-between px-0.5">
+                <p class="text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
+                <button @click="store.cleanCanvas()" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">Dọn canvas</button>
+              </div>
+              <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
+                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1.5 rounded-lg border p-1" :class="store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60'">
+                  <button @click="store.selectLayer(l)" class="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+                    <img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover">
+                    <span v-if="renamingId !== l.id" class="truncate text-[10px] text-cream-100">{{ l.name }}</span>
+                    <input v-else v-model="renameValue" class="w-full min-w-0 rounded bg-ink-900 px-1 py-0.5 text-[10px] text-cream-100 outline-none ring-1 ring-brand-500" @keyup.enter="commitRename()" @keyup.esc="cancelRename()" @blur="commitRename()" @click.stop>
+                  </button>
+                  <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button @click="store.moveLayer(l.id, 'up')" :disabled="i === 0" class="grid h-5 w-4 place-items-center rounded text-cream-300 hover:bg-ink-700 disabled:opacity-30" title="Lên trên">▲</button>
+                    <button @click="store.moveLayer(l.id, 'down')" :disabled="i === store.canvasLayers.length - 1" class="grid h-5 w-4 place-items-center rounded text-cream-300 hover:bg-ink-700 disabled:opacity-30" title="Xuống dưới">▼</button>
+                    <button v-if="renamingId !== l.id" @click="startRename(l)" class="grid h-5 w-5 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Đổi tên">✎</button>
+                    <button @click="store.deleteLayer(l)" class="grid h-5 w-5 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600" title="Gỡ khỏi canvas (không xóa kết quả)">🗑</button>
+                  </div>
                 </div>
               </div>
             </div>
+            <p v-else class="rounded-2xl bg-ink-900/50 px-2 py-2.5 text-center text-[10px] text-cream-300/40">Chưa có layer — thêm ảnh nguồn hoặc kết quả.</p>
             <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
               <div class="mb-1 text-[10px] font-semibold text-cream-300/60">🎨 Palette</div>
               <div class="grid grid-cols-3 gap-1.5">

@@ -138,6 +138,7 @@ export const useStudioStore = defineStore('studio', {
     upscaleName() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; } return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
 
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
+    activeLayer() { return this.canvasLayers.find(x => x.id === this.activeLayerId) || null; },
   },
   actions: {
     async api(url, body = {}, signal = null) {
@@ -606,6 +607,25 @@ export const useStudioStore = defineStore('studio', {
       this.pan = { x: 0, y: 0 };
       this.zoom = 1;
       this.toast('Đã dọn canvas — ảnh kết quả vẫn còn trong Kết quả/Thư viện.');
+    },
+    // Đổi tên layer (chỉ tên hiển thị, không đổi dữ liệu/output).
+    renameLayer(id, name) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l) return;
+      const n = (name || '').trim();
+      if (!n) return;
+      l.name = n;
+      if (l.kind === 'source' && this.editSource) this.editSource.name = n;
+      this.toast('Đã đổi tên layer.');
+    },
+    // Di chuyển layer lên/xuống trong danh sách (không ảnh hưởng output).
+    moveLayer(id, dir) {
+      const i = this.canvasLayers.findIndex((x) => x.id === id);
+      const j = i + (dir === 'up' ? -1 : 1);
+      if (i < 0 || j < 0 || j >= this.canvasLayers.length) return;
+      const arr = this.canvasLayers.slice();
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+      this.canvasLayers = arr;
     },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
