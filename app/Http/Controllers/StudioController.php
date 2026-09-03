@@ -430,7 +430,7 @@ class StudioController extends Controller
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
             $finalPrompt = 'The face of the person in @image1 MUST be the face from @image2 (the reference face) — do NOT change or generate a different face, and do NOT paste, stamp, overlay or collage the @image2 photo on top of the image. '
                 .'Replace the entire head (face, hairstyle, ears, forehead, jawline, neck) with @image2\'s identity, blending skin tone, hairline and lighting seamlessly so there is NO visible seam, border or patch edge. '
-                .'Keep the head-to-body ratio EXACTLY the same as @image1 — the new head must be the SAME SIZE as the original head, never larger. Match natural fashion proportions (head ≈ 1/7.5 of total body height) and a balanced, natural neck and shoulder transition. Do NOT enlarge, stretch, distort or make the head out of proportion. '
+                .'Keep the head SMALL and proportionate — the new head must be the SAME SIZE as the original head in @image1, or slightly SMALLER; NEVER larger. Match natural fashion proportions (head ≈ 1/7.5 to 1/8 of total body height) with a balanced, natural neck and shoulder transition. Do NOT enlarge, stretch, blow up or distort the head or face. '
                 .'Keep the exact garment, body pose, body proportions, background and composition of @image1 unchanged. Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
