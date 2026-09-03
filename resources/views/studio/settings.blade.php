@@ -318,20 +318,8 @@
         <p class="text-xs text-ink-500">Cấu hình model riêng cho tính năng "Thay Đổi Người Mẫu" — tách khỏi cấu hình chung.</p>
         <div class="grid gap-3 sm:grid-cols-2">
             <div>
-                <label class="label">Chế độ try-on</label>
-                <select name="swap_mode" class="input !py-2">
-                    <option value="edit" @selected(old('swap_mode', $swap_mode) === 'edit')>Edit (qwen-image-edit — mặc đúng mẫu, ổn định)</option>
-                    <option value="generation" @selected(old('swap_mode', $swap_mode) === 'generation')>Generation (vision + wan2.7-image-pro — thử nghiệm)</option>
-                </select>
-                <p class="mt-1 text-xs text-ink-500">Khuyến nghị dùng <b>Edit</b> — bám đúng mẫu trang phục.</p>
-            </div>
-            <div>
                 <label class="label">Model Edit (Thay Đổi Người Mẫu)</label>
                 <input type="text" name="swap_model" value="{{ old('swap_model', $swap_model) }}" class="input !py-2" placeholder="để trống = dùng qwen_edit_model">
-            </div>
-            <div>
-                <label class="label">Model Sinh ảnh (generation)</label>
-                <input type="text" name="swap_gen_model" value="{{ old('swap_gen_model', $swap_gen_model) }}" class="input !py-2" placeholder="wan2.7-image-pro">
             </div>
             <div>
                 <label class="label">Model Qwen Edit (Inpaint)</label>

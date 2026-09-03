@@ -15,9 +15,6 @@ class VirtualTryOnService
     /** The image model that actually produced the last swap (may differ from the configured swap_model). */
     public ?string $lastModel = null;
 
-    /** Mô tả trang phục do vision (qwen3.8-flash) tạo trong chế độ generation — lưu để hiển thị/QA. */
-    public ?string $lastGarmentDesc = null;
-
     /** Number of real model calls made for the last swap (2 for a face-ref 2-step swap, 1 otherwise). */
     protected int $calls = 0;
 
@@ -214,114 +211,6 @@ class VirtualTryOnService
     }
 
     /**
-     * Try-on chế độ GENERATION (mặc định): qwen3.8-flash ĐỌC ảnh nguồn -> mô tả trang phục + phụ kiện
-     * -> wan2.7-image-pro SINH ảnh full-body. Tránh lỗi "vẽ lại đồ" (đổi màu/họa tiết, crop, bố cục to)
-     * của model edit. Chỉ cần mô tả chữ chính xác là kết quả đúng full-body.
-     */
-    public function generationTryOn(string $designImage, string $pose, string $background = '', ?string $faceDesc = null, string $tone = 'none'): ?string
-    {
-        $this->calls = 0;
-        $this->lastModel = null;
-
-        // PASS 1 — vision mô tả trang phục + phụ kiện chính xác.
-        $garmentDesc = $this->describeGarment($designImage);
-        if (! $garmentDesc) {
-            logger()->warning('Swap generation: vision description failed, dùng mô tả fallback');
-            $garmentDesc = 'the outfit and accessories exactly as shown in the source image (same colors, prints, patterns and every accessory)';
-        }
-        $this->calls += 1; // 1 vision call
-        $this->lastGarmentDesc = $garmentDesc;
-        logger()->info('Swap generation: garment description', ['desc' => $garmentDesc]);
-
-        // PASS 2 — text-to-image bằng model sinh ảnh.
-        $physique = 'a stylish, edgy young Vietnamese fashion model with a slim figure, slim waist, long toned legs and a beautiful delicate face';
-        $face = $faceDesc ? ' with the face described as: '.$faceDesc : '';
-        $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
-            ? ' Background: '.$background.'.'
-            : ' Clean minimal studio background.';
-
-        $prompt = 'Full-body fashion photograph of '.$physique.$face.'. '
-            .'The model is wearing: '.$garmentDesc.'. '
-            .'Pose: '.$pose.'. '
-            .'FULL BODY from head to toe, not cropped; the model occupies about 75-80% of the frame height with clear space above the head and below the feet. '
-            .$bg
-            .($this->toneInstruction($tone, $background) ?: '').' '
-            .'Photorealistic, high fashion, studio quality, consistent lighting.';
-
-        $imageSvc = app(ImageAIService::class);
-        $genModel = (string) studio_config('swap_gen_model', 'wan2.7-image-pro');
-        try {
-            $url = $imageSvc->generate(
-                $prompt,
-                null, null,
-                (string) studio_config('swap_gen_resolution', '2K'),
-                (string) studio_config('swap_gen_ratio', '3:4'),
-                null,
-                'qwen',
-                $genModel,
-                (string) config('studio.negative_prompt', '')
-            );
-        } catch (\Throwable $e) {
-            logger()->warning('Swap generation failed', ['model' => $genModel, 'err' => $e->getMessage()]);
-            return null;
-        }
-        if (! $url) {
-            return null;
-        }
-        $this->calls += 1; // 1 generation call
-        $this->lastModel = $imageSvc->lastModel() ?: $genModel;
-        return $url;
-    }
-
-    /**
-     * Dùng qwen3.8-flash (vision) đọc ảnh flat-lay -> mô tả chính xác từng món + màu + họa tiết + phụ kiện.
-     */
-    protected function describeGarment(string $imageUrl): ?string
-    {
-        // Dùng base64 data-URI (giống edit model) — provider ngoài KHÔNG fetch được URL localhost.
-        $imageUri = studio_vision_image_data_uri($imageUrl, 1600);
-        $keys = studio_qwen_credentials('vision');
-        if (! $imageUri || empty($keys)) { return null; }
-
-        $instruction = 'Describe the clothing and accessories in this flat-lay image as a precise, literal fashion text-to-image prompt. '
-            .'List every garment and accessory with its EXACT color, pattern/print, material, and where it should be worn on a model: top, bottom/dress, jacket, shoes, handbag, watch, jewelry/earrings, belt, hat. '
-            .'Do NOT invent items that are not visible. Output ONLY the descriptive text, no commentary.';
-
-        $lastErr = '';
-        foreach ($keys as $key) {
-            $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
-            foreach (studio_qwen_vision_models() as $model) {
-                try {
-                    $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(60)
-                        ->post($base, [
-                            'model' => $model,
-                            'messages' => [['role' => 'user', 'content' => [
-                                ['type' => 'image_url', 'image_url' => ['url' => $imageUri]],
-                                ['type' => 'text', 'text' => $instruction],
-                            ]]],
-                            'temperature' => 0.2,
-                        ]);
-                    if ($resp->successful()) {
-                        $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                        if ($text !== '') {
-                            logger()->info('Swap generation: garment described', ['model' => $model, 'len' => strlen($text)]);
-                            return $text;
-                        }
-                        $lastErr = 'HTTP 200 but empty content ('.$model.')';
-                    } else {
-                        $lastErr = 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 200);
-                        if (in_array($resp->status(), [404, 429]) || $resp->status() >= 500) { continue; }
-                    }
-                } catch (\Throwable $e) {
-                    $lastErr = $e->getMessage();
-                }
-            }
-        }
-        logger()->warning('describeGarment: all vision attempts failed', ['err' => substr((string) $lastErr, 0, 300)]);
-        return null;
-    }
-
-    /**
      * "Mặc thử đồ" (Click-to-Swap) — Qwen image-edit, nhiều pass.
      *
      * PASS 1 (cốt lõi): đổi DÁNG/cơ thể, LUÔN giữ nguyên khuôn mặt gốc + trang phục (họa tiết, vân
@@ -392,7 +281,7 @@ class VirtualTryOnService
 
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
         // sắc nét, tránh mặt méo/lệch tỷ lệ và vải bị "airbrush" mất vân.
-        $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, invented or added patterns on plain fabric, altered prints or motifs, extra embroidery or logos not in the source, airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
+        $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, invented or added patterns on plain fabric, altered prints or motifs, extra embroidery or logos not in the source, misplaced or missing accessories, accessories on the wrong body part (e.g. watch on the shoulder or arm instead of the wrist, handbag on the wrong side), airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
         $fullBodyClause = 'FULL BODY from head to toe — the entire body including head, torso, legs and feet must be visible inside the frame; do NOT crop, cut off or zoom into the model; leave a little space above the head and below the feet. ';
 
         $instr = $garmentLock

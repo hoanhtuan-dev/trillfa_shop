@@ -38,10 +38,6 @@ return [
     'swap_moderation' => (bool) env('STUDIO_SWAP_MODERATION', false),      // image-moderation (mặc định tắt)
     'swap_qa' => (bool) env('STUDIO_SWAP_QA', true),                        // QA scoring (qwen3.8-flash — bật mặc định, fail êm khi rate-limit)
     'swap_brighten' => (bool) env('STUDIO_SWAP_BRIGHTEN', false),          // kéo sáng chủ thể tối (có thể lệch màu đồ) → mặc định TẮT
-    'swap_mode' => env('STUDIO_SWAP_MODE', 'edit'),                        // edit = qwen-image-edit (bản ổn định, mặc đúng mẫu); generation = vision mô tả + wan2.7-image-pro (thử nghiệm)
-    'swap_gen_model' => env('STUDIO_SWAP_GEN_MODEL', 'wan2.7-image-pro'),  // model SINH ảnh cho try-on
-    'swap_gen_ratio' => env('STUDIO_SWAP_GEN_RATIO', '3:4'),               // tỷ lệ dọc full-body
-    'swap_gen_resolution' => env('STUDIO_SWAP_GEN_RESOLUTION', '2K'),      // độ phân giải ảnh try-on
     'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
