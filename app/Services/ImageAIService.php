@@ -899,8 +899,37 @@ class ImageAIService
             return null;
         }
 
+        // Tăng nét cuối (unsharp mask nhẹ 0.22) + chuẩn hóa PNG LOSSLESS — cải thiện chất lượng
+        // đầu ra, không blur/noise (chỉ sharpen chi tiết). Bỏ qua nếu ảnh quá lớn hoặc không đọc được.
+        $img = @imagecreatefromstring($contents);
+        if ($img) {
+            $w = imagesx($img); $h = imagesy($img);
+            if ($w * $h <= 24000000 && function_exists('imagefilter')) {
+                $blur = imagecreatetruecolor($w, $h);
+                imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+                @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+                $amt = 0.22;
+                for ($y = 0; $y < $h; $y++) {
+                    for ($x = 0; $x < $w; $x++) {
+                        $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
+                        $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                        $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
+                        imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                            (int) max(0, min(255, $cr + $amt * ($cr - $br))),
+                            (int) max(0, min(255, $cg + $amt * ($cg - $bg))),
+                            (int) max(0, min(255, $cb + $amt * ($cb - $bb)))));
+                    }
+                }
+                imagedestroy($blur);
+            }
+            ob_start(); imagepng($img); $bytes = (string) ob_get_clean();
+            imagedestroy($img);
+        } else {
+            $bytes = $contents;
+        }
+
         $name = Str::uuid().'.png';
-        Storage::disk('public')->put('studio/'.$name, $contents);
+        Storage::disk('public')->put('studio/'.$name, $bytes);
 
         return '/storage/studio/'.$name;
     }
