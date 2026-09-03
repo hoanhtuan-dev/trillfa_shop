@@ -81,7 +81,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintPreserveFace: true,// giữ nguyên khuôn mặt
     // ── Inpaint Mask (tích hợp region selection vào Inpaint) ──
     inpaintMaskMode: 'none',   // 'none' | 'rect' | 'brush' — chọn vùng cần sửa
-    inpaintMaskBox: { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }, // vùng mask (normalized 0..1)
+    inpaintMaskBox: { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }, // vùng mask mặc định = 15% ảnh (giữa), nhỏ để dễ thao tác
     inpaintBrushData: '',      // base64 PNG của brush mask
     _inpaintMaskCanvas: null,  // canvas DOM cho brush mask (tạm thời)
     _inpaintMaskCtx: null,     // 2d context
@@ -558,7 +558,7 @@ export const useStudioStore = defineStore('studio', {
       if (this._inpaintDrag) this._inpaintStopDrag();
       this.inpaintMaskMode = mode;
       this.inpaintBrushData = '';
-      this.inpaintMaskBox = { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }; // khung mặc định khi bật
+      this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') this._initInpaintBrush();
     },
     inpaintMaskPointer(e) {
@@ -640,7 +640,7 @@ export const useStudioStore = defineStore('studio', {
         return;
       }
       const bx = (e.clientX - d.sx) / m.vw, by = (e.clientY - d.sy) / m.vh;
-      const b = { ...(d.box || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }) };
+      const b = { ...(d.box || { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }) };
       const MIN = 0.02;
       const cl = (v, lo, hi) => this._clamp(v, lo, Math.max(lo, hi));
       if (d.key === 'move') {
