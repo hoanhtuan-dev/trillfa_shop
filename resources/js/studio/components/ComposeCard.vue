@@ -30,7 +30,7 @@ const genImages = computed(() => store.generations
 
 const poseImages = computed(() => poses.value
   .filter(p => p.image)
-  .map(p => ({ key: 'pose-' + p.id, url: p.image, label: p.name })));
+  .map(p => ({ key: 'pose-' + p.id, url: p.image, label: p.name, skeleton: p.skeleton || p.description || '' })));
 
 const upImages = computed(() => uploaded.value.map((u, i) => ({ key: 'up-' + i + '-' + u.name, url: u.url, label: u.name })));
 
@@ -119,8 +119,13 @@ async function run() {
   if (selectedCount.value < 2 || busy.value) return;
   const urls = selectedImgs.value.map(g => g.url).filter(Boolean);
   baseUrl.value = urls[0] || '';
+  // Thử đồ ảo: tự chèn mô tả tư thế (skeleton) của pose để model hiểu dáng chính xác
+  let finalPrompt = prompt.value;
+  if (mode.value === 'tryon' && selected.value[1]?.skeleton) {
+    finalPrompt += '. Pose detail: ' + selected.value[1].skeleton;
+  }
   busy.value = true;
-  const items = await store.compose(urls, prompt.value, variants.value, mode.value);
+  const items = await store.compose(urls, finalPrompt, variants.value, mode.value);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
