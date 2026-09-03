@@ -1,7 +1,15 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
+import CompareSlider from './CompareSlider.vue';
 const store = useStudioStore();
+
+const beforeUrl = ref('');   // ảnh gốc trước khi sửa (để so sánh)
+const compareOpen = ref(false);
+function submitInpaint() {
+  beforeUrl.value = store.preview?.media_url || '';
+  store.inpaint(store.inpaintPrompt);
+}
 
 const now = ref(Date.now());
 let timer = null;
@@ -86,10 +94,10 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       <label class="flex cursor-pointer items-center gap-1.5"><input type="checkbox" v-model="store.inpaintPreserveBg" class="h-3.5 w-3.5 accent-brand-500"> Giữ nguyên nền</label>
     </div>
 
-    <button @click="store.inpaint(store.inpaintPrompt)" :disabled="!canSubmit" class="btn-brand mt-3 w-full whitespace-nowrap">
+    <button @click="submitInpaint" :disabled="!canSubmit" class="btn-brand mt-3 w-full whitespace-nowrap">
       <span v-if="store.inpainting && store.inpaintStage === 'send'">Đang gửi yêu cầu…</span>
       <span v-else-if="store.inpainting">AI đang chỉnh sửa…</span>
-      <span v-else>✏️ Sửa ảnh</span>
+      <span v-else>✏️ Sửa ảnh <span class="opacity-70">· {{ store.imageCreditCost }} credit</span></span>
     </button>
 
     <!-- Tiến độ -->
@@ -110,6 +118,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <!-- Thành công -->
     <div v-if="store.inpaintStage === 'done'" class="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
       ✅ Đã sửa xong — ảnh mới đã được chọn trong Outputs.
+      <button v-if="beforeUrl && activeGen?.media_url" @click="compareOpen = true" class="rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">🔍 So sánh Trước/Sau</button>
       <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
@@ -128,5 +137,8 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       🛑 Đã hủy yêu cầu sửa ảnh.
       <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
+
+    <!-- So sánh Trước/Sau -->
+    <CompareSlider v-model="compareOpen" :before="beforeUrl" :after="activeGen?.media_url || ''" />
   </div>
 </template>

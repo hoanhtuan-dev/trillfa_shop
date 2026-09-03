@@ -2,9 +2,16 @@
 import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
+import CompareSlider from './CompareSlider.vue';
 const store = useStudioStore();
 
+const baseUrl = ref('');
+const lastIds = ref([]);
+const compareOpen = ref(false);
+const afterUrl = computed(() => store.generations.find(g => lastIds.value.includes(g.id) && g.status === 'completed')?.media_url || '');
+
 const prompt = ref('');
+const variants = ref(1);
 const busy = ref(false);
 const open = ref(false);
 const uploading = ref(false);
@@ -79,8 +86,10 @@ async function uploadImage(e) {
 async function run() {
   if (selected.value.length < 2 || busy.value) return;
   const urls = selectedImgs.value.map(g => g.url).filter(Boolean);
+  baseUrl.value = urls[0] || '';
   busy.value = true;
-  await store.compose(urls, prompt.value);
+  const items = await store.compose(urls, prompt.value, variants.value);
+  if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
 </script>
@@ -128,9 +137,18 @@ async function run() {
     <label class="label mt-3">Mô tả ghép</label>
     <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đặt sản phẩm lên bàn studio gỗ, hòa ánh sáng tự nhiên…"></textarea>
 
+    <div class="mt-2 flex items-center gap-1.5 text-xs text-cream-200">
+      <span class="mr-1">Số biến thể:</span>
+      <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
+              :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              class="h-7 w-7 rounded-full font-semibold transition-colors">{{ n }}</button>
+    </div>
+
     <button @click="run" :disabled="busy || selected.length < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
-      {{ busy ? 'Đang ghép…' : '🧩 Ghép ảnh' }}
+      {{ busy ? 'Đang ghép…' : '🧩 Ghép ảnh' }} <span v-if="!busy" class="opacity-70">· {{ store.imageCreditCost }} credit</span>
     </button>
+
+    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
 
     <!-- Popup chọn ảnh -->
     <BaseModal v-model="open" title="🖼 Chọn 2–3 ảnh để ghép" wide>
@@ -164,5 +182,8 @@ async function run() {
         <button @click="open = false" class="btn-brand">✅ Xong</button>
       </div>
     </BaseModal>
+
+    <!-- So sánh Trước/Sau -->
+    <CompareSlider v-model="compareOpen" :before="baseUrl" :after="afterUrl" title="🧩 So sánh Trước/Sau khi ghép" />
   </div>
 </template>

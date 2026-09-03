@@ -342,6 +342,7 @@ class StudioController extends Controller
             'images.*' => ['string', 'max:2048'],
             'prompt' => ['required', 'string', 'max:4000'],
             'layout' => ['nullable', 'string', 'max:100'],
+            'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
         ]);
 
         $imgs = array_values(array_slice($data['images'], 0, 3));
@@ -354,13 +355,22 @@ class StudioController extends Controller
             .'Blend the other '.count($refs).' reference image(s) naturally into the scene. '.$userPrompt;
 
         $cost = (int) studio_config('image_credits', 1);
+        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
 
-        return $this->queueGeneration('image', [
-            'prompt' => $finalPrompt,
-            'base_image' => $base,
-            'edit' => true,
-            'ref_images' => $refs,
-        ], $cost);
+        $items = [];
+        for ($i = 0; $i < $variants; $i++) {
+            $items[] = $this->queueGeneration('image', [
+                'prompt' => $finalPrompt,
+                'base_image' => $base,
+                'edit' => true,
+                'ref_images' => $refs,
+            ], $cost)->getData(true);
+        }
+
+        return response()->json([
+            'items' => $items,
+            'credits_left' => auth()->user()->fresh()->credits_balance,
+        ]);
     }
 
     /**
@@ -3542,6 +3552,7 @@ RULES:
             // Gợi ý từ ảnh — trạng thái + ngôn ngữ mặc định cho SuggestCard.
             'suggest_enabled' => studio_suggest_enabled(),
             'suggest_default_lang' => (string) studio_suggest_config('default_lang', 'en'),
+            'image_credits' => (int) studio_config('image_credits', 1),
         ]);
     }
 

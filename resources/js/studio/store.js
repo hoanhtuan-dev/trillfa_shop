@@ -13,6 +13,7 @@ export const useStudioStore = defineStore('studio', {
     preview: null,
     generations: [],
     creditsLeft: 0,
+    imageCreditCost: 1,  // chi phí credit cho 1 ảnh (load từ defaults)
     canvasImg: '',
     // film / reframe / swap share the source image (editSource || preview)
     editSource: null,
@@ -174,12 +175,22 @@ export const useStudioStore = defineStore('studio', {
       // 💡 Gợi ý từ ảnh — trạng thái + ngôn ngữ mặc định.
       if (defaults.suggest_enabled !== undefined) this.suggestEnabled = !!defaults.suggest_enabled;
       if (defaults.suggest_default_lang) this.suggestLang = defaults.suggest_default_lang === 'vi' ? 'vi' : 'en';
+      if (defaults.image_credits != null) this.imageCreditCost = Number(defaults.image_credits);
     },
     applyDefaults() {
       // Re-fetch and apply default values (used by reset button)
       this.loadDefaults();
     },
     async load() {
+      // Reset kết quả/canvas trước khi nạp lại để luôn phản ánh đúng dữ liệu server —
+      // ảnh đã xóa sẽ không "sống lại" sau khi tải lại trang (khởi động lại).
+      this.generations = [];
+      this.previewId = null;
+      this.preview = null;
+      this.editSource = null;
+      this.canvasImg = '';
+      this.canvasLayers = [];
+      this.activeLayerId = '';
       this.loadUpscaleMemory();
       // Load settings defaults from backend (set in Studio Settings page)
       await this.loadDefaults();
@@ -254,16 +265,16 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi tạo lại ảnh.', 'error'); return null; }
     },
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend)
-    async compose(images, prompt) {
+    async compose(images, prompt, variants = 1) {
       if (!Array.isArray(images) || images.length < 2 || !(prompt || '').trim()) { this.toast('Chọn ít nhất 2 ảnh + nhập mô tả.', 'error'); return null; }
       try {
-        const d = await this.api('/studio/compose', { images, prompt });
-        if (d.generation_id) {
-          this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'compose', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa ghép ảnh' });
-          if (d.credits_left != null) this.creditsLeft = d.credits_left;
-          this.pollGeneration(d.generation_id);
-        }
-        return d;
+        const d = await this.api('/studio/compose', { images, prompt, variants: Number(variants) || 1 });
+        const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
+        items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: it.credits_cost ?? 1, created_at: 'Vừa ghép ảnh' }));
+        if (items.length) this.setBatch(items.map(it => it.generation_id));
+        if (d.credits_left != null) this.creditsLeft = d.credits_left;
+        this.processQueue();
+        return items;
       } catch (e) { this.toast(e.message || 'Lỗi ghép ảnh.', 'error'); return null; }
     },
     async loadPalette(id) {
@@ -477,8 +488,24 @@ export const useStudioStore = defineStore('studio', {
     },
     panEnd() { this._drag = null; },
     async deleteGen(g) {
-      try { const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || 'Lỗi xóa.'); this.generations = this.generations.filter(x => x.id !== g.id); if (this.previewId === g.id) { this.previewId = null; this.preview = null; } this.toast('Đã xóa.'); return true; }
-      catch(e){ this.toast(e.message || 'Lỗi xóa.', 'error'); return false; }
+      try {
+        const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.message || 'Lỗi xóa.');
+        this.generations = this.generations.filter(x => x.id !== g.id);
+        // Gỡ luôn layer canvas trỏ tới ảnh vừa xóa, nếu không canvas vẫn hiển thị ảnh cũ
+        // (upscaleSrc ưu tiên active layer hơn preview).
+        const lid = String(g.id);
+        if (this.canvasLayers.some((l) => l.id === lid)) this.canvasLayers = this.canvasLayers.filter((l) => l.id !== lid);
+        if (this.activeLayerId === lid || this.previewId === g.id) {
+          const next = this.canvasLayers[0];
+          if (next) this.selectLayer(next);
+          else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
+        }
+        this.toast('Đã xóa.');
+        return true;
+      }
+      catch (e) { this.toast(e.message || 'Lỗi xóa.', 'error'); return false; }
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
     // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):
