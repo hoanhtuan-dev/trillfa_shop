@@ -241,7 +241,31 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
       finally { this.videoBusy = false; }
     },
-    wheelZoom(delta) { const f = delta > 0 ? 0.9 : 1.1; const nz = Math.max(0.25, Math.min(4, +(this.zoom * f).toFixed(2))); this.zoom = nz; },
+    // Zoom theo điểm chuột (cx, cy = px so với TÂM khung) — điểm ảnh dưới con trỏ
+    // không trôi khi phóng/thu (pan' = c*(1-k) + pan*k).
+    zoomAt(cx, cy, factor) {
+      const z0 = this.zoom;
+      const z1 = Math.max(0.1, Math.min(8, z0 * factor));
+      if (z1 === z0) return;
+      const k = z1 / z0;
+      this.zoom = z1;
+      this.pan = { x: cx * (1 - k) + this.pan.x * k, y: cy * (1 - k) + this.pan.y * k };
+    },
+    wheelZoom(e) {
+      // e có thể là event (kèm clientX/Y) hoặc số deltaY (tương thích cũ)
+      let cx = 0, cy = 0, delta;
+      if (typeof e === 'number') { delta = e; }
+      else {
+        delta = e.deltaY;
+        const cont = this.canvasZoom;
+        if (cont) {
+          const r = cont.getBoundingClientRect();
+          cx = e.clientX - r.left - r.width / 2;
+          cy = e.clientY - r.top - r.height / 2;
+        }
+      }
+      this.zoomAt(cx, cy, delta > 0 ? 1 / 1.15 : 1.15);
+    },
     // ── Canvas refs (set by StudioApp template refs; markRaw so Vue never proxies DOM nodes) ──
     setCanvasRefs(img, zoom) { this.cvImg = img ? markRaw(img) : null; this.canvasZoom = zoom ? markRaw(zoom) : null; },
     setBrushCanvas(el) { this.brushOverlay = el ? markRaw(el) : null; },
@@ -401,26 +425,15 @@ export const useStudioStore = defineStore('studio', {
     savePreset(name) { const n = (name || 'Preset ' + (this.upscalePresets.length + 1)).trim(); const existing = this.upscalePresets.find(p => p.name === n); const cfg = this.upscaleCfg(); if (existing) Object.assign(existing, cfg); else this.upscalePresets.push({ name: n, ...cfg }); this.saveUpscaleMemory(); this.toast('Đã lưu preset "' + n + '".'); },
     applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, skinDetail: p.skin ?? 4, lightShadow: p.light ?? 5 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
     deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
-    zoomIn() { this.zoom = Math.min(4, +(this.zoom + 0.25)); },
-    zoomOut() { this.zoom = Math.max(0.25, +(this.zoom - 0.25)); },
+    zoomIn() { this.zoomAt(0, 0, 1.5); },
+    zoomOut() { this.zoomAt(0, 0, 1 / 1.5); },
     zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
     panStart(e) { if (this._cropDrag) return; this._drag = { x: e.clientX, y: e.clientY, px: this.pan.x, py: this.pan.y }; },
     panMove(e) {
       if (!this._drag) return;
-      let x = this._drag.px + (e.clientX - this._drag.x);
-      let y = this._drag.py + (e.clientY - this._drag.y);
-      const m = this.canvasMetrics();
-      if (m) {
-        // LUÔN kéo được ảnh. Giới hạn theo KHUNG thật (crW/crH): cho phép kéo tới khi
-        // mép ảnh (sau zoom) chạm mép khung — không bao giờ trượt hẳn ảnh ra ngoài,
-        // và khi ảnh nhỏ hơn khung thì kéo được trong khoảng trống letterbox.
-        const imgW = m.vw * this.zoom, imgH = m.vh * this.zoom;
-        const limX = Math.abs(imgW - m.crW) / 2;
-        const limY = Math.abs(imgH - m.crH) / 2;
-        x = this._clamp(x, -limX, limX);
-        y = this._clamp(y, -limY, limY);
-      }
-      this.pan.x = x; this.pan.y = y;
+      // Pan TỰ DO, không giới hạn, không đọc layout mỗi event → kéo mượt không khựng.
+      this.pan.x = this._drag.px + (e.clientX - this._drag.x);
+      this.pan.y = this._drag.py + (e.clientY - this._drag.y);
     },
     panEnd() { this._drag = null; },
     async deleteGen(g) {
