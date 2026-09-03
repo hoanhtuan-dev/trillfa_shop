@@ -2365,6 +2365,9 @@ RULES:
         if (! $pose) {
             return response()->json(['message' => 'Không tìm thấy dáng.'], 422);
         }
+        if ($model) {
+            logger()->info('Swap face resolved', ['model_id' => $data['model_id'], 'name' => $model['name'], 'image' => $model['image'] ?? null]);
+        }
 
         // Pose reference image: prefer the client-sent one, fall back to the pose catalog image
         // (custom asset / DB preset / built-in sample) so the model can actually replicate the pose.

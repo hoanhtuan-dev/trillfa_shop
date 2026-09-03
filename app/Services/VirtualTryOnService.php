@@ -271,7 +271,7 @@ class VirtualTryOnService
             $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', reproduce this pose EXACTLY: '.$pose.' — body posture, stance, arm/leg placement and facing direction must match this pose precisely. '
                 .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
-                .'The '.$facePos.' is the reference face to apply. Apply the face from '.$facePos.' onto the model: match the facial features, skin tone and head angle of the reference face; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
+                .'The face in the result MUST be EXACTLY the face from '.$facePos.' (the reference face) — do NOT generate a different face, do NOT change the identity, do NOT use any other face. Apply the face from '.$facePos.' onto the model: match the facial features, skin tone and head angle of the reference face; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
                 .'Keep the hairstyle and head shape of '.$srcPos.'. ';
         } else {
             $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', reproduce this pose EXACTLY: '.$pose.' — body posture, stance, arm/leg placement and facing direction must match this pose precisely. '
@@ -290,7 +290,7 @@ class VirtualTryOnService
             .'Keep every print, pattern, embroidery, logo, button and zipper exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
             .'If the fabric is PLAIN or SOLID color, keep it PLAIN and SOLID — do NOT invent or add any pattern, print, motif, embroidery or logo that is not in the source image. '
             .'ALL accessories must be worn/carried in their EXACT anatomical position — watch STRICTLY on the wrist (never on the shoulder, arm or anywhere else), handbag held in hand or on shoulder, shoes STRICTLY on the feet, earrings on the ears, belt at the waist, hat on the head. Do NOT omit, move, or swap the position of ANY accessory. '
-            .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. ';
+            .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern; do NOT ADD any garment, accessory or item that is NOT present in the source image. ';
 
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
         // sắc nét, tránh mặt méo/lệch tỷ lệ và vải bị "airbrush" mất vân.
