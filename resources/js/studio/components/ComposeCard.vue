@@ -8,8 +8,7 @@ const store = useStudioStore();
 const prompt = ref('');
 const variants = ref(1);
 const busy = ref(false);
-const mode = ref('compose'); // 'compose' | 'tryon' | 'pattern'
-const patternDensity = ref('sparse'); // 'sparse' | 'medium' | 'dense'
+const mode = ref('compose'); // 'compose' | 'tryon'
 const open = ref(false);
 const uploading = ref(false);
 const uploaded = ref([]);   // [{ url, name }]
@@ -78,19 +77,12 @@ function roleLabel(i) { return '@image' + (i + 1); }
 // Vai trò slot theo chế độ
 const slotRoles = computed(() => mode.value === 'tryon'
   ? ['👗 Trang phục', '🧍 Pose', '🖼 Bối cảnh (tùy chọn)']
-  : mode.value === 'pattern'
-    ? ['🏷 Logo/hoạ tiết', '🧍 Người mẫu/Sản phẩm', '🎨 Tham chiếu (tùy chọn)']
-    : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+  : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
 function setTryon() {
   mode.value = 'tryon';
   prompt.value = 'mặc trang phục @image1 lên người mẫu theo dáng @image2, giữ đúng dáng và tỉ lệ cơ thể';
   store.toast('Thử đồ ảo: @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tùy chọn).');
-}
-function setPattern() {
-  mode.value = 'pattern';
-  prompt.value = 'biến logo @image1 thành pattern lặp lại làm nền, đặt người mẫu @image2 ở giữa';
-  store.toast('Phông pattern: @image1 = logo/hoạ tiết, @image2 = người mẫu/sản phẩm, @image3 = tham chiếu (tùy chọn).');
 }
 function setCompose() {
   mode.value = 'compose';
@@ -143,7 +135,7 @@ async function run() {
     finalPrompt += '. Pose detail: ' + selected.value[1].skeleton;
   }
   busy.value = true;
-  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, patternDensity.value);
+  const items = await store.compose(urls, finalPrompt, variants.value, mode.value);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
@@ -161,23 +153,10 @@ async function run() {
       <button @click="setTryon()"
               :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🕺 Thử đồ ảo</button>
-      <button @click="setPattern()"
-              :class="mode === 'pattern' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🖼 Phông pattern</button>
     </div>
     <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = 👗 trang phục · @image2 = 🧍 pose · @image3 = 🖼 bối cảnh (tùy chọn)
     </p>
-    <p v-if="mode === 'pattern'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
-      @image1 = 🏷 logo/hoạ tiết · @image2 = 🧍 người mẫu/sản phẩm · @image3 = 🎨 tham chiếu (tùy chọn)
-    </p>
-    <div v-if="mode === 'pattern'" class="mt-1.5 flex items-center gap-1.5 text-[11px] text-cream-200">
-      <span class="text-cream-300/60">Mật độ:</span>
-      <button @click="patternDensity = 'sparse'" :class="patternDensity === 'sparse' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="rounded-full px-2.5 py-1 font-semibold transition-colors">Thưa</button>
-      <button @click="patternDensity = 'medium'" :class="patternDensity === 'medium' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="rounded-full px-2.5 py-1 font-semibold transition-colors">Vừa</button>
-      <button @click="patternDensity = 'dense'" :class="patternDensity === 'dense' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="rounded-full px-2.5 py-1 font-semibold transition-colors">Dày</button>
-    </div>
-
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-3 grid grid-cols-3 gap-1.5">
       <button v-for="i in 3" :key="i" @click="openSlot(i - 1)"
