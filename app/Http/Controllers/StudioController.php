@@ -381,6 +381,7 @@ class StudioController extends Controller
             'layout' => ['nullable', 'string', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
             'mode' => ['nullable', 'string', 'in:compose,tryon,pattern'],
+            'density' => ['nullable', 'string', 'in:sparse,medium,dense'],
         ]);
 
         $imgs = array_values(array_slice($data['images'], 0, 3));
@@ -401,8 +402,16 @@ class StudioController extends Controller
             $finalPrompt .= ' '.$userPrompt;
         } elseif ($isPattern) {
             // Phông pattern từ logo: @image1 = logo/hoạ tiết → seamless pattern nền; @image2 = người mẫu/sản phẩm.
-            $finalPrompt = 'Turn the logo/graphic in @image1 into a seamless, repeating tileable pattern background (premium fashion, elegant spacing, no distortion, no blur). '
-                .'Then place the fashion subject in @image2 centered on that pattern background, keeping the subject sharp, natural and well-lit.';
+            $densityMap = [
+                'sparse' => 'sparse pattern with very generous spacing and small tile size (low density, airy, elegant)',
+                'medium' => 'moderate density with balanced spacing between repeats',
+                'dense'  => 'denser repeat with tighter spacing, each repeat still fully visible',
+            ];
+            $densityDesc = $densityMap[$data['density'] ?? 'sparse'] ?? $densityMap['sparse'];
+            $finalPrompt = 'Turn the logo/graphic in @image1 into a seamless, repeating tileable pattern background for a fashion photo backdrop. '
+                .$densityDesc.'. '
+                .'Keep the logo/graphic crisp, sharp and undistorted — no blur, no pixelation, no jaggies, no stretching, no moiré, no noise. '
+                .'Then place the fashion subject in @image2 centered on that pattern background, keeping the subject EXACTLY unchanged (same face, identity, pose, garment and proportions) — only change the background behind it. Keep the subject sharp and naturally lit.';
             if (count($refs) > 1) {
                 $finalPrompt .= ' Optionally blend the style/color of @image3 into the pattern.';
             }

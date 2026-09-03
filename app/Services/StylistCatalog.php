@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\StylistGarmentType;
 use App\Models\StylistQuestion;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * StylistCatalog — dữ liệu xương sống của ✨ Thuật sỹ (module hóa, dễ kế thừa/mở rộng).
@@ -11,8 +13,73 @@ use App\Models\StylistQuestion;
  */
 class StylistCatalog
 {
+    /**
+     * Tự tạo bảng + seed khi chưa có (shared hosting có thể không chạy được `php artisan migrate`).
+     * Chỉ chạy thật ở lần đầu; các lần sau Schema::hasTable trả true nên gần như không tốn gì.
+     */
+    public function ensureTables(): void
+    {
+        try {
+            if (Schema::hasTable('stylist_garment_types') && Schema::hasTable('stylist_questions')) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            // fall through để thử tạo
+        }
+
+        try {
+            Schema::create('stylist_garment_types', function (Blueprint $table) {
+                $table->id();
+                $table->string('slug', 40)->unique();
+                $table->string('name', 120);
+                $table->string('emoji', 8)->default('');
+                $table->string('color', 20)->default('#4a7a90');
+                $table->integer('sort_order')->default(0);
+                $table->timestamps();
+            });
+        } catch (\Throwable $e) {
+            // bảng đã tồn tại (race) — bỏ qua
+        }
+
+        try {
+            Schema::create('stylist_questions', function (Blueprint $table) {
+                $table->id();
+                $table->string('key', 40)->unique();
+                $table->string('question', 500);
+                $table->json('options');
+                $table->integer('sort_order')->default(0);
+                $table->timestamps();
+            });
+        } catch (\Throwable $e) {
+            // bảng đã tồn tại (race) — bỏ qua
+        }
+
+        // Seed nếu rỗng (idempotent)
+        try {
+            if (! StylistGarmentType::exists()) {
+                foreach ($this->defaultGarmentTypes() as $i => $t) {
+                    StylistGarmentType::firstOrCreate(
+                        ['slug' => $t['id']],
+                        ['name' => $t['name'], 'emoji' => $t['emoji'], 'color' => $t['color'], 'sort_order' => $i],
+                    );
+                }
+            }
+            if (! StylistQuestion::exists()) {
+                foreach ($this->defaultQuestions() as $i => $q) {
+                    StylistQuestion::firstOrCreate(
+                        ['key' => $q['key']],
+                        ['question' => $q['q'], 'options' => $q['opts'], 'sort_order' => $i],
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            // seed lỗi — không chặn luồng chính
+        }
+    }
+
     public function garmentTypes(): array
     {
+        $this->ensureTables();
         try {
             $rows = StylistGarmentType::orderBy('sort_order')->orderBy('id')->get();
         } catch (\Throwable $e) {
@@ -56,6 +123,7 @@ class StylistCatalog
      */
     public function questions(string $type): array
     {
+        $this->ensureTables();
         $g = $this->nameOf($type);
         try {
             $rows = StylistQuestion::orderBy('sort_order')->orderBy('id')->get();
