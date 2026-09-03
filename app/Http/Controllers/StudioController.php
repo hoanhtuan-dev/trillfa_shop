@@ -2370,26 +2370,29 @@ RULES:
             if ($scaled) { $fallback = $scaled; }
         }
 
-        // Post-process: upscale the result for higher resolution (DashScope image-super-resolution).
-        $upscaled = $this->applySuperResolution($fallback, (int) studio_config('swap_superres_scale', 2));
-        if ($upscaled) { $fallback = $upscaled; }
+        // Post-process: upscale (model image-super-resolution — KHÔNG có trên host intl, tắt mặc định).
+        if (studio_config('swap_superres', false)) {
+            $upscaled = $this->applySuperResolution($fallback, (int) studio_config('swap_superres_scale', 2));
+            if ($upscaled) { $fallback = $upscaled; }
+        }
 
-        // Post-process: enhance the face ONLY when swapping the face — when keeping the original face,
-        // skip so the model's original identity isn't drifted by the enhance model.
-        if ($changeFace) {
+        // Post-process: face-enhance khi đổi mặt (model face-image-enhance — KHÔNG có trên host intl, tắt mặc định).
+        if ($changeFace && studio_config('swap_face_enhance', false)) {
             $enhanced = $this->applyFaceEnhance($fallback);
             if ($enhanced) { $fallback = $enhanced; }
         }
 
-        // Safety: moderate the final image before saving (DashScope image-moderation, free).
-        if (! $this->moderateImage($fallback)) {
-            logger()->warning('Swap result flagged by moderation, replacing with fallback');
-            $gen->update(['status' => 'failed', 'error' => 'Kết quả không đạt kiểm duyệt nội dung. Vui lòng thử lại với ảnh khác.']);
-            return;
+        // Safety: moderate (model image-moderation — KHÔNG có trên host intl, tắt mặc định).
+        if (studio_config('swap_moderation', false)) {
+            if (! $this->moderateImage($fallback)) {
+                logger()->warning('Swap result flagged by moderation, replacing with fallback');
+                $gen->update(['status' => 'failed', 'error' => 'Kết quả không đạt kiểm duyệt nội dung. Vui lòng thử lại với ảnh khác.']);
+                return;
+            }
         }
 
-        // QA: score the final result against the ORIGINAL design image (garment preservation + quality).
-        $qaScores = $this->scoreSwapResult($fallback, (string) ($meta['image'] ?? ''));
+        // QA: score the final result (qwen3.8-flash / qwen-vl — bật mặc định, fail êm nếu rate-limit).
+        $qaScores = studio_config('swap_qa', true) ? $this->scoreSwapResult($fallback, (string) ($meta['image'] ?? '')) : null;
 
         $swapModel = studio_swap_model();
         $actualModel = $svc->lastModel() ?: $swapModel;

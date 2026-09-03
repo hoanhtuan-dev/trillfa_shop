@@ -264,12 +264,13 @@ class VirtualTryOnService
         // KHÔNG đưa prompt "render fabric texture" vào luồng — vân vải lấy NGUYÊN BẢN từ ảnh nguồn.
         $garmentLock = 'The clothing and ACCESSORIES shown in the image are the PRODUCT of this edit: they must appear in the result EXACTLY as they are — identical garment, same colors, silhouette, length, seams, folds and fabric. '
             .'PRESERVE every print, pattern, embroidery, logo, button, zipper, and the fabric texture exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
+            .'If the fabric is PLAIN or SOLID color, keep it PLAIN and SOLID — do NOT invent, add, or alter any pattern, print, motif, embroidery, logo or texture that is not already in the source image; never add new patterns to a plain fabric. '
             .'ALL accessories must be worn/carried correctly and exactly as shown: shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head — matching their color, style, material and placement precisely; do NOT omit, add or redesign any accessory. '
             .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. ';
 
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
         // sắc nét, tránh mặt méo/lệch tỷ lệ và vải bị "airbrush" mất vân.
-        $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, flat textureless fabric, airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
+        $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, invented or added patterns on plain fabric, altered prints or motifs, extra embroidery or logos not in the source, airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
 
         $instr = $garmentLock
             .$personClause

@@ -32,6 +32,10 @@ return [
     'swap_candidates' => (int) env('STUDIO_SWAP_CANDIDATES', 1), // 1 = nhanh; 2-3 = chọn bản đẹp nhất (chậm hơn)
     'swap_superres_scale' => (int) env('STUDIO_SWAP_SUPERRES_SCALE', 2), // upscale 2x/4x trước khi trả kết quả
     'swap_pose_image' => (bool) env('STUDIO_SWAP_POSE_IMAGE', true),  // gửi kèm ảnh dáng tham chiếu (pose ref)
+    'swap_superres' => (bool) env('STUDIO_SWAP_SUPERRES', false),          // upscale image-super-resolution (KHÔNG có trên host intl => mặc định tắt)
+    'swap_face_enhance' => (bool) env('STUDIO_SWAP_FACE_ENHANCE', false),  // face-image-enhance (mặc định tắt)
+    'swap_moderation' => (bool) env('STUDIO_SWAP_MODERATION', false),      // image-moderation (mặc định tắt)
+    'swap_qa' => (bool) env('STUDIO_SWAP_QA', true),                        // QA scoring (qwen3.8-flash — bật mặc định, fail êm khi rate-limit)
     'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
