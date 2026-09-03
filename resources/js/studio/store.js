@@ -411,16 +411,14 @@ export const useStudioStore = defineStore('studio', {
       let y = this._drag.py + (e.clientY - this._drag.y);
       const m = this.canvasMetrics();
       if (m) {
-        if (this.zoom <= 1) {
-          // Ảnh đã fit trọn khung → không cho kéo ra ngoài
-          x = 0; y = 0;
-        } else {
-          // Clamp để ảnh không bao giờ trượt hẳn khỏi khung (luôn thấy được toàn bộ khi kéo về biên)
-          const mx = Math.max(0, (m.vw * this.zoom - m.vw) / 2);
-          const my = Math.max(0, (m.vh * this.zoom - m.vh) / 2);
-          x = this._clamp(x, -mx, mx);
-          y = this._clamp(y, -my, my);
-        }
+        // LUÔN kéo được ảnh. Giới hạn theo KHUNG thật (crW/crH): cho phép kéo tới khi
+        // mép ảnh (sau zoom) chạm mép khung — không bao giờ trượt hẳn ảnh ra ngoài,
+        // và khi ảnh nhỏ hơn khung thì kéo được trong khoảng trống letterbox.
+        const imgW = m.vw * this.zoom, imgH = m.vh * this.zoom;
+        const limX = Math.abs(imgW - m.crW) / 2;
+        const limY = Math.abs(imgH - m.crH) / 2;
+        x = this._clamp(x, -limX, limX);
+        y = this._clamp(y, -limY, limY);
       }
       this.pan.x = x; this.pan.y = y;
     },
