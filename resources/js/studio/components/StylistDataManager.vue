@@ -93,7 +93,7 @@ async function deleteQuestion(q) {
 
       <div v-if="loading" class="py-8 text-center text-xs text-cream-300/60">⏳ Đang tải…</div>
       <div v-else class="space-y-2">
-        <div v-for="t in types" :key="t.id" class="flex items-center gap-3 rounded-xl border border-ink-700 bg-ink-900/60 p-2.5">
+        <div v-for="t in types" :key="t.slug" class="flex items-center gap-3 rounded-xl border border-ink-700 bg-ink-900/60 p-2.5">
           <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-900 text-lg" :style="{ boxShadow: 'inset 0 0 0 1px ' + (t.color || '#4a7a90') }">{{ t.emoji || '👗' }}</span>
           <div class="min-w-0 flex-1">
             <p class="truncate text-xs font-semibold text-cream-100">{{ t.name }}</p>
@@ -129,7 +129,7 @@ async function deleteQuestion(q) {
 
       <div v-if="loading" class="py-8 text-center text-xs text-cream-300/60">⏳ Đang tải…</div>
       <div v-else class="space-y-2">
-        <div v-for="q in questions" :key="q.id" class="rounded-xl border border-ink-700 bg-ink-900/60 p-3">
+        <div v-for="q in questions" :key="q.key" class="rounded-xl border border-ink-700 bg-ink-900/60 p-3">
           <div class="flex items-start gap-3">
             <span class="mt-0.5 shrink-0 rounded bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] text-brand-300">{{ q.key }}</span>
             <p class="min-w-0 flex-1 text-xs font-semibold text-cream-100">{{ q.q }}</p>

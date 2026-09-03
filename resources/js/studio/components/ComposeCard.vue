@@ -74,15 +74,22 @@ function makeBase(i) {
 
 function roleLabel(i) { return '@image' + (i + 1); }
 
-// Vai trò slot theo chế độ (thử đồ ảo = chiến lược)
+// Vai trò slot theo chế độ
 const slotRoles = computed(() => mode.value === 'tryon'
   ? ['👗 Trang phục', '🧍 Pose', '🖼 Bối cảnh (tùy chọn)']
-  : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+  : mode.value === 'pattern'
+    ? ['🏷 Logo/hoạ tiết', '🧍 Người mẫu/Sản phẩm', '🎨 Tham chiếu (tùy chọn)']
+    : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
 function setTryon() {
   mode.value = 'tryon';
   prompt.value = 'mặc trang phục @image1 lên người mẫu theo dáng @image2, giữ đúng dáng và tỉ lệ cơ thể';
   store.toast('Thử đồ ảo: @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tùy chọn).');
+}
+function setPattern() {
+  mode.value = 'pattern';
+  prompt.value = 'biến logo @image1 thành pattern lặp lại làm nền, đặt người mẫu @image2 ở giữa';
+  store.toast('Phông pattern: @image1 = logo/hoạ tiết, @image2 = người mẫu/sản phẩm, @image3 = tham chiếu (tùy chọn).');
 }
 function setCompose() {
   mode.value = 'compose';
@@ -153,9 +160,15 @@ async function run() {
       <button @click="setTryon()"
               :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🕺 Thử đồ ảo</button>
+      <button @click="setPattern()"
+              :class="mode === 'pattern' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🖼 Phông pattern</button>
     </div>
     <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = 👗 trang phục · @image2 = 🧍 pose · @image3 = 🖼 bối cảnh (tùy chọn)
+    </p>
+    <p v-if="mode === 'pattern'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+      @image1 = 🏷 logo/hoạ tiết · @image2 = 🧍 người mẫu/sản phẩm · @image3 = 🎨 tham chiếu (tùy chọn)
     </p>
 
     <!-- 3 slot ảnh: bấm để tải/chọn -->

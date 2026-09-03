@@ -19,20 +19,34 @@ class StylistDataController extends Controller
 
     public function data(): \Illuminate\Http\JsonResponse
     {
+        $catalog = app(\App\Services\StylistCatalog::class);
+        $defaultTypes = collect($catalog->defaultGarmentTypes())
+            ->map(fn ($t, $i) => ['id' => null, 'slug' => $t['id'], 'name' => $t['name'], 'emoji' => $t['emoji'], 'color' => $t['color'], 'sort_order' => $i])
+            ->values();
+        $defaultQuestions = collect($catalog->defaultQuestions())
+            ->map(fn ($q, $i) => ['id' => null, 'key' => $q['key'], 'q' => $q['q'], 'opts' => $q['opts'], 'sort_order' => $i])
+            ->values();
+
         try {
             $types = StylistGarmentType::orderBy('sort_order')->orderBy('id')->get()
                 ->map(fn ($r) => ['id' => $r->id, 'slug' => $r->slug, 'name' => $r->name, 'emoji' => $r->emoji, 'color' => $r->color, 'sort_order' => $r->sort_order])
                 ->values();
+            if ($types->isEmpty()) {
+                $types = $defaultTypes;
+            }
         } catch (\Throwable $e) {
-            $types = collect();
+            $types = $defaultTypes;
         }
 
         try {
             $questions = StylistQuestion::orderBy('sort_order')->orderBy('id')->get()
                 ->map(fn ($r) => ['id' => $r->id, 'key' => $r->key, 'q' => $r->question, 'opts' => $r->options ?? [], 'sort_order' => $r->sort_order])
                 ->values();
+            if ($questions->isEmpty()) {
+                $questions = $defaultQuestions;
+            }
         } catch (\Throwable $e) {
-            $questions = collect();
+            $questions = $defaultQuestions;
         }
 
         return response()->json(['types' => $types, 'questions' => $questions]);
