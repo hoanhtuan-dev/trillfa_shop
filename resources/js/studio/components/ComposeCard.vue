@@ -8,6 +8,7 @@ const store = useStudioStore();
 const prompt = ref('');
 const variants = ref(1);
 const busy = ref(false);
+const mode = ref('compose'); // 'compose' | 'tryon'
 const open = ref(false);
 const uploading = ref(false);
 const uploaded = ref([]);   // [{ url, name }]
@@ -65,6 +66,20 @@ function makeBase(i) {
 
 function roleLabel(i) { return '@image' + (i + 1); }
 
+// Vai trò slot theo chế độ (thử đồ ảo = chiến lược)
+const slotRoles = computed(() => mode.value === 'tryon'
+  ? ['👗 Trang phục', '🧍 Pose', '🖼 Bối cảnh (tùy chọn)']
+  : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+
+function setTryon() {
+  mode.value = 'tryon';
+  prompt.value = 'mặc trang phục @image1 lên người mẫu theo dáng @image2, giữ đúng dáng và tỉ lệ cơ thể';
+  store.toast('Thử đồ ảo: @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tùy chọn).');
+}
+function setCompose() {
+  mode.value = 'compose';
+}
+
 function insertTag(tag) {
   prompt.value = (prompt.value ? prompt.value + ' ' : '') + tag + ' ';
 }
@@ -105,7 +120,7 @@ async function run() {
   const urls = selectedImgs.value.map(g => g.url).filter(Boolean);
   baseUrl.value = urls[0] || '';
   busy.value = true;
-  const items = await store.compose(urls, prompt.value, variants.value);
+  const items = await store.compose(urls, prompt.value, variants.value, mode.value);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
@@ -115,6 +130,19 @@ async function run() {
     <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🧩 Ghép ảnh</h2>
     <p class="text-[11px] text-ink-500">Hòa trộn 2–3 ảnh thành 1.</p>
 
+    <!-- Chip chế độ -->
+    <div class="mt-2.5 flex gap-1.5">
+      <button @click="setCompose()"
+              :class="mode === 'compose' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🧩 Ghép tự do</button>
+      <button @click="setTryon()"
+              :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🕺 Thử đồ ảo</button>
+    </div>
+    <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+      @image1 = 👗 trang phục · @image2 = 🧍 pose · @image3 = 🖼 bối cảnh (tùy chọn)
+    </p>
+
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-3 grid grid-cols-3 gap-1.5">
       <button v-for="i in 3" :key="i" @click="openSlot(i - 1)"
@@ -123,14 +151,14 @@ async function run() {
         <template v-if="selected[i-1]">
           <img :src="selected[i-1].url" class="h-full w-full object-cover">
           <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ i }}</span>
-          <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ roleLabel(i-1) }}</span>
+          <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ slotRoles[i-1] }}</span>
           <span @click.stop="removeSlot(i-1)" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">✕</span>
           <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>
-          <span class="text-2xl text-ink-600">{{ i === 1 ? '🖼' : '＋' }}</span>
-          <span class="px-1 text-center text-[9px] text-cream-300/50">@image{{ i }}</span>
-          <span class="px-1 text-center text-[9px] text-cream-300/40">Bấm để tải ảnh</span>
+          <span class="text-xl text-ink-600">{{ i === 1 ? '🖼' : '＋' }}</span>
+          <span class="px-1 text-center text-[9px] font-medium text-cream-300/60">{{ slotRoles[i-1] }}</span>
+          <span class="px-1 text-center text-[9px] text-cream-300/40">@image{{ i }}</span>
         </template>
       </button>
     </div>
@@ -159,7 +187,7 @@ async function run() {
     <!-- Popup chọn/tải ảnh cho slot -->
     <BaseModal v-model="open" :title="'🖼 Tải ảnh cho ' + roleLabel(targetSlot)" wide>
       <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
-        <p class="font-semibold">💡 {{ roleLabel(targetSlot) }} = {{ targetSlot === 0 ? 'nền chính / bố cục' : 'ảnh ghép vào' }}</p>
+        <p class="font-semibold">💡 @image{{ targetSlot + 1 }} = {{ slotRoles[targetSlot] }}</p>
       </div>
 
       <!-- Tải từ máy -->

@@ -343,24 +343,37 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'layout' => ['nullable', 'string', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
+            'mode' => ['nullable', 'string', 'in:compose,tryon'],
         ]);
 
         $imgs = array_values(array_slice($data['images'], 0, 3));
         $base = (string) $imgs[0];
         $refs = array_slice($imgs, 1);
         $userPrompt = trim((string) $data['prompt']);
+        $isTryon = ($data['mode'] ?? '') === 'tryon';
+
+        // Thử đồ ảo (chiến lược): @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
+        if ($isTryon) {
+            $finalPrompt = 'Virtual try-on: put the garment in @image1 onto the model pose in @image2, '
+                .'keeping the pose, body proportions, skin tone and lighting of @image2. '
+                .'Make the garment fit naturally with correct drape, texture and shadows.';
+            if (count($refs) > 1) {
+                $finalPrompt .= ' Place the result into the background of @image3.';
+            }
+            $finalPrompt .= ' '.$userPrompt;
+        } else {
+            $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
+                .'The FIRST image is the main base (keep its subject and overall layout). '
+                .'Blend the other '.count($refs).' reference image(s) naturally into the scene. '.$userPrompt;
+        }
 
         // Định danh @image1/@image2/@image3 → mô tả chuẩn cho model hiểu đúng từng ảnh.
         $tagMap = [
-            '@image1' => 'the FIRST image (main base)',
-            '@image2' => 'the SECOND image (first reference)',
-            '@image3' => 'the THIRD image (second reference)',
+            '@image1' => 'the FIRST image',
+            '@image2' => 'the SECOND image',
+            '@image3' => 'the THIRD image',
         ];
-        $userPrompt = strtr($userPrompt, $tagMap);
-
-        $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
-            .'The FIRST image is the main base (keep its subject and overall layout). '
-            .'Blend the other '.count($refs).' reference image(s) naturally into the scene. '.$userPrompt;
+        $finalPrompt = strtr($finalPrompt, $tagMap);
 
         $cost = (int) studio_config('image_credits', 1);
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
