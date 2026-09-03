@@ -123,16 +123,16 @@ class VirtualTryOnService
 
     public function builtinPosePresets(): array
     {
-        $physique = 'a stylish, edgy young Vietnamese fashion model with a slim figure, slim waist, long toned legs and a beautiful delicate face, ';
+        // Pose chỉ mô tả TƯ THẾ (không lẫn phom người) — phom người đưa riêng vào prompt (physique).
         return [
-            ['id' => 'pose01', 'name' => 'Đứng thẳng', 'skeleton' => $physique.'standing straight and elegant, arms relaxed at sides, one foot slightly forward, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-01.png'],
-            ['id' => 'pose02', 'name' => 'Tay chống hông', 'skeleton' => $physique.'standing with one hand on hip, weight on one leg, chin slightly up, confident, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-02.png'],
-            ['id' => 'pose03', 'name' => 'Sải bước catwalk', 'skeleton' => $physique.'walking mid-stride catwalk, one hand on hip, dynamic and confident, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-03.png'],
-            ['id' => 'pose04', 'name' => 'Nghiêng người', 'skeleton' => $physique.'standing at a slight angle, one shoulder forward, one hand lightly brushing hair, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-04.png'],
-            ['id' => 'pose05', 'name' => 'Ngồi ghế', 'skeleton' => $physique.'sitting gracefully on a high stool, back straight, one leg extended, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-05.png'],
-            ['id' => 'pose06', 'name' => 'Tay đút túi', 'skeleton' => $physique.'standing in relaxed side profile, one hand in pocket, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-06.png'],
-            ['id' => 'pose07', 'name' => 'Xoay lưng', 'skeleton' => $physique.'back view turned away, glancing over one shoulder, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-07.png'],
-            ['id' => 'pose08', 'name' => 'Tựa tường', 'skeleton' => $physique.'leaning lightly against a wall, one leg bent, arms relaxed, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-08.png'],
+            ['id' => 'pose01', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight and elegant, arms relaxed at sides, weight even, one foot slightly forward, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-01.png'],
+            ['id' => 'pose02', 'name' => 'Tay chống hông', 'skeleton' => 'standing with one hand on hip, weight on one leg, chin slightly up, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-02.png'],
+            ['id' => 'pose03', 'name' => 'Sải bước catwalk', 'skeleton' => 'walking mid-stride catwalk, one hand on hip, dynamic confident stride, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-03.png'],
+            ['id' => 'pose04', 'name' => 'Nghiêng người', 'skeleton' => 'standing at a slight angle, one shoulder forward, one hand lightly brushing hair, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-04.png'],
+            ['id' => 'pose05', 'name' => 'Ngồi ghế', 'skeleton' => 'sitting gracefully on a high stool, back straight, one leg extended, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-05.png'],
+            ['id' => 'pose06', 'name' => 'Tay đút túi', 'skeleton' => 'standing in relaxed side profile, one hand in pocket, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-06.png'],
+            ['id' => 'pose07', 'name' => 'Xoay lưng', 'skeleton' => 'back view turned away, glancing over one shoulder, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-07.png'],
+            ['id' => 'pose08', 'name' => 'Tựa tường', 'skeleton' => 'leaning lightly against a wall, one leg bent, arms relaxed, full body head to toe', 'image' => '/storage/studio/dang-nguoi-mau/pose-08.png'],
         ];
     }
 
@@ -268,7 +268,8 @@ class VirtualTryOnService
 
         if ($inlineFace) {
             // 1 pass: dress model + apply face from reference, giữ nguyên trang phục/phụ kiện/mũ.
-            $personClause = 'Dress a full-body model in the EXACT clothing and accessories shown in '.$srcPos.'. The face MUST be the face from '.$facePos.' (reference face) — do NOT change or generate a different face. Pose EXACTLY: '.$pose.'. ';
+            $physique = 'a stylish, edgy young Vietnamese fashion model with a slim figure, slim waist, long toned legs and a beautiful delicate face';
+            $personClause = 'Dress a full-body model ('.$physique.') in the EXACT clothing and accessories shown in '.$srcPos.'. The face MUST be the face from '.$facePos.' (reference face) — do NOT change or generate a different face. Pose EXACTLY: '.$pose.'. ';
         } else {
             $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', reproduce this pose EXACTLY: '.$pose.' — body posture, stance, arm/leg placement and facing direction must match this pose precisely. '
                 .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '

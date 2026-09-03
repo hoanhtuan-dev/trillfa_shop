@@ -31,7 +31,7 @@ return [
     'swap_model' => env('STUDIO_SWAP_MODEL', ''), // '' = dùng chung qwen_edit_model (giống Inpaint: qwen-image-edit-max)
     'swap_candidates' => (int) env('STUDIO_SWAP_CANDIDATES', 1), // 1 = nhanh; 2-3 = chọn bản đẹp nhất (chậm hơn)
     'swap_superres_scale' => (int) env('STUDIO_SWAP_SUPERRES_SCALE', 2), // upscale 2x/4x trước khi trả kết quả
-    'swap_pose_image' => (bool) env('STUDIO_SWAP_POSE_IMAGE', true),  // gửi ảnh dáng (pose ref) để áp dụng đúng tư thế
+    'swap_pose_image' => (bool) env('STUDIO_SWAP_POSE_IMAGE', false), // pose dùng MÔ TẢ (không gửi ảnh) — tránh crop/biến dạng
     'swap_face_inline' => (bool) env('STUDIO_SWAP_FACE_INLINE', true),  // true = 1 pass (mặt + đồ, 2 ảnh) — ổn định, mặc đúng mẫu
     'swap_superres' => (bool) env('STUDIO_SWAP_SUPERRES', false),          // upscale image-super-resolution (KHÔNG có trên host intl => mặc định tắt)
     'swap_face_enhance' => (bool) env('STUDIO_SWAP_FACE_ENHANCE', false),  // face-image-enhance (mặc định tắt)
