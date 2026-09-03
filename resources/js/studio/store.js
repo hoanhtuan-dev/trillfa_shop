@@ -89,6 +89,8 @@ export const useStudioStore = defineStore('studio', {
     _inpaintBrushLast: null,
     _inpaintDrag: null,
     _inpaintHandle: null,
+    _inpaintRaf: null,           // rAF id cho drag batching (mượt như crop)
+    _inpaintPending: null,       // pointermove chờ flush
     // Canvas mask overlay (dùng chung cho Inpaint brush trên canvas chính)
     brushOverlay: null,
     _brushCanvas: null,
@@ -517,13 +519,15 @@ export const useStudioStore = defineStore('studio', {
       try { await this.api('/studio/generations/' + this.inpaintGenId + '/cancel', {}); this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
       catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
     },
-    clearInpaintStatus() { this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; },
+    clearInpaintStatus() { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; },
     // ── Inpaint Mask: chọn vùng trên ảnh preview (integrated into InpaintCard) ──
     toggleInpaintMask(mode) {
-      if (this.inpaintMaskMode === mode) { this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; return; }
+      if (this.inpaintMaskMode === mode) { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; return; }
       if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
+      if (this._inpaintDrag) this._inpaintStopDrag();
       this.inpaintMaskMode = mode;
       this.inpaintBrushData = '';
+      this.inpaintMaskBox = { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }; // khung mặc định khi bật
       if (mode === 'brush') this._initInpaintBrush();
     },
     inpaintMaskPointer(e) {
@@ -534,71 +538,118 @@ export const useStudioStore = defineStore('studio', {
       const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
       return { nx, ny };
     },
-    inpaintHandleDown(e, key) {
-      if (this.inpaintMaskMode === 'none') return;
-      e.stopPropagation();
-      const p = this.inpaintMaskPointer(e); if (!p) return;
-      this._inpaintHandle = key;
-      this._inpaintDrag = { x: p.nx, y: p.ny, box: { ...this.inpaintMaskBox } };
-    },
+    // Bắt đầu thao tác mask: kéo tạo vùng mới / di chuyển / resize handle / vẽ brush.
+    // Dùng window-level pointer listeners (giống crop) để kéo MƯỢT — không bị mất
+    // khi chuột đi nhanh hoặc ra khỏi overlay (pointer capture implicit qua window).
     inpaintMaskStart(e) {
       if (this.inpaintMaskMode === 'none') return;
       e.stopPropagation();
       const p = this.inpaintMaskPointer(e); if (!p) return;
+      // Drag cũ còn dở (bấm nhanh 2 lần trước khi nhả) → đóng sạch trước.
+      if (this._inpaintDrag) this._inpaintStopDrag();
+      const handlers = { move: (ev) => this._inpaintQueue(ev), up: () => this._inpaintStopDrag() };
       if (this.inpaintMaskMode === 'brush') {
         this._inpaintBrushDrawing = true;
-        this._inpaintBrushLast = p;
+        this._inpaintDrag = { key: 'brush', sx: e.clientX, sy: e.clientY, last: p, handlers };
         this._drawInpaintBrushDot(p);
-        return;
-      }
-      const b = this.inpaintMaskBox;
-      const hit = this._inpaintHitTest(p, b);
-      if (hit) {
-        this._inpaintHandle = hit;
-        this._inpaintDrag = { x: p.nx, y: p.ny, box: { ...b } };
       } else {
-        this._inpaintHandle = null;
-        this._inpaintDrag = { x: p.nx, y: p.ny };
-        this.inpaintMaskBox = { x: p.nx, y: p.ny, w: 0.005, h: 0.005 };
+        const b = this.inpaintMaskBox || { x: 0, y: 0, w: 0, h: 0 };
+        // Chỉ hit-test khi đã có vùng đủ lớn — không thì kéo tạo vùng mới
+        const hit = (b.w >= 0.02 && b.h >= 0.02) ? this._inpaintHitTest(p, b) : null;
+        if (hit) {
+          // Bắt đầu di chuyển ('move') hoặc kéo 1 handle ('nw'/'ne'/'sw'/'se')
+          this._inpaintDrag = { key: hit, sx: e.clientX, sy: e.clientY, box: { ...b }, handlers };
+        } else {
+          // Kéo tạo vùng chọn mới từ điểm nhấn
+          this._inpaintDrag = { key: 'draw', sx: e.clientX, sy: e.clientY, box: { x: p.nx, y: p.ny, w: 0, h: 0 }, handlers };
+          this.inpaintMaskBox = { x: p.nx, y: p.ny, w: 0, h: 0 };
+        }
       }
+      window.addEventListener('pointermove', handlers.move);
+      window.addEventListener('pointerup', handlers.up);
+      window.addEventListener('pointercancel', handlers.up);
     },
-    inpaintMaskMove(e) {
-      if (this.inpaintMaskMode === 'none') return;
-      if (this.inpaintMaskMode === 'brush' && this._inpaintBrushDrawing) {
-        const p = this.inpaintMaskPointer(e); if (!p) return;
-        this._drawInpaintBrushLine(this._inpaintBrushLast, p);
-        this._inpaintBrushLast = p;
-        return;
-      }
+    // Batch pointermoves qua rAF — kéo không giật, không đọc layout mỗi event.
+    _inpaintQueue(e) {
+      if (!this._inpaintDrag) return;
+      this._inpaintPending = e;
+      if (this._inpaintRaf) return;
+      const flush = () => {
+        this._inpaintRaf = null;
+        const ev = this._inpaintPending; this._inpaintPending = null;
+        if (ev && this._inpaintDrag) this._inpaintDragMove(ev);
+      };
+      if (typeof requestAnimationFrame === 'function') this._inpaintRaf = requestAnimationFrame(flush);
+      else flush();
+    },
+    _inpaintDragMove(e) {
       const d = this._inpaintDrag; if (!d) return;
-      const p = this.inpaintMaskPointer(e); if (!p) return;
-      if (this._inpaintHandle) {
-        const bx = (p.nx - d.x), by = (p.ny - d.y);
-        const b = { ...d.box }; const MIN = 0.02;
-        const h = this._inpaintHandle;
-        if (h === 'move') { b.x = this._clamp(b.x + bx, 0, 1 - b.w); b.y = this._clamp(b.y + by, 0, 1 - b.h); }
-        else if (h === 'se') { b.w = this._clamp(b.w + bx, MIN, 1 - b.x); b.h = this._clamp(b.h + by, MIN, 1 - b.y); }
-        else if (h === 'sw') { const nw = this._clamp(b.w - bx, MIN, b.x + b.w); b.x = b.x + b.w - nw; b.w = nw; b.h = this._clamp(b.h + by, MIN, 1 - b.y); }
-        else if (h === 'ne') { b.w = this._clamp(b.w + bx, MIN, 1 - b.x); const nh = this._clamp(b.h - by, MIN, b.y + b.h); b.y = b.y + b.h - nh; b.h = nh; }
-        else if (h === 'nw') { const nw = this._clamp(b.w - bx, MIN, b.x + b.w); b.x = b.x + b.w - nw; b.w = nw; const nh = this._clamp(b.h - by, MIN, b.y + b.h); b.y = b.y + b.h - nh; b.h = nh; }
-        this.inpaintMaskBox = b;
-      } else {
-        const x = Math.min(d.x, p.nx), y = Math.min(d.y, p.ny);
-        this.inpaintMaskBox = { x, y, w: Math.max(0.005, Math.abs(p.nx - d.x)), h: Math.max(0.005, Math.abs(p.ny - d.y)) };
+      const m = this.canvasMetrics(); if (!m) return;
+      if (d.key === 'brush') {
+        const p = this.inpaintMaskPointer(e); if (!p) return;
+        this._drawInpaintBrushLine(d.last || p, p);
+        d.last = p;
+        return;
       }
+      const bx = (e.clientX - d.sx) / m.vw, by = (e.clientY - d.sy) / m.vh;
+      const b = { ...(d.box || { x: 0.15, y: 0.15, w: 0.7, h: 0.7 }) };
+      const MIN = 0.02;
+      const cl = (v, lo, hi) => this._clamp(v, lo, Math.max(lo, hi));
+      if (d.key === 'move') {
+        b.x = this._clamp(b.x + bx, 0, 1 - b.w);
+        b.y = this._clamp(b.y + by, 0, 1 - b.h);
+      } else if (d.key === 'draw') {
+        const ox = d.box.x, oy = d.box.y;
+        const cx = this._clamp(ox + bx, 0, 1), cy = this._clamp(oy + by, 0, 1);
+        b.x = Math.min(ox, cx); b.y = Math.min(oy, cy);
+        b.w = Math.max(MIN, Math.abs(cx - ox));
+        b.h = Math.max(MIN, Math.abs(cy - oy));
+      } else {
+        // Kéo handle: góc đối diện neo cố định
+        const { x: x0, y: y0, w: w0, h: h0 } = d.box;
+        const right = x0 + w0, bottom = y0 + h0;
+        let x = x0, y = y0, w = w0, h = h0;
+        if (d.key === 'se') { w = cl(w0 + bx, MIN, 1 - x0); h = cl(h0 + by, MIN, 1 - y0); }
+        else if (d.key === 'sw') { w = cl(w0 - bx, MIN, right); x = right - w; h = cl(h0 + by, MIN, 1 - y0); }
+        else if (d.key === 'ne') { w = cl(w0 + bx, MIN, 1 - x0); h = cl(h0 - by, MIN, bottom); y = bottom - h; }
+        else if (d.key === 'nw') { w = cl(w0 - bx, MIN, right); x = right - w; h = cl(h0 - by, MIN, bottom); y = bottom - h; }
+        b.x = x; b.y = y; b.w = w; b.h = h;
+      }
+      this.inpaintMaskBox = b;
     },
-    inpaintMaskStop() {
+    // Kết thúc drag: gỡ window listeners, finalize brush, reset nếu vùng quá nhỏ.
+    _inpaintStopDrag() {
+      const d = this._inpaintDrag;
       this._inpaintDrag = null;
       this._inpaintHandle = null;
+      this._inpaintPending = null;
+      if (this._inpaintRaf != null) {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._inpaintRaf);
+        this._inpaintRaf = null;
+      }
+      if (d && d.handlers) {
+        window.removeEventListener('pointermove', d.handlers.move);
+        window.removeEventListener('pointerup', d.handlers.up);
+        window.removeEventListener('pointercancel', d.handlers.up);
+      }
       if (this._inpaintBrushDrawing) {
         this._inpaintBrushDrawing = false;
         this._inpaintBrushLast = null;
         this._finalizeInpaintBrush();
+      } else if (this.inpaintMaskMode === 'rect') {
+        // Vùng vừa vẽ quá nhỏ (click nhầm) → reset để không còn khung lơ lửng
+        const b = this.inpaintMaskBox;
+        if (!b || b.w < 0.02 || b.h < 0.02) this.inpaintMaskBox = { x: 0, y: 0, w: 0, h: 0 };
       }
     },
+    // Alias cho pointerup fallback nếu template vẫn gọi
+    inpaintMaskStop() { this._inpaintStopDrag(); },
     _inpaintHitTest(p, b) {
-      if (b.w < 0.02 || b.h < 0.02) return null;
-      const M = 0.05;
+      if (!b || b.w < 0.02 || b.h < 0.02) return null;
+      // Margin bắt handle theo PIXEL thật trên màn hình (≈ 26px quanh góc) —
+      // không phải % cố định → dễ bắt góc dù ảnh nhỏ hay zoom xa.
+      const m = this.canvasMetrics();
+      const M = m ? Math.max(0.025, 26 / m.vw) : 0.06;
       const corners = [['nw', b.x, b.y], ['ne', b.x + b.w, b.y], ['sw', b.x, b.y + b.h], ['se', b.x + b.w, b.y + b.h]];
       for (const [k, cx, cy] of corners) { if (Math.abs(p.nx - cx) <= M && Math.abs(p.ny - cy) <= M) return k; }
       if (p.nx >= b.x && p.nx <= b.x + b.w && p.ny >= b.y && p.ny <= b.y + b.h) return 'move';

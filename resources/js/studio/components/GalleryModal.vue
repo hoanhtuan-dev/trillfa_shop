@@ -38,17 +38,66 @@ async function doDelete() {
 }
 
 // ── Zoom / pan (local, không đụng zoom của canvas) ──
+// ZOOM_MIN = 1 → ảnh luôn hiển thị ĐẦY ĐỦ (fit) trong khung khi mở / khi thu nhỏ nhất.
+// Zoom giữ nguyên điểm ảnh ngay dưới con trỏ (zoom-to-cursor), pan bị chặn ở biên để
+// không kéo ảnh ra khỏi khung / không tạo khoảng trống khi ảnh còn nhỏ hơn khung.
 const viewerZoom = ref(1);
 const viewerPan = ref({ x: 0, y: 0 });
+const zoomArea = ref(null);
+const imgEl = ref(null);
+const dragging = ref(false);
 let drag = null;
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 6;
+
 function resetZoom() { viewerZoom.value = 1; viewerPan.value = { x: 0, y: 0 }; }
-function onWheel(e) { const f = e.deltaY > 0 ? 1 / 1.15 : 1.15; viewerZoom.value = Math.max(0.25, Math.min(4, viewerZoom.value * f)); }
-function zoomIn() { viewerZoom.value = Math.min(4, viewerZoom.value * 1.25); }
-function zoomOut() { viewerZoom.value = Math.max(0.25, viewerZoom.value / 1.25); }
-function panStart(e) { drag = { x: e.clientX, y: e.clientY, px: viewerPan.value.x, py: viewerPan.value.y }; }
-function panMove(e) { if (drag) viewerPan.value = { x: drag.px + (e.clientX - drag.x), y: drag.py + (e.clientY - drag.y) }; }
-function panEnd() { drag = null; }
-function toggleZoom() { viewerZoom.value = viewerZoom.value <= 1 ? 2 : 1; }
+
+// Chặn pan tại biên: ảnh không được trôi ra ngoài khung; nếu nhỏ hơn khung → ép về giữa.
+function clampPan() {
+  const area = zoomArea.value, img = imgEl.value;
+  if (!area || !img) return;
+  const z = viewerZoom.value;
+  const mx = Math.max(0, (img.offsetWidth * z - area.clientWidth) / 2);
+  const my = Math.max(0, (img.offsetHeight * z - area.clientHeight) / 2);
+  const p = viewerPan.value;
+  const nx = Math.min(mx, Math.max(-mx, p.x));
+  const ny = Math.min(my, Math.max(-my, p.y));
+  if (nx !== p.x || ny !== p.y) viewerPan.value = { x: nx, y: ny };
+}
+
+// cx, cy = toạ độ con trỏ so với TÂM vùng zoom. Sau scale k lần, dịch pan để điểm
+// ảnh dưới con trỏ giữ nguyên vị trí màn hình: pan' = c*(1-k) + pan*k.
+function zoomTo(cx, cy, factor) {
+  const z0 = viewerZoom.value;
+  let z1 = z0 * factor;
+  if (z1 < ZOOM_MIN) z1 = ZOOM_MIN;
+  if (z1 > ZOOM_MAX) z1 = ZOOM_MAX;
+  if (z1 === z0) return;
+  const k = z1 / z0;
+  viewerZoom.value = z1;
+  viewerPan.value = { x: cx * (1 - k) + viewerPan.value.x * k, y: cy * (1 - k) + viewerPan.value.y * k };
+  clampPan();
+}
+
+function onWheel(e) {
+  const area = zoomArea.value;
+  if (!area) return;
+  const rect = area.getBoundingClientRect();
+  const cx = e.clientX - rect.left - rect.width / 2;
+  const cy = e.clientY - rect.top - rect.height / 2;
+  zoomTo(cx, cy, e.deltaY > 0 ? 1 / 1.15 : 1.15);
+}
+function zoomIn() { zoomTo(0, 0, 1.5); }
+function zoomOut() { zoomTo(0, 0, 1 / 1.5); }
+function panStart(e) {
+  if (viewerZoom.value <= ZOOM_MIN) return; // chưa phóng to thì không cần kéo
+  dragging.value = true;
+  drag = { x: e.clientX, y: e.clientY, px: viewerPan.value.x, py: viewerPan.value.y };
+  if (e.currentTarget.setPointerCapture) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} }
+}
+function panMove(e) { if (drag) { viewerPan.value = { x: drag.px + (e.clientX - drag.x), y: drag.py + (e.clientY - drag.y) }; clampPan(); } }
+function panEnd() { drag = null; dragging.value = false; }
+function toggleZoom() { zoomTo(0, 0, viewerZoom.value <= ZOOM_MIN + 0.01 ? 2 : 1 / 2); }
 
 // ── Dải thumbnail: wheel + kéo để cuộn ngang ──
 const stripEl = ref(null);
@@ -138,12 +187,14 @@ onBeforeUnmount(() => {
         <video v-if="isVideo && current?.media_url" :src="current.media_url" controls autoplay loop muted playsinline
                class="max-h-full max-w-full rounded-xl object-contain"></video>
         <!-- Ảnh: zoom / pan -->
-        <div v-else-if="current?.media_url && !imgError" class="grid h-full w-full cursor-grab place-items-center overflow-hidden active:cursor-grabbing" style="touch-action:none"
+        <div ref="zoomArea" v-else-if="current?.media_url && !imgError" class="grid h-full w-full cursor-grab place-items-center overflow-hidden active:cursor-grabbing" style="touch-action:none"
              @wheel.prevent="onWheel"
              @pointerdown="panStart" @pointermove="panMove" @pointerup="panEnd" @pointerleave="panEnd">
-          <img :src="current.media_url" class="max-h-full max-w-full select-none object-contain transition-transform duration-75"
-               :style="{ transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + viewerZoom + ')' }" draggable="false"
-               @dblclick="toggleZoom" @error="imgError = true" />
+          <img ref="imgEl" :src="current.media_url"
+               class="max-h-full max-w-full select-none object-contain"
+               :class="dragging ? 'transition-none' : 'transition-transform duration-100 ease-out'"
+               :style="{ transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + viewerZoom + ')' }"
+               draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="clampPan" />
         </div>
         <p v-else class="text-sm text-cream-300/60">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
         <!-- Badge trạng thái -->
