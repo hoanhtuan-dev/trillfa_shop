@@ -40,59 +40,9 @@ async function runMultiView() {
   store.toast('Đã render ' + enabled.length + ' góc chụp.');
 }
 
-// ── Ghép (thay thế) khuôn mặt ──
-const fsOpen = ref(false);
-const fsBusy = ref(false);
-const fsFaces = ref([]);
-const fsSelected = ref(null);
-async function loadFaces() {
-  try {
-    const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
-    const d = await r.json();
-    // CHỈ hiển thị khuôn mặt CÓ ẢNH THẬT — face chỉ có mô tả (image null) sẽ khiến model
-    // thay bằng text thay vì khuôn mặt thật.
-    fsFaces.value = (d.items || []).filter(f => f.image);
-  } catch (e) { fsFaces.value = []; }
-}
-async function runFaceSwap() {
-  const img = store.upscaleSrc || store.preview?.media_url;
-  if (!img) { store.toast('Chọn ảnh người mẫu để thay khuôn mặt.', 'error'); return; }
-  if (!fsSelected.value?.image) { store.toast('Chọn một khuôn mặt.', 'error'); return; }
-  fsBusy.value = true;
-  await store.faceSwap(img, fsSelected.value.image);
-  fsBusy.value = false;
-  fsOpen.value = false;
-}
-
-// Tải khuôn mặt tùy chỉnh từ máy
-const fsUploading = ref(false);
-const fsFileEl = ref(null);
-const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-async function uploadFace(e) {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  fsUploading.value = true;
-  try {
-    const fd = new FormData();
-    fd.append('image', file);
-    const res = await fetch('/studio/upload-ref', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(d.message || 'Lỗi tải khuôn mặt.');
-    const img = { id: 'up-' + Date.now(), name: file.name.replace(/\.[^.]+$/, ''), image: d.url };
-    fsFaces.value.push(img);
-    fsSelected.value = img;
-    store.toast('Đã tải khuôn mặt lên.');
-  } catch (err) {
-    store.toast(err.message || 'Lỗi tải khuôn mặt.', 'error');
-  } finally {
-    fsUploading.value = false;
-    if (fsFileEl.value) fsFileEl.value.value = '';
-  }
-}
-
 const now = ref(Date.now());
 let timer = null;
-onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); loadFaces(); });
+onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
 onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 
 const elapsedSec = computed(() => store.inpaintStartTs ? Math.max(0, Math.floor((now.value - store.inpaintStartTs) / 1000)) : 0);
@@ -172,10 +122,6 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
                 class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
           📐 Render đa góc
         </button>
-        <button @click="fsOpen = true"
-                class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
-          👤 Thay khuôn mặt
-        </button>
       </div>
     </div>
 
@@ -207,38 +153,6 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
         <span class="text-xs text-cream-300/70">Đã chọn: <b class="text-brand-300">{{ mvCount }}/4 góc</b></span>
         <button @click="runMultiView" :disabled="mvBusy || !mvCount" class="btn-brand whitespace-nowrap">
           {{ mvBusy ? 'Đang render…' : '📐 Render ' + mvCount + ' góc' }}
-        </button>
-      </div>
-    </BaseModal>
-
-    <!-- Modal thay khuôn mặt -->
-    <BaseModal v-model="fsOpen" title="👤 Thay khuôn mặt cho người mẫu" wide>
-      <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
-        <p class="font-semibold">💡 Chọn 1 khuôn mặt để ghép lên ảnh người mẫu đang chọn.</p>
-        <p class="mt-1 text-brand-100/80">AI giữ nguyên dáng, trang phục, bối cảnh và ánh sáng — chỉ thay khuôn mặt.</p>
-      </div>
-
-      <label class="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand-500/40 bg-brand-900/20 px-3 py-2.5 text-xs font-semibold text-brand-200 transition hover:bg-brand-900/40">
-        <span>{{ fsUploading ? '⏳ Đang tải lên…' : '📤 Tải khuôn mặt từ máy' }}</span>
-        <input ref="fsFileEl" type="file" accept="image/*" class="hidden" @change="uploadFace">
-      </label>
-
-      <div v-if="fsFaces.length" class="grid grid-cols-4 gap-2 sm:grid-cols-5">
-        <button v-for="f in fsFaces" :key="f.id" @click="fsSelected = f"
-                class="relative aspect-square overflow-hidden rounded-xl border-2 transition"
-                :class="fsSelected?.id === f.id ? 'border-brand-500 ring-2 ring-brand-500/40' : 'border-ink-700 hover:border-ink-500'">
-          <img v-if="f.image" :src="f.image" class="h-full w-full bg-ink-900 object-cover" loading="lazy">
-          <span v-else class="grid h-full w-full place-items-center bg-ink-800 text-xl">👩</span>
-          <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ f.name }}</span>
-        </button>
-      </div>
-      <p v-else class="rounded-2xl border border-dashed border-ink-600 p-4 text-center text-xs text-cream-300/60">Chưa có khuôn mặt — thêm trong <b>Settings → Face Presets</b>.</p>
-      <p v-if="fsFaces.length" class="mt-2 text-[10px] text-cream-300/50">⚠️ Chỉ hiển thị khuôn mặt <b>có ảnh thật</b>. Khuôn mặt chỉ có mô tả (chưa upload ảnh) sẽ không hiện — hãy thêm ảnh trong <b>Settings → Face Presets → Ảnh tham chiếu</b>.</p>
-
-      <div class="mt-4 flex items-center justify-between">
-        <span class="text-xs text-cream-300/70">{{ fsSelected ? 'Đã chọn: <b class="text-brand-300">' + fsSelected.name + '</b>' : 'Chưa chọn khuôn mặt' }}</span>
-        <button @click="runFaceSwap" :disabled="fsBusy || !fsSelected" class="btn-brand whitespace-nowrap">
-          {{ fsBusy ? 'Đang ghép…' : '👤 Thay khuôn mặt' }}
         </button>
       </div>
     </BaseModal>

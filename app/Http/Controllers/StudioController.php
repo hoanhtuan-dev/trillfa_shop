@@ -407,7 +407,7 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'layout' => ['nullable', 'string', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
-            'mode' => ['nullable', 'string', 'in:compose,tryon'],
+            'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap'],
         ]);
 
         $imgs = array_values(array_slice($data['images'], 0, 3));
@@ -415,6 +415,7 @@ class StudioController extends Controller
         $refs = array_slice($imgs, 1);
         $userPrompt = trim((string) $data['prompt']);
         $isTryon = ($data['mode'] ?? '') === 'tryon';
+        $isFaceSwap = ($data['mode'] ?? '') === 'faceswap';
 
         if ($isTryon) {
             // Thử đồ ảo (chiến lược): @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
@@ -425,6 +426,13 @@ class StudioController extends Controller
                 $finalPrompt .= ' Place the result into the background of @image3.';
             }
             $finalPrompt .= ' '.$userPrompt;
+        } elseif ($isFaceSwap) {
+            // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
+            $finalPrompt = 'Swap the ENTIRE head — face, hairstyle, ears, forehead, jawline and neck — of @image1 with the reference face photo in @image2. '
+                .'Match @image2\'s identity, hairstyle, facial features, ears and head proportions exactly. '
+                .'Scale the new head/face to fit the ORIGINAL head size and body proportions naturally — do NOT enlarge, stretch or distort. '
+                .'Blend skin tone, hairline and lighting seamlessly. Keep garment, pose, body, background and composition exactly unchanged. '
+                .'Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
                 .'The FIRST image is the main base (keep its subject and overall layout). '
@@ -442,13 +450,18 @@ class StudioController extends Controller
         $cost = (int) studio_config('image_credits', 1);
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
 
+        // Thay khuôn mặt: ảnh thứ 2 (refs[0]) là khuôn mặt tham chiếu → face_ref; còn lại là ref_images.
+        $faceRef = $isFaceSwap && isset($refs[0]) ? (string) $refs[0] : null;
+        $remainingRefs = $isFaceSwap ? array_slice($refs, 1) : $refs;
+
         $items = [];
         for ($i = 0; $i < $variants; $i++) {
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $finalPrompt,
                 'base_image' => $base,
                 'edit' => true,
-                'ref_images' => $refs,
+                'ref_images' => $remainingRefs,
+                'face_ref' => $faceRef,
             ], $cost)->getData(true);
         }
 

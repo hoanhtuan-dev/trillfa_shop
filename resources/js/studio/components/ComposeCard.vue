@@ -77,12 +77,19 @@ function roleLabel(i) { return '@image' + (i + 1); }
 // Vai trò slot theo chế độ
 const slotRoles = computed(() => mode.value === 'tryon'
   ? ['👗 Trang phục', '🧍 Pose', '🖼 Bối cảnh (tùy chọn)']
-  : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+  : mode.value === 'faceswap'
+    ? ['🧍 Người mẫu', '👤 Khuôn mặt', 'Ảnh ghép (tùy chọn)']
+    : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
 function setTryon() {
   mode.value = 'tryon';
   prompt.value = 'mặc trang phục @image1 lên người mẫu theo dáng @image2, giữ đúng dáng và tỉ lệ cơ thể';
   store.toast('Thử đồ ảo: @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tùy chọn).');
+}
+function setFaceSwap() {
+  mode.value = 'faceswap';
+  prompt.value = 'thay khuôn mặt của @image1 bằng khuôn mặt trong @image2, giữ nguyên dáng, trang phục, bối cảnh';
+  store.toast('Thay khuôn mặt: @image1 = người mẫu, @image2 = khuôn mặt, @image3 = ảnh ghép (tùy chọn).');
 }
 function setCompose() {
   mode.value = 'compose';
@@ -153,9 +160,15 @@ async function run() {
       <button @click="setTryon()"
               :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🕺 Thử đồ ảo</button>
+      <button @click="setFaceSwap()"
+              :class="mode === 'faceswap' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">👤 Thay khuôn mặt</button>
     </div>
     <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = 👗 trang phục · @image2 = 🧍 pose · @image3 = 🖼 bối cảnh (tùy chọn)
+    </p>
+    <p v-if="mode === 'faceswap'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+      @image1 = 🧍 người mẫu · @image2 = 👤 khuôn mặt · @image3 = ảnh ghép (tùy chọn)
     </p>
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-3 grid grid-cols-3 gap-1.5">
