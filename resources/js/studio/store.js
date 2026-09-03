@@ -175,6 +175,15 @@ export const useStudioStore = defineStore('studio', {
         if (comp) { this.previewId = comp.id; this.preview = { id: comp.id, media_url: comp.media_url, type: comp.type || 'image', status: comp.status }; }
         // In các kết quả Đổi người mẫu đã hoàn tất vào layer canvas (không cưỡng chế active).
         (this.generations || []).forEach((g) => { if (g.status === 'completed' && g.media_url && g.meta && g.meta.swap) this.syncLayerForGen(g.id, g.media_url, 'Ảnh #' + g.id, false); });
+        // Deep-link từ Studio Library: /studio?step=2|3&id=<genId> — khôi phục đúng bước + ảnh.
+        const sp = new URLSearchParams(window.location.search);
+        const stepParam = parseInt(sp.get('step') || '', 10);
+        if (stepParam >= 1 && stepParam <= 3) this.step = stepParam;
+        const idParam = parseInt(sp.get('id') || '', 10);
+        if (idParam) {
+          const target = this.generations.find(g => g.id === idParam);
+          if (target) this.select(target);
+        }
       } catch (e) { /* app data loads via Alpine too */ }
     },
     select(g) { if (!g) return; this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; if (g.media_url) { this.pushCanvasLayer(String(g.id), 'gen', 'Ảnh #' + g.id, g.media_url, g.id); this.setActiveLayer(String(g.id)); } },
@@ -395,11 +404,27 @@ export const useStudioStore = defineStore('studio', {
     panMove(e) { if (this._drag) { this.pan.x = this._drag.px + (e.clientX - this._drag.x); this.pan.y = this._drag.py + (e.clientY - this._drag.y); } },
     panEnd() { this._drag = null; },
     async deleteGen(g) {
-      try { const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || 'Lỗi xóa.'); this.generations = this.generations.filter(x => x.id !== g.id); if (this.previewId === g.id) { this.previewId = null; this.preview = null; } this.toast('Đã xóa.'); }
-      catch(e){ this.toast(e.message || 'Lỗi xóa.', 'error'); }
+      try { const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || 'Lỗi xóa.'); this.generations = this.generations.filter(x => x.id !== g.id); if (this.previewId === g.id) { this.previewId = null; this.preview = null; } this.toast('Đã xóa.'); return true; }
+      catch(e){ this.toast(e.message || 'Lỗi xóa.', 'error'); return false; }
     },
-    goEdit(g) { this.select(g); this.step = 2; },
-    goVideo(g) { this.select(g); this.step = 3; },
+    // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
+    // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):
+    //  - đang ở trang studio (có step 1/2/3): chọn ảnh + chuyển step ngay.
+    //  - đang ở trang library (không có step): redirect về /studio?step=&id= để
+    //    StudioApp (qua load()) khôi phục đúng bước + đúng ảnh đang chọn.
+    goEditor(g, step) {
+      if (!g) return;
+      this.viewer = null;
+      this.select(g);
+      const onLibrary = window.location.pathname.includes('/library');
+      if (onLibrary) {
+        window.location.href = '/studio?step=' + step + '&id=' + g.id;
+      } else {
+        this.step = step;
+      }
+    },
+    goEdit(g) { this.goEditor(g, 2); },
+    goVideo(g) { this.goEditor(g, 3); },
     pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) this.canvasLayers.push({ id, kind, name, image, genId }); },
     setActiveLayer(id) { if (!id) return; this.activeLayerId = id; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
