@@ -428,10 +428,10 @@ class StudioController extends Controller
             $finalPrompt .= ' '.$userPrompt;
         } elseif ($isFaceSwap) {
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
-            $finalPrompt = 'The face of the person in @image1 MUST be the face from @image2 (the reference face) — do NOT change or generate a different face, and do NOT paste, stamp, overlay or collage the @image2 photo on top of the image. '
-                .'Replace the entire head (face, hairstyle, ears, forehead, jawline, neck) with @image2\'s identity, blending skin tone, hairline and lighting seamlessly so there is NO visible seam, border or patch edge. '
-                .'Keep the head SMALL and proportionate — the new head must be the SAME SIZE as the original head in @image1, or slightly SMALLER; NEVER larger. Match natural fashion proportions (head ≈ 1/7.5 to 1/8 of total body height) with a balanced, natural neck and shoulder transition. Do NOT enlarge, stretch, blow up or distort the head or face. '
-                .'Keep the exact garment, body pose, body proportions, background and composition of @image1 unchanged. Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
+            $finalPrompt = 'Swap ONLY the facial features of the person in @image1 to match the face in @image2 — take ONLY @image2\'s facial features, hairstyle, ears and identity, and do NOT copy @image2\'s head size, neck, shoulders or background. '
+                .'Keep the head size IDENTICAL to the original head in @image1 — do NOT enlarge, do NOT shrink, do NOT change the head size at all. '
+                .'Do NOT paste, stamp, overlay or collage the @image2 photo on top. Blend skin tone, hairline and lighting seamlessly with no visible seam, border or patch edge. '
+                .'Keep the neck, shoulders, body, garment, pose, background and composition of @image1 exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion. '.$userPrompt;
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
                 .'The FIRST image is the main base (keep its subject and overall layout). '
