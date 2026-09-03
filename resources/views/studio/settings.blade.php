@@ -225,7 +225,7 @@
 
     <div x-show="tab==='models'">
     {{-- ===== Cấu hình model Thay Đổi Người Mẫu (Try-on) ===== --}}
-    <form method="POST" action="{{ route('studio.settings.models') }}" class="card mt-6 space-y-4 p-6">
+    <form method="POST" action="{{ url('/studio/settings/models') }}" class="card mt-6 space-y-4 p-6">
         @csrf
         <h2 class="font-display text-base font-semibold text-ink-900">🪄 Model Thay Đổi Người Mẫu (Try-on)</h2>
         <p class="text-xs text-ink-500">Cấu hình model riêng cho tính năng "Thay Đổi Người Mẫu" — tách khỏi cấu hình chung.</p>
