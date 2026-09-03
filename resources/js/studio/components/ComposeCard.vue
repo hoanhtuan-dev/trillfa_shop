@@ -8,7 +8,8 @@ const store = useStudioStore();
 const prompt = ref('');
 const variants = ref(1);
 const busy = ref(false);
-const mode = ref('compose'); // 'compose' | 'tryon'
+const mode = ref('compose'); // 'compose' | 'tryon' | 'pattern'
+const patternDensity = ref('sparse'); // 'sparse' | 'medium' | 'dense'
 const open = ref(false);
 const uploading = ref(false);
 const uploaded = ref([]);   // [{ url, name }]
@@ -142,7 +143,7 @@ async function run() {
     finalPrompt += '. Pose detail: ' + selected.value[1].skeleton;
   }
   busy.value = true;
-  const items = await store.compose(urls, finalPrompt, variants.value, mode.value);
+  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, patternDensity.value);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
@@ -170,6 +171,12 @@ async function run() {
     <p v-if="mode === 'pattern'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = 🏷 logo/hoạ tiết · @image2 = 🧍 người mẫu/sản phẩm · @image3 = 🎨 tham chiếu (tùy chọn)
     </p>
+    <div v-if="mode === 'pattern'" class="mt-1.5 flex items-center gap-1.5 text-[11px] text-cream-200">
+      <span class="text-cream-300/60">Mật độ:</span>
+      <button @click="patternDensity = 'sparse'" :class="patternDensity === 'sparse' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="rounded-full px-2.5 py-1 font-semibold transition-colors">Thưa</button>
+      <button @click="patternDensity = 'medium'" :class="patternDensity === 'medium' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="rounded-full px-2.5 py-1 font-semibold transition-colors">Vừa</button>
+      <button @click="patternDensity = 'dense'" :class="patternDensity === 'dense' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="rounded-full px-2.5 py-1 font-semibold transition-colors">Dày</button>
+    </div>
 
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-3 grid grid-cols-3 gap-1.5">
