@@ -460,6 +460,8 @@ class StudioController extends Controller
                 'edit' => true,
                 'ref_images' => $remainingRefs,
                 'face_ref' => $faceRef,
+                'user_prompt' => $userPrompt,
+                'mode' => $data['mode'] ?? null,
             ], $cost)->getData(true);
         }
 
@@ -1031,6 +1033,8 @@ RULES:
                 'negative_prompt' => $data['negative_prompt'] ?? null,
                 'ref_images' => $data['ref_images'] ?? null,
                 'face_ref' => $data['face_ref'] ?? null,
+                'user_prompt' => $data['user_prompt'] ?? null,
+                'mode' => $data['mode'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 
