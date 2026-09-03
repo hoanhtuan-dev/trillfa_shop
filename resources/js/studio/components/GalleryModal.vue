@@ -41,24 +41,42 @@ async function doDelete() {
 // ZOOM_MIN = 1 → ảnh luôn hiển thị ĐẦY ĐỦ (fit) trong khung khi mở / khi thu nhỏ nhất.
 // Zoom giữ nguyên điểm ảnh ngay dưới con trỏ (zoom-to-cursor), pan bị chặn ở biên để
 // không kéo ảnh ra khỏi khung / không tạo khoảng trống khi ảnh còn nhỏ hơn khung.
+// ── Zoom / pan theo KÍCH THƯỚC THẬT của ảnh (natural px) ──
+// viewerZoom = hệ số SO VỚI FIT: 100% (zoom=1) = ảnh vừa TRỌN khung theo cả 2 chiều
+// (thu ảnh lớn xuống / phóng ảnh nhỏ lên cho tới khi 1 chiều chạm khung — không bao giờ crop).
+// Zoom nhỏ nhất = 80% (ảnh nhỏ hơn khung một chút), lớn nhất = 6×.
+// Scale hiển thị thực = viewerZoom × fitScale (fitScale = min(khung_w/natW, khung_h/natH)).
 const viewerZoom = ref(1);
 const viewerPan = ref({ x: 0, y: 0 });
 const zoomArea = ref(null);
 const imgEl = ref(null);
 const dragging = ref(false);
+const loadedTick = ref(0); // buộc render lại khi ảnh load xong (biết kích thước tự nhiên)
 let drag = null;
-const ZOOM_MIN = 1;
+const ZOOM_MIN = 0.8;  // 80% — không cho thu nhỏ hơn
 const ZOOM_MAX = 6;
 
 function resetZoom() { viewerZoom.value = 1; viewerPan.value = { x: 0, y: 0 }; }
 
-// Chặn pan tại biên: ảnh không được trôi ra ngoài khung; nếu nhỏ hơn khung → ép về giữa.
+// Hệ số để ảnh (kích thước tự nhiên) vừa trọn khung: min(ngang, dọc) — đảm bảo không crop.
+function fitScale() {
+  const area = zoomArea.value, img = imgEl.value;
+  if (!area || !img || !img.naturalWidth || !img.naturalHeight) return 1;
+  return Math.min(area.clientWidth / img.naturalWidth, area.clientHeight / img.naturalHeight);
+}
+// Scale hiển thị thực (được dùng trong transform).
+function renderScale() { return viewerZoom.value * fitScale(); }
+
+// Chặn pan tại biên theo kích thước HIỂN THỊ thực; khi ảnh ≤ khung → ép về giữa.
 function clampPan() {
   const area = zoomArea.value, img = imgEl.value;
-  if (!area || !img) return;
+  if (!area || !img || !img.naturalWidth || !img.naturalHeight) return;
   const z = viewerZoom.value;
-  const mx = Math.max(0, (img.offsetWidth * z - area.clientWidth) / 2);
-  const my = Math.max(0, (img.offsetHeight * z - area.clientHeight) / 2);
+  const fit = fitScale();
+  const iw = img.naturalWidth * fit * z;
+  const ih = img.naturalHeight * fit * z;
+  const mx = Math.max(0, (iw - area.clientWidth) / 2);
+  const my = Math.max(0, (ih - area.clientHeight) / 2);
   const p = viewerPan.value;
   const nx = Math.min(mx, Math.max(-mx, p.x));
   const ny = Math.min(my, Math.max(-my, p.y));
@@ -98,6 +116,12 @@ function panStart(e) {
 function panMove(e) { if (drag) { viewerPan.value = { x: drag.px + (e.clientX - drag.x), y: drag.py + (e.clientY - drag.y) }; clampPan(); } }
 function panEnd() { drag = null; dragging.value = false; }
 function toggleZoom() { zoomTo(0, 0, viewerZoom.value <= ZOOM_MIN + 0.01 ? 2 : 1 / 2); }
+function onImgLoad() {
+  imgError.value = false;
+  loadedTick.value++; // biết naturalWidth/Height → render lại để fit đúng
+  resetZoom();        // luôn mở/đổi ảnh ở chế độ fit vừa khung
+  nextTick(() => clampPan());
+}
 
 // ── Dải thumbnail: wheel + kéo để cuộn ngang ──
 const stripEl = ref(null);
@@ -190,11 +214,11 @@ onBeforeUnmount(() => {
         <div ref="zoomArea" v-else-if="current?.media_url && !imgError" class="grid h-full w-full cursor-grab place-items-center overflow-hidden active:cursor-grabbing" style="touch-action:none"
              @wheel.prevent="onWheel"
              @pointerdown="panStart" @pointermove="panMove" @pointerup="panEnd" @pointerleave="panEnd">
-          <img ref="imgEl" :src="current.media_url"
-               class="max-h-full max-w-full select-none object-contain"
+          <img ref="imgEl" :src="current.media_url" :key="'img-' + current.id"
+               class="select-none"
                :class="dragging ? 'transition-none' : 'transition-transform duration-100 ease-out'"
-               :style="{ transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + viewerZoom + ')' }"
-               draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="clampPan" />
+               :style="{ width: imgEl && imgEl.naturalWidth ? imgEl.naturalWidth + 'px' : 'auto', transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + renderScale() + ')' }"
+               draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="onImgLoad" />
         </div>
         <p v-else class="text-sm text-cream-300/60">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
         <!-- Badge trạng thái -->

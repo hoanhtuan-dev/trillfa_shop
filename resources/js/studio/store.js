@@ -538,36 +538,43 @@ export const useStudioStore = defineStore('studio', {
       const ny = this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1);
       return { nx, ny };
     },
-    // Bắt đầu thao tác mask: kéo tạo vùng mới / di chuyển / resize handle / vẽ brush.
-    // Dùng window-level pointer listeners (giống crop) để kéo MƯỢT — không bị mất
-    // khi chuột đi nhanh hoặc ra khỏi overlay (pointer capture implicit qua window).
-    inpaintMaskStart(e) {
+    // Bắt đầu kéo 1 thao tác với KEY TƯỜNG MINH — gọi từ .stop trên chính box/handle
+    // (giống hệt crop: mỗi vùng biết mình là gì, KHÔNG hit-test, không bao giờ nhầm
+    // 'resize' ↔ 'move', và không vô tình tạo vùng mới khi bấm lệch ra ngoài).
+    beginInpaintDrag(key, e) {
       if (this.inpaintMaskMode === 'none') return;
       e.stopPropagation();
       const p = this.inpaintMaskPointer(e); if (!p) return;
-      // Drag cũ còn dở (bấm nhanh 2 lần trước khi nhả) → đóng sạch trước.
+      // Drag cũ còn dở → đóng sạch trước.
       if (this._inpaintDrag) this._inpaintStopDrag();
       const handlers = { move: (ev) => this._inpaintQueue(ev), up: () => this._inpaintStopDrag() };
-      if (this.inpaintMaskMode === 'brush') {
+      if (key === 'brush') {
         this._inpaintBrushDrawing = true;
         this._inpaintDrag = { key: 'brush', sx: e.clientX, sy: e.clientY, last: p, handlers };
         this._drawInpaintBrushDot(p);
+      } else if (key === 'draw') {
+        // Kéo tạo vùng mới từ điểm nhấn (chỉ khi bấm ngoài box cũ)
+        this._inpaintDrag = { key: 'draw', sx: e.clientX, sy: e.clientY, box: { x: p.nx, y: p.ny, w: 0, h: 0 }, handlers };
+        this.inpaintMaskBox = { x: p.nx, y: p.ny, w: 0, h: 0 };
       } else {
-        const b = this.inpaintMaskBox || { x: 0, y: 0, w: 0, h: 0 };
-        // Chỉ hit-test khi đã có vùng đủ lớn — không thì kéo tạo vùng mới
-        const hit = (b.w >= 0.02 && b.h >= 0.02) ? this._inpaintHitTest(p, b) : null;
-        if (hit) {
-          // Bắt đầu di chuyển ('move') hoặc kéo 1 handle ('nw'/'ne'/'sw'/'se')
-          this._inpaintDrag = { key: hit, sx: e.clientX, sy: e.clientY, box: { ...b }, handlers };
-        } else {
-          // Kéo tạo vùng chọn mới từ điểm nhấn
-          this._inpaintDrag = { key: 'draw', sx: e.clientX, sy: e.clientY, box: { x: p.nx, y: p.ny, w: 0, h: 0 }, handlers };
-          this.inpaintMaskBox = { x: p.nx, y: p.ny, w: 0, h: 0 };
-        }
+        // 'move' hoặc 1 trong 'nw'/'ne'/'sw'/'se' — bám vào box hiện tại
+        const b = { ...(this.inpaintMaskBox || { x: 0, y: 0, w: 0, h: 0 }) };
+        this._inpaintDrag = { key, sx: e.clientX, sy: e.clientY, box: b, handlers };
       }
       window.addEventListener('pointermove', handlers.move);
       window.addEventListener('pointerup', handlers.up);
       window.addEventListener('pointercancel', handlers.up);
+    },
+    // Container overlay: bấm ngoài box. Nếu CHƯA có box → kéo tạo vùng mới.
+    // Nếu ĐÃ có box → bấm ngoài không làm gì (tránh mất vùng đang chọn vô tình;
+    // muốn chọn vùng khác thì bấm "✕ Bỏ mask" trong InpaintCard trước).
+    inpaintMaskStart(e) {
+      if (this.inpaintMaskMode === 'none') return;
+      if (this.inpaintMaskMode === 'rect') {
+        const b = this.inpaintMaskBox;
+        if (b && b.w >= 0.02 && b.h >= 0.02) return;
+      }
+      this.beginInpaintDrag(this.inpaintMaskMode === 'brush' ? 'brush' : 'draw', e);
     },
     // Batch pointermoves qua rAF — kéo không giật, không đọc layout mỗi event.
     _inpaintQueue(e) {
