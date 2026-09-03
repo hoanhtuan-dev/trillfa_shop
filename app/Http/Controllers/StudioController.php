@@ -3108,6 +3108,19 @@ RULES:
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * Lưu riêng prompt thay khuôn mặt (tab Dáng & Khuôn mặt) — form riêng, không kéo theo
+     * các trường required của updateSettings.
+     */
+    public function saveFaceswapPrompt(Request $request)
+    {
+        $data = $request->validate(['faceswap_prompt' => ['nullable', 'string', 'max:2000']]);
+        if (isset($data['faceswap_prompt'])) {
+            set_setting('studio_faceswap_prompt', $data['faceswap_prompt']);
+        }
+        return back()->with('success', 'Đã lưu prompt thay khuôn mặt.');
+    }
+
     public function settingsData(): IlluminateHttpJsonResponse
     {
         $providers = [

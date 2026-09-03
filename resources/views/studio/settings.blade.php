@@ -423,11 +423,13 @@
         <div>
             <h3 class="text-sm font-semibold text-ink-900">👩 Khuôn mặt mẫu <span class="text-ink-500">(dùng trong 🪄 Thay Đổi Người Mẫu)</span></h3>
             <p class="mt-1 text-xs text-ink-500">Preset là <b>mô tả khuôn mặt</b> (không cần tải ảnh) — nhập mô tả tiếng Anh rõ ràng để model dựng đúng. Nếu có ảnh kèm, hệ thống dùng ảnh làm tham chiếu (độ giống cao hơn).</p>
-            <div class="mt-3 rounded-xl border border-brand-200 bg-brand-50 p-3">
+            <form method="POST" action="{{ route('studio.settings.faceswap') }}" class="mt-3 rounded-xl border border-brand-200 bg-brand-50 p-3">
+                @csrf
                 <label class="label">🎨 Prompt thay khuôn mặt (Compose → 👤 Thay khuôn mặt)</label>
                 <textarea name="faceswap_prompt" rows="3" class="input !py-2" placeholder="Face swap...">{{ old('faceswap_prompt', $faceswap_prompt) }}</textarea>
                 <p class="mt-1 text-xs text-ink-500">Dùng <b>@image1</b> = người mẫu, <b>@image2</b> = khuôn mặt tham chiếu. VD tỷ lệ đầu: "Make the new head about 80% the size of the original head".</p>
-            </div>
+                <button type="submit" class="btn-brand btn-sm mt-2">💾 Lưu prompt</button>
+            </form>
             <div class="mt-2 space-y-2">
                 @forelse($face_presets as $fp)
                     <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editf:false }">
