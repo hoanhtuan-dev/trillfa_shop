@@ -24,6 +24,14 @@ const toneOptions = [
   { v: 'mono', label: '⚪ Trắng đen' },
   { v: 'none', label: '🚫 Không' },
 ];
+
+// Quick presets (combo 1-click cho người mới)
+const swapPresets = [
+  { id: 'keep-bg', icon: '👤', label: 'Đổi mẫu · giữ nền', apply: () => { changeFace.value = true; swapBg.value = ''; swapTone.value = 'none'; } },
+  { id: 'cine', icon: '🎬', label: 'Điện ảnh', apply: () => { changeFace.value = true; swapTone.value = 'cinematic'; } },
+  { id: 'studio', icon: '🏙', label: 'Nền studio', apply: () => { changeFace.value = true; swapTone.value = 'auto'; } },
+  { id: 'keep-face', icon: '🪞', label: 'Giữ mặt · đổi dáng', apply: () => { changeFace.value = false; } },
+];
 // Persist swap settings across sessions (like upscale memory).
 const SWAP_KEY = 'trillfa.swap';
 function loadSwapMemory() {
@@ -87,6 +95,14 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
         <p class="mt-0.5 text-[11px] text-cream-300/60">{{ changeFace ? 'Thay khuôn mặt + dáng' : 'Giữ nguyên khuôn mặt · chỉ đổi dáng' }}</p>
       </div>
       <button v-if="hasSelection && !store.swapLoading && !store.swapProcessing" type="button" @click="resetSelections" class="shrink-0 rounded-full bg-ink-800 px-2.5 py-1 text-[10px] text-cream-300/70 hover:text-red-300" title="Bỏ lựa chọn khuôn mặt / dáng / bối cảnh">↺ Bỏ chọn</button>
+    </div>
+
+    <!-- Quick presets (combo 1-click cho người mới) -->
+    <div class="mt-2 flex flex-wrap gap-1.5">
+      <button v-for="p in swapPresets" :key="p.id" @click="p.apply()"
+              class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
+        {{ p.icon }} {{ p.label }}
+      </button>
     </div>
 
     <!-- 👩 Đổi khuôn mặt (mặc định BẬT) -->

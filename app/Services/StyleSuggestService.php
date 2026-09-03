@@ -23,44 +23,28 @@ class StyleSuggestService
         // Provider + model RIÊNG cho "Gợi ý từ ảnh" — không dùng chung cấu hình Vision.
         $provider = studio_suggest_provider();
         $geminiKey = studio_api_key('gemini');
-        $qwenKeys = studio_qwen_credentials('vision');
-        $hasQwen = ! empty($qwenKeys);
+        $hasQwen = ! empty(studio_qwen_credentials('vision'));
 
-        $primaryQwen = $provider === 'qwen' && $hasQwen;
-        $primaryGemini = $provider === 'gemini' && $geminiKey;
-
-        // Try primary provider
-        if ($primaryQwen) {
-            try {
-                return $this->suggestViaQwenVision($imagePath, $creativeLevel);
-            } catch (\Throwable $e) {
-                logger()->error('Qwen vision suggest failed: '.$e->getMessage());
-            }
+        // Thử provider đã cấu hình trước, provider còn lại sau — đảm bảo không bao giờ
+        // âm thầm rớt về fallback màu khi vẫn còn key hợp lệ của provider kia.
+        $attempts = [];
+        if ($provider === 'qwen') {
+            if ($hasQwen) { $attempts[] = 'qwen'; }
+            if ($geminiKey) { $attempts[] = 'gemini'; }
+        } else {
+            if ($geminiKey) { $attempts[] = 'gemini'; }
+            if ($hasQwen) { $attempts[] = 'qwen'; }
         }
 
-        if ($primaryGemini || $geminiKey) {
+        foreach ($attempts as $attempt) {
             try {
+                if ($attempt === 'qwen') {
+                    return $this->suggestViaQwenVision($imagePath, $creativeLevel);
+                }
+
                 return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey);
             } catch (\Throwable $e) {
-                logger()->error('Gemini vision suggest failed: '.$e->getMessage());
-            }
-        }
-
-        // Fallback: if primary was Qwen and it failed, try Gemini next
-        if ($primaryQwen && $geminiKey) {
-            try {
-                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey);
-            } catch (\Throwable $e) {
-                logger()->error('Gemini fallback after Qwen failed: '.$e->getMessage());
-            }
-        }
-
-        // Fallback: if primary was Gemini and it failed, try Qwen next
-        if ($primaryGemini && $hasQwen) {
-            try {
-                return $this->suggestViaQwenVision($imagePath, $creativeLevel);
-            } catch (\Throwable $e) {
-                logger()->error('Qwen fallback after Gemini failed: '.$e->getMessage());
+                logger()->error($attempt.' vision suggest failed: '.$e->getMessage());
             }
         }
 

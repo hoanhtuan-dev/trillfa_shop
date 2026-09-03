@@ -77,6 +77,17 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       </div>
     </div>
 
+    <!-- Quick presets (chips 1-click cho người mới) -->
+    <div class="mt-3">
+      <p class="text-[10px] font-semibold text-cream-300/70">✨ Gợi ý nhanh — bấm để điền sẵn</p>
+      <div class="mt-1.5 flex flex-wrap gap-1.5">
+        <button v-for="p in store.inpaintPresets" :key="p.id" @click="store.applyInpaintPreset(p)"
+                class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
+          {{ p.icon }} {{ p.label }}
+        </button>
+      </div>
+    </div>
+
     <label class="label mt-3">Mô tả chỉnh sửa</label>
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước…"></textarea>
     <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ store.inpaintPrompt.length }}/1000</p>

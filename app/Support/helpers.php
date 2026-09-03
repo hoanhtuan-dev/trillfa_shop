@@ -268,6 +268,64 @@ if (! function_exists('studio_vision_image_url')) {
     }
 }
 
+if (! function_exists('studio_image_url')) {
+    function studio_image_url(?string $image): ?string
+    {
+        // Phục vụ ảnh qua route Laravel (không phụ thuộc symlink storage) — chống ảnh vỡ ở popup.
+        if (! $image) { return null; }
+        if (! str_starts_with($image, '/storage/')) { return $image; }
+        return url('/studio/image/'.substr($image, strlen('/storage/')));
+    }
+}
+
+if (! function_exists('studio_vision_image_data_uri')) {
+    /**
+     * Chuyển /storage/... hoặc đường dẫn local thành base64 data-URI cho các call VISION.
+     * Provider bên ngoài (DashScope/Qwen/Gemini) KHÔNG thể fetch URL localhost, nên luôn
+     * gửi pixel inline — giống cách edit model nhận ảnh (imageDataUri).
+     */
+    function studio_vision_image_data_uri(string $url, int $max = 1600): ?string
+    {
+        if (str_starts_with($url, 'data:')) {
+            return $url;
+        }
+
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $file = null;
+        foreach ([public_path($path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
+            if (is_file($c)) { $file = $c; break; }
+        }
+        if (! $file) {
+            return null;
+        }
+
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) {
+            return null;
+        }
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+        $max = max(64, min(4096, $max));
+        if ($w > $max || $h > $max) {
+            $scale = min($max / $w, $max / $h);
+            $nw = max(1, (int) ($w * $scale));
+            $nh = max(1, (int) ($h * $scale));
+            $tmp = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($tmp, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($img);
+            $img = $tmp;
+        }
+
+        ob_start();
+        imagejpeg($img, null, 85);
+        $data = ob_get_clean();
+        imagedestroy($img);
+
+        return 'data:image/jpeg;base64,'.base64_encode((string) $data);
+    }
+}
+
 if (! function_exists('studio_api_key')) {
     /**
      * Read a provider API key. Prefers the encrypted DB value managed from the

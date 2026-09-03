@@ -39,14 +39,17 @@ class VirtualTryOnService
                     'id' => 'fp'.$p->id,
                     'name' => $p->name,
                     'ethnicity' => $p->ethnicity ?: 'Vietnamese female',
-                    'image' => $p->image, // may be null (text-only preset)
+                    'image' => studio_image_url($p->image), // may be null (text-only preset)
                     'desc' => $p->description,
                     'preset' => true,
                 ];
             })->values()->all();
         }
 
-        return $this->builtinFacePresets();
+        return array_map(function ($m) {
+            $m['image'] = studio_image_url($m['image']);
+            return $m;
+        }, $this->builtinFacePresets());
     }
 
     /**

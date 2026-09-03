@@ -83,6 +83,15 @@ export const useStudioStore = defineStore('studio', {
     inpaintError: '',         // thông báo lỗi cuối
     inpaintPreserveBg: true,  // giữ nguyên nền
     inpaintPreserveFace: true,// giữ nguyên khuôn mặt
+    // Quick presets cài sẵn (chips 1-click) — giúp người mới không cần viết prompt
+    inpaintPresets: [
+      { id: 'erase', icon: '🧹', label: 'Xóa vật thể', prompt: 'Remove the object inside the selected area and reconstruct the background naturally, matching lighting, texture and perspective.', face: true, bg: true, mask: 'brush' },
+      { id: 'recolor', icon: '🎨', label: 'Đổi màu', prompt: 'Change the color of the selected area to a new color, keep the fabric texture, lighting and shading.', face: true, bg: true, mask: 'rect' },
+      { id: 'fabric', icon: '🧵', label: 'Đổi chất liệu', prompt: 'Change the material and fabric of the selected garment, keep the fit, drape and lighting.', face: true, bg: true, mask: 'rect' },
+      { id: 'smooth', icon: '✨', label: 'Làm mượt da', prompt: 'Smooth the skin in the selected area, remove blemishes and imperfections, keep a natural look.', face: false, bg: true, mask: 'brush' },
+      { id: 'bg', icon: '🌅', label: 'Đổi nền', prompt: 'Replace the entire background with a clean, professional studio background. Keep the subject, pose and lighting on the subject unchanged.', face: true, bg: false, mask: null },
+      { id: 'accessory', icon: '➕', label: 'Thêm phụ kiện', prompt: 'Add a subtle accessory to the selected area, matching the style, color and lighting of the image.', face: true, bg: true, mask: 'rect' },
+    ],
     // ── Inpaint Mask (tích hợp region selection vào Inpaint) ──
     inpaintMaskMode: 'none',   // 'none' | 'rect' | 'brush' — chọn vùng cần sửa
     inpaintMaskBox: { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }, // vùng mask mặc định = 15% ảnh (giữa), nhỏ để dễ thao tác
@@ -662,6 +671,28 @@ export const useStudioStore = defineStore('studio', {
       this._inpaintPrevBox = null;
       this._inpaintDrew = false;
       this.toast?.('Kéo chọn vùng mới trên ảnh.');
+    },
+    // Áp 1 quick-preset: điền prompt mẫu + bật/tắt preserve + tự chọn chế độ mask phù hợp.
+    applyInpaintPreset(p) {
+      if (!p) return;
+      if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn preset.', 'error'); return; }
+      this.inpaintPrompt = p.prompt;
+      this.inpaintPreserveFace = !!p.face;
+      this.inpaintPreserveBg = !!p.bg;
+      if (p.mask) {
+        // Preset cần chọn vùng → bật chế độ mask tương ứng, khung 15% giữa ảnh
+        if (this._inpaintDrag) this._inpaintStopDrag();
+        this.inpaintMaskMode = p.mask;
+        this.inpaintMaskDone = false;
+        this._inpaintMaskKind = '';
+        this.inpaintBrushData = '';
+        this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
+        if (p.mask === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
+        this.toast(p.mask === 'brush' ? '🖌 Vẽ lên vùng cần xử lý rồi bấm "Xong" → "Sửa ảnh".' : '▭ Kéo chọn vùng cần xử lý rồi bấm "Xong" → "Sửa ảnh".');
+      } else {
+        // Preset toàn ảnh (vd đổi nền) → không cần mask
+        this.clearInpaintMask();
+      }
     },
     // Batch pointermoves qua rAF — kéo không giật, không đọc layout mỗi event.
     _inpaintQueue(e) {

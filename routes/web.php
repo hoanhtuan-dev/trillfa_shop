@@ -186,6 +186,9 @@ Route::get('/studio', [StudioController::class, 'index'])->name('studio.index');
 // Public garment-avatar endpoint (bypasses auth + static cache — served by Laravel with immutable cache).
 Route::get('/garment/{id}', [StudioController::class, 'garmentAvatar'])->name('garment.avatar');
 
+// Public studio image endpoint — phục vụ ảnh upload từ storage (không phụ thuộc symlink).
+Route::get('/studio/image/{path}', [StudioController::class, 'studioImage'])->where('path', '.*')->name('studio.image');
+
 // Blog
 Route::prefix('blog')->name('blog.')->group(function () {
     Route::get('/', [BlogController::class, 'index'])->name('index');

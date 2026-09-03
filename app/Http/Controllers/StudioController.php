@@ -1010,6 +1010,18 @@ RULES:
      * Public garment-avatar endpoint — serves the avatar from a fixed location with a
      * correct immutable cache header (versioned URL => safe to cache). Public, no auth.
      */
+    public function studioImage(string $path)
+    {
+        if (str_contains($path, '..') || ! preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path)) {
+            return response()->json(['error' => 'invalid'], 404);
+        }
+        $file = storage_path('app/public/'.$path);
+        if (! is_file($file)) {
+            return response()->json(['error' => 'not found'], 404);
+        }
+        return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
+    }
+
     public function garmentAvatar(string $id)
     {
         if (! preg_match('/^[a-z0-9-]+$/', $id)) {
