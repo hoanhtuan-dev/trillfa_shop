@@ -117,19 +117,16 @@ class VirtualTryOnService
 
     public function builtinPosePresets(): array
     {
+        $physique = 'a stylish, edgy young Vietnamese fashion model with a slim figure, slim waist, long toned legs and a beautiful delicate face, ';
         return [
-            ['id' => 'pose01', 'name' => 'Đứng thẳng', 'skeleton' => 'standing straight, arms relaxed, full body', 'image' => '/storage/studio/dang-nguoi-mau/pose-01.png'],
-            ['id' => 'pose02', 'name' => 'Tay chống hông', 'skeleton' => 'standing, one hand on hip, one leg crossed', 'image' => '/storage/studio/dang-nguoi-mau/pose-02.png'],
-            ['id' => 'pose03', 'name' => 'Hai tay chống hông', 'skeleton' => 'standing, both hands on hips', 'image' => '/storage/studio/dang-nguoi-mau/pose-03.png'],
-            ['id' => 'pose04', 'name' => 'Chống hông chéo chân', 'skeleton' => 'standing, hands on hips, legs crossed', 'image' => '/storage/studio/dang-nguoi-mau/pose-04.png'],
-            ['id' => 'pose05', 'name' => 'Chống hông (trắng-đen)', 'skeleton' => 'standing, both hands on hips', 'image' => '/storage/studio/dang-nguoi-mau/pose-05.png'],
-            ['id' => 'pose06', 'name' => 'Ngồi ghế', 'skeleton' => 'sitting on a high stool, one leg extended', 'image' => '/storage/studio/dang-nguoi-mau/pose-06.png'],
-            ['id' => 'pose07', 'name' => 'Tay đút túi', 'skeleton' => 'side view, hand in pocket, relaxed', 'image' => '/storage/studio/dang-nguoi-mau/pose-07.png'],
-            ['id' => 'pose08', 'name' => 'Ngồi xổm', 'skeleton' => 'stylish squat pose, knees apart', 'image' => '/storage/studio/dang-nguoi-mau/pose-08.png'],
-            ['id' => 'pose09', 'name' => 'Sải bước', 'skeleton' => 'walking mid-stride catwalk, hand on hip', 'image' => '/storage/studio/dang-nguoi-mau/pose-09.png'],
-            ['id' => 'pose10', 'name' => 'Xoay lưng', 'skeleton' => 'back view, turned away', 'image' => '/storage/studio/dang-nguoi-mau/pose-10.png'],
-            ['id' => 'pose11', 'name' => 'Tựa ghế', 'skeleton' => 'leaning on a stool, hand to head', 'image' => '/storage/studio/dang-nguoi-mau/pose-11.png'],
-            ['id' => 'pose12', 'name' => 'Bước ngang', 'skeleton' => 'walking, side profile, dynamic', 'image' => '/storage/studio/dang-nguoi-mau/pose-12.png'],
+            ['id' => 'pose01', 'name' => 'Đứng thẳng', 'skeleton' => $physique.'standing straight and elegant, arms relaxed at sides, one foot slightly forward, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-01.png'],
+            ['id' => 'pose02', 'name' => 'Tay chống hông', 'skeleton' => $physique.'standing with one hand on hip, weight on one leg, chin slightly up, confident, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-02.png'],
+            ['id' => 'pose03', 'name' => 'Sải bước catwalk', 'skeleton' => $physique.'walking mid-stride catwalk, one hand on hip, dynamic and confident, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-03.png'],
+            ['id' => 'pose04', 'name' => 'Nghiêng người', 'skeleton' => $physique.'standing at a slight angle, one shoulder forward, one hand lightly brushing hair, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-04.png'],
+            ['id' => 'pose05', 'name' => 'Ngồi ghế', 'skeleton' => $physique.'sitting gracefully on a high stool, back straight, one leg extended, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-05.png'],
+            ['id' => 'pose06', 'name' => 'Tay đút túi', 'skeleton' => $physique.'standing in relaxed side profile, one hand in pocket, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-06.png'],
+            ['id' => 'pose07', 'name' => 'Xoay lưng', 'skeleton' => $physique.'back view turned away, glancing over one shoulder, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-07.png'],
+            ['id' => 'pose08', 'name' => 'Tựa tường', 'skeleton' => $physique.'leaning lightly against a wall, one leg bent, arms relaxed, full body head to toe, not cropped', 'image' => '/storage/studio/dang-nguoi-mau/pose-08.png'],
         ];
     }
 
@@ -285,13 +282,14 @@ class VirtualTryOnService
         // Negative prompt (đính vào văn bản — model edit không có trường negative riêng): tăng độ
         // sắc nét, tránh mặt méo/lệch tỷ lệ và vải bị "airbrush" mất vân.
         $negativeClause = 'Avoid: blurry, out of focus, low resolution, pixelated, oversharpened, deformed or mismatched face, oversized face or head, distorted anatomy, extra limbs, deformed hands, crossed eyes, asymmetric face, washed-out colors, oversaturated, overexposed, invented or added patterns on plain fabric, altered prints or motifs, extra embroidery or logos not in the source, airbrushed or plastic skin, watermark, text, logo, jpeg artifacts.';
+        $fullBodyClause = 'FULL BODY from head to toe — the entire body including head, torso, legs and feet must be visible inside the frame; do NOT crop, cut off or zoom into the model; leave a little space above the head and below the feet. ';
 
         $instr = $garmentLock
             .$personClause
             .$poseHint
             .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
             .'Keep the background of the original image unchanged. '
-            .($wantBg ? '' : $toneS).' '.$negativeClause
+            .($wantBg ? '' : $toneS).' '.$negativeClause.' '.$fullBodyClause
             .' Photorealistic, full body, studio quality, high fashion, consistent lighting.';
 
         $imageSvc = app(ImageAIService::class);
@@ -305,11 +303,11 @@ class VirtualTryOnService
                 .'Change ONLY the person wearing it: '.$personClause.$poseHint
                 .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions. '
                 .'Keep the background of the original image unchanged. '
-                .($wantBg ? '' : $toneS).' '.$negativeClause.' Photorealistic, full body, studio quality, high fashion.',
+                .($wantBg ? '' : $toneS).' '.$negativeClause.' '.$fullBodyClause.' Photorealistic, full body, studio quality, high fashion.',
             // Variant 3: direct instruction style
             'Keep the outfit identical. '.$personClause.$poseHint
                 .$proportion.'. Do not change the background. '
-                .($wantBg ? '' : $toneS).' '.$negativeClause.' Photorealistic fashion editorial.',
+                .($wantBg ? '' : $toneS).' '.$negativeClause.' '.$fullBodyClause.' Photorealistic fashion editorial.',
         ];
 
         // Best-of-N: model edit không deterministic — sinh tối đa N candidates rồi chọn bản đẹp
@@ -474,9 +472,9 @@ class VirtualTryOnService
     protected function buildEnglish(int $v): string
     {
         return match (true) {
-            $v >= 9 => 'tall, slender runway-model build with long legs and an ~1:8 head-to-body ratio',
-            $v >= 7 => 'tall, slim fashion-model build with long legs and an ~1:7.5 head-to-body ratio',
-            $v >= 5 => 'average height, slim fitness-model build with an ~1:7 head-to-body ratio',
+            $v >= 9 => 'tall, slender runway-model build with a slim waist, long legs and an ~1:8 head-to-body ratio',
+            $v >= 7 => 'tall, slim fashion-model build with a slim waist, long legs and an ~1:7.5 head-to-body ratio',
+            $v >= 5 => 'slim fashion-model build with a slim waist and an ~1:7 head-to-body ratio',
             $v >= 3 => 'slightly shorter, curvy/athletic build with an ~1:6.5 head-to-body ratio',
             default => 'shorter, fuller curvy build with an ~1:6 head-to-body ratio',
         };
