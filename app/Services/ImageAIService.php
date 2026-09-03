@@ -55,14 +55,14 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = []): string
     {
         $dashscopeKey = studio_api_key('dashscope');
 
         // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
         // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
         if ($baseImage && (studio_api_key('qwen_edit') || $this->providerKey() || $dashscopeKey)) {
-            $edited = $this->editImage($prompt, $baseImage, null, null, null, $maskImage);
+            $edited = $this->editImage($prompt, $baseImage, null, null, null, $maskImage, $refImages);
             if ($edited) {
                 // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
                 // về ĐÚNG kích thước ảnh nguồn để kết quả khớp khung hình ban đầu.
@@ -606,7 +606,7 @@ class ImageAIService
         return 'data:'.$mime.';base64,'.$b64;
     }
 
-    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null, ?string $maskImage = null): ?string
+    protected function editImage(string $prompt, string $imageUrl, ?string $modelOverride = null, ?string $faceRefUrl = null, ?string $poseRefUrl = null, ?string $maskImage = null, array $refImages = []): ?string
     {
         $model = $modelOverride ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit');
         if (! $this->isImageEditCapableModel($model)) {
@@ -641,6 +641,11 @@ class ImageAIService
             $content = [];
             if ($faceRef) { $content[] = ['image' => $faceRef]; }
             if ($poseRef) { $content[] = ['image' => $poseRef]; }
+            // Compose (ghép nhiều ảnh): các ảnh tham chiếu bổ sung được thêm trước ảnh gốc.
+            foreach ($refImages as $refUrl) {
+                $ref = $this->imageDataUri((string) $refUrl);
+                if ($ref) { $content[] = ['image' => $ref]; }
+            }
             $content[] = ['image' => $source];
             if ($maskImage) {
                 $maskUri = $this->imageDataUri($maskImage);
@@ -653,6 +658,23 @@ class ImageAIService
                 $this->lastModel = $model;
                 logger()->info('Edit succeeded', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
                 return $this->storeRemoteImage($editUrl);
+            }
+
+            // Compose refs (ghép nhiều ảnh): model không nhận nhiều ảnh → thử chỉ còn ảnh gốc.
+            if ($refImages && $this->editModelRejectsMultiImage()) {
+                logger()->info('Edit retry without compose refs', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                $retry = [['image' => $source]];
+                if ($maskImage) {
+                    $maskUri = $this->imageDataUri($maskImage);
+                    if ($maskUri) { $retry[] = ['image' => $maskUri]; }
+                }
+                $retry[] = ['text' => $prompt];
+                $editUrl = $this->postMultimodalEdit($model, $base, $key, $retry);
+                if ($editUrl) {
+                    $this->lastModel = $model;
+                    logger()->info('Edit succeeded (no compose refs)', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                    return $this->storeRemoteImage($editUrl);
+                }
             }
 
             // The image-edit model may not accept multiple reference images -> retry with fewer

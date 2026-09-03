@@ -39,6 +39,7 @@ class RenderImageJob implements ShouldQueue
             // (Face sync "Khuôn mặt mẫu" was removed — no vision description step, keeps generation fast.)
             $prompt = (string) $generation->prompt;
 
+            $refImages = (array) ($generation->meta['ref_images'] ?? []);
             $url = $images->generate(
                 $prompt,
                 $generation->base_image,
@@ -49,6 +50,7 @@ class RenderImageJob implements ShouldQueue
                 $generation->provider,
                 $generation->model,
                 $generation->meta['negative_prompt'] ?? null,
+                $refImages,
             );
 
             // DEEP REDESIGN (region): AI đã sửa trên CROP — paste lại vào ẢNH GỐC đúng vị trí

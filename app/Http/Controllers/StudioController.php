@@ -295,6 +295,75 @@ class StudioController extends Controller
     }
 
     /**
+     * i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation).
+     * Dùng ảnh gốc làm base (không mask) + prompt → model edit tạo biến thể mới.
+     */
+    public function reimagine(Request $request)
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],
+            'prompt' => ['required', 'string', 'max:4000'],
+            'similarity' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
+        ]);
+
+        $sim = (int) ($data['similarity'] ?? 70);
+        $userPrompt = trim((string) $data['prompt']);
+        $finalPrompt = 'Reimagine this image into a new variation. Keep about '.$sim
+            .'% similarity to the original (same subject, identity and key layout), but apply: '.$userPrompt
+            .'. Keep high quality, realistic, studio lighting, sharp details.';
+
+        $cost = (int) studio_config('image_credits', 1);
+        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
+
+        $items = [];
+        for ($i = 0; $i < $variants; $i++) {
+            $items[] = $this->queueGeneration('image', [
+                'prompt' => $finalPrompt,
+                'base_image' => (string) $data['image'],
+                'edit' => true,
+            ], $cost)->getData(true);
+        }
+
+        return response()->json([
+            'items' => $items,
+            'credits_left' => auth()->user()->fresh()->credits_balance,
+        ]);
+    }
+
+    /**
+     * i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).
+     * Ảnh đầu = base (giữ chủ thể/bố cục); các ảnh sau = ref images để hòa trộn vào cảnh.
+     */
+    public function compose(Request $request)
+    {
+        $data = $request->validate([
+            'images' => ['required', 'array', 'min:2', 'max:3'],
+            'images.*' => ['string', 'max:2048'],
+            'prompt' => ['required', 'string', 'max:4000'],
+            'layout' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $imgs = array_values(array_slice($data['images'], 0, 3));
+        $base = (string) $imgs[0];
+        $refs = array_slice($imgs, 1);
+        $userPrompt = trim((string) $data['prompt']);
+
+        $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
+            .'The FIRST image is the main base (keep its subject and overall layout). '
+            .'Blend the other '.count($refs).' reference image(s) naturally into the scene. '.$userPrompt;
+
+        $cost = (int) studio_config('image_credits', 1);
+
+        return $this->queueGeneration('image', [
+            'prompt' => $finalPrompt,
+            'base_image' => $base,
+            'edit' => true,
+            'ref_images' => $refs,
+        ], $cost);
+    }
+
+    /**
      * Region edit ("xóa theo vùng chọn trên canvas"): nhận vùng chọn (normalized 0..1),
      * dựng mask ảnh (TRẮNG = giữ nguyên, ĐEN = vùng chỉnh sửa, cùng kích thước ảnh gốc) rồi:
      *  - có key AI (Qwen Edit / DashScope / Qwen) → gửi mask + prompt cho model edit (async, poll như inpaint);
@@ -854,6 +923,7 @@ RULES:
                 'reg_w' => $data['region_meta']['reg_w'] ?? null,
                 'reg_h' => $data['region_meta']['reg_h'] ?? null,
                 'negative_prompt' => $data['negative_prompt'] ?? null,
+                'ref_images' => $data['ref_images'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 

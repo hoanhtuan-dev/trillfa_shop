@@ -18,8 +18,8 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
-    <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🎨 Biến đổi ảnh (i2i)</h2>
-    <p class="text-[11px] text-ink-500">Chọn chế độ bên dưới rồi bấm xử lý — AI biến đổi ảnh đang chọn theo đúng thao tác.</p>
+    <h2 class="mb-1 font-display text-base font-semibold text-brand-300">✏️ Sửa ảnh (Inpaint)</h2>
+    <p class="text-[11px] text-ink-500">Chỉnh sửa vùng/phần tử trên ảnh đang chọn — AI chỉ sửa đúng vùng được chọn, giữ phần còn lại.</p>
 
     <!-- Ảnh đang chọn -->
     <div v-if="store.preview?.media_url" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
@@ -77,20 +77,6 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       </div>
     </div>
 
-    <!-- Bộ chọn chế độ i2i -->
-    <div class="mt-3">
-      <p class="text-[10px] font-semibold text-cream-300/70">✨ Chế độ biến đổi</p>
-      <div class="mt-1.5 flex flex-wrap gap-1.5">
-        <button v-for="p in store.inpaintModes" :key="p.id" @click="store.applyInpaintMode(p)"
-                :class="store.inpaintMode === p.id ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-700 bg-ink-800/60 text-cream-200 hover:border-brand-400 hover:bg-brand-600/20'"
-                class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
-                :title="p.desc">
-          {{ p.icon }} {{ p.label }}
-        </button>
-      </div>
-      <p class="mt-1.5 text-[10px] text-cream-300/60">{{ store.inpaintModes.find(m => m.id === store.inpaintMode)?.desc }}</p>
-    </div>
-
     <label class="label mt-3">Mô tả chỉnh sửa</label>
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước…"></textarea>
     <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ store.inpaintPrompt.length }}/1000</p>
@@ -102,8 +88,8 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 
     <button @click="store.inpaint(store.inpaintPrompt)" :disabled="!canSubmit" class="btn-brand mt-3 w-full whitespace-nowrap">
       <span v-if="store.inpainting && store.inpaintStage === 'send'">Đang gửi yêu cầu…</span>
-      <span v-else-if="store.inpainting">AI đang xử lý…</span>
-      <span v-else>{{ store.inpaintModes.find(m => m.id === store.inpaintMode)?.icon }} {{ store.inpaintModes.find(m => m.id === store.inpaintMode)?.label }}</span>
+      <span v-else-if="store.inpainting">AI đang chỉnh sửa…</span>
+      <span v-else>✏️ Sửa ảnh</span>
     </button>
 
     <!-- Tiến độ -->
