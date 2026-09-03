@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
+import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 const store = useStudioStore();
 
@@ -59,7 +59,14 @@ watch(() => store.upscaleSrc, () => {
 });
 // Zoom/pan → chỉ cập nhật vị trí overlay (KHÔNG clear nét)
 watch([() => store.zoom, () => store.pan], () => { nextTick(() => { metricsTick.value++; }); });
-onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; });
+// Ctrl/Cmd+Z: hoàn tác nét vẽ khi đang ở chế độ brush
+function onKeyDown(e) {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    if (store.inpaintMaskMode === 'brush') { e.preventDefault(); store.undoInpaintBrush(); }
+  }
+}
+onMounted(() => { window.addEventListener('keydown', onKeyDown); });
+onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window.removeEventListener('keydown', onKeyDown); });
 </script>
 <template>
   <div v-if="visible" class="absolute inset-0 z-31 cursor-crosshair" style="touch-action:none"
@@ -117,12 +124,21 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; });
 
     <!-- Brush mode hint + công cụ Vẽ / Tẩy -->
     <div v-if="store.inpaintMaskMode === 'brush'" class="pointer-events-none absolute inset-0 grid place-items-center">
-      <div class="flex items-center gap-1.5 rounded-full bg-ink-900/95 px-2 py-1 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
-        <button @click="store.inpaintErase = false" :class="!store.inpaintErase ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                class="pointer-events-auto rounded-full px-2.5 py-1 transition-colors" title="Vẽ thêm vùng cần sửa">🖌 Vẽ</button>
-        <button @click="store.inpaintErase = true" :class="store.inpaintErase ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                class="pointer-events-auto rounded-full px-2.5 py-1 transition-colors" title="Tẩy nét đã vẽ (sửa khi lỡ tay)">🧽 Tẩy</button>
-        <span class="pointer-events-none px-1 text-[10px] font-medium text-cream-300/70">{{ store.inpaintErase ? 'Tẩy nét — không cần giữ nút' : (store.inpaintBrushData ? '✅ Đã vẽ mask' : 'Vẽ lên vùng cần sửa · Esc hủy') }}</span>
+      <div class="flex flex-col items-center gap-1.5 rounded-2xl bg-ink-900/95 px-2.5 py-1.5 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
+        <div class="flex items-center gap-1.5">
+          <button @click.stop="store.inpaintErase = false" @pointerdown.stop :class="!store.inpaintErase ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                  class="pointer-events-auto rounded-full px-2.5 py-1 transition-colors" title="Vẽ thêm vùng cần sửa">🖌 Vẽ</button>
+          <button @click.stop="store.inpaintErase = true" @pointerdown.stop :class="store.inpaintErase ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                  class="pointer-events-auto rounded-full px-2.5 py-1 transition-colors" title="Tẩy nét đã vẽ (sửa khi lỡ tay)">🧽 Tẩy</button>
+          <button @click.stop="store.undoInpaintBrush()" @pointerdown.stop class="pointer-events-auto rounded-full bg-ink-800 px-2.5 py-1 text-cream-200 transition-colors hover:bg-ink-700" title="Hoàn tác nét vẽ (Ctrl+Z)">↩</button>
+        </div>
+        <div class="pointer-events-auto flex items-center gap-1.5 rounded-full bg-ink-800/70 px-2 py-0.5">
+          <span class="text-[10px] text-cream-300/70">Cỡ cọ</span>
+          <button @click.stop="store.inpaintBrushSize = Math.max(2, (store.inpaintBrushSize||10) - 2)" @pointerdown.stop class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" title="Cọ nhỏ hơn">−</button>
+          <span class="min-w-6 text-center text-[11px] text-cream-100">{{ store.inpaintBrushSize || 10 }}</span>
+          <button @click.stop="store.inpaintBrushSize = Math.min(48, (store.inpaintBrushSize||10) + 2)" @pointerdown.stop class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" title="Cọ to hơn">+</button>
+        </div>
+        <span class="pointer-events-none text-[10px] font-medium text-cream-300/70">{{ store.inpaintErase ? 'Tẩy nét' : (store.inpaintBrushData ? '✅ Đã vẽ mask · Ctrl+Z hoàn tác' : 'Vẽ lên vùng cần sửa · Esc hủy') }}</span>
       </div>
     </div>
   </div>

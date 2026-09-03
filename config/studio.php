@@ -29,7 +29,7 @@ return [
     'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen multimodal trước)
     'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtualmodel'), // Virtual Try-On (Thay đổi người mẫu) — Beijing-only, free-trial
     'swap_model' => env('STUDIO_SWAP_MODEL', ''), // '' = dùng chung qwen_edit_model (giống Inpaint: qwen-image-edit-max)
-    'swap_candidates' => (int) env('STUDIO_SWAP_CANDIDATES', 2), // số bản PASS 1 để chọn bản đẹp nhất (1-3)
+    'swap_candidates' => (int) env('STUDIO_SWAP_CANDIDATES', 1), // 1 = nhanh; 2-3 = chọn bản đẹp nhất (chậm hơn)
     'swap_superres_scale' => (int) env('STUDIO_SWAP_SUPERRES_SCALE', 2), // upscale 2x/4x trước khi trả kết quả
     'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),

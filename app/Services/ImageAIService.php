@@ -781,6 +781,16 @@ class ImageAIService
     }
 
     /**
+     * CHỈ chấp nhận model EDIT (qwen-image-edit*) cho swap — KHÔNG dùng model sinh ảnh
+     * (qwen-image-3.0-pro, qwen-image, wanx…) vì chúng 403 "AllocationQuota.FreeTierOnly" và chỉ
+     * làm chậm swap (mỗi lần thử mất thêm 1 request thất bại) trong khi model edit kế tiếp mới chạy.
+     */
+    protected function isSwapEditModel(string $model): bool
+    {
+        return str_contains(strtolower($model), 'edit');
+    }
+
+    /**
      * Edit an image with a SPECIFIC model (used by "Thay Đổi Người Mẫu" swap). Retries a couple of
      * times on a 429 rate-limit so a busy model still produces a result.
      */
@@ -794,7 +804,7 @@ class ImageAIService
         $models = array_values(array_unique(array_filter([
             $fusion ?: null,
             $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
-        ], fn ($m) => $m !== null && $m !== '' && $this->isImageEditCapableModel((string) $m))));
+        ], fn ($m) => $m !== null && $m !== '' && $this->isSwapEditModel((string) $m))));
 
         // Rate-limits (429) can take ~10-30s to clear: retry the SAME model with a short bounded
         // backoff (3s then 8s), then move to the next model on other errors (or after giving up).
@@ -834,7 +844,7 @@ class ImageAIService
     {
         $models = array_values(array_unique(array_filter([
             $modelOverride, 'qwen-image-edit-max', 'qwen-image-edit-plus', 'qwen-image-edit',
-        ], fn ($m) => $m !== null && $m !== '' && $this->isImageEditCapableModel((string) $m))));
+        ], fn ($m) => $m !== null && $m !== '' && $this->isSwapEditModel((string) $m))));
 
         $backoffs = [3, 8];
         foreach ($models as $model) {

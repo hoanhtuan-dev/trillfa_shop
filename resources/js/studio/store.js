@@ -92,6 +92,8 @@ export const useStudioStore = defineStore('studio', {
     _inpaintBrushDrawing: false,
     _inpaintBrushLast: null,
     inpaintErase: false,   // true = cọ tẩy (xoá nét đã vẽ thay vì tô thêm)
+    inpaintBrushSize: 10,  // bán kính cọ vẽ (px trên canvas mask 512) — điều chỉnh được
+    _inpaintUndoStack: [], // snapshot canvas trước mỗi nét — Ctrl+Z hoàn tác
     _inpaintDrag: null,
     _inpaintHandle: null,
     _inpaintRaf: null,           // rAF id cho drag batching (mượt như crop)
@@ -587,6 +589,12 @@ export const useStudioStore = defineStore('studio', {
       if (key === 'brush') {
         this._inpaintBrushDrawing = true;
         this._inpaintDrag = { key: 'brush', sx: e.clientX, sy: e.clientY, last: p, handlers };
+        // Snapshot để Ctrl+Z hoàn tác từng nét (giới hạn 30 bước).
+        if (this._inpaintMaskCanvas && this._inpaintMaskCtx) {
+          const snap = this._inpaintMaskCtx.getImageData(0, 0, this._inpaintMaskCanvas.width, this._inpaintMaskCanvas.height);
+          this._inpaintUndoStack.push(snap);
+          if (this._inpaintUndoStack.length > 30) this._inpaintUndoStack.shift();
+        }
         this._drawInpaintBrushDot(p);
       } else if (key === 'draw') {
         // Kéo tạo vùng mới từ điểm nhấn. Lưu box cũ để khôi phục nếu chỉ click nhầm.
@@ -721,6 +729,20 @@ export const useStudioStore = defineStore('studio', {
       c.width = 512; c.height = 512;
       this._inpaintMaskCanvas = c;
       this._inpaintMaskCtx = c.getContext('2d');
+      this._inpaintUndoStack = [];
+    },
+    // Ctrl+Z: khôi phục canvas về trước nét vẽ gần nhất, rồi snapshot lại mask data.
+    undoInpaintBrush() {
+      if (this.inpaintMaskMode !== 'brush') return;
+      const c = this._inpaintMaskCtx; if (!c) return;
+      const snap = this._inpaintUndoStack.pop();
+      if (!snap) { this.toast('Không còn nét để hoàn tác.', 'info'); return; }
+      const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
+      c.globalCompositeOperation = 'source-over';
+      c.clearRect(0, 0, w, h);
+      c.putImageData(snap, 0, 0);
+      this._finalizeInpaintBrush();
+      this.toast('Đã hoàn tác nét vẽ.');
     },
     // Gắn canvas DOM thật (overlay trên ảnh) làm nơi vẽ mask → nét vẽ HIỂN THỊ realtime.
     // Khi tắt brush (el = null) → gỡ tham chiếu để không vẽ vào element đã unmount.
@@ -732,6 +754,8 @@ export const useStudioStore = defineStore('studio', {
       this._inpaintMaskCanvas = c;
       this._inpaintMaskCtx = ctx;
     },
+    _inpaintBrushRadius() { const s = Math.max(2, Math.min(48, Number(this.inpaintBrushSize) || 10)); return this.inpaintErase ? s * 1.6 : s; },
+    _inpaintBrushWidth() { return this._inpaintBrushRadius() * 2; },
     _drawInpaintBrushDot(p) {
       const c = this._inpaintMaskCtx; if (!c) return;
       const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
@@ -739,7 +763,7 @@ export const useStudioStore = defineStore('studio', {
       const erase = !!this.inpaintErase;
       c.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
       c.fillStyle = erase ? 'rgba(0,0,0,1)' : 'rgba(220,38,38,0.6)'; // đỏ 60% — rõ mà không che ảnh
-      c.beginPath(); c.arc(p.nx * w, p.ny * h, erase ? 16 : 10, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.arc(p.nx * w, p.ny * h, this._inpaintBrushRadius(), 0, Math.PI * 2); c.fill();
       c.globalCompositeOperation = 'source-over';
     },
     _drawInpaintBrushLine(from, to) {
@@ -748,7 +772,7 @@ export const useStudioStore = defineStore('studio', {
       const erase = !!this.inpaintErase;
       c.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
       c.strokeStyle = erase ? 'rgba(0,0,0,1)' : 'rgba(220,38,38,0.6)';
-      c.lineWidth = erase ? 32 : 20; c.lineCap = 'round'; c.lineJoin = 'round';
+      c.lineWidth = this._inpaintBrushWidth(); c.lineCap = 'round'; c.lineJoin = 'round';
       c.beginPath(); c.moveTo(from.nx * w, from.ny * h); c.lineTo(to.nx * w, to.ny * h); c.stroke();
       c.globalCompositeOperation = 'source-over';
     },

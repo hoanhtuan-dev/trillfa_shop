@@ -31,15 +31,15 @@ function loadSwapMemory() {
     const m = JSON.parse(localStorage.getItem(SWAP_KEY) || '{}');
     if (m.tone) swapTone.value = m.tone;
     if (typeof m.bg === 'string') swapBg.value = m.bg;
-    if (typeof m.changeFace === 'boolean') changeFace.value = m.changeFace;
+    // changeFace KHÔNG persist — luôn mặc định TẮT mỗi phiên (tránh vô tình chạy PASS đổi mặt).
   } catch (e) {}
 }
 function saveSwapMemory() {
   try {
-    localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value, changeFace: changeFace.value }));
+    localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value }));
   } catch (e) {}
 }
-watch([swapBg, swapTone, changeFace], saveSwapMemory);
+watch([swapBg, swapTone], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
   try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; } catch(e){}
