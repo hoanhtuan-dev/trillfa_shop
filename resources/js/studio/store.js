@@ -9,6 +9,7 @@ export const useStudioStore = defineStore('studio', {
     step: 1,
     opening: false,
     defaultsLoaded: false,
+    needsLogin: false,
     previewId: null,
     preview: null,
     generations: [],
@@ -204,6 +205,8 @@ export const useStudioStore = defineStore('studio', {
       await this.loadDefaults();
       try {
         const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
+        if (res.status === 401 || res.status === 403 || res.redirected || (res.url && res.url.includes('/dang-nhap'))) { this.needsLogin = true; return; }
+        this.needsLogin = false;
         const d = await res.json();
         const items = d.items || d.generations || [];
         if (Array.isArray(items)) this.generations = items;

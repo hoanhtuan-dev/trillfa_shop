@@ -36,6 +36,10 @@ class AuthController extends Controller
         $cart->cart(true);
 
         if (auth()->user()->isAdmin()) {
+            $redirect = $request->input('redirect');
+            if (is_string($redirect) && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')) {
+                return redirect($redirect);
+            }
             return redirect()->intended('/admin');
         }
 

@@ -199,6 +199,8 @@ class StudioController extends Controller
 
         $sourceUrl = trim((string) ($data['source_url'] ?? ''));
         if ($sourceUrl === '') { $sourceUrl = (string) $generation->media_url; }
+        // Tự downscale về ≤1600px để mask & base CÙNG kích thước model xử lý (kết quả không nhòe)
+        $sourceUrl = $this->downscaleSource($sourceUrl, 1600);
 
         // Nếu có mask → tạo mask image và gửi kèm (dùng ĐÚNG ảnh đang hiển thị)
         $maskUrl = null;
@@ -300,6 +302,36 @@ class StudioController extends Controller
     }
 
     /**
+     * Tự downscale ảnh về cạnh dài tối đa $maxSide (mặc định 1600) TRƯỚC khi đưa model edit.
+     * Model edit giới hạn ~1600px; nếu gửi ảnh lớn hơn, kết quả bị model thu nhỏ rồi
+     * fitToSourceSize phóng lại → nhòe. Downscale 1 lần ở đây giúp mask & base CÙNG kích thước,
+     * kết quả luôn sắc nét, không nhòe/sọc.
+     */
+    protected function downscaleSource(string $url, int $maxSide = 1600): string
+    {
+        $file = null;
+        foreach ([public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($url, PHP_URL_PATH), '/')))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) { return $url; }
+        $img = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $img) { return $url; }
+        $w = imagesx($img); $h = imagesy($img);
+        $long = max($w, $h);
+        if ($long <= $maxSide) { imagedestroy($img); return $url; }
+        $scale = $maxSide / $long;
+        $nw = (int) max(1, round($w * $scale));
+        $nh = (int) max(1, round($h * $scale));
+        $out = imagecreatetruecolor($nw, $nh);
+        imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        imagedestroy($img);
+        $name = 'studio/ds-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($out));
+        imagedestroy($out);
+        return '/storage/'.$name;
+    }
+
+    /**
      * i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation).
      * Dùng ảnh gốc làm base (không mask) + prompt → model edit tạo biến thể mới.
      */
@@ -325,7 +357,7 @@ class StudioController extends Controller
         for ($i = 0; $i < $variants; $i++) {
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $finalPrompt,
-                'base_image' => (string) $data['image'],
+                'base_image' => $this->downscaleSource((string) $data['image'], 1600),
                 'edit' => true,
             ], $cost)->getData(true);
         }
@@ -352,7 +384,7 @@ class StudioController extends Controller
         ]);
 
         $imgs = array_values(array_slice($data['images'], 0, 3));
-        $base = (string) $imgs[0];
+        $base = $this->downscaleSource((string) $imgs[0], 1600);
         $refs = array_slice($imgs, 1);
         $userPrompt = trim((string) $data['prompt']);
         $isTryon = ($data['mode'] ?? '') === 'tryon';

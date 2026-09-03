@@ -54,6 +54,11 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
+    <!-- Chưa đăng nhập: studio cần session admin để tải data -->
+    <div v-if="store.needsLogin" class="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-900/30 px-4 py-2.5">
+      <p class="text-xs text-amber-100">🔒 Bạn chưa đăng nhập (hoặc phiên đã hết hạn) — dữ liệu Studio chưa tải được.</p>
+      <a href="/dang-nhap?redirect=/studio" class="shrink-0 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
+    </div>
     <!-- toast (copy/status) -->
     <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 top-4 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
     <!-- Mobile top bar -->
