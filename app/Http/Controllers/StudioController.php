@@ -342,8 +342,11 @@ class StudioController extends Controller
             'face' => ['required', 'string', 'max:2048'],
         ]);
 
-        $finalPrompt = 'Swap the face in the image with the reference face. Keep the new face identity, skin tone and hair natural, blending seamlessly with the original head pose, body proportions and lighting. '
-            .'Keep everything else (garment, pose, background, composition) exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion.';
+        $finalPrompt = 'Swap the ENTIRE head — face, hairstyle, ears, forehead, jawline and neck — with the reference face photo. '
+            .'Match the reference face\'s identity, hairstyle, facial features, ears and head proportions exactly. '
+            .'Scale the new head/face to fit the ORIGINAL head size and body proportions naturally — do NOT enlarge, stretch or distort the head/face. '
+            .'Blend skin tone, hairline and lighting seamlessly with the original body and background. '
+            .'Keep the garment, pose, body, background and composition exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion.';
 
         $cost = (int) studio_config('image_credits', 1);
 
