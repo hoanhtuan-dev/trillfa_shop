@@ -268,13 +268,13 @@ class VirtualTryOnService
 
         if ($inlineFace) {
             // 1 pass: dress model + apply face from reference, giữ nguyên trang phục/phụ kiện/mũ.
-            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', in the pose: '.$pose.'. '
+            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', reproduce this pose EXACTLY: '.$pose.' — body posture, stance, arm/leg placement and facing direction must match this pose precisely. '
                 .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'The '.$facePos.' is the reference face to apply. Apply the face from '.$facePos.' onto the model: match the facial features, skin tone and head angle of the reference face; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
                 .'Keep the hairstyle and head shape of '.$srcPos.'. ';
         } else {
-            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', in the pose: '.$pose.'. '
+            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcPos.', reproduce this pose EXACTLY: '.$pose.' — body posture, stance, arm/leg placement and facing direction must match this pose precisely. '
                 .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors (exact hue, saturation and brightness, no color shift), prints and patterns, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head); do NOT omit ANY accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'Keep the face of the person in the image unchanged (facial features, hairstyle); do NOT swap or restyle the face. ';
