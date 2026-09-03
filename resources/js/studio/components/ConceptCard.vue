@@ -251,9 +251,9 @@ function applyTemplate(tpl) {
 async function loadPresets() {
   presetsLoading.value = true;
   try {
-    const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } });
+    const r = await fetch('/studio/stylist/presets', { headers: { Accept: 'application/json' } });
     const d = await r.json();
-    presets.value = d.types || d.items || [];
+    presets.value = d.presets || d.items || [];
   } catch (e) { presets.value = []; }
   finally { presetsLoading.value = false; }
 }
@@ -365,21 +365,22 @@ async function doEnrichPreview() {
           </div>
         </div>
 
-        <!-- Preset popup (danh sách loại trang phục từ Trợ lý thiết kế) -->
+        <!-- Preset popup (danh sách prompt đã lưu từ Trợ lý thiết kế) -->
         <div v-if="showPresets" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
           <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
-              <span class="text-sm font-semibold text-brand-300">✨ Preset — Loại trang phục</span>
+              <span class="text-sm font-semibold text-brand-300">✨ Preset — Prompt đã lưu</span>
               <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white">✕</button>
             </div>
             <p v-if="presetsLoading" class="py-6 text-center text-xs text-cream-300/60">⏳ Đang tải preset…</p>
-            <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <button v-for="p in presets" :key="p.id" @click="applyPreset(p)" class="group relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 bg-ink-900 transition hover:border-brand-400">
-                <img :src="p.thumb || p.img" :alt="p.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-200 group-hover:scale-105">
-                <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-[10px] font-medium leading-tight text-white">{{ p.name }}</span>
+            <div v-else-if="!presets.length" class="py-6 text-center text-xs text-cream-300/50">Chưa có preset — dùng ✨ Trợ lý thiết kế để tạo prompt, nó sẽ tự lưu tại đây.</div>
+            <div v-else class="space-y-2">
+              <button v-for="p in presets" :key="p.id" @click="applyPreset(p)" class="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
+                <span class="block text-sm font-semibold text-cream-100">{{ p.name }}</span>
+                <span class="mt-1 block text-[11px] leading-snug text-cream-300/50 line-clamp-2">{{ p.prompt }}</span>
               </button>
             </div>
-            <p class="mt-3 text-[10px] text-cream-300/40">Chọn 1 loại trang phục để điền prompt gốc vào ô Prompt Tạo Ảnh.</p>
+            <p class="mt-3 text-[10px] text-cream-300/40">Prompt tạo bằng ✨ Trợ lý thiết kế sẽ được lưu tự động; chọn 1 preset để điền vào ô prompt.</p>
           </div>
         </div>
 

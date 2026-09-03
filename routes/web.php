@@ -192,6 +192,8 @@ Route::prefix('studio')->name('studio.')->group(function () {
     Route::delete('/stylist-data/types/{id}', [StylistDataController::class, 'deleteType'])->name('stylist.data.types.delete');
     Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
     Route::delete('/stylist-data/questions/{id}', [StylistDataController::class, 'deleteQuestion'])->name('stylist.data.questions.delete');
+    Route::get('/stylist/presets', [StylistDataController::class, 'presets'])->name('stylist.presets');
+    Route::delete('/stylist/presets/{id}', [StylistDataController::class, 'deletePreset'])->name('stylist.presets.delete');
 });
 
 // PUBLIC studio page (renders the Vue app for everyone — no auth redirect, so /studio never loops).

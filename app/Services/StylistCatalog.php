@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\StylistGarmentType;
+use App\Models\StylistPreset;
 use App\Models\StylistQuestion;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -20,7 +21,7 @@ class StylistCatalog
     public function ensureTables(): void
     {
         try {
-            if (Schema::hasTable('stylist_garment_types') && Schema::hasTable('stylist_questions')) {
+            if (Schema::hasTable('stylist_garment_types') && Schema::hasTable('stylist_questions') && Schema::hasTable('stylist_presets')) {
                 return;
             }
         } catch (\Throwable $e) {
@@ -47,6 +48,19 @@ class StylistCatalog
                 $table->string('key', 40)->unique();
                 $table->string('question', 500);
                 $table->json('options');
+                $table->integer('sort_order')->default(0);
+                $table->timestamps();
+            });
+        } catch (\Throwable $e) {
+            // bảng đã tồn tại (race) — bỏ qua
+        }
+
+        try {
+            Schema::create('stylist_presets', function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 120);
+                $table->text('prompt');
+                $table->string('type', 40)->nullable();
                 $table->integer('sort_order')->default(0);
                 $table->timestamps();
             });
@@ -211,5 +225,47 @@ class StylistCatalog
                 'Minimal thanh lịch', 'Luxury couture', 'Boho tự do', 'Streetwear hiện đại', 'Retro/cổ điển', 'Futuristic avant-garde',
             ]],
         ];
+    }
+
+    // ── Presets (prompt đã lưu từ Trợ lý thiết kế) ──
+
+    public function savePreset(string $name, string $prompt, string $type = ''): void
+    {
+        $this->ensureTables();
+        try {
+            if (StylistPreset::where('prompt', $prompt)->exists()) {
+                return; // dedup
+            }
+            StylistPreset::create([
+                'name' => $name,
+                'prompt' => $prompt,
+                'type' => $type,
+                'sort_order' => (int) StylistPreset::max('sort_order') + 1,
+            ]);
+        } catch (\Throwable $e) {
+            // bỏ qua lỗi lưu preset — không chặn luồng tạo prompt
+        }
+    }
+
+    public function presets(): array
+    {
+        $this->ensureTables();
+        try {
+            return StylistPreset::orderBy('sort_order')->orderBy('id')->get()
+                ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'prompt' => $p->prompt, 'type' => $p->type])
+                ->values()->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function deletePreset(int $id): void
+    {
+        $this->ensureTables();
+        try {
+            StylistPreset::where('id', $id)->delete();
+        } catch (\Throwable $e) {
+            // bỏ qua
+        }
     }
 }

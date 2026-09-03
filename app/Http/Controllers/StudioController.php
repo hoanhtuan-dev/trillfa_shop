@@ -1867,6 +1867,10 @@ RULES:
         $type = (string) $data['type'];
         $promptEn = $svc->buildPrompt($type, $answers);
         $promptVi = $svc->buildPromptVi($type, $answers);
+
+        // Tự lưu thành preset (data của Trợ lý thiết kế) để nút Preset trong popup Prompt load được.
+        app(\App\Services\StylistCatalog::class)->savePreset($svc->nameOf($type), $promptEn, $type);
+
         return response()->json(['prompt_en' => $promptEn, 'prompt_vi' => $promptVi]);
     }
 

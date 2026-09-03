@@ -61,6 +61,17 @@ class StylistDataController extends Controller
         return response()->json(['types' => $types, 'questions' => $questions]);
     }
 
+    public function presets(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json(['presets' => $this->catalog()->presets()]);
+    }
+
+    public function deletePreset(int $id): \Illuminate\Http\JsonResponse
+    {
+        $this->catalog()->deletePreset($id);
+        return response()->json(['ok' => true]);
+    }
+
     public function saveType(Request $request): \Illuminate\Http\JsonResponse
     {
         $this->catalog();
