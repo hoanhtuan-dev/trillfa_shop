@@ -211,6 +211,100 @@ class VirtualTryOnService
     }
 
     /**
+     * Try-on chế độ GENERATION (mặc định): qwen3.8-flash ĐỌC ảnh nguồn -> mô tả trang phục + phụ kiện
+     * -> wan2.7-image-pro SINH ảnh full-body. Tránh lỗi "vẽ lại đồ" (đổi màu/họa tiết, crop, bố cục to)
+     * của model edit. Chỉ cần mô tả chữ chính xác là kết quả đúng full-body.
+     */
+    public function generationTryOn(string $designImage, string $pose, string $background = '', ?string $faceDesc = null, string $tone = 'none'): ?string
+    {
+        $this->calls = 0;
+        $this->lastModel = null;
+
+        // PASS 1 — vision mô tả trang phục + phụ kiện chính xác.
+        $garmentDesc = $this->describeGarment($designImage);
+        if (! $garmentDesc) {
+            logger()->warning('Swap generation: vision description failed, dùng mô tả fallback');
+            $garmentDesc = 'the outfit and accessories exactly as shown in the source image (same colors, prints, patterns and every accessory)';
+        }
+        $this->calls += 1; // 1 vision call
+
+        // PASS 2 — text-to-image bằng model sinh ảnh.
+        $physique = 'a stylish, edgy young Vietnamese fashion model with a slim figure, slim waist, long toned legs and a beautiful delicate face';
+        $face = $faceDesc ? ' with the face described as: '.$faceDesc : '';
+        $bg = ($background && strtolower($background) !== 'keep' && strtolower($background) !== 'original')
+            ? ' Background: '.$background.'.'
+            : ' Clean minimal studio background.';
+
+        $prompt = 'Full-body fashion photograph of '.$physique.$face.'. '
+            .'The model is wearing: '.$garmentDesc.'. '
+            .'Pose: '.$pose.'. '
+            .'FULL BODY from head to toe, not cropped; the model occupies about 75-80% of the frame height with clear space above the head and below the feet. '
+            .$bg
+            .($this->toneInstruction($tone, $background) ?: '').' '
+            .'Photorealistic, high fashion, studio quality, consistent lighting.';
+
+        $imageSvc = app(ImageAIService::class);
+        $genModel = (string) studio_config('swap_gen_model', 'wan2.7-image-pro');
+        try {
+            $url = $imageSvc->generate(
+                $prompt,
+                null, null,
+                (string) studio_config('swap_gen_resolution', '2K'),
+                (string) studio_config('swap_gen_ratio', '3:4'),
+                null,
+                'qwen',
+                $genModel,
+                (string) config('studio.negative_prompt', '')
+            );
+        } catch (\Throwable $e) {
+            logger()->warning('Swap generation failed', ['model' => $genModel, 'err' => $e->getMessage()]);
+            return null;
+        }
+        if (! $url) {
+            return null;
+        }
+        $this->calls += 1; // 1 generation call
+        $this->lastModel = $imageSvc->lastModel() ?: $genModel;
+        return $url;
+    }
+
+    /**
+     * Dùng qwen3.8-flash (vision) đọc ảnh flat-lay -> mô tả chính xác từng món + màu + họa tiết + phụ kiện.
+     */
+    protected function describeGarment(string $imageUrl): ?string
+    {
+        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        if (! $key) { return null; }
+        $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
+        $instruction = 'Describe the clothing and accessories in this flat-lay image as a precise, literal fashion text-to-image prompt. '
+            .'List every garment and accessory with its EXACT color, pattern/print, material, and where it should be worn on a model: top, bottom/dress, jacket, shoes, handbag, watch, jewelry/earrings, belt, hat. '
+            .'Do NOT invent items that are not visible. Output ONLY the descriptive text, no commentary.';
+
+        foreach (studio_qwen_vision_models() as $model) {
+            try {
+                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(60)
+                    ->post($base, [
+                        'model' => $model,
+                        'messages' => [['role' => 'user', 'content' => [
+                            ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
+                            ['type' => 'text', 'text' => $instruction],
+                        ]]],
+                        'temperature' => 0.2,
+                    ]);
+                if ($resp->successful()) {
+                    $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                    if ($text !== '') {
+                        logger()->info('Swap generation: garment described', ['model' => $model, 'len' => strlen($text)]);
+                        return $text;
+                    }
+                }
+                if ($resp->status() === 404 || $resp->status() === 429 || $resp->status() >= 500) { continue; }
+            } catch (\Throwable $e) { /* next model */ }
+        }
+        return null;
+    }
+
+    /**
      * "Mặc thử đồ" (Click-to-Swap) — Qwen image-edit, nhiều pass.
      *
      * PASS 1 (cốt lõi): đổi DÁNG/cơ thể, LUÔN giữ nguyên khuôn mặt gốc + trang phục (họa tiết, vân

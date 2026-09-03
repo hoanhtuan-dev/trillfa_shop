@@ -2319,6 +2319,7 @@ RULES:
     public function executeSwapFromGeneration(\App\Models\Generation $gen): void
     {
         $meta = (array) ($gen->meta ?? []);
+        $swapMode = (string) studio_config('swap_mode', 'generation');
         $svc = app(\App\Services\VirtualTryOnService::class);
         $changeFace = (bool) ($meta['change_face'] ?? false);
         $model = $changeFace ? $svc->pickModel((string) ($meta['model_id'] ?? '')) : null;
@@ -2328,24 +2329,36 @@ RULES:
             return;
         }
 
-        $fallback = $svc->fallbackEdit(
-            (string) ($meta['image'] ?? ''),
-            $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? 'a model')) : '',
-            $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
-            (string) ($meta['background'] ?? ''),
-            $changeFace ? ($model['image'] ?? null) : null, // face reference only khi bật đổi khuôn mặt
-            (string) ($meta['tone'] ?? 'none'),
-            (string) ($meta['pose_ref'] ?? ''),
-            $changeFace,
-        );
+        if ($swapMode === 'generation') {
+            $fallback = $svc->generationTryOn(
+                (string) ($meta['image'] ?? ''),
+                $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
+                (string) ($meta['background'] ?? ''),
+                $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? null)) : null,
+                (string) ($meta['tone'] ?? 'none'),
+            );
+        } else {
+            $fallback = $svc->fallbackEdit(
+                (string) ($meta['image'] ?? ''),
+                $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? 'a model')) : '',
+                $pose['skeleton'] ?? ($pose['name'] ?? 'standing'),
+                (string) ($meta['background'] ?? ''),
+                $changeFace ? ($model['image'] ?? null) : null, // face reference only khi bật đổi khuôn mặt
+                (string) ($meta['tone'] ?? 'none'),
+                (string) ($meta['pose_ref'] ?? ''),
+                $changeFace,
+            );
+        }
         if (! $fallback) {
-            $gen->update(['status' => 'failed', 'error' => 'Không thể thay đổi người mẫu. Kiểm tra model “'.studio_swap_model().'” và key Qwen Edit (Pay-As-You-Go).']);
+            $gen->update(['status' => 'failed', 'error' => $swapMode === 'generation'
+                ? 'Không thể tạo ảnh mặc thử. Kiểm tra model sinh ảnh “'.studio_config('swap_gen_model', 'wan2.7-image-pro').'” và model đọc ảnh (qwen3.8-flash).'
+                : 'Không thể thay đổi người mẫu. Kiểm tra model “'.studio_swap_model().'” và key Qwen Edit (Pay-As-You-Go).']);
             return;
         }
 
         // Safety net (TẮT mặc định): kéo sáng chủ thể tối. Có thể làm lệch màu trang phục nên chỉ bật
         // khi cần chống hiện tượng silhouette đen — cấu hình STUDIO_SWAP_BRIGHTEN=true.
-        if (studio_config('swap_brighten', false)) {
+        if ($swapMode === 'edit' && studio_config('swap_brighten', false)) {
             $bright = $this->brightenDarkSubject($fallback);
             if ($bright) { $fallback = $bright; }
         }
@@ -2356,7 +2369,7 @@ RULES:
         //            is configured (studio.removebg_key) the call is skipped and the raw result kept.
         //  bokeh:    deterministic depth-of-field on the original frame.
         //  off:      no background post-processing (the raw swap result).
-        $mode = (string) studio_config('swap_portrait_depth', 'removebg');
+        $mode = $swapMode === 'edit' ? (string) studio_config('swap_portrait_depth', 'removebg') : 'off';
         if ($mode === 'removebg') {
             $seg = $this->applySegmentComposite($fallback);
             if ($seg) { $fallback = $seg; }
@@ -2367,20 +2380,20 @@ RULES:
 
         // Làm nhỏ nhân vật một chút (mặc định ~10%) — mở rộng nền nhẹ (không mirror), người giữ nét.
         // Config swap_scale: 0.90 = nhỏ hơn 10%, 1 = tắt.
-        $scale = (float) studio_config('swap_scale', 0.90);
+        $scale = $swapMode === 'edit' ? (float) studio_config('swap_scale', 0.90) : 1.0;
         if ($scale > 0.05 && $scale < 1.0) {
             $scaled = $this->applyScaleDown($fallback, $scale);
             if ($scaled) { $fallback = $scaled; }
         }
 
         // Post-process: upscale (model image-super-resolution — KHÔNG có trên host intl, tắt mặc định).
-        if (studio_config('swap_superres', false)) {
+        if ($swapMode === 'edit' && studio_config('swap_superres', false)) {
             $upscaled = $this->applySuperResolution($fallback, (int) studio_config('swap_superres_scale', 2));
             if ($upscaled) { $fallback = $upscaled; }
         }
 
         // Post-process: face-enhance khi đổi mặt (model face-image-enhance — KHÔNG có trên host intl, tắt mặc định).
-        if ($changeFace && studio_config('swap_face_enhance', false)) {
+        if ($swapMode === 'edit' && $changeFace && studio_config('swap_face_enhance', false)) {
             $enhanced = $this->applyFaceEnhance($fallback);
             if ($enhanced) { $fallback = $enhanced; }
         }
@@ -2398,8 +2411,8 @@ RULES:
         $qaScores = studio_config('swap_qa', true) ? $this->scoreSwapResult($fallback, (string) ($meta['image'] ?? '')) : null;
 
         $swapModel = studio_swap_model();
-        $actualModel = $svc->lastModel() ?: $swapModel;
-        $credits = max(1, $svc->calls()); // 2-3 for the try-on + face-swap + background passes, 1 otherwise
+        $actualModel = $svc->lastModel() ?: ($swapMode === 'generation' ? (string) studio_config('swap_gen_model', 'wan2.7-image-pro') : $swapModel);
+        $credits = max(1, $svc->calls()); // 1 (generation) hoặc 2-3 (edit: try-on + face-swap + background)
 
         $gen->update([
             'status' => 'completed', 'media_url' => $fallback,
