@@ -273,6 +273,44 @@ class StyleSuggestService
         return [base64_encode((string) $data), 'image/jpeg'];
     }
 
+    /**
+     * Đọc ảnh khuôn mặt bằng vision model → trả mô tả chi tiết (tiếng Anh) để hỗ trợ face swap.
+     * Dùng cho "👤 Thay khuôn mặt": mô tả identity + tóc + tai + tỷ lệ giúp model edit hiểu chính xác hơn.
+     * Trả null khi không có key vision hoặc model lỗi (face swap vẫn chạy, chỉ thiếu mô tả).
+     */
+    public function describeFace(string $imagePath): ?string
+    {
+        try {
+            [$b64, $mime] = $this->downscaleBase64($imagePath, 1024);
+            if ($b64 === '') { return null; }
+            $prompt = 'Describe this face in detail for a face-swap task. Return a short English description (1-2 sentences, plain text only, no JSON, no labels) covering: gender, age, face shape, hairstyle (length, color, style), ears, eyebrows, eyes, nose, lips, skin tone, and overall head proportions.';
+            foreach (studio_suggest_qwen_models() as $model) {
+                foreach (studio_qwen_credentials('vision') as $key) {
+                    $base = dashscope_base_url($key).'/compatible-mode/v1';
+                    try {
+                        $resp = Http::withToken($key)->timeout(60)
+                            ->post($base.'/chat/completions', [
+                                'model' => $model,
+                                'messages' => [['role' => 'user', 'content' => [
+                                    ['type' => 'text', 'text' => $prompt],
+                                    ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                                ]]],
+                            ]);
+                        if ($resp->successful()) {
+                            $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                            if ($text !== '' && mb_strlen($text) < 800) { return $text; }
+                        }
+                    } catch (\Throwable $e) {
+                        continue;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->warning('describeFace failed: '.$e->getMessage());
+        }
+        return null;
+    }
+
     protected function suggestViaColor(string $imagePath, int $creativeLevel = 6): array
     {
         $styles = Preset::category('style')->get();

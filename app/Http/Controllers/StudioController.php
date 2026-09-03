@@ -359,6 +359,26 @@ class StudioController extends Controller
     }
 
     /**
+     * Đọc ảnh khuôn mặt bằng vision model → mô tả chi tiết (hỗ trợ face swap).
+     * Resolve URL (route/studio/image hoặc /storage) → file cục bộ → gọi StyleSuggestService::describeFace.
+     */
+    protected function faceDescription(string $url): ?string
+    {
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        if (str_starts_with($path, 'studio/image/')) { $path = substr($path, strlen('studio/image/')); }
+        $file = null;
+        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
+            if (is_file($c)) { $file = $c; break; }
+        }
+        if (! $file) { return null; }
+        try {
+            return app(\App\Services\StyleSuggestService::class)->describeFace($file);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation).
      * Dùng ảnh gốc làm base (không mask) + prompt → model edit tạo biến thể mới.
      */
@@ -430,6 +450,9 @@ class StudioController extends Controller
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
             // Prompt kiểm soát tại Settings → Studio → "Prompt thay khuôn mặt".
             $finalPrompt = (string) studio_config('faceswap_prompt', 'Face swap: replace the face of @image1 with the face in @image2, matching identity, hairstyle, ears and proportions. Keep garment, pose, body, background unchanged.').' '.$userPrompt;
+            // Đọc ảnh khuôn mặt bằng vision → mô tả chi tiết → chèn vào prompt (model edit hiểu chính xác hơn).
+            $faceDesc = isset($refs[0]) ? $this->faceDescription((string) $refs[0]) : null;
+            if ($faceDesc) { $finalPrompt .= ' Face description (from reference photo): '.$faceDesc; }
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
                 .'The FIRST image is the main base (keep its subject and overall layout). '
