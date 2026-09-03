@@ -40,13 +40,14 @@ class RenderImageJob implements ShouldQueue
             $prompt = (string) $generation->prompt;
 
             $refImages = (array) ($generation->meta['ref_images'] ?? []);
+            $faceRef = $generation->meta['face_ref'] ?? null;
             $url = $images->generate(
                 $prompt,
                 $generation->base_image,
                 $generation->mask_image,
                 $generation->resolution,
                 $generation->ratio,
-                null,
+                $faceRef,
                 $generation->provider,
                 $generation->model,
                 $generation->meta['negative_prompt'] ?? null,

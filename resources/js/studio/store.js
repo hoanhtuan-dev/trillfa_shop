@@ -275,6 +275,19 @@ export const useStudioStore = defineStore('studio', {
         return items;
       } catch (e) { this.toast(e.message || 'Lỗi tạo lại ảnh.', 'error'); return null; }
     },
+    // i2i — Ghép (thay thế) khuôn mặt cho người mẫu
+    async faceSwap(image, face) {
+      if (!image || !face) { this.toast('Chọn ảnh người mẫu + ảnh khuôn mặt.', 'error'); return null; }
+      try {
+        const d = await this.api('/studio/face-swap', { image, face });
+        if (d.generation_id) {
+          this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'faceswap', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa thay khuôn mặt' });
+          if (d.credits_left != null) this.creditsLeft = d.credits_left;
+          this.pollGeneration(d.generation_id);
+        }
+        return d;
+      } catch (e) { this.toast(e.message || 'Lỗi thay khuôn mặt.', 'error'); return null; }
+    },
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend)
     async compose(images, prompt, variants = 1, mode = 'compose') {
       if (!Array.isArray(images) || images.length < 2 || !(prompt || '').trim()) { this.toast('Chọn ít nhất 2 ảnh + nhập mô tả.', 'error'); return null; }

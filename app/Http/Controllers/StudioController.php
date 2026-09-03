@@ -332,6 +332,30 @@ class StudioController extends Controller
     }
 
     /**
+     * i2i — Ghép (thay thế) khuôn mặt cho người mẫu.
+     * Ảnh gốc (image) + ảnh khuôn mặt tham chiếu (face) → editImage dùng face_ref.
+     */
+    public function faceSwap(Request $request)
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],
+            'face' => ['required', 'string', 'max:2048'],
+        ]);
+
+        $finalPrompt = 'Swap the face in the image with the reference face. Keep the new face identity, skin tone and hair natural, blending seamlessly with the original head pose, body proportions and lighting. '
+            .'Keep everything else (garment, pose, background, composition) exactly unchanged. Sharp, realistic, no blur, no artifacts, no distortion.';
+
+        $cost = (int) studio_config('image_credits', 1);
+
+        return $this->queueGeneration('image', [
+            'prompt' => $finalPrompt,
+            'base_image' => $this->downscaleSource((string) $data['image'], 1600),
+            'edit' => true,
+            'face_ref' => (string) $data['face'],
+        ], $cost);
+    }
+
+    /**
      * i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation).
      * Dùng ảnh gốc làm base (không mask) + prompt → model edit tạo biến thể mới.
      */
@@ -992,6 +1016,7 @@ RULES:
                 'reg_h' => $data['region_meta']['reg_h'] ?? null,
                 'negative_prompt' => $data['negative_prompt'] ?? null,
                 'ref_images' => $data['ref_images'] ?? null,
+                'face_ref' => $data['face_ref'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 
