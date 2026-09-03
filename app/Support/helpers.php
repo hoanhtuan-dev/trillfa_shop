@@ -628,8 +628,8 @@ function studio_vision_model(?string $provider = null): string
     }
 
     $m = (string) studio_config('vision_model', 'gemini-2.5-flash');
-    if (str_contains(strtolower($m), 'qwen')) {
-        return 'gemini-2.5-flash'; // wrong provider configured -> use a Gemini vision model
+    if (! str_starts_with(strtolower($m), 'gemini')) {
+        return 'gemini-2.5-flash'; // sai provider/model (qwen/deepseek/…) -> dùng Gemini vision
     }
     return $m ?: 'gemini-2.5-flash';
 }
@@ -641,11 +641,11 @@ function studio_qwen_vision_default(): string
 {
     $m = trim((string) studio_config('qwen_vision_model', ''));
 
-    if ($m === '') {
+    if ($m === '' || ! is_qwen_vision_capable($m)) {
         $m = (string) config('studio.qwen_vision_model', 'qwen3.8-flash');
     }
 
-    return $m ?: 'qwen3.8-flash';
+    return ($m && is_qwen_vision_capable($m)) ? $m : 'qwen3.8-flash';
 }
 
 /**
@@ -676,6 +676,7 @@ function is_qwen_vision_capable(?string $model): bool
 
     if (preg_match('/(^|[\-_.])(image|img)(edit)?([\-_.]|$)/', $m)
         || str_contains($m, 'wanx')
+        || str_contains($m, 'deepseek')
         || str_contains($m, 'videogen')
         || str_contains($m, 'taichu')
         || str_contains($m, 'embedding')
@@ -699,16 +700,15 @@ function is_qwen_vision_capable(?string $model): bool
  */
 function studio_qwen_vision_models(): array
 {
-    $custom = array_filter(array_map('trim', explode(',', (string) studio_config('qwen_vision_models', ''))));
-    if (! empty($custom)) {
-        return array_values(array_unique(array_filter($custom)));
-    }
-
+    $custom = array_values(array_filter(
+        array_map('trim', explode(',', (string) studio_config('qwen_vision_models', ''))),
+        fn ($m) => $m !== '' && is_qwen_vision_capable($m)
+    ));
     $primary = studio_qwen_vision_default(); // model admin chọn qua Settings/env/config
     $max = studio_qwen_max_default();
-    $candidates = [$primary, $max, 'qwen-vl-max', 'qwen2.5-vl-72b-instruct', 'qwen-vl-plus', 'qwen2-vl-plus'];
+    $defaults = [$primary, $max, 'qwen3.8-flash', 'qwen-vl-max', 'qwen-vl-plus'];
 
-    return array_values(array_unique(array_filter($candidates)));
+    return array_values(array_unique(array_filter(array_merge($custom, $defaults))));
 }
 
 /**
