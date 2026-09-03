@@ -64,6 +64,32 @@ async function runFaceSwap() {
   fsOpen.value = false;
 }
 
+// Tải khuôn mặt tùy chỉnh từ máy
+const fsUploading = ref(false);
+const fsFileEl = ref(null);
+const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+async function uploadFace(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  fsUploading.value = true;
+  try {
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch('/studio/upload-ref', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.message || 'Lỗi tải khuôn mặt.');
+    const img = { id: 'up-' + Date.now(), name: file.name.replace(/\.[^.]+$/, ''), image: d.url };
+    fsFaces.value.push(img);
+    fsSelected.value = img;
+    store.toast('Đã tải khuôn mặt lên.');
+  } catch (err) {
+    store.toast(err.message || 'Lỗi tải khuôn mặt.', 'error');
+  } finally {
+    fsUploading.value = false;
+    if (fsFileEl.value) fsFileEl.value.value = '';
+  }
+}
+
 const now = ref(Date.now());
 let timer = null;
 onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); loadFaces(); });
@@ -191,6 +217,11 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
         <p class="font-semibold">💡 Chọn 1 khuôn mặt để ghép lên ảnh người mẫu đang chọn.</p>
         <p class="mt-1 text-brand-100/80">AI giữ nguyên dáng, trang phục, bối cảnh và ánh sáng — chỉ thay khuôn mặt.</p>
       </div>
+
+      <label class="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand-500/40 bg-brand-900/20 px-3 py-2.5 text-xs font-semibold text-brand-200 transition hover:bg-brand-900/40">
+        <span>{{ fsUploading ? '⏳ Đang tải lên…' : '📤 Tải khuôn mặt từ máy' }}</span>
+        <input ref="fsFileEl" type="file" accept="image/*" class="hidden" @change="uploadFace">
+      </label>
 
       <div v-if="fsFaces.length" class="grid grid-cols-4 gap-2 sm:grid-cols-5">
         <button v-for="f in fsFaces" :key="f.id" @click="fsSelected = f"
