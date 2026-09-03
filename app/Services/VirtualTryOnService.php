@@ -245,20 +245,33 @@ class VirtualTryOnService
         // CỐT LÕI "Mặc thử đồ": PASS 1 LUÔN giữ nguyên khuôn mặt gốc + trang phục, chỉ đổi dáng/cơ thể.
         // Việc đổi khuôn mặt làm RIÊNG ở PASS 1b bằng ẢNH tham chiếu — không nhét mô tả "cả người" vào
         // PASS 1, vì điều đó khiến model vẽ lại cả người + trang phục (thành "tạo ảnh mới" thay vì mặc thử đồ).
-        // Gửi kèm ảnh dáng tham chiếu (pose reference) nếu có — giúp model bám dáng + cách đặt phụ kiện.
-        $sendPoseImg = (bool) studio_config('swap_pose_image', true) && $poseRefUrl !== '';
+        // ===== Vai trò các ảnh trong content (thứ tự editImage: [faceRef?, poseRef?, source]) =====
+        // Mặc định GỘP đổi mặt vào 1 pass (swap_face_inline=true) để NHANH: PASS 1 nhận faceRef + source,
+        // bỏ PASS 1b riêng. Đặt false để quay lại 2-pass (chất lượng mặt có thể tốt hơn nhưng chậm gấp đôi).
+        $inlineFace = $changeFace && (bool) studio_config('swap_face_inline', true) && $faceRefUrl !== '';
+        // Ảnh dáng toàn thân dễ gây nhiễu (deep-eval: "vài người trong 1 request") + chậm → mặc định TẮT.
+        $sendPoseImg = ! $inlineFace && (bool) studio_config('swap_pose_image', false) && $poseRefUrl !== '';
         $srcRef = $sendPoseImg ? 'the SECOND image' : 'the image';
         $poseHint = $sendPoseImg
             ? 'A pose reference image is the FIRST image (a model demonstrating the target pose). The garment and accessories to be worn are in the SECOND image. Reproduce the EXACT body pose, stance and limb placement from the FIRST image, while wearing the garment/accessories from the SECOND image — do NOT copy the garment or the person from the FIRST image. '
             : '';
 
-        $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcRef.', in the pose: '.$pose.'. '
-            .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors, prints, patterns, fabric weave/texture, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head). '
-            .'Do NOT redesign, replace, or omit any garment or accessory. '
-            .'Keep the face of the person in the image unchanged (facial features, hairstyle); do NOT swap or restyle the face. ';
-        if ($changeFace && ! $faceRefUrl && $modelDesc !== '') {
-            // Preset mặt không có ảnh: đổi mặt NHẸ bằng văn bản (chỉ mặt, giữ mọi thứ khác).
-            $personClause .= 'Change ONLY the person\'s face to match this description: '.$modelDesc.'. Keep the hairstyle, head shape, body, pose, and the EXACT outfit + accessories unchanged. ';
+        if ($inlineFace) {
+            // 1 pass: dress model + apply face from reference, giữ nguyên trang phục/phụ kiện/mũ.
+            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in the SECOND image, in the pose: '.$pose.'. '
+                .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors, prints, patterns, fabric texture, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head). '
+                .'Do NOT redesign, replace, or omit any garment or accessory. '
+                .'The FIRST image is the reference face to apply. Apply the face from the FIRST image onto the model: match the facial features, skin tone and head angle of the FIRST image; scale the face DOWN to the natural head size (about 1/7 of the body height, never larger); if the model wears a hat, headband or headwear, KEEP the headwear, hairline and hair intact around the new face; blend the face naturally with no seam or sticker look. '
+                .'Keep the hairstyle and head shape of the SECOND image. ';
+        } else {
+            $personClause = 'Dress a full-body fashion model in the clothing and ACCESSORIES shown in '.$srcRef.', in the pose: '.$pose.'. '
+                .'The outfit and EVERY accessory must appear on the model EXACTLY as shown — identical colors, prints, patterns, fabric weave/texture, and each accessory correctly placed (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head). '
+                .'Do NOT redesign, replace, or omit any garment or accessory. '
+                .'Keep the face of the person in the image unchanged (facial features, hairstyle); do NOT swap or restyle the face. ';
+            if ($changeFace && ! $faceRefUrl && $modelDesc !== '') {
+                // Preset mặt không có ảnh: đổi mặt NHẸ bằng văn bản (chỉ mặt, giữ mọi thứ khác).
+                $personClause .= 'Change ONLY the person\'s face to match this description: '.$modelDesc.'. Keep the hairstyle, head shape, body, pose, and the EXACT outfit + accessories unchanged. ';
+            }
         }
 
         // KHÔNG đưa prompt "render fabric texture" vào luồng — vân vải lấy NGUYÊN BẢN từ ảnh nguồn.
@@ -307,7 +320,7 @@ class VirtualTryOnService
         $calls = 0;
         foreach ($variants as $vi => $variant) {
             if (count($urls) >= $candidates) { break; }
-            $url = $imageSvc->swapEdit($variant, $designImage, $swapModel, null, $sendPoseImg ? $poseRefUrl : null);
+            $url = $imageSvc->swapEdit($variant, $designImage, $swapModel, $inlineFace ? $faceRefUrl : null, $sendPoseImg ? $poseRefUrl : null);
             if ($url) {
                 $urls[] = $url;
                 $calls++;
@@ -330,7 +343,7 @@ class VirtualTryOnService
         // A separate pass prevents the edit model from ignoring the face reference (the original
         // evaluation found that sending a full-body ref alongside the garment image confuses the
         // model). With face-only as the sole instruction, fidelity is much higher.
-        if ($changeFace && $faceRefUrl) {
+        if ($changeFace && $faceRefUrl && ! $inlineFace) {
             $faceInstr = 'The FIRST image is the reference face; the SECOND image is the person to edit. Replace ONLY the face in the SECOND image with the face from the FIRST image. '
                 .'Scale the reference face DOWN to match the natural head size of the person exactly — the face must NOT be enlarged or magnified beyond the original head; keep the face at the correct anatomical proportion of the head (about 1/7 of the body height, never larger). '
                 .'If the reference face is angled, tilted or turned, match the head angle, direction and perspective of the SECOND image exactly — do NOT paste a frontal or mismatched-angle face onto a turned head. '
