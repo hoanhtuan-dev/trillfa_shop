@@ -15,12 +15,18 @@ class StyleSuggestService
 {
     public function suggest(string $imagePath, int $creativeLevel = 6): array
     {
-        $provider = (string) studio_config('vision_provider', 'gemini');
-        $geminiKey = studio_api_key('gemini');
-        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        // Tính năng bị tắt -> trả kết quả rỗng kèm cờ `disabled` để controller báo lỗi thân thiện.
+        if (! studio_suggest_enabled()) {
+            return ['disabled' => true, 'styles' => [], 'background' => '', 'image_prompt_en' => ''];
+        }
 
-        // Determine the chain: try configured provider first, then fallback to the other, then GD color.
-        $primaryQwen = $provider === 'qwen' && $qwenKey;
+        // Provider + model RIÊNG cho "Gợi ý từ ảnh" — không dùng chung cấu hình Vision.
+        $provider = studio_suggest_provider();
+        $geminiKey = studio_api_key('gemini');
+        $qwenKeys = studio_qwen_credentials('vision');
+        $hasQwen = ! empty($qwenKeys);
+
+        $primaryQwen = $provider === 'qwen' && $hasQwen;
         $primaryGemini = $provider === 'gemini' && $geminiKey;
 
         // Try primary provider
@@ -50,7 +56,7 @@ class StyleSuggestService
         }
 
         // Fallback: if primary was Gemini and it failed, try Qwen next
-        if ($primaryGemini && $qwenKey && !$geminiKey) {
+        if ($primaryGemini && $hasQwen) {
             try {
                 return $this->suggestViaQwenVision($imagePath, $creativeLevel);
             } catch (\Throwable $e) {
@@ -58,12 +64,17 @@ class StyleSuggestService
             }
         }
 
-        return $this->suggestViaColor($imagePath, $creativeLevel);
+        // Không có key + đã bật fallback màu -> phân tích màu GD để vẫn gợi ý offline.
+        if (studio_suggest_fallback()) {
+            return $this->suggestViaColor($imagePath, $creativeLevel);
+        }
+
+        throw new \RuntimeException('Chưa cấu hình API key vision cho "Gợi ý từ ảnh" và fallback màu đang tắt.');
     }
 
     protected function suggestViaQwenVision(string $imagePath, int $creativeLevel): array
     {
-        [$b64, $mime] = $this->downscaleBase64($imagePath);
+        [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
             .'Return ONLY valid JSON with keys: "styles", "background", "pose", "fabric", "silhouette", "camera", '
@@ -73,7 +84,7 @@ class StyleSuggestService
 
         // Try several Qwen VISION models × keys. qwen3.8-flash/max (multimodal) thường thử trước; các tài khoản cũ chỉ expose qwen-vl-* nên giữ fallback ở cuối danh sách.
         $last = null;
-        foreach (studio_qwen_vision_models() as $model) {
+        foreach (studio_suggest_qwen_models() as $model) {
             foreach (studio_qwen_credentials('vision') as $key) {
                 $base = dashscope_base_url($key).'/compatible-mode/v1';
                 try {
@@ -118,9 +129,12 @@ class StyleSuggestService
 
     protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key): array
     {
-        $model = studio_vision_model('gemini');
-        $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
-        $b64 = base64_encode((string) file_get_contents($imagePath));
+        $model = studio_suggest_gemini_model();
+        [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
+        if ($b64 === '') {
+            $mime = function_exists('mime_content_type') ? (mime_content_type($imagePath) ?: 'image/jpeg') : 'image/jpeg';
+            $b64 = base64_encode((string) file_get_contents($imagePath));
+        }
 
         $direction = app(CreativeDirectionService::class);
         $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
@@ -169,6 +183,8 @@ class StyleSuggestService
     protected function finalize(array $json, int $creativeLevel): array
     {
         $styles = array_values(array_filter((array) ($json['styles'] ?? [])));
+        // Giới hạn số phong cách gợi ý (cấu hình riêng max_styles).
+        $styles = array_values(array_slice($styles, 0, max(1, (int) studio_suggest_config('max_styles', 3))));
         $background = $this->str($json['background'] ?? '');
         $pose = $this->str($json['pose'] ?? '');
         $fabric = $this->str($json['fabric'] ?? '');
@@ -208,7 +224,7 @@ class StyleSuggestService
             'camera' => $camera,
             'image_prompt_en' => $c['image_prompt_en'],
             'prompt_vi' => (string) ($json['prompt_vi'] ?? ''),
-            'video_prompt_en' => $c['video_prompt_en'],
+            'video_prompt_en' => studio_suggest_include_video() ? $c['video_prompt_en'] : '',
             'creative_level' => $c['creative_level'],
             'adherence' => $c['adherence'],
             'negative_prompt' => $c['negative_prompt'],
@@ -247,7 +263,7 @@ class StyleSuggestService
         return array_values(array_unique($ids));
     }
 
-    protected function downscaleBase64(string $path): array
+    protected function downscaleBase64(string $path, int $max = 1024): array
     {
         $img = @imagecreatefromstring((string) file_get_contents($path));
         if (! $img) {
@@ -255,7 +271,7 @@ class StyleSuggestService
         }
         $w = imagesx($img);
         $h = imagesy($img);
-        $max = 1024;
+        $max = max(64, min(4096, $max));
         if ($w > $max || $h > $max) {
             $scale = min($max / $w, $max / $h);
             $nw = max(1, (int) ($w * $scale));

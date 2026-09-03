@@ -911,8 +911,13 @@ RULES:
             return response()->json(['message' => 'Không đọc được ảnh nguồn. Vui lòng tải ảnh hoặc chọn ảnh sản phẩm.'], 422);
         }
 
-        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
+        // "Gợi ý từ ảnh" dùng mức sáng tạo RIÊNG (studio_suggest_creative_level), không theo cấu hình chung.
+        $creativeLevel = (int) ($data['creative_level'] ?? studio_suggest_config('creative_level', 6));
         $result = app(StyleSuggestService::class)->suggest($imagePath, $creativeLevel);
+
+        if (($result['disabled'] ?? false) === true) {
+            return response()->json(['message' => 'Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt Studio.'], 422);
+        }
 
         return response()->json($result);
     }
@@ -2921,6 +2926,18 @@ RULES:
             'prompt_suffix' => setting('studio_prompt_suffix', config('studio.prompt_suffix', '')),
             'negative_prompt' => setting('studio_negative_prompt', config('studio.negative_prompt', '')),
             'enrich_prompt' => filter_var(setting('studio_enrich_prompt', config('studio.enrich_prompt', true)), FILTER_VALIDATE_BOOLEAN),
+            // Cấu hình RIÊNG cho "💡 Gợi ý từ ảnh" (tách khỏi Vision chung).
+            'suggest_enabled' => studio_suggest_enabled(),
+            'suggest_provider' => studio_suggest_provider(),
+            'suggest_gemini_model' => studio_suggest_gemini_model(),
+            'suggest_qwen_model' => (string) studio_suggest_config('qwen_model', 'qwen3.8-flash'),
+            'suggest_qwen_models' => (string) studio_suggest_config('qwen_models', ''),
+            'suggest_creative_level' => (int) studio_suggest_config('creative_level', 6),
+            'suggest_max_styles' => (int) studio_suggest_config('max_styles', 3),
+            'suggest_downscale_max' => (int) studio_suggest_config('downscale_max', 1024),
+            'suggest_fallback' => studio_suggest_fallback(),
+            'suggest_include_video' => studio_suggest_include_video(),
+            'suggest_default_lang' => (string) studio_suggest_config('default_lang', 'en'),
             'pending_count' => auth()->user()->generations()->whereIn('status', ['pending', 'processing'])->count(),
             'queue_driver' => config('queue.default'),
             'usage' => studio_usage(auth()->user()),
@@ -3175,6 +3192,41 @@ RULES:
         return back()->with('success', 'Đã lưu cấu hình model Thay Đổi Người Mẫu.');
     }
 
+    /**
+     * Cấu hình RIÊNG cho "💡 Gợi ý từ ảnh" — provider + model + hành vi độc lập,
+     * không phụ thuộc cấu hình chung (Vision / Model Registry).
+     */
+    public function updateSuggestSettings(Request $request)
+    {
+        $data = $request->validate([
+            'suggest_enabled' => ['nullable', 'string', 'in:1'],
+            'suggest_provider' => ['required', 'string', 'in:gemini,qwen'],
+            'suggest_gemini_model' => ['nullable', 'string', 'max:255'],
+            'suggest_qwen_model' => ['nullable', 'string', 'max:255'],
+            'suggest_qwen_models' => ['nullable', 'string', 'max:1000'],
+            'suggest_creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'suggest_max_styles' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'suggest_downscale_max' => ['nullable', 'integer', 'min:64', 'max:4096'],
+            'suggest_fallback' => ['nullable', 'string', 'in:1'],
+            'suggest_include_video' => ['nullable', 'string', 'in:1'],
+            'suggest_default_lang' => ['required', 'string', 'in:en,vi'],
+        ]);
+
+        set_setting('studio_suggest_enabled', ! empty($data['suggest_enabled']) ? '1' : '0');
+        set_setting('studio_suggest_provider', $data['suggest_provider']);
+        set_setting('studio_suggest_gemini_model', $data['suggest_gemini_model'] ?? '');
+        set_setting('studio_suggest_qwen_model', $data['suggest_qwen_model'] ?? '');
+        set_setting('studio_suggest_qwen_models', $data['suggest_qwen_models'] ?? '');
+        if (isset($data['suggest_creative_level'])) set_setting('studio_suggest_creative_level', (string) $data['suggest_creative_level']);
+        if (isset($data['suggest_max_styles'])) set_setting('studio_suggest_max_styles', (string) $data['suggest_max_styles']);
+        if (isset($data['suggest_downscale_max'])) set_setting('studio_suggest_downscale_max', (string) $data['suggest_downscale_max']);
+        set_setting('studio_suggest_fallback', ! empty($data['suggest_fallback']) ? '1' : '0');
+        set_setting('studio_suggest_include_video', ! empty($data['suggest_include_video']) ? '1' : '0');
+        set_setting('studio_suggest_default_lang', $data['suggest_default_lang']);
+
+        return back()->with('success', 'Đã lưu cấu hình "Gợi ý từ ảnh".');
+    }
+
     public function updateSettings(Request $request)
     {
         $data = $request->validate([
@@ -3421,6 +3473,9 @@ RULES:
             'video_resolution' => (string) studio_config('video_resolution', '720'),
             'enrich_prompt' => (bool) studio_config('enrich_prompt', true),
             'negative_prompt' => (string) studio_config('negative_prompt', ''),
+            // Gợi ý từ ảnh — trạng thái + ngôn ngữ mặc định cho SuggestCard.
+            'suggest_enabled' => studio_suggest_enabled(),
+            'suggest_default_lang' => (string) studio_suggest_config('default_lang', 'en'),
         ]);
     }
 

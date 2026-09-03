@@ -111,6 +111,8 @@ export const useStudioStore = defineStore('studio', {
     _pollTimers: {},          // single-flight poll per generation id
     suggesting: false,
     suggestResult: null,
+    suggestEnabled: true,   // bật/tắt tính năng "💡 Gợi ý từ ảnh" (cấu hình Studio)
+    suggestLang: 'en',      // ngôn ngữ hiển thị mặc định (en | vi)
     promptOpen: false,
     viewer: null,
     flashMsg: '',
@@ -169,6 +171,9 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.video_duration) this.videoDuration = defaults.video_duration;
       if (defaults.video_resolution) this.videoRes = defaults.video_resolution;
       if (defaults.negative_prompt !== undefined) this.negativePromptEn = defaults.negative_prompt;
+      // 💡 Gợi ý từ ảnh — trạng thái + ngôn ngữ mặc định.
+      if (defaults.suggest_enabled !== undefined) this.suggestEnabled = !!defaults.suggest_enabled;
+      if (defaults.suggest_default_lang) this.suggestLang = defaults.suggest_default_lang === 'vi' ? 'vi' : 'en';
     },
     applyDefaults() {
       // Re-fetch and apply default values (used by reset button)
@@ -487,6 +492,7 @@ export const useStudioStore = defineStore('studio', {
     pickFromResult(g) { this.setSource(g.media_url, 'Ảnh kết quả #' + g.id); },
     async translate(promptTo) { if (!promptTo) { this.toast('Nhập prompt.', 'error'); return; } this.suggestResult = this.suggestResult || {}; try { const d = await this.api('/studio/translate', { text: promptTo, direction: 'vi' }); this.suggestResult.prompt_vi = d.text || d; this.toast('Đã dịch sang tiếng Việt.'); } catch (e) { this.toast(e.message || 'Lỗi dịch.', 'error'); } },
     async suggestStyle(image) {
+      if (!this.suggestEnabled) { this.toast('Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt.', 'error'); return; }
       if (!image) { this.toast('Chọn ảnh nguồn để gợi ý.', 'error'); return; }
       this.suggesting = true;
       try { const d = await this.api('/studio/suggest', { reference_url: image, creative_level: this.creativeLevel }); this.suggestResult = d; const styles = (d.styles || []).join(', '); this.toast(styles ? 'Phong cách: ' + styles + (d.background ? ' · ' + d.background : '') : 'Đã gợi ý.'); }

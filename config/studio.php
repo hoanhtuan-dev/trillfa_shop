@@ -66,6 +66,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Gợi ý từ ảnh (image → style / prompt suggestion)
+    |--------------------------------------------------------------------------
+    | Tách hoàn toàn khỏi cấu hình Vision chung: tính năng "💡 Gợi ý từ ảnh" có
+    | provider + model + hành vi riêng, không phụ thuộc setting nào khác.
+    */
+    'suggest' => [
+        'enabled' => (bool) env('STUDIO_SUGGEST_ENABLED', true),
+        'provider' => env('STUDIO_SUGGEST_PROVIDER', 'gemini'), // gemini | qwen
+        'gemini_model' => env('STUDIO_SUGGEST_GEMINI_MODEL', 'gemini-2.5-flash'),
+        'qwen_model' => env('STUDIO_SUGGEST_QWEN_MODEL', 'qwen3.8-flash'), // multimodal chính
+        'qwen_models' => env('STUDIO_SUGGEST_QWEN_MODELS', ''), // danh sách ưu tiên, phân cách dấu phẩy
+        'creative_level' => (int) env('STUDIO_SUGGEST_CREATIVE_LEVEL', 6),
+        'max_styles' => (int) env('STUDIO_SUGGEST_MAX_STYLES', 3),
+        'downscale_max' => (int) env('STUDIO_SUGGEST_DOWNSCALE_MAX', 1024),
+        'fallback' => (bool) env('STUDIO_SUGGEST_FALLBACK', true), // GD color fallback khi không có key
+        'include_video' => (bool) env('STUDIO_SUGGEST_INCLUDE_VIDEO', true),
+        'default_lang' => env('STUDIO_SUGGEST_DEFAULT_LANG', 'en'), // en | vi
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | AI providers (optional)
     |--------------------------------------------------------------------------
     | Set these in .env when you have real API keys. When empty the services

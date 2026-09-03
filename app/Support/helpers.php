@@ -175,6 +175,80 @@ if (! function_exists('studio_config')) {
     }
 }
 
+if (! function_exists('studio_suggest_config')) {
+    /**
+     * Đọc cấu hình RIÊNG của tính năng "💡 Gợi ý từ ảnh" — tách hoàn toàn khỏi
+     * cấu hình Vision chung. Ưu tiên: DB (studio_suggest_<key>) -> config/studio.php
+     * (studio.suggest.<key>) -> default.
+     */
+    function studio_suggest_config(string $key, $default = null)
+    {
+        $stored = setting('studio_suggest_'.$key);
+
+        return $stored !== null ? (string) $stored : config('studio.suggest.'.$key, $default);
+    }
+}
+
+if (! function_exists('studio_suggest_enabled')) {
+    function studio_suggest_enabled(): bool
+    {
+        return filter_var(studio_suggest_config('enabled', true), FILTER_VALIDATE_BOOLEAN);
+    }
+}
+
+if (! function_exists('studio_suggest_provider')) {
+    function studio_suggest_provider(): string
+    {
+        $p = strtolower((string) studio_suggest_config('provider', 'gemini'));
+
+        return in_array($p, ['gemini', 'qwen'], true) ? $p : 'gemini';
+    }
+}
+
+if (! function_exists('studio_suggest_gemini_model')) {
+    function studio_suggest_gemini_model(): string
+    {
+        $m = strtolower(trim((string) studio_suggest_config('gemini_model', 'gemini-2.5-flash')));
+
+        // Sai provider (qwen/…) -> dùng Gemini vision mặc định.
+        return str_starts_with($m, 'gemini') ? $m : 'gemini-2.5-flash';
+    }
+}
+
+if (! function_exists('studio_suggest_qwen_models')) {
+    /**
+     * Danh sách model Qwen VISION cho "Gợi ý từ ảnh" (theo thứ tự ưu tiên).
+     * Ưu tiên 1: danh sách tùy biến (studio_suggest_qwen_models).
+     * Ưu tiên 2: model chính (studio_suggest_qwen_model) + fallback qwen3.8-flash / qwen-vl-*.
+     */
+    function studio_suggest_qwen_models(): array
+    {
+        $custom = array_values(array_filter(
+            array_map('trim', explode(',', (string) studio_suggest_config('qwen_models', ''))),
+            fn ($m) => $m !== '' && is_qwen_vision_capable($m)
+        ));
+
+        $primary = trim((string) studio_suggest_config('qwen_model', 'qwen3.8-flash'));
+        $defaults = array_filter([$primary, 'qwen3.8-flash', 'qwen-vl-max', 'qwen-vl-plus'], fn ($m) => $m !== '' && is_qwen_vision_capable($m));
+
+        return array_values(array_unique(array_filter(array_merge($custom, $defaults))));
+    }
+}
+
+if (! function_exists('studio_suggest_fallback')) {
+    function studio_suggest_fallback(): bool
+    {
+        return filter_var(studio_suggest_config('fallback', true), FILTER_VALIDATE_BOOLEAN);
+    }
+}
+
+if (! function_exists('studio_suggest_include_video')) {
+    function studio_suggest_include_video(): bool
+    {
+        return filter_var(studio_suggest_config('include_video', true), FILTER_VALIDATE_BOOLEAN);
+    }
+}
+
 if (! function_exists('studio_swap_model')) {
     function studio_swap_model(): string
     {

@@ -10,6 +10,7 @@
         <button @click="tab='general'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='general' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">⚙️ Cấu hình</button>
         <button @click="tab='models'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='models' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🤖 Model</button>
         <button @click="tab='faces'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='faces' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">💃 Dáng & Khuôn mặt</button>
+        <button @click="tab='suggest'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='suggest' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">💡 Gợi ý từ ảnh</button>
         <button @click="tab='keys'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🔑 API Keys</button>
     </div>
 
@@ -219,6 +220,92 @@
             <button type="submit" class="btn-brand">Lưu cài đặt</button>
             <a href="{{ route('studio.index') }}" class="btn-ghost">Quay lại</a>
         </div>
+        @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
+    </form>
+    </div>
+
+    <div x-show="tab==='suggest'">
+    {{-- ===== Cấu hình RIÊNG "💡 Gợi ý từ ảnh" — độc lập với cấu hình chung ===== --}}
+    <form method="POST" action="{{ route('studio.settings.suggest') }}" class="card mt-6 space-y-4 p-6">
+        @csrf
+        <h2 class="font-display text-base font-semibold text-ink-900">💡 Gợi ý từ ảnh (Image → Style / Prompt)</h2>
+        <p class="text-xs text-ink-500">Cấu hình <b>provider + model + hành vi riêng</b> cho tính năng "Gợi ý từ ảnh". Không phụ thuộc cấu hình Vision chung, Model Registry hay API Keys của các tính năng khác.</p>
+
+        <div class="rounded-xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
+            <label class="flex items-center gap-2 font-semibold text-brand-100">
+                <input type="checkbox" name="suggest_enabled" value="1" @if(old('suggest_enabled', $suggest_enabled)) checked @endif class="h-4 w-4 accent-brand-600">
+                Bật tính năng
+            </label>
+            <p class="mt-1">Khi tắt, thẻ "💡 Gợi ý từ ảnh" trong Studio sẽ không trả kết quả (báo lỗi thân thiện).</p>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+                <label class="label">Vision provider</label>
+                <select name="suggest_provider" class="input !py-2">
+                    <option value="gemini" @selected(old('suggest_provider', $suggest_provider) === 'gemini')>Gemini (Vision)</option>
+                    <option value="qwen" @selected(old('suggest_provider', $suggest_provider) === 'qwen')>Qwen (multimodal)</option>
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Tự chuyển fallback sang provider còn lại khi lỗi; cuối cùng mới tới phân tích màu GD.</p>
+            </div>
+            <div>
+                <label class="label">Gemini model (Vision)</label>
+                <input type="text" name="suggest_gemini_model" value="{{ old('suggest_gemini_model', $suggest_gemini_model) }}" class="input !py-2" placeholder="gemini-2.5-flash">
+            </div>
+            <div>
+                <label class="label">Qwen model chính (multimodal)</label>
+                <input type="text" name="suggest_qwen_model" value="{{ old('suggest_qwen_model', $suggest_qwen_model) }}" class="input !py-2" placeholder="qwen3.8-flash" list="suggest-qwen-models">
+                <datalist id="suggest-qwen-models">
+                    <option value="qwen3.8-flash"></option>
+                    <option value="qwen3.8-max"></option>
+                    <option value="qwen-vl-max"></option>
+                    <option value="qwen-vl-plus"></option>
+                </datalist>
+            </div>
+            <div>
+                <label class="label">Qwen Vision models (ưu tiên, phân cách dấu phẩy)</label>
+                <input type="text" name="suggest_qwen_models" value="{{ old('suggest_qwen_models', $suggest_qwen_models) }}" class="input !py-2" placeholder="qwen3.8-max, qwen3.8-flash (để trống = mặc định)">
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
+            <h3 class="mb-3 font-display text-sm font-semibold text-ink-900">Hành vi gợi ý</h3>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="label">Mức sáng tạo mặc định (1-10)</label>
+                    <input type="number" name="suggest_creative_level" min="1" max="10" value="{{ old('suggest_creative_level', $suggest_creative_level) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">Dùng riêng cho gợi ý — không theo mức sáng tạo chung.</p>
+                </div>
+                <div>
+                    <label class="label">Số phong cách tối đa (1-5)</label>
+                    <input type="number" name="suggest_max_styles" min="1" max="5" value="{{ old('suggest_max_styles', $suggest_max_styles) }}" class="input !py-2">
+                </div>
+                <div>
+                    <label class="label">Giới hạn downscale ảnh (px, 64-4096)</label>
+                    <input type="number" name="suggest_downscale_max" min="64" max="4096" value="{{ old('suggest_downscale_max', $suggest_downscale_max) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">Ảnh lớn hơn sẽ được thu nhỏ trước khi gửi lên model để giảm chi phí/token.</p>
+                </div>
+                <div>
+                    <label class="label">Ngôn ngữ hiển thị mặc định</label>
+                    <select name="suggest_default_lang" class="input !py-2">
+                        <option value="en" @selected(old('suggest_default_lang', $suggest_default_lang) === 'en')>🇬🇧 English</option>
+                        <option value="vi" @selected(old('suggest_default_lang', $suggest_default_lang) === 'vi')>🇻🇳 Tiếng Việt</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <label class="flex items-center gap-2 text-ink-700">
+                    <input type="checkbox" name="suggest_fallback" value="1" @if(old('suggest_fallback', $suggest_fallback)) checked @endif class="h-4 w-4 accent-brand-600">
+                    Dùng fallback màu (GD) khi không có key
+                </label>
+                <label class="flex items-center gap-2 text-ink-700">
+                    <input type="checkbox" name="suggest_include_video" value="1" @if(old('suggest_include_video', $suggest_include_video)) checked @endif class="h-4 w-4 accent-brand-600">
+                    Kèm prompt video catwalk
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-brand">💾 Lưu cấu hình "Gợi ý từ ảnh"</button>
         @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </form>
     </div>

@@ -173,6 +173,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/settings/vue', [StudioController::class, 'settingsVue'])->name('settings.vue');
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::post('/settings/models', [StudioController::class, 'updateModelSettings'])->name('settings.models');
+    Route::post('/settings/suggest', [StudioController::class, 'updateSuggestSettings'])->name('settings.suggest');
     Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');
     Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
