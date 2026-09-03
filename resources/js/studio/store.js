@@ -200,8 +200,8 @@ export const useStudioStore = defineStore('studio', {
         const items = d.items || d.generations || [];
         if (Array.isArray(items)) this.generations = items;
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
-        const comp = this.generations.find(g => g.status === 'completed' && (g.type === 'image' || !g.type));
-        if (comp) { this.previewId = comp.id; this.preview = { id: comp.id, media_url: comp.media_url, type: comp.type || 'image', status: comp.status }; }
+        // KHÔNG tự chọn/khôi phục ảnh kết quả mới nhất lên canvas khi tải lại trang — canvas bắt đầu sạch;
+        // chỉ khôi phục khi có deep-link ?id= (từ Studio Library → Chỉnh sửa/Tạo video).
         // In các kết quả Đổi người mẫu đã hoàn tất vào layer canvas (không cưỡng chế active).
         (this.generations || []).forEach((g) => { if (g.status === 'completed' && g.media_url && g.meta && g.meta.swap) this.syncLayerForGen(g.id, g.media_url, 'Ảnh #' + g.id, false); });
         // Deep-link từ Studio Library: /studio?step=2|3&id=<genId> — khôi phục đúng bước + ảnh.
@@ -531,15 +531,9 @@ export const useStudioStore = defineStore('studio', {
     pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) this.canvasLayers.push({ id, kind, name, image, genId }); },
     setActiveLayer(id) { if (!id) return; this.activeLayerId = id; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
-    // Xóa layer trên canvas. Với layer ảnh kết quả (gen) cũng xóa luôn generation trên
-    // server để sau khi reset ảnh KHÔNG quay lại; layer 'source' chỉ là ảnh tham chiếu nên chỉ gỡ khỏi canvas.
+    // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
     deleteLayer(item) {
       if (!item) return;
-      if (item.kind === 'gen' && item.genId) {
-        const g = this.generations.find((x) => x.id === item.genId) || { id: item.genId };
-        this.deleteGen(g);
-        return;
-      }
       this.canvasLayers = this.canvasLayers.filter((l) => l.id !== item.id);
       if (this.activeLayerId === item.id) {
         const next = this.canvasLayers[0];

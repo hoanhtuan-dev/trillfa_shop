@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import CompareSlider from './CompareSlider.vue';
@@ -16,6 +16,7 @@ const busy = ref(false);
 const open = ref(false);
 const uploading = ref(false);
 const uploaded = ref([]); // [{ url, name }]
+const poses = ref([]);   // pose presets từ Settings
 const selected = ref([]); // array of key
 const fileEl = ref(null);
 
@@ -26,8 +27,9 @@ const genImages = computed(() => store.generations
   .map(g => ({ key: 'gen-' + g.id, url: g.media_url, label: '#' + g.id })));
 
 const upImages = computed(() => uploaded.value.map((u, i) => ({ key: 'up-' + i + '-' + u.name, url: u.url, label: 'Tải lên' })));
+const poseImages = computed(() => poses.value.map(p => ({ key: 'pose-' + p.id, url: p.image, label: 'Pose · ' + p.name })));
 
-const images = computed(() => [...genImages.value, ...upImages.value]);
+const images = computed(() => [...genImages.value, ...poseImages.value, ...upImages.value]);
 const selectedImgs = computed(() => selected.value.map(k => images.value.find(img => img.key === k)).filter(Boolean));
 
 function toggle(key) {
@@ -65,8 +67,17 @@ const quickTemplates = [
   { icon: '👤', label: 'Thay nhân vật', prompt: 'xóa nhân vật trong @image1, thay bằng nhân vật trong @image2' },
   { icon: '🌅', label: 'Đổi nền', prompt: 'giữ nguyên @image1, đổi nền theo @image2' },
   { icon: '🎨', label: 'Phối style', prompt: 'áp dụng phong cách của @image2 vào @image1' },
+  { icon: '🕺', label: 'Thử đồ theo dáng', prompt: 'mặc trang phục trong @image1 lên người mẫu theo dáng trong @image2' },
 ];
 function applyTemplate(t) { prompt.value = t.prompt; }
+
+onMounted(async () => {
+  try {
+    const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } });
+    const d = await r.json();
+    poses.value = d.items || [];
+  } catch (e) { poses.value = []; }
+});
 
 const step = computed(() => {
   if (!selected.value.length) return 1;
