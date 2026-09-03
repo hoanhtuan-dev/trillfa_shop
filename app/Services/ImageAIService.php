@@ -62,7 +62,7 @@ class ImageAIService
         // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
         // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
         if ($baseImage && (studio_api_key('qwen_edit') || $this->providerKey() || $dashscopeKey)) {
-            $edited = $this->editImage($prompt, $baseImage, null, null, null, $maskImage, $refImages);
+            $edited = $this->editImage($prompt, $baseImage, null, $faceRef, null, $maskImage, $refImages);
             if ($edited) {
                 // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
                 // về ĐÚNG kích thước ảnh nguồn để kết quả khớp khung hình ban đầu.
