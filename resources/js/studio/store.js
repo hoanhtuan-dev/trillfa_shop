@@ -22,7 +22,6 @@ export const useStudioStore = defineStore('studio', {
     upscaleScale: 2,
     upscaleRefine: 0,
     studioPhotoreal: 5,
-    skinDetail: 4,
     lightShadow: 5,
     sharpen: 3,   // hậu kỳ: tăng nét chi tiết (không blur)
     clarity: 3,   // hậu kỳ: micro-contrast / độ nổi khối
@@ -210,9 +209,9 @@ export const useStudioStore = defineStore('studio', {
         if (Array.isArray(items)) this.generations = items;
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         // Khôi phục bố cục layer đã lưu (chỉ giữ layer còn hợp lệ) — thay cho việc tự chọn ảnh kết quả cũ.
+        // KHÔNG tự in lại các kết quả swap vào layer nữa: việc này làm layer "sống lại" sau mỗi lần tải lại
+        // và khiến người dùng không thể xóa chúng khỏi canvas. Kết quả swap vẫn hiển thị ở Output/Thư viện.
         this.restoreLayerLayout();
-        // In các kết quả Đổi người mẫu đã hoàn tất vào layer canvas (không cưỡng chế active).
-        (this.generations || []).forEach((g) => { if (g.status === 'completed' && g.media_url && g.meta && g.meta.swap) this.syncLayerForGen(g.id, g.media_url, 'Ảnh #' + g.id, false); });
         // Deep-link từ Studio Library: /studio?step=2|3&id=<genId> — khôi phục đúng bước + ảnh.
         const sp = new URLSearchParams(window.location.search);
         const stepParam = parseInt(sp.get('step') || '', 10);
@@ -512,13 +511,13 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi cắt.', 'error'); }
       finally { this.reframing = false; }
     },
-    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, skin: this.skinDetail, light: this.lightShadow, sharpen: this.sharpen, clarity: this.clarity, vibrance: this.vibrance }; },
+    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, light: this.lightShadow, sharpen: this.sharpen, clarity: this.clarity, vibrance: this.vibrance }; },
     loadUpscaleMemory() {
-      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, skinDetail: m.settings.skin ?? 4, lightShadow: m.settings.light ?? 5, sharpen: m.settings.sharpen ?? 3, clarity: m.settings.clarity ?? 3, vibrance: m.settings.vibrance ?? 3 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
+      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, lightShadow: m.settings.light ?? 5, sharpen: m.settings.sharpen ?? 3, clarity: m.settings.clarity ?? 3, vibrance: m.settings.vibrance ?? 3 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
     },
     saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg(), presets: this.upscalePresets })); } catch (e) {} },
     savePreset(name) { const n = (name || 'Preset ' + (this.upscalePresets.length + 1)).trim(); const existing = this.upscalePresets.find(p => p.name === n); const cfg = this.upscaleCfg(); if (existing) Object.assign(existing, cfg); else this.upscalePresets.push({ name: n, ...cfg }); this.saveUpscaleMemory(); this.toast('Đã lưu preset "' + n + '".'); },
-    applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, skinDetail: p.skin ?? 4, lightShadow: p.light ?? 5, sharpen: p.sharpen ?? 3, clarity: p.clarity ?? 3, vibrance: p.vibrance ?? 3 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
+    applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, lightShadow: p.light ?? 5, sharpen: p.sharpen ?? 3, clarity: p.clarity ?? 3, vibrance: p.vibrance ?? 3 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
     deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
     zoomIn() { this.zoomAt(0, 0, 1.5); },
     zoomOut() { this.zoomAt(0, 0, 1 / 1.5); },
@@ -544,7 +543,11 @@ export const useStudioStore = defineStore('studio', {
         // (upscaleSrc ưu tiên active layer hơn preview).
         const lid = String(g.id);
         if (this.canvasLayers.some((l) => l.id === lid)) this.canvasLayers = this.canvasLayers.filter((l) => l.id !== lid);
-        if (this.activeLayerId === lid || this.previewId === g.id) {
+        // Nếu có layer 'source' được tạo từ ảnh kết quả này (pickFromResult), gỡ luôn để
+        // xóa output không để lại "ảnh ma" vẫn hiển thị trên canvas.
+        const orphanSource = g.media_url ? this.canvasLayers.find((l) => l.kind === 'source' && l.image === g.media_url) : null;
+        if (orphanSource) this.canvasLayers = this.canvasLayers.filter((l) => !(l.kind === 'source' && l.image === g.media_url));
+        if (this.activeLayerId === lid || this.previewId === g.id || (orphanSource && this.activeLayerId === orphanSource.id)) {
           const next = this.canvasLayers.find((x) => x.visible !== false);
           if (next) this.selectLayer(next);
           else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
@@ -580,7 +583,9 @@ export const useStudioStore = defineStore('studio', {
     deleteLayer(item) {
       if (!item) return;
       if (item.locked) { this.toast('Layer đang khóa — mở khóa trước khi gỡ.', 'error'); return; }
+      const wasSource = item.kind === 'source' || item.id === 'source';
       this.canvasLayers = this.canvasLayers.filter((l) => l.id !== item.id);
+      if (wasSource) this.editSource = null;
       if (this.activeLayerId === item.id) {
         const next = this.canvasLayers.find((x) => x.visible !== false);
         if (next) this.selectLayer(next);

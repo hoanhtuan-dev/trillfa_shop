@@ -1148,7 +1148,6 @@ RULES:
             'scale' => ['nullable', 'integer', 'min:1', 'max:4'],
             'refine' => ['nullable', 'integer', 'min:0', 'max:10'],
             'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'skin_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
             'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
             'sharpen' => ['nullable', 'integer', 'min:0', 'max:10'],
             'clarity' => ['nullable', 'integer', 'min:0', 'max:10'],
@@ -1157,7 +1156,6 @@ RULES:
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
         $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
-        $skinDetail = max(0, min(10, (int) ($data['skin_detail'] ?? 0)));
         $lightShadow = max(0, min(10, (int) ($data['light_shadow'] ?? 0)));
         $sharpen = max(0, min(10, (int) ($data['sharpen'] ?? 0)));
         $clarity = max(0, min(10, (int) ($data['clarity'] ?? 0)));
@@ -1194,7 +1192,6 @@ RULES:
         // around it are always protected (no weave/grain ever bleeds onto skin or its boundary).
         $skinMask = $this->buildSkinMask($dst);
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal, $skinMask); }
-        if ($skinDetail > 0) { $this->skinTexturePass($dst, $skinDetail); }
         if ($lightShadow > 0) { $this->lightShadowPass($dst, $lightShadow); }
         if ($sharpen > 0) { $this->sharpenPass($dst, $sharpen, $skinMask); }
         if ($clarity > 0) { $this->clarityPass($dst, $clarity, $skinMask); }
@@ -1302,46 +1299,10 @@ RULES:
         $w = imagesx($img); $h = imagesy($img);
         if ($skinMask === null) { $skinMask = $this->buildSkinMask($img); }
         $cols = (int) ceil($w / 2);
-        // 1) SOFT LIGHT BLEND — blur + lift a copy and blend it in gently for soft, natural ambient light.
+        // smart tone: soft contrast + subtle warm/cool grade — KHÔNG blur, KHÔNG grain/noise.
         if (function_exists('imagefilter')) {
-            $soft = imagecreatetruecolor($w, $h);
-            imagecopy($soft, $img, 0, 0, 0, 0, $w, $h);
-            @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
-            @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
-            @imagefilter($soft, IMG_FILTER_BRIGHTNESS, (int) round(9 * $k));
-            $alpha = 0.04 + 0.08 * $k;
-            for ($y = 0; $y < $h; $y++) {
-                for ($x = 0; $x < $w; $x++) {
-                    $c = imagecolorat($img, $x, $y); $s = imagecolorat($soft, $x, $y);
-                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
-                    $sr = ($s >> 16) & 0xFF; $sg = ($s >> 8) & 0xFF; $sb = $s & 0xFF;
-                    $nr = (int) round($cr * (1 - $alpha) + $sr * $alpha);
-                    $ng = (int) round($cg * (1 - $alpha) + $sg * $alpha);
-                    $nb = (int) round($cb * (1 - $alpha) + $sb * $alpha);
-                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
-                }
-            }
-            imagedestroy($soft);
-            // smart tone: soft contrast + subtle warm/cool grade + gentle denoise
             @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(7 * $k));
             @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
-        }
-        // 2) SUBTLE FILM GRAIN — on shadows/midtones, but SKIPS the dilated skin band (the face
-        //    plus a small rim around it) so the face and its boundary never get a grainy edge.
-        for ($y = 0; $y < $h; $y += 3) {
-            for ($x = 0; $x < $w; $x += 3) {
-                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
-                $c = imagecolorat($img, $x, $y);
-                $r3 = ($c >> 16) & 0xFF; $g3 = ($c >> 8) & 0xFF; $b3 = $c & 0xFF;
-                $lum = $r3 * 0.3 + $g3 * 0.6 + $b3 * 0.1;
-                if ($lum < 215) {
-                    $n = (int) ((mt_rand(-450, 450) / 1000.0) * 6 * $k);
-                    $r = max(0, min(255, (($c >> 16) & 0xFF) + $n));
-                    $g = max(0, min(255, (($c >> 8) & 0xFF) + $n));
-                    $b = max(0, min(255, ($c & 0xFF) + $n));
-                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
-                }
-            }
         }
         // 3) gentle vignette (darken corners slightly, keeps depth)
         $cx = $w / 2; $cy = $h / 2; $maxd = (float) max($w, $h);
@@ -1425,42 +1386,6 @@ RULES:
             }
         }
         return false;
-    }
-
-    /**
-     * Skin (face/body) detail: natural pores + subtle freckles/nam, ONLY on skin mask pixels.
-     */
-    protected function skinTexturePass(\GdImage $img, int $level): void
-    {
-        if ($level <= 0) { return; }
-        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
-        // Random soft pores that are DENSER but blended: fewer on bright skin (so highlights stay clean),
-        // each pore is a soft 2x2 radial dot (center stronger, edge fades) so it melts into the skin.
-        for ($y = 0; $y < $h; $y += 2) {
-            for ($x = 0; $x < $w; $x += 2) {
-                $c = imagecolorat($img, $x, $y);
-                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
-                if ($this->isSkinPixel($r, $g, $b)) {
-                    $bright = $r > 185 ? 0.09 : ($r > 165 ? 0.19 : ($r > 148 ? 0.33 : 1.0));   // face (bright) 50% fewer again
-                    if (mt_rand(0, 1000) < (14 + 70 * $k) * $bright) {
-                        $amp = (int) ((mt_rand(-120, 120) / 1000.0) * 2.2 * $k * (0.4 + 0.6 * $bright));
-                        for ($dy = 0; $dy < 2; $dy++) {
-                            for ($dx = 0; $dx < 2; $dx++) {
-                                $px = $x + $dx; $py = $y + $dy;
-                                if ($px >= $w || $py >= $h) { continue; }
-                                $cc = imagecolorat($img, $px, $py);
-                                $rr = ($cc >> 16) & 0xFF; $gg = ($cc >> 8) & 0xFF; $bb = $cc & 0xFF;
-                                $fade = ($dx + $dy === 0) ? 1.0 : 0.65;
-                                imagesetpixel($img, $px, $py, imagecolorallocate($img,
-                                    max(0, min(255, $rr + (int) ($amp * $fade))),
-                                    max(0, min(255, $gg + (int) ($amp * $fade))),
-                                    max(0, min(255, $bb + (int) ($amp * $fade * 0.8)))));
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     /**
