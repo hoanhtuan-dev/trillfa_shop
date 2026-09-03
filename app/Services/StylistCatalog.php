@@ -20,14 +20,14 @@ class StylistCatalog
      */
     public function ensureTables(): void
     {
+        $hasAll = false;
         try {
-            if (Schema::hasTable('stylist_garment_types') && Schema::hasTable('stylist_questions') && Schema::hasTable('stylist_presets')) {
-                return;
-            }
+            $hasAll = Schema::hasTable('stylist_garment_types') && Schema::hasTable('stylist_questions') && Schema::hasTable('stylist_presets');
         } catch (\Throwable $e) {
-            // fall through để thử tạo
+            $hasAll = false;
         }
 
+        if (! $hasAll) {
         try {
             Schema::create('stylist_garment_types', function (Blueprint $table) {
                 $table->id();
@@ -67,8 +67,9 @@ class StylistCatalog
         } catch (\Throwable $e) {
             // bảng đã tồn tại (race) — bỏ qua
         }
+        }
 
-        // Seed nếu rỗng (idempotent)
+        // Seed nếu rỗng (idempotent) — chạy MỌI lần để bù dữ liệu mặc định khi rỗng.
         try {
             if (! StylistGarmentType::exists()) {
                 foreach ($this->defaultGarmentTypes() as $i => $t) {
@@ -83,6 +84,15 @@ class StylistCatalog
                     StylistQuestion::firstOrCreate(
                         ['key' => $q['key']],
                         ['question' => $q['q'], 'options' => $q['opts'], 'sort_order' => $i],
+                    );
+                }
+            }
+            // Seed preset mặc định (1 prompt gốc cho mỗi loại) để danh sách Preset không bao giờ rỗng.
+            if (! StylistPreset::exists()) {
+                foreach ($this->defaultGarmentTypes() as $i => $t) {
+                    StylistPreset::firstOrCreate(
+                        ['prompt' => $this->basePrompt((string) $t['name'])],
+                        ['name' => $t['name'], 'type' => $t['id'], 'sort_order' => $i],
                     );
                 }
             }
@@ -228,6 +238,12 @@ class StylistCatalog
     }
 
     // ── Presets (prompt đã lưu từ Trợ lý thiết kế) ──
+
+    /** Prompt EN cơ bản cho một loại trang phục (dùng để seed preset mặc định). */
+    public function basePrompt(string $name): string
+    {
+        return 'A high-fashion editorial photo of a women\'s '.$name.', an elegant contemporary design, worn by a young Vietnamese woman (slim, fair skin, long black hair), styled for an elegant occasion, refined editorial aesthetic, set in a clean minimal studio, premium Vogue editorial, full-body, refined silhouette, soft even studio lighting, ultra detailed, 4k';
+    }
 
     public function savePreset(string $name, string $prompt, string $type = ''): void
     {

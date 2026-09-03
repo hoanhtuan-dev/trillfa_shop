@@ -49,7 +49,9 @@ async function loadFaces() {
   try {
     const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
     const d = await r.json();
-    fsFaces.value = d.items || [];
+    // CHỈ hiển thị khuôn mặt CÓ ẢNH THẬT — face chỉ có mô tả (image null) sẽ khiến model
+    // thay bằng text thay vì khuôn mặt thật.
+    fsFaces.value = (d.items || []).filter(f => f.image);
   } catch (e) { fsFaces.value = []; }
 }
 async function runFaceSwap() {
@@ -200,6 +202,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
         </button>
       </div>
       <p v-else class="rounded-2xl border border-dashed border-ink-600 p-4 text-center text-xs text-cream-300/60">Chưa có khuôn mặt — thêm trong <b>Settings → Face Presets</b>.</p>
+      <p v-if="fsFaces.length" class="mt-2 text-[10px] text-cream-300/50">⚠️ Chỉ hiển thị khuôn mặt <b>có ảnh thật</b>. Khuôn mặt chỉ có mô tả (chưa upload ảnh) sẽ không hiện — hãy thêm ảnh trong <b>Settings → Face Presets → Ảnh tham chiếu</b>.</p>
 
       <div class="mt-4 flex items-center justify-between">
         <span class="text-xs text-cream-300/70">{{ fsSelected ? 'Đã chọn: <b class="text-brand-300">' + fsSelected.name + '</b>' : 'Chưa chọn khuôn mặt' }}</span>

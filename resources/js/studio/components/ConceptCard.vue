@@ -253,16 +253,18 @@ function applyTemplate(tpl) {
 async function loadPresets() {
   presetsLoading.value = true;
   try {
-    const [tRes, pRes] = await Promise.all([
-      fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }),
-      fetch('/studio/stylist/presets', { headers: { Accept: 'application/json' } }),
-    ]);
-    const tD = await tRes.json();
-    const pD = await pRes.json();
+    const tRes = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } });
+    const tD = await tRes.json().catch(() => ({}));
     presetTypes.value = tD.types || tD.items || [];
+  } catch (e) { presetTypes.value = []; }
+
+  try {
+    const pRes = await fetch('/studio/stylist/presets', { headers: { Accept: 'application/json' } });
+    const pD = await pRes.json().catch(() => ({}));
     presets.value = pD.presets || pD.items || [];
-  } catch (e) { presets.value = []; presetTypes.value = []; }
-  finally { presetsLoading.value = false; }
+  } catch (e) { presets.value = []; }
+
+  presetsLoading.value = false;
 }
 const filteredPresets = computed(() => {
   if (!presetType.value) return presets.value;
