@@ -2898,6 +2898,8 @@ RULES:
             'qwen_text_models' => setting('studio_qwen_text_models', ''),
             'translate_model' => setting('studio_translate_model', config('studio.translate_model')),
             'swap_model' => setting('studio_swap_model', ''), // '' = dùng chung qwen_edit_model
+            'swap_mode' => setting('studio_swap_mode', config('studio.swap_mode', 'edit')),
+            'swap_gen_model' => setting('studio_swap_gen_model', config('studio.swap_gen_model', 'wan2.7-image-pro')),
             'stylist_model' => setting('studio_stylist_model', config('studio.stylist_model')),
             'image_model' => setting('studio_image_model', config('studio.image_model')),
             'wan_model' => setting('studio_wan_model', config('studio.wan_model')),
@@ -3150,6 +3152,27 @@ RULES:
     {
         $key->delete();
         return redirect()->back()->with('success', 'Đã xóa API key.');
+    }
+
+    public function updateModelSettings(Request $request)
+    {
+        $data = $request->validate([
+            'swap_mode' => ['required', 'string', 'in:edit,generation'],
+            'swap_model' => ['nullable', 'string', 'max:255'],
+            'swap_gen_model' => ['nullable', 'string', 'max:255'],
+            'qwen_edit_model' => ['nullable', 'string', 'max:255'],
+            'qwen_vision_model' => ['nullable', 'string', 'max:255'],
+            'qwen_vision_models' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        set_setting('studio_swap_mode', $data['swap_mode']);
+        if (isset($data['swap_model'])) set_setting('studio_swap_model', $data['swap_model']);
+        if (isset($data['swap_gen_model'])) set_setting('studio_swap_gen_model', $data['swap_gen_model']);
+        if (isset($data['qwen_edit_model'])) set_setting('studio_qwen_edit_model', $data['qwen_edit_model']);
+        if (isset($data['qwen_vision_model'])) set_setting('studio_qwen_vision_model', $data['qwen_vision_model']);
+        if (isset($data['qwen_vision_models'])) set_setting('studio_qwen_vision_models', $data['qwen_vision_models']);
+
+        return back()->with('success', 'Đã lưu cấu hình model Thay Đổi Người Mẫu.');
     }
 
     public function updateSettings(Request $request)
