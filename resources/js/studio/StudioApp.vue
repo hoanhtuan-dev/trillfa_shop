@@ -56,7 +56,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
     <!-- Chưa đăng nhập: studio cần session admin để tải data -->
     <div v-if="store.needsLogin" class="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-900/30 px-4 py-2.5">
-      <p class="text-xs text-amber-100">🔒 Bạn chưa đăng nhập (hoặc phiên đã hết hạn) — dữ liệu Studio chưa tải được.</p>
+      <p class="text-xs text-amber-100">🔒 Chưa đăng nhập — dữ liệu ✨ Trợ lý thiết kế đã load được; để tạo ảnh/video & lưu dữ liệu cần tài khoản admin.</p>
       <a href="/dang-nhap?redirect=/studio" class="shrink-0 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
     </div>
     <!-- toast (copy/status) -->

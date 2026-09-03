@@ -129,14 +129,10 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/swap-models', [StudioController::class, 'swapCatalog'])->defaults('kind', 'models')->name('swap-models');
     Route::get('/swap-poses', [StudioController::class, 'swapCatalog'])->defaults('kind', 'poses')->name('swap-poses');
     Route::get('/swap-backgrounds', [StudioController::class, 'swapBackgrounds'])->name('swap-backgrounds');
-    Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
     Route::get('/studiosample/{file}', [StudioController::class, 'assetSample'])->name('studio.asset');
     Route::post('/stylist', [StudioController::class, 'stylist'])->name('stylist');
-    Route::post('/stylist/cluster', [StudioController::class, 'stylistCluster'])->name('stylist.cluster');
-    Route::post('/stylist/prompt', [StudioController::class, 'stylistPrompt'])->name('stylist.prompt');
     Route::post('/stylist/refine', [StudioController::class, 'stylistRefine'])->name('stylist.refine');
     Route::get('/stylist-data', [StylistDataController::class, 'page'])->name('stylist.data');
-    Route::get('/stylist-data/data', [StylistDataController::class, 'data'])->name('stylist.data.json');
     Route::post('/stylist-data/types', [StylistDataController::class, 'saveType'])->name('stylist.data.types.save');
     Route::delete('/stylist-data/types/{id}', [StylistDataController::class, 'deleteType'])->name('stylist.data.types.delete');
     Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
@@ -187,6 +183,15 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');
     Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
+});
+
+// Public stylist data (read-only, non-sensitive) — để card ✨ Trợ lý thiết kế và popup quản lý
+// load được dữ liệu (loại trang phục + câu hỏi) mà không cần login. Các thao tác ghi/LLM vẫn auth+admin.
+Route::prefix('studio')->name('studio.')->group(function () {
+    Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
+    Route::post('/stylist/cluster', [StudioController::class, 'stylistCluster'])->name('stylist.cluster');
+    Route::post('/stylist/prompt', [StudioController::class, 'stylistPrompt'])->name('stylist.prompt');
+    Route::get('/stylist-data/data', [StylistDataController::class, 'data'])->name('stylist.data.json');
 });
 
 // PUBLIC studio page (renders the Vue app for everyone — no auth redirect, so /studio never loops).
