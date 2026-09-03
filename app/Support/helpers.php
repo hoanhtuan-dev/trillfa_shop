@@ -260,6 +260,14 @@ if (! function_exists('studio_swap_model')) {
     }
 }
 
+if (! function_exists('studio_vision_image_url')) {
+    function studio_vision_image_url(string $url): string
+    {
+        // API vision cần URL công khai (http/https) — chuyển /storage/... thành absolute URL.
+        return str_starts_with($url, 'http') ? $url : url($url);
+    }
+}
+
 if (! function_exists('studio_api_key')) {
     /**
      * Read a provider API key. Prefers the encrypted DB value managed from the

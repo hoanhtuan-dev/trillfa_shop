@@ -2084,9 +2084,9 @@ RULES:
             try {
                 $content = [];
                 if ($designImage !== '') {
-                    $content[] = ['type' => 'image_url', 'image_url' => ['url' => $designImage]];
+                    $content[] = ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($designImage)]];
                 }
-                $content[] = ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]];
+                $content[] = ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($imageUrl)]];
                 $content[] = ['type' => 'text', 'text' => $instruction];
 
                 $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(45)

@@ -286,7 +286,7 @@ class VirtualTryOnService
                     ->post($base, [
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => [
-                            ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
+                            ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($imageUrl)]],
                             ['type' => 'text', 'text' => $instruction],
                         ]]],
                         'temperature' => 0.2,
@@ -526,8 +526,8 @@ class VirtualTryOnService
                         'messages' => [[
                             'role' => 'user',
                             'content' => [
-                                ['type' => 'image_url', 'image_url' => ['url' => $designImage]],
-                                ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
+                                ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($designImage)]],
+                                ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_url($imageUrl)]],
                                 ['type' => 'text', 'text' => $instruction],
                             ],
                         ]],
