@@ -115,11 +115,14 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; });
       </div>
     </div>
 
-    <!-- Brush mode hint -->
+    <!-- Brush mode hint + công cụ Vẽ / Tẩy -->
     <div v-if="store.inpaintMaskMode === 'brush'" class="pointer-events-none absolute inset-0 grid place-items-center">
-      <div class="rounded-full bg-ink-900/90 px-3 py-1 text-xs font-semibold text-brand-200">
-        <template v-if="!store.inpaintBrushData">🖌 Vẽ lên vùng cần sửa · Esc để hủy</template>
-        <template v-else>✅ Đã vẽ mask</template>
+      <div class="flex items-center gap-1.5 rounded-full bg-ink-900/95 px-2 py-1 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
+        <button @click="store.inpaintErase = false" :class="!store.inpaintErase ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                class="pointer-events-auto rounded-full px-2.5 py-1 transition-colors" title="Vẽ thêm vùng cần sửa">🖌 Vẽ</button>
+        <button @click="store.inpaintErase = true" :class="store.inpaintErase ? 'bg-amber-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                class="pointer-events-auto rounded-full px-2.5 py-1 transition-colors" title="Tẩy nét đã vẽ (sửa khi lỡ tay)">🧽 Tẩy</button>
+        <span class="pointer-events-none px-1 text-[10px] font-medium text-cream-300/70">{{ store.inpaintErase ? 'Tẩy nét — không cần giữ nút' : (store.inpaintBrushData ? '✅ Đã vẽ mask' : 'Vẽ lên vùng cần sửa · Esc hủy') }}</span>
       </div>
     </div>
   </div>

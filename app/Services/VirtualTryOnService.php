@@ -214,14 +214,14 @@ class VirtualTryOnService
     }
 
     /**
-     * Swap via a SINGLE-pass, TEXT-DRIVEN Qwen image-edit call.
+     * "Mặc thử đồ" (Click-to-Swap) — Qwen image-edit, nhiều pass.
      *
-     * The face and pose are described in WORDS only (modelDesc + pose skeleton). The face/pose
-     * reference IMAGES are intentionally NOT sent to the model — they stay in the picker as visual
-     * labels. Deep-evaluation finding: sending full-body reference photos confuses the qwen edit
-     * models (several human bodies in one request) and makes them IGNORE the pose; the earlier
-     * text-driven version demonstrably produced the correct pose, and it broke exactly when the
-     * reference images were introduced. $tone is prompt-level.
+     * PASS 1 (cốt lõi): đổi DÁNG/cơ thể, LUÔN giữ nguyên khuôn mặt gốc + trang phục (họa tiết, vân
+     * vải). KHÔNG nhét mô tả "cả người" vào PASS 1 — điều đó khiến model vẽ lại người mới (mất đồ).
+     * PASS 1b (chỉ khi $changeFace): đổi RIÊNG khuôn mặt bằng ẢNH tham chiếu (mặt được chọn).
+     * PASS 2 (nếu có $background): đổi hậu cảnh, giữ nguyên người + trang phục.
+     * Pose được mô tả bằng văn bản ($pose skeleton); ảnh pose ref không gửi vì từng làm model bỏ
+     * qua pose. $tone là hiệu ứng màu ở mức prompt.
      */
     public function fallbackEdit(string $designImage, string $modelDesc, string $pose, string $background = '', ?string $faceRefUrl = null, string $tone = 'none', ?string $poseRefUrl = null, bool $changeFace = false): ?string
     {
@@ -229,7 +229,7 @@ class VirtualTryOnService
         // không dùng mô tả mặt người mẫu, không gửi ảnh mặt tham chiếu, bỏ qua pass face-swap riêng.
         // $changeFace=true: thay người bằng khuôn mặt người mẫu (mô tả văn bản + ảnh ref + pass 1b).
         $swapModel = studio_swap_model();
-        $this->calls = 1;
+        $this->calls = 0; // bộ đếm cộng dồn: PASS1 candidates + face + background
         $this->lastModel = null;
 
         // Fixed body-proportion descriptor at the default build=6 (the slider was removed; this is the
@@ -244,11 +244,20 @@ class VirtualTryOnService
         // with the pose instruction — with a complex background the model redraws the scene and
         // IGNORES the pose (simple/white backgrounds don't trigger this because they are trivial to
         // regenerate). The background is applied in a separate PASS 2 below.
-        $personClause = $changeFace && $modelDesc !== ''
-            ? 'Replace the person in the image with a full-body '.$modelDesc.' in the pose: '.$pose.', keeping the EXACT garment unchanged. '
-            : 'Replace the person in the image with a full-body model figure in the pose: '.$pose.', keeping the ORIGINAL person\'s face and hair 100% unchanged — the face, facial features, identity and hairstyle must stay exactly like the original person; do NOT swap, alter or restyle the face; keep the EXACT garment unchanged. ';
+        // CỐT LÕI "Mặc thử đồ": PASS 1 LUÔN giữ nguyên khuôn mặt gốc + trang phục, chỉ đổi dáng/cơ thể.
+        // Việc đổi khuôn mặt làm RIÊNG ở PASS 1b bằng ẢNH tham chiếu — không nhét mô tả "cả người" vào
+        // PASS 1, vì điều đó khiến model vẽ lại cả người + trang phục (thành "tạo ảnh mới" thay vì mặc thử đồ).
+        $personClause = 'Replace the person in the image with a full-body model figure in the pose: '.$pose.', keeping the ORIGINAL person\'s face and hair 100% unchanged — the face, facial features, identity and hairstyle must stay exactly like the original person; do NOT swap, alter or restyle the face. Keep the EXACT garment unchanged. ';
+        if ($changeFace && ! $faceRefUrl && $modelDesc !== '') {
+            // Preset mặt không có ảnh: đổi mặt NHẸ bằng văn bản (chỉ mặt, giữ mọi thứ khác).
+            $personClause .= 'Change ONLY the person\'s face to match this description: '.$modelDesc.'. Keep the hairstyle, head shape, body, pose and the EXACT garment unchanged. ';
+        }
 
-        $instr = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, patterns, prints, seams, folds, silhouette, length and fabric. Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. '
+        $garmentLock = 'The garment worn by the person in the image is the PRODUCT of this edit: it must appear in the result EXACTLY as it is — identical garment, same colors, silhouette, length, seams, folds and fabric. '
+            .'PRESERVE every print, pattern, embroidery, logo, button, zipper, and the fabric weave/texture exactly — do NOT blur, simplify, redraw or alter them; for patterned garments (floral, plaid, stripes, logo prints, lace), keep each motif crisp and at its original position, size and orientation. '
+            .'Do NOT redesign, replace, reimagine or restyle the outfit; never change its colors or pattern. ';
+
+        $instr = $garmentLock
             .$personClause
             .'Render a vertically-balanced figure: '.$proportion.', with natural, elongated model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat, compressed or stubby. '
             .'Keep the background of the original image unchanged. '
@@ -256,9 +265,8 @@ class VirtualTryOnService
 
         $imageSvc = app(ImageAIService::class);
 
-        // PASS 1 — replace the person (garment kept, face described in text, pose from text).
-        // The edit model is non-deterministic: retry with 2 prompt variants if the first attempt
-        // fails, because different wording can produce drastically different results.
+        // PASS 1 — đổi dáng/cơ thể, giữ khuôn mặt gốc + trang phục. Model không deterministic nên
+        // thử tối đa 3 biến thể prompt; sinh thêm bản để chọn bản đẹp nhất (best-of-N ở dưới).
         $variants = [
             $instr,
             // Variant 2: emphasise garment preservation first, then person replacement
@@ -273,36 +281,48 @@ class VirtualTryOnService
                 .($wantBg ? '' : $toneS).' Photorealistic fashion editorial.',
         ];
 
-        $url = null;
+        // Best-of-N: model edit không deterministic — sinh tối đa N candidates rồi chọn bản đẹp
+        // nhất bằng vision QA (so với ảnh thiết kế gốc). Không có key vision thì chỉ sinh 1 bản
+        // để không lãng phí lượt gọi.
+        $hasVision = (bool) (studio_api_key('qwen') ?: studio_api_key('dashscope'));
+        $candidates = $hasVision ? max(1, min(3, (int) studio_config('swap_candidates', 2))) : 1;
+        $urls = [];
+        $calls = 0;
         foreach ($variants as $vi => $variant) {
+            if (count($urls) >= $candidates) { break; }
             $url = $imageSvc->swapEdit($variant, $designImage, $swapModel, null, null);
             if ($url) {
-                if ($vi > 0) {
-                    logger()->info('Swap PASS 1 succeeded on prompt variant '.($vi + 1));
-                }
-                break;
+                $urls[] = $url;
+                $calls++;
+                logger()->info('Swap PASS 1 candidate '.count($urls).' (variant '.($vi + 1).')');
+            } else {
+                logger()->warning('Swap PASS 1 variant '.($vi + 1).' failed, trying next');
             }
-            logger()->warning('Swap PASS 1 variant '.($vi + 1).' failed, trying next');
         }
-        if (! $url) {
+        if (empty($urls)) {
             return null;
         }
+        $this->calls = $calls;
         $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
+
+        $url = count($urls) > 1
+            ? ($this->pickBestCandidate($urls, $designImage) ?? $urls[0])
+            : $urls[0];
 
         // PASS 1b (NEW) — dedicated face-swap: replace ONLY the face with the reference image.
         // A separate pass prevents the edit model from ignoring the face reference (the original
         // evaluation found that sending a full-body ref alongside the garment image confuses the
         // model). With face-only as the sole instruction, fidelity is much higher.
         if ($changeFace && $faceRefUrl) {
-            $faceInstr = 'Replace ONLY the face of this person with the face from the reference image. '
-                .'Keep the hairstyle, head shape, body, pose, garment and background 100% unchanged. '
+            $faceInstr = 'The FIRST image is the reference face; the SECOND image is the person to edit. Replace ONLY the face in the SECOND image with the face from the FIRST image. '
+                .'Keep the hairstyle, head shape, body, pose, background, and the EXACT garment (colors, prints, patterns, seams, fabric texture) 100% unchanged — do NOT redraw or restyle the outfit. '
                 .'Match the skin tone of the reference face exactly. '
                 .'Blend the new face seamlessly into the head — no visible seam, no color mismatch, no hard edge. '
                 .'Photorealistic, studio quality.';
             $withFace = $imageSvc->swapFace($faceInstr, $url, $swapModel, $faceRefUrl);
             if ($withFace) {
                 $url = $withFace;
-                $this->calls = 2;
+                $this->calls += 1;
                 $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
                 logger()->info('Swap face-ref pass succeeded');
             } else {
@@ -323,16 +343,89 @@ class VirtualTryOnService
                 .$toneS.' Photorealistic.';
             $final = $imageSvc->swapEdit($bgInstr, $url, $swapModel, null, null);
             if ($final) {
-                $this->calls = 2;
+                $this->calls += 1;
                 $this->lastModel = $imageSvc->lastModel() ?: $swapModel;
                 logger()->info('Swap 2-pass done (person+pose, then background)');
                 return $final;
             }
             logger()->warning('Swap background pass failed; keeping the person-swap result');
-            $this->calls = 1;
         }
 
         return $url;
+    }
+
+    /**
+     * Chọn bản đẹp nhất trong các PASS 1 candidates bằng vision QA (so với ảnh thiết kế gốc).
+     * Trả null nếu không score được → giữ bản đầu tiên.
+     */
+    protected function pickBestCandidate(array $urls, string $designImage): ?string
+    {
+        $best = null;
+        $bestScore = null;
+        foreach ($urls as $u) {
+            $s = $this->scoreCandidate($u, $designImage);
+            $score = $s ? $this->candidateScore($s) : null;
+            if ($score !== null && ($bestScore === null || $score > $bestScore)) {
+                $bestScore = $score;
+                $best = $u;
+            }
+        }
+        if ($best) {
+            logger()->info('Swap best candidate selected', ['score' => round((float) $bestScore, 2)]);
+        }
+        return $best;
+    }
+
+    /**
+     * Vision QA (qwen-vl) so sánh candidate với ảnh thiết kế gốc trên 4 tiêu chí.
+     */
+    protected function scoreCandidate(string $imageUrl, string $designImage): ?array
+    {
+        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        if (! $key) { return null; }
+        $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
+        $instruction = 'You are a fashion photography evaluator. The FIRST image is the ORIGINAL design (its garment is the product and must be preserved). The SECOND image is a virtual try-on result. Rate the result 1-10 on:'
+            .'\n1. garment_preservation: how identical is the garment in image 2 to image 1 (colors, patterns, silhouette, length)'
+            .'\n2. face_quality: sharp, natural, photorealistic face'
+            .'\n3. pose_accuracy: natural, correctly executed pose'
+            .'\n4. overall_aesthetic: overall appeal, lighting, composition'
+            .'\nReturn ONLY valid JSON: {"garment_preservation":N,"face_quality":N,"pose_accuracy":N,"overall_aesthetic":N}';
+
+        foreach (studio_qwen_vision_models() as $model) {
+            try {
+                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(45)
+                    ->post($base, [
+                        'model' => $model,
+                        'messages' => [[
+                            'role' => 'user',
+                            'content' => [
+                                ['type' => 'image_url', 'image_url' => ['url' => $designImage]],
+                                ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
+                                ['type' => 'text', 'text' => $instruction],
+                            ],
+                        ]],
+                        'temperature' => 0.1,
+                    ]);
+                if ($resp->successful()) {
+                    $raw = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                    if (preg_match('/\{[^}]+\}/s', $raw, $m)) {
+                        $scores = json_decode($m[0], true);
+                        if (is_array($scores) && isset($scores['garment_preservation'])) {
+                            return $scores;
+                        }
+                    }
+                }
+                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')) { continue; }
+            } catch (\Throwable $e) { /* next model */ }
+        }
+        return null;
+    }
+
+    protected function candidateScore(array $s): float
+    {
+        return ((float) ($s['garment_preservation'] ?? 5) * 0.5)
+            + ((float) ($s['pose_accuracy'] ?? 5) * 0.3)
+            + ((float) ($s['overall_aesthetic'] ?? 5) * 0.2);
     }
 
     /**

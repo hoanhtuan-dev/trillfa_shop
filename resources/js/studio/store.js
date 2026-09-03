@@ -91,6 +91,7 @@ export const useStudioStore = defineStore('studio', {
     _inpaintMaskCtx: null,     // 2d context
     _inpaintBrushDrawing: false,
     _inpaintBrushLast: null,
+    inpaintErase: false,   // true = cọ tẩy (xoá nét đã vẽ thay vì tô thêm)
     _inpaintDrag: null,
     _inpaintHandle: null,
     _inpaintRaf: null,           // rAF id cho drag batching (mượt như crop)
@@ -554,16 +555,16 @@ export const useStudioStore = defineStore('studio', {
       try { await this.api('/studio/generations/' + this.inpaintGenId + '/cancel', {}); this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
       catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
     },
-    clearInpaintStatus() { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; },
+    clearInpaintStatus() { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this.inpaintErase = false; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; },
     // ── Inpaint Mask: chọn vùng trên ảnh preview (integrated into InpaintCard) ──
     toggleInpaintMask(mode) {
-      if (this.inpaintMaskMode === mode) { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; return; }
+      if (this.inpaintMaskMode === mode) { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this.inpaintErase = false; return; }
       if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
       if (this._inpaintDrag) this._inpaintStopDrag();
       this.inpaintMaskMode = mode;
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
-      if (mode === 'brush') this._initInpaintBrush();
+      if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
     },
     inpaintMaskPointer(e) {
       const m = this.canvasMetrics();
@@ -734,15 +735,22 @@ export const useStudioStore = defineStore('studio', {
     _drawInpaintBrushDot(p) {
       const c = this._inpaintMaskCtx; if (!c) return;
       const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
-      c.fillStyle = 'rgba(220,38,38,0.7)'; // đỏ, opacity 70% — nhìn rõ vùng mask trên ảnh
-      c.beginPath(); c.arc(p.nx * w, p.ny * h, 12, 0, Math.PI * 2); c.fill();
+      // Tẩy: destination-out xoá hẳn pixel (cả nét vẽ lẫn mask) — sửa khi vẽ lỡ.
+      const erase = !!this.inpaintErase;
+      c.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
+      c.fillStyle = erase ? 'rgba(0,0,0,1)' : 'rgba(220,38,38,0.6)'; // đỏ 60% — rõ mà không che ảnh
+      c.beginPath(); c.arc(p.nx * w, p.ny * h, erase ? 16 : 10, 0, Math.PI * 2); c.fill();
+      c.globalCompositeOperation = 'source-over';
     },
     _drawInpaintBrushLine(from, to) {
       const c = this._inpaintMaskCtx; if (!c) return;
       const w = this._inpaintMaskCanvas.width, h = this._inpaintMaskCanvas.height;
-      c.strokeStyle = 'rgba(220,38,38,0.7)';
-      c.lineWidth = 24; c.lineCap = 'round'; c.lineJoin = 'round';
+      const erase = !!this.inpaintErase;
+      c.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
+      c.strokeStyle = erase ? 'rgba(0,0,0,1)' : 'rgba(220,38,38,0.6)';
+      c.lineWidth = erase ? 32 : 20; c.lineCap = 'round'; c.lineJoin = 'round';
       c.beginPath(); c.moveTo(from.nx * w, from.ny * h); c.lineTo(to.nx * w, to.ny * h); c.stroke();
+      c.globalCompositeOperation = 'source-over';
     },
     _finalizeInpaintBrush() {
       const el = this._inpaintMaskCanvas; if (!el || !this._inpaintMaskCtx) return;
@@ -763,7 +771,8 @@ export const useStudioStore = defineStore('studio', {
         if (src.data[(y * w + x) * 4 + 3] > 40) { found = true; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
       }}
       if (found && minX <= maxX && minY <= maxY) this.inpaintMaskBox = { x: minX / w, y: minY / h, w: (maxX - minX + 1) / w, h: (maxY - minY + 1) / h };
-      this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null;
+      // KHÔNG null canvas: giữ nét để vẽ TIẾP nhiều nét trên cùng mask (finalize chỉ snapshot
+      // dữ liệu). Canvas bị xoá khi bật brush mới / thoát chế độ (attachBrushCanvas clearRect).
     },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }

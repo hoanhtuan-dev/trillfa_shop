@@ -284,6 +284,9 @@ class StudioController extends Controller
             imagefilledrectangle($mask, $px, $py, $px + $pw - 1, $py + $ph - 1, imagecolorallocate($mask, 0, 0, 0));
         }
 
+        // Feather: mép vùng edit chuyển mềm — model tôn trọng biên, ảnh gộp không seam.
+        $this->featherMaskEdges($mask);
+
         $name = 'studio/mask-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($mask));
         imagedestroy($mask);
@@ -415,6 +418,9 @@ class StudioController extends Controller
             imagecopyresampled($tmp2, $mask, 0, 0, 0, 0, $cropW2, $cropH2, $cropW, $cropH);
             imagedestroy($mask); $mask = $tmp2;
         }
+
+        // Feather mask trước khi lưu — biên vùng edit mềm, composite paste không seam.
+        $this->featherMaskEdges($mask);
 
         $cropName = 'studio/region-crop-'.Str::uuid().'.png';
         $maskName = 'studio/region-mask-'.Str::uuid().'.png';
@@ -1509,6 +1515,29 @@ RULES:
         imagedestroy($blur);
     }
 
+    /**
+     * Feather mask: làm mềm mép vùng đen (edit) → ảnh gộp không lộ seam / viền cứng.
+     * Thực hiện trên bản thu nhỏ (~1/5) rồi nội suy về kích thước gốc — mép đen/trắng
+     * chuyển dần qua xám vài px tỉ lệ theo ảnh, nhanh kể cả ảnh lớn.
+     */
+    protected function featherMaskEdges(\GdImage &$mask): void
+    {
+        $w = imagesx($mask); $h = imagesy($mask);
+        if ($w < 32 || $h < 32) return;
+        $tw = max(32, (int) round($w / 5));
+        $th = max(32, (int) round($h / 5));
+        $small = imagecreatetruecolor($tw, $th);
+        imagecopyresampled($small, $mask, 0, 0, 0, 0, $tw, $th, $w, $h);
+        imagefilter($small, IMG_FILTER_GAUSSIAN_BLUR);
+        imagefilter($small, IMG_FILTER_GAUSSIAN_BLUR);
+        imagefilter($small, IMG_FILTER_GAUSSIAN_BLUR);
+        $tmp = imagecreatetruecolor($w, $h);
+        imagecopyresampled($tmp, $small, 0, 0, 0, 0, $w, $h, $tw, $th);
+        imagedestroy($mask);
+        imagedestroy($small);
+        $mask = $tmp;
+    }
+
     protected function pngBytes(\GdImage $img): string
     {
         ob_start(); imagepng($img); return (string) ob_get_clean();
@@ -2029,7 +2058,7 @@ RULES:
      * Score a swap result via qwen-vl-max on 4 criteria: garment preservation, face quality,
      * pose accuracy, and overall aesthetic. Returns a 0-10 score array or null on failure.
      */
-    protected function scoreSwapResult(string $imageUrl, string $garmentDesc = ''): ?array
+    protected function scoreSwapResult(string $imageUrl, string $designImage = ''): ?array
     {
         $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
         if (! $key) { return null; }
@@ -2037,27 +2066,28 @@ RULES:
         $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
         $models = studio_qwen_vision_models();
 
-        $garmentHint = $garmentDesc ? ' The original garment is: '.$garmentDesc.'.' : '';
-        $instruction = 'You are a fashion photography quality evaluator. Rate this virtual try-on result on a scale of 1-10 for each criterion:'
-            .$garmentHint
-            .'\n1. garment_preservation: Is the garment identical to the original? (colors, patterns, silhouette, length)'
-            .'\n2. face_quality: Is the face sharp, natural, well-lit, and photorealistic?'
-            .'\n3. pose_accuracy: Is the pose natural and correctly executed?'
-            .'\n4. overall_aesthetic: Overall visual appeal, lighting, composition.'
+        $instruction = ($designImage !== '')
+            ? 'You are a fashion photography quality evaluator. The FIRST image is the ORIGINAL design (its garment is the product and must be preserved). The SECOND image is the result to rate 1-10 for each criterion:'
+            : 'You are a fashion photography quality evaluator. Rate the image 1-10 for each criterion:';
+        $instruction .= '\n1. garment_preservation: garment identical to the original design (colors, patterns, silhouette, length)'
+            .'\n2. face_quality: face sharp, natural, well-lit, photorealistic'
+            .'\n3. pose_accuracy: pose natural and correctly executed'
+            .'\n4. overall_aesthetic: overall appeal, lighting, composition'
             .'\nReturn ONLY valid JSON: {"garment_preservation":N,"face_quality":N,"pose_accuracy":N,"overall_aesthetic":N}';
 
         foreach ($models as $model) {
             try {
+                $content = [];
+                if ($designImage !== '') {
+                    $content[] = ['type' => 'image_url', 'image_url' => ['url' => $designImage]];
+                }
+                $content[] = ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]];
+                $content[] = ['type' => 'text', 'text' => $instruction];
+
                 $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(45)
                     ->post($base, [
                         'model' => $model,
-                        'messages' => [[
-                            'role' => 'user',
-                            'content' => [
-                                ['type' => 'image_url', 'image_url' => ['url' => $imageUrl]],
-                                ['type' => 'text', 'text' => $instruction],
-                            ],
-                        ]],
+                        'messages' => [['role' => 'user', 'content' => $content]],
                         'temperature' => 0.1,
                     ]);
 
@@ -2341,12 +2371,15 @@ RULES:
         }
 
         // Post-process: upscale the result for higher resolution (DashScope image-super-resolution).
-        $upscaled = $this->applySuperResolution($fallback, 2);
+        $upscaled = $this->applySuperResolution($fallback, (int) studio_config('swap_superres_scale', 2));
         if ($upscaled) { $fallback = $upscaled; }
 
-        // Post-process: enhance the face if it came out blurry (DashScope face-image-enhance).
-        $enhanced = $this->applyFaceEnhance($fallback);
-        if ($enhanced) { $fallback = $enhanced; }
+        // Post-process: enhance the face ONLY when swapping the face — when keeping the original face,
+        // skip so the model's original identity isn't drifted by the enhance model.
+        if ($changeFace) {
+            $enhanced = $this->applyFaceEnhance($fallback);
+            if ($enhanced) { $fallback = $enhanced; }
+        }
 
         // Safety: moderate the final image before saving (DashScope image-moderation, free).
         if (! $this->moderateImage($fallback)) {
@@ -2355,9 +2388,8 @@ RULES:
             return;
         }
 
-        // QA: score the result for quality tracking (qwen-vl-max, optional — skips if no key).
-        $garmentDesc = $changeFace ? ($model['desc'] ?? ($model['ethnicity'] ?? '')) : 'giữ nguyên khuôn mặt gốc';
-        $qaScores = $this->scoreSwapResult($fallback, $garmentDesc);
+        // QA: score the final result against the ORIGINAL design image (garment preservation + quality).
+        $qaScores = $this->scoreSwapResult($fallback, (string) ($meta['image'] ?? ''));
 
         $swapModel = studio_swap_model();
         $actualModel = $svc->lastModel() ?: $swapModel;
