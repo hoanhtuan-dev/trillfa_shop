@@ -1150,12 +1150,18 @@ RULES:
             'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
             'skin_detail' => ['nullable', 'integer', 'min:0', 'max:10'],
             'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'sharpen' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'clarity' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'vibrance' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
         $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
         $skinDetail = max(0, min(10, (int) ($data['skin_detail'] ?? 0)));
         $lightShadow = max(0, min(10, (int) ($data['light_shadow'] ?? 0)));
+        $sharpen = max(0, min(10, (int) ($data['sharpen'] ?? 0)));
+        $clarity = max(0, min(10, (int) ($data['clarity'] ?? 0)));
+        $vibrance = max(0, min(10, (int) ($data['vibrance'] ?? 0)));
         $srcUrl = (string) $data['image'];
 
         // Optional AI-edit refine for photoreal human detail. The prompt never asks for fabric
@@ -1190,6 +1196,9 @@ RULES:
         if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal, $skinMask); }
         if ($skinDetail > 0) { $this->skinTexturePass($dst, $skinDetail); }
         if ($lightShadow > 0) { $this->lightShadowPass($dst, $lightShadow); }
+        if ($sharpen > 0) { $this->sharpenPass($dst, $sharpen, $skinMask); }
+        if ($clarity > 0) { $this->clarityPass($dst, $clarity, $skinMask); }
+        if ($vibrance > 0) { $this->vibrancePass($dst, $vibrance, $skinMask); }
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
         imagedestroy($src); imagedestroy($dst);
@@ -1476,6 +1485,78 @@ RULES:
         }
         if (function_exists('imagefilter')) {
             @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(6 * $k));
+        }
+    }
+
+    /**
+     * Hậu kỳ — Tăng nét chi tiết (unsharp mask), BỎ QUA vùng da để không lộ khuyết điểm.
+     * Làm sắc đường may, họa tiết vải, viền — không blur, không noise.
+     */
+    protected function sharpenPass(\GdImage $img, int $level, array $skinMask): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0;
+        $w = imagesx($img); $h = imagesy($img);
+        $sharp = imagecreatetruecolor($w, $h);
+        imagecopy($sharp, $img, 0, 0, 0, 0, $w, $h);
+        $a = 0.5 + 1.6 * $k; // 0.5..2.1
+        $kernel = [[0, -$a, 0], [-$a, 1 + 4 * $a, -$a], [0, -$a, 0]];
+        @imageconvolution($sharp, $kernel, 1, 0);
+        $cols = intdiv($w + 1, 2);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
+                imagesetpixel($img, $x, $y, imagecolorat($sharp, $x, $y));
+            }
+        }
+        imagedestroy($sharp);
+    }
+
+    /**
+     * Hậu kỳ — Clarity (micro-contrast cục bộ): tăng độ "nổi khối" cho vải/chi tiết, bỏ qua da.
+     */
+    protected function clarityPass(\GdImage $img, int $level, array $skinMask): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0;
+        $w = imagesx($img); $h = imagesy($img);
+        $tmp = imagecreatetruecolor($w, $h);
+        imagecopy($tmp, $img, 0, 0, 0, 0, $w, $h);
+        $c = 0.25 + 0.75 * $k; // 0.25..1.0 — nhẹ hơn sharpen, chỉ tăng khối/chiều sâu
+        $kernel = [[0, -$c, 0], [-$c, 1 + 4 * $c, -$c], [0, -$c, 0]];
+        @imageconvolution($tmp, $kernel, 1, 0);
+        $cols = intdiv($w + 1, 2);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
+                imagesetpixel($img, $x, $y, imagecolorat($tmp, $x, $y));
+            }
+        }
+        imagedestroy($tmp);
+    }
+
+    /**
+     * Hậu kỳ — Vibrance (tăng độ sống động màu): đẩy màu ra xa xám, bảo vệ tone da (tăng rất nhẹ trên da).
+     */
+    protected function vibrancePass(\GdImage $img, int $level, array $skinMask): void
+    {
+        if ($level <= 0) { return; }
+        $k = $level / 10.0;
+        $w = imagesx($img); $h = imagesy($img);
+        $cols = intdiv($w + 1, 2);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                $skin = $this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1);
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $gray = ($r + $g + $b) / 3.0;
+                $factor = $skin ? (1 + 0.12 * $k) : (1 + 0.55 * $k);
+                $nr = $gray + ($r - $gray) * $factor;
+                $ng = $gray + ($g - $gray) * $factor;
+                $nb = $gray + ($b - $gray) * $factor;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    (int) max(0, min(255, $nr)), (int) max(0, min(255, $ng)), (int) max(0, min(255, $nb))));
+            }
         }
     }
 

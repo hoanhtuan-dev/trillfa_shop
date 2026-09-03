@@ -24,6 +24,9 @@ export const useStudioStore = defineStore('studio', {
     studioPhotoreal: 5,
     skinDetail: 4,
     lightShadow: 5,
+    sharpen: 3,   // hậu kỳ: tăng nét chi tiết (không blur)
+    clarity: 3,   // hậu kỳ: micro-contrast / độ nổi khối
+    vibrance: 3,  // hậu kỳ: độ sống động màu
     upscaling: false,
     // film look
     lookPreset: 'studio',
@@ -508,13 +511,13 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi cắt.', 'error'); }
       finally { this.reframing = false; }
     },
-    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, skin: this.skinDetail, light: this.lightShadow }; },
+    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, skin: this.skinDetail, light: this.lightShadow, sharpen: this.sharpen, clarity: this.clarity, vibrance: this.vibrance }; },
     loadUpscaleMemory() {
-      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, skinDetail: m.settings.skin ?? 4, lightShadow: m.settings.light ?? 5 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
+      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, skinDetail: m.settings.skin ?? 4, lightShadow: m.settings.light ?? 5, sharpen: m.settings.sharpen ?? 3, clarity: m.settings.clarity ?? 3, vibrance: m.settings.vibrance ?? 3 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
     },
     saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg(), presets: this.upscalePresets })); } catch (e) {} },
     savePreset(name) { const n = (name || 'Preset ' + (this.upscalePresets.length + 1)).trim(); const existing = this.upscalePresets.find(p => p.name === n); const cfg = this.upscaleCfg(); if (existing) Object.assign(existing, cfg); else this.upscalePresets.push({ name: n, ...cfg }); this.saveUpscaleMemory(); this.toast('Đã lưu preset "' + n + '".'); },
-    applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, skinDetail: p.skin ?? 4, lightShadow: p.light ?? 5 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
+    applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, skinDetail: p.skin ?? 4, lightShadow: p.light ?? 5, sharpen: p.sharpen ?? 3, clarity: p.clarity ?? 3, vibrance: p.vibrance ?? 3 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
     deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
     zoomIn() { this.zoomAt(0, 0, 1.5); },
     zoomOut() { this.zoomAt(0, 0, 1 / 1.5); },

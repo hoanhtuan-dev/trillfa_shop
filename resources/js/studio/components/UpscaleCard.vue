@@ -8,7 +8,7 @@ async function runUpscale() {
   if (!store.upscaleSrc || store.upscaling) return;
   store.upscaling = true;
   try {
-    const d = await store.api('/studio/upscale', { image: store.upscaleSrc, scale: Number(store.upscaleScale)||2, refine: Number(store.upscaleRefine)||0, photoreal: Number(store.studioPhotoreal)||0, skin_detail: Number(store.skinDetail)||0, light_shadow: Number(store.lightShadow)||0 });
+    const d = await store.api('/studio/upscale', { image: store.upscaleSrc, scale: Number(store.upscaleScale)||2, refine: Number(store.upscaleRefine)||0, photoreal: Number(store.studioPhotoreal)||0, skin_detail: Number(store.skinDetail)||0, light_shadow: Number(store.lightShadow)||0, sharpen: Number(store.sharpen)||0, clarity: Number(store.clarity)||0, vibrance: Number(store.vibrance)||0 });
     store.addGen({ id: d.generation_id, type:'image', status:'completed', model:'upscale', provider:'upscale', media_url:d.media_url, error:null, credits_cost:0, created_at:'Vừa nâng cấp' });
     store.toast('Đã nâng cấp ảnh (' + store.upscaleScale + 'x).');
   } catch(e){ store.toast(e.message || 'Lỗi nâng cấp ảnh.', 'error'); }
@@ -32,7 +32,7 @@ function setv(field, val) { store[field] = Number(val); store.saveUpscaleMemory(
       <div class="scrollbar-hide max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl border border-brand-500/30 bg-ink-900 p-5" @click.stop>
         <div class="mb-3 flex items-center justify-between"><span class="text-sm font-semibold text-brand-300">🔍 Cài đặt & presets</span><button @click="popupOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200">✕</button></div>
         <div class="space-y-2.5">
-          <div v-for="(f,i) in [['upscaleRefine','Tinh chỉnh AI'],['studioPhotoreal','Studio Chân thực'],['skinDetail','Da (lỗ chân lông/nám)'],['lightShadow','Ánh sáng & Bóng đổ']]" :key="f[0]">
+          <div v-for="(f,i) in [['upscaleRefine','Tinh chỉnh AI'],['studioPhotoreal','Studio Chân thực'],['skinDetail','Da (lỗ chân lông/nám)'],['lightShadow','Ánh sáng & Bóng đổ'],['sharpen','Tăng nét chi tiết'],['clarity','Độ nổi khối (clarity)'],['vibrance','Màu sống động']]" :key="f[0]">
             <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs"><span class="w-40 shrink-0 font-medium text-cream-200">{{ f[1] }}</span><input type="range" min="0" max="10" step="1" :value="store[f[0]]" @input="setv(f[0], $event.target.value)" class="h-2 w-full cursor-pointer accent-brand-500"><span class="shrink-0 font-semibold text-cream-50">{{ store[f[0]] }}</span></div>
           </div>
         </div>
