@@ -212,7 +212,8 @@ class StudioController extends Controller
             .($preserveFace ? 'the model\'s face and identity, skin tone and hair, ' : '')
             .'pose, body proportions, garment structure and fit, fabric, all colours except the edited element, lighting, shadows, camera angle, composition'
             .($preserveBg ? ', and background' : '')
-            .'. Do not restyle, do not add new elements, do not change the setting.';
+            .'. Do not restyle, do not add new elements, do not change the setting. '
+            .'Output must be clean and sharp: no blur, no noise, no color banding, no posterization, no compression artifacts, no halftone or moiré — keep smooth tonal gradients and crisp clean edges.';
 
         if ($maskUrl) {
             $promptInstruction .= ' A mask image is provided (same size as the base): its BLACK region is the exact area to edit — change ONLY that black region and keep every pixel outside it identical to the original image.';

@@ -927,14 +927,20 @@ class ImageAIService
                 return $editedUrl;
             }
             $out = imagecreatetruecolor($sw, $sh);
-            // COVER-CROP thay vì STRETCH: scale edited phủ kín ảnh gốc (giữ tỷ lệ) rồi crop giữa
-            // → vật thể không bị méo/lệch do model trả tỷ lệ khác ảnh gốc.
-            $scale = max($sw / $ew, $sh / $eh);
-            $cw = (int) round($ew * $scale); $ch = (int) round($eh * $scale);
-            $tmp = imagecreatetruecolor($cw, $ch);
-            imagecopyresampled($tmp, $edited, 0, 0, 0, 0, $cw, $ch, $ew, $eh);
-            imagecopy($out, $tmp, 0, 0, (int) (($cw - $sw) / 2), (int) (($ch - $sh) / 2), $sw, $sh);
-            imagedestroy($tmp);
+            // Nếu tỉ lệ chỉ chênh nhỏ (< 1.5%) → STRETCH nhẹ (giữ toàn bộ ảnh, 1 lần resample,
+            // không phóng to + crop gây nhòe/mất chi tiết). Chênh lớn mới cover-crop để không méo.
+            $ratioDiff = abs(($ew / $eh) - ($sw / $sh)) / ($sw / $sh);
+            if ($ratioDiff < 0.015) {
+                imagecopyresampled($out, $edited, 0, 0, 0, 0, $sw, $sh, $ew, $eh);
+            } else {
+                // COVER-CROP: scale edited phủ kín ảnh gốc (giữ tỷ lệ) rồi crop giữa.
+                $scale = max($sw / $ew, $sh / $eh);
+                $cw = (int) round($ew * $scale); $ch = (int) round($eh * $scale);
+                $tmp = imagecreatetruecolor($cw, $ch);
+                imagecopyresampled($tmp, $edited, 0, 0, 0, 0, $cw, $ch, $ew, $eh);
+                imagecopy($out, $tmp, 0, 0, (int) (($cw - $sw) / 2), (int) (($ch - $sh) / 2), $sw, $sh);
+                imagedestroy($tmp);
+            }
             imagedestroy($edited); imagedestroy($source);
             ob_start(); imagepng($out); $bytes = (string) ob_get_clean();
             imagedestroy($out);
