@@ -94,6 +94,8 @@ export const useStudioStore = defineStore('studio', {
     inpaintErase: false,   // true = cọ tẩy (xoá nét đã vẽ thay vì tô thêm)
     inpaintBrushSize: 10,  // bán kính cọ vẽ (px trên canvas mask 512) — điều chỉnh được
     _inpaintUndoStack: [], // snapshot canvas trước mỗi nét — Ctrl+Z hoàn tác
+    inpaintMaskDone: false, // đã bấm "Xong" — mask được LƯU để xử lý dù overlay đã tắt
+    _inpaintMaskKind: '',   // 'rect' | 'brush' — loại mask đang được lưu để gửi khi Sửa ảnh
     _inpaintDrag: null,
     _inpaintHandle: null,
     _inpaintRaf: null,           // rAF id cho drag batching (mượt như crop)
@@ -531,11 +533,11 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintStartTs = Date.now();
       try {
         const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace };
-        // Gửi mask nếu có chọn vùng (rect/brush)
-        if (this.inpaintMaskMode !== 'none') {
-          body.mask_mode = this.inpaintMaskMode;
+        // Gửi mask đã LƯU (bấm "Xong") — dù overlay công cụ đã tắt vẫn xử lý đúng vùng.
+        if (this.inpaintMaskDone && this._inpaintMaskKind) {
+          body.mask_mode = this._inpaintMaskKind;
           body.region = this.inpaintMaskBox;
-          if (this.inpaintMaskMode === 'brush' && this.inpaintBrushData) {
+          if (this._inpaintMaskKind === 'brush' && this.inpaintBrushData) {
             body.mask_data = this.inpaintBrushData;
           }
         }
@@ -557,13 +559,42 @@ export const useStudioStore = defineStore('studio', {
       try { await this.api('/studio/generations/' + this.inpaintGenId + '/cancel', {}); this.inpaintStage = 'cancelled'; this.toast('Đã hủy sửa ảnh.'); }
       catch (e) { this.toast(e.message || 'Lỗi hủy.', 'error'); }
     },
-    clearInpaintStatus() { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this.inpaintErase = false; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; },
+    clearInpaintStatus() { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintStage = ''; this.inpaintError = ''; this.inpaintGenId = null; this.inpaintStartTs = 0; this.inpaintMaskMode = 'none'; this.inpaintMaskDone = false; this._inpaintMaskKind = ''; this.inpaintBrushData = ''; this.inpaintErase = false; this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; },
     // ── Inpaint Mask: chọn vùng trên ảnh preview (integrated into InpaintCard) ──
+    // "Xong": áp dụng vùng chọn/vùng vẽ, thoát công cụ, LƯU mask vào store để Sửa ảnh dùng.
+    confirmInpaintMask() {
+      if (this.inpaintMaskMode === 'brush') {
+        if (this._inpaintDrag) this._inpaintStopDrag(); // đang kéo dở → finalize trước
+        if (!this.inpaintBrushData) { this.toast('Chưa vẽ mask — vẽ vùng cần sửa trước.', 'error'); return; }
+        this._inpaintMaskKind = 'brush';
+      } else if (this.inpaintMaskMode === 'rect') {
+        this._inpaintMaskKind = 'rect';
+      } else {
+        return;
+      }
+      this._inpaintStopDrag && this._inpaintStopDrag();
+      this.inpaintMaskDone = true;
+      this.inpaintMaskMode = 'none'; // tắt overlay, không xoá dữ liệu
+      this.inpaintErase = false;
+      this.toast('Đã lưu vùng — bấm "Sửa ảnh" để xử lý.');
+    },
+    // "Bỏ mask": xoá hoàn toàn vùng chọn/vẽ (rect + brush).
+    clearInpaintMask() {
+      this._inpaintStopDrag && this._inpaintStopDrag();
+      this.inpaintMaskMode = 'none';
+      this.inpaintMaskDone = false;
+      this._inpaintMaskKind = '';
+      this.inpaintBrushData = '';
+      this.inpaintErase = false;
+      this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
+    },
     toggleInpaintMask(mode) {
-      if (this.inpaintMaskMode === mode) { this._inpaintStopDrag && this._inpaintStopDrag(); this.inpaintMaskMode = 'none'; this.inpaintBrushData = ''; this.inpaintErase = false; return; }
+      if (this.inpaintMaskMode === mode) { this.clearInpaintMask(); return; }
       if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
       if (this._inpaintDrag) this._inpaintStopDrag();
       this.inpaintMaskMode = mode;
+      this.inpaintMaskDone = false;
+      this._inpaintMaskKind = '';
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }

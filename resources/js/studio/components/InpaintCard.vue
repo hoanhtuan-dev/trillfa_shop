@@ -49,7 +49,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
               title="Bỏ vùng hiện tại để kéo chọn vùng mới">
         🔄 Vẽ lại
       </button>
-      <button v-if="maskActive" @click="store.inpaintMaskMode = 'none'; store.inpaintBrushData = ''; store._inpaintStopDrag && store._inpaintStopDrag()"
+      <button v-if="maskActive || store.inpaintMaskDone" @click="store.clearInpaintMask()"
               class="rounded-full bg-red-600/25 px-2 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">
         ✕ Bỏ mask
       </button>
@@ -60,6 +60,12 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
         <span v-else>▭ Kéo chọn vùng trên canvas — AI chỉ sửa trong vùng đã chọn</span>
       </template>
       <span v-else>🖌 Vẽ mask trên canvas — AI chỉ sửa vùng đã vẽ</span>
+    </div>
+    <!-- Trạng thái mask ĐÃ LƯU (bấm Xong, overlay tắt): hiển thị vùng sẽ xử lý -->
+    <div v-else-if="store.inpaintMaskDone" class="mt-1.5 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-1.5 text-[10px] text-emerald-200">
+      <span v-if="store._inpaintMaskKind === 'rect'">✅ Đã chọn vùng {{ Math.round((store.inpaintMaskBox.w || 0) * 100) }}% × {{ Math.round((store.inpaintMaskBox.h || 0) * 100) }}% — AI sẽ chỉ sửa trong vùng này.</span>
+      <span v-else>✅ Đã vẽ mask — AI sẽ chỉ sửa vùng đã vẽ.</span>
+      <button @click="store.toggleInpaintMask(store._inpaintMaskKind)" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
     </div>
 
     <label class="label mt-3">Mô tả chỉnh sửa</label>
