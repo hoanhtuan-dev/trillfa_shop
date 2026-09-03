@@ -1136,6 +1136,46 @@ RULES:
     }
 
     /**
+     * Ảnh đại diện thu nhỏ (320×320 JPEG) cho lưới chọn loại trang phục — sinh một lần rồi cache
+     * ra đĩa để popup Trợ lý thiết kế tải nhanh thay vì kéo cả PNG gốc 1328×1328 (nhiều MB).
+     */
+    public function garmentThumb(string $id)
+    {
+        if (! preg_match('/^[a-z0-9-]+$/', $id)) {
+            return response()->json(['error' => 'invalid'], 404);
+        }
+        $src = public_path('assets/garments/garment-'.$id.'.png');
+        if (! is_file($src)) {
+            return response()->json(['error' => 'not found'], 404);
+        }
+
+        $dir = public_path('assets/garments/thumbs');
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        $dst = $dir.'/garment-'.$id.'.jpg';
+
+        if (! is_file($dst)) {
+            $im = @imagecreatefrompng($src);
+            if (! $im) {
+                return response()->json(['error' => 'decode failed'], 500);
+            }
+            $w = imagesx($im);
+            $h = imagesy($im);
+            $side = 320;
+            $thumb = imagecreatetruecolor($side, $side);
+            $white = imagecolorallocate($thumb, 255, 255, 255);
+            imagefilledrectangle($thumb, 0, 0, $side, $side, $white);
+            imagecopyresampled($thumb, $im, 0, 0, 0, 0, $side, $side, $w, $h);
+            imagejpeg($thumb, $dst, 82);
+            imagedestroy($im);
+            imagedestroy($thumb);
+        }
+
+        return response()->file($dst, ['Cache-Control' => 'public, max-age=31536000, immutable']);
+    }
+
+    /**
      * Tinh chỉnh & Nâng cấp ảnh: AI-edit refine (optional) + GD upscale with studio photo
      * finish, skin detail and light/shadow passes. Fabric-weave/roughness pass was REMOVED —
      * the per-pixel skin heuristic misclassified dark skin (r <= 70) and painted weave onto
@@ -1167,7 +1207,7 @@ RULES:
         if ($refine > 0) {
             try {
                 $keep = 'Keep the exact aspect ratio and framing of the input image — do NOT crop or change the frame. Keep the exact garment, model, pose, composition unchanged. Ultra-detailed, 4K.';
-                $guard = 'IMPORTANT: Do NOT add fabric weave, texture, grain or any pattern to the skin, face, hair or jewellery — keep them smooth, clean and natural. Keep all detail edges (face, hair, garment seams, outlines) crisp, sharp and completely free of aliasing, halos, moiré or blur.';
+                $guard = 'IMPORTANT: Do NOT add fabric weave, texture, grain, noise, checkerboard, halftone, moiré, pixelation, blocky artifacts or any pattern to the skin, face, hair, jewellery or any flat area — keep them smooth, clean and natural. Keep all detail edges (face, hair, garment seams, outlines) crisp, sharp and completely free of aliasing, halos, ringing, moiré, banding or blur.';
                 $detail = 'Enhance this fashion photograph at high resolution (hyper-realistic, like a professional fashion editorial): hyper-realistic human skin with natural pores and soft sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, crisp sharp edges, rich natural color, '.$guard.' '.$keep;
                 $studio = 'Render a high-end professional studio photograph of this fashion garment with hyper-realistic human detail (softbox light, subtle film color grading, shallow depth of field): photorealistic skin with pores, individual hair strands, realistic eyelashes and eye catchlight, ultra-sharp micro-detail, premium catalog quality, '.$guard.' '.$keep;
                 $prompt = $photoreal > 0 ? $studio : $detail;
@@ -1321,7 +1361,7 @@ RULES:
             $blur = imagecreatetruecolor($w, $h);
             imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
             @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
-            $amount = 0.30 + 0.35 * $k;
+            $amount = 0.18 + 0.22 * $k; // nhẹ — tăng nét mà không tạo halo/ringing
             for ($y = 0; $y < $h; $y++) {
                 for ($x = 0; $x < $w; $x++) {
                     $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
@@ -1409,7 +1449,7 @@ RULES:
             }
         }
         if (function_exists('imagefilter')) {
-            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(6 * $k));
+            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(3 * $k));
         }
     }
 
@@ -1424,7 +1464,7 @@ RULES:
         $w = imagesx($img); $h = imagesy($img);
         $sharp = imagecreatetruecolor($w, $h);
         imagecopy($sharp, $img, 0, 0, 0, 0, $w, $h);
-        $a = 0.5 + 1.6 * $k; // 0.5..2.1
+        $a = 0.2 + 0.6 * $k; // 0.2..0.8 — nhẹ, không tạo halo/ringing
         $kernel = [[0, -$a, 0], [-$a, 1 + 4 * $a, -$a], [0, -$a, 0]];
         @imageconvolution($sharp, $kernel, 1, 0);
         $cols = intdiv($w + 1, 2);
@@ -1447,7 +1487,7 @@ RULES:
         $w = imagesx($img); $h = imagesy($img);
         $tmp = imagecreatetruecolor($w, $h);
         imagecopy($tmp, $img, 0, 0, 0, 0, $w, $h);
-        $c = 0.25 + 0.75 * $k; // 0.25..1.0 — nhẹ hơn sharpen, chỉ tăng khối/chiều sâu
+        $c = 0.12 + 0.38 * $k; // 0.12..0.5 — rất nhẹ, chỉ tăng khối, không sọc/halo
         $kernel = [[0, -$c, 0], [-$c, 1 + 4 * $c, -$c], [0, -$c, 0]];
         @imageconvolution($tmp, $kernel, 1, 0);
         $cols = intdiv($w + 1, 2);
@@ -2855,6 +2895,21 @@ RULES:
         }
 
         return response()->download($abs, basename($abs));
+    }
+
+    /**
+     * Rename a generation's custom label (shown in the output library / canvas layer).
+     */
+    public function renameGeneration(Request $request, Generation $generation)
+    {
+        abort_unless($generation->user_id === auth()->id(), 403);
+
+        $data = $request->validate(['name' => ['required', 'string', 'max:120']]);
+        $meta = is_array($generation->meta) ? $generation->meta : [];
+        $meta['name'] = (string) $data['name'];
+        $generation->update(['meta' => $meta]);
+
+        return response()->json(['ok' => true, 'name' => $meta['name']]);
     }
 
     /**

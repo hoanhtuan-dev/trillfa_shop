@@ -36,6 +36,7 @@ use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StudioController;
+use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
 
@@ -134,6 +135,12 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/stylist/cluster', [StudioController::class, 'stylistCluster'])->name('stylist.cluster');
     Route::post('/stylist/prompt', [StudioController::class, 'stylistPrompt'])->name('stylist.prompt');
     Route::post('/stylist/refine', [StudioController::class, 'stylistRefine'])->name('stylist.refine');
+    Route::get('/stylist-data', [StylistDataController::class, 'page'])->name('stylist.data');
+    Route::get('/stylist-data/data', [StylistDataController::class, 'data'])->name('stylist.data.json');
+    Route::post('/stylist-data/types', [StylistDataController::class, 'saveType'])->name('stylist.data.types.save');
+    Route::delete('/stylist-data/types/{id}', [StylistDataController::class, 'deleteType'])->name('stylist.data.types.delete');
+    Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
+    Route::delete('/stylist-data/questions/{id}', [StylistDataController::class, 'deleteQuestion'])->name('stylist.data.questions.delete');
     Route::post('/upscale', [StudioController::class, 'upscale'])->name('upscale');
     Route::post('/look', [StudioController::class, 'look'])->name('look');
     Route::post('/reframe', [StudioController::class, 'reframe'])->name('reframe');
@@ -161,6 +168,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/generations/{generation}', [StudioController::class, 'show'])->name('generations.show');
     Route::post('/generations/{generation}/cancel', [StudioController::class, 'cancel'])->name('generations.cancel');
     Route::delete('/generations/{generation}', [StudioController::class, 'destroy'])->name('generations.destroy');
+    Route::post('/generations/{generation}/rename', [StudioController::class, 'renameGeneration'])->name('generations.rename');
     Route::post('/suggest', [StudioController::class, 'suggest'])->name('suggest');
     Route::post('/upload-ref', [StudioController::class, 'uploadRef'])->name('uploadRef');
     Route::get('/ref-images', [StudioController::class, 'refImages'])->name('ref-images');
@@ -187,6 +195,7 @@ Route::get('/studio', [StudioController::class, 'index'])->name('studio.index');
 
 // Public garment-avatar endpoint (bypasses auth + static cache — served by Laravel with immutable cache).
 Route::get('/garment/{id}', [StudioController::class, 'garmentAvatar'])->name('garment.avatar');
+Route::get('/garment/{id}/thumb', [StudioController::class, 'garmentThumb'])->name('garment.thumb');
 
 // Public studio image endpoint — phục vụ ảnh upload từ storage (không phụ thuộc symlink).
 Route::get('/studio/image/{path}', [StudioController::class, 'studioImage'])->where('path', '.*')->name('studio.image');

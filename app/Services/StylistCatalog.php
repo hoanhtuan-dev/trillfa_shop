@@ -2,34 +2,42 @@
 
 namespace App\Services;
 
+use App\Models\StylistGarmentType;
+use App\Models\StylistQuestion;
+
 /**
  * StylistCatalog — dữ liệu xương sống của ✨ Thuật sỹ (module hóa, dễ kế thừa/mở rộng).
- * Một module khác có thể dùng chung hoặc kế thừa: garmentTypes(), questions(), nameOf().
+ * Đọc từ DB (quản trị qua trang /studio/stylist-data); fallback về dữ liệu mặc định khi DB rỗng.
  */
 class StylistCatalog
 {
-    /** 18 loại trang phục dựng sẵn (không trùng lặp). */
     public function garmentTypes(): array
     {
+        $rows = StylistGarmentType::orderBy('sort_order')->orderBy('id')->get();
+
+        if ($rows->isEmpty()) {
+            $items = collect($this->defaultGarmentTypes());
+        } else {
+            $items = $rows->map(fn ($r) => ['id' => $r->slug, 'name' => $r->name, 'emoji' => $r->emoji, 'color' => $r->color]);
+        }
+
+        return $items->map(fn ($t) => $this->hydrateType(
+            (string) $t['id'],
+            (string) $t['name'],
+            (string) ($t['emoji'] ?? ''),
+            (string) ($t['color'] ?? ''),
+        ))->values()->all();
+    }
+
+    protected function hydrateType(string $id, string $name, string $emoji, string $color): array
+    {
         return [
-            ['id' => 'dress',        'name' => 'Đầm',              'emoji' => '👗', 'color' => '#e8577d', 'img' => '/garment/dress'],
-            ['id' => 'top',          'name' => 'Áo sơ mi / Blouse','emoji' => '👚', 'color' => '#7aa7e0', 'img' => '/garment/top'],
-            ['id' => 'pants',        'name' => 'Quần',          'emoji' => '👖', 'color' => '#6a8f6a', 'img' => '/garment/pants'],
-            ['id' => 'skirt',        'name' => 'Chân váy',         'emoji' => '🩰', 'color' => '#b57bd0', 'img' => '/garment/skirt'],
-            ['id' => 'shorts',       'name' => 'Quần short',    'emoji' => '🩳', 'color' => '#e0a95a', 'img' => '/garment/shorts'],
-            ['id' => 'jacket',       'name' => 'Áo khoác',      'emoji' => '🧥', 'color' => '#8a6a4a', 'img' => '/garment/jacket'],
-            ['id' => 'aodai',        'name' => 'Áo dài',      'emoji' => '💃', 'color' => '#d04a4a', 'img' => '/garment/aodai'],
-            ['id' => 'set',          'name' => 'Set đồ',        'emoji' => '🧥', 'color' => '#4a7a90', 'img' => '/garment/set'],
-            ['id' => 'tshirt',       'name' => 'Áo thun',       'emoji' => '👕', 'color' => '#5aa0c8', 'img' => '/garment/tshirt'],
-            ['id' => 'hoodie',       'name' => 'Áo hoodie',     'emoji' => '🧶', 'color' => '#9a7ad0', 'img' => '/garment/hoodie'],
-            ['id' => 'denimjacket',  'name' => 'Áo denim',      'emoji' => '🧥', 'color' => '#5a8a9a', 'img' => '/garment/denimjacket'],
-            ['id' => 'blazer',       'name' => 'Áo blazer',     'emoji' => '🕴️', 'color' => '#6a7a8a', 'img' => '/garment/blazer'],
-            ['id' => 'weddingdress', 'name' => 'Đầm cưới',         'emoji' => '💍', 'color' => '#e8e0d8', 'img' => '/garment/weddingdress'],
-            ['id' => 'bodysuit',     'name' => 'Bodysuit',      'emoji' => '🩱', 'color' => '#c88aa0', 'img' => '/garment/bodysuit'],
-            ['id' => 'jogger',       'name' => 'Quần jogger',   'emoji' => '👖', 'color' => '#8aa06a', 'img' => '/garment/jogger'],
-            ['id' => 'windbreaker',  'name' => 'Áo gió',        'emoji' => '🧥', 'color' => '#6aa0b0', 'img' => '/garment/windbreaker'],
-            ['id' => 'tanktop',      'name' => 'Áo ba lỗ',      'emoji' => '🎽', 'color' => '#e0b06a', 'img' => '/garment/tanktop'],
-            ['id' => 'bomber',       'name' => 'Áo bomber',     'emoji' => '🧥', 'color' => '#7a6a5a', 'img' => '/garment/bomber'],
+            'id' => $id,
+            'name' => $name,
+            'emoji' => $emoji,
+            'color' => $color,
+            'img' => '/garment/'.$id,
+            'thumb' => '/garment/'.$id.'/thumb',
         ];
     }
 
@@ -45,6 +53,49 @@ class StylistCatalog
     public function questions(string $type): array
     {
         $g = $this->nameOf($type);
+        $rows = StylistQuestion::orderBy('sort_order')->orderBy('id')->get();
+
+        if ($rows->isEmpty()) {
+            $items = collect($this->defaultQuestions());
+        } else {
+            $items = $rows->map(fn ($r) => ['key' => $r->key, 'q' => $r->question, 'opts' => $r->options ?? []]);
+        }
+
+        return $items->map(fn ($r) => [
+            'key' => (string) $r['key'],
+            'q' => str_replace('{name}', $g, (string) $r['q']),
+            'opts' => array_values((array) ($r['opts'] ?? [])),
+        ])->values()->all();
+    }
+
+    /** 18 loại trang phục dựng sẵn (không trùng lặp). Dùng làm seed mặc định. */
+    public function defaultGarmentTypes(): array
+    {
+        return [
+            ['id' => 'dress',        'name' => 'Đầm',              'emoji' => '👗', 'color' => '#e8577d'],
+            ['id' => 'top',          'name' => 'Áo sơ mi / Blouse','emoji' => '👚', 'color' => '#7aa7e0'],
+            ['id' => 'pants',        'name' => 'Quần',             'emoji' => '👖', 'color' => '#6a8f6a'],
+            ['id' => 'skirt',        'name' => 'Chân váy',         'emoji' => '🩰', 'color' => '#b57bd0'],
+            ['id' => 'shorts',       'name' => 'Quần short',       'emoji' => '🩳', 'color' => '#e0a95a'],
+            ['id' => 'jacket',       'name' => 'Áo khoác',         'emoji' => '🧥', 'color' => '#8a6a4a'],
+            ['id' => 'aodai',        'name' => 'Áo dài',           'emoji' => '💃', 'color' => '#d04a4a'],
+            ['id' => 'set',          'name' => 'Set đồ',           'emoji' => '🧥', 'color' => '#4a7a90'],
+            ['id' => 'tshirt',       'name' => 'Áo thun',          'emoji' => '👕', 'color' => '#5aa0c8'],
+            ['id' => 'hoodie',       'name' => 'Áo hoodie',        'emoji' => '🧶', 'color' => '#9a7ad0'],
+            ['id' => 'denimjacket',  'name' => 'Áo denim',         'emoji' => '🧥', 'color' => '#5a8a9a'],
+            ['id' => 'blazer',       'name' => 'Áo blazer',        'emoji' => '🕴️', 'color' => '#6a7a8a'],
+            ['id' => 'weddingdress', 'name' => 'Đầm cưới',         'emoji' => '💍', 'color' => '#e8e0d8'],
+            ['id' => 'bodysuit',     'name' => 'Bodysuit',         'emoji' => '🩱', 'color' => '#c88aa0'],
+            ['id' => 'jogger',       'name' => 'Quần jogger',      'emoji' => '👖', 'color' => '#8aa06a'],
+            ['id' => 'windbreaker',  'name' => 'Áo gió',           'emoji' => '🧥', 'color' => '#6aa0b0'],
+            ['id' => 'tanktop',      'name' => 'Áo ba lỗ',         'emoji' => '🎽', 'color' => '#e0b06a'],
+            ['id' => 'bomber',       'name' => 'Áo bomber',        'emoji' => '🧥', 'color' => '#7a6a5a'],
+        ];
+    }
+
+    /** Ma trận câu hỏi mặc định (seed). 'silhouette' dùng placeholder {name} theo loại trang phục. */
+    public function defaultQuestions(): array
+    {
         return [
             ['key' => 'model', 'q' => 'Người mẫu nữ (Việt):', 'opts' => [
                 'Trẻ trung 18-25, thanh mảnh, tóc dài đen, da sáng',
@@ -52,7 +103,7 @@ class StylistCatalog
                 'Trưởng thành 32-40, đầy đặn, tóc ngắn cá tính, da ngăm',
                 'Cận trung niên 40-50, quyến rũ, tóc búi, da sáng',
             ]],
-            ['key' => 'silhouette', 'q' => 'Phom/ silhouette '.$g.' (kỹ thuật dựng):', 'opts' => [
+            ['key' => 'silhouette', 'q' => 'Phom/ silhouette {name} (kỹ thuật dựng):', 'opts' => [
                 'Ôm sát (fitted): may co giãn 2-4%, tôn dáng, đường may princess tách eo',
                 'Suông (straight): cắt đơn giản, rộng vừa, không chiết ly, phom H',
                 'A-line: xòe dần từ eo, độ rộng gấu +8-12cm, phom A mềm mại',

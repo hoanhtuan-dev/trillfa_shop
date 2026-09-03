@@ -618,7 +618,8 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
       this.toast('Đã dọn canvas — ảnh kết quả vẫn còn trong Kết quả/Thư viện.');
     },
-    // Đổi tên layer (chỉ tên hiển thị, không đổi dữ liệu/output).
+    // Đổi tên layer. Với layer ảnh kết quả (gen), tên mới cũng được lưu vào generation
+    // để hiển thị đồng bộ ở Output/Thư viện.
     renameLayer(id, name) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l) return;
@@ -627,6 +628,11 @@ export const useStudioStore = defineStore('studio', {
       if (!n) return;
       l.name = n;
       if (l.kind === 'source' && this.editSource) this.editSource.name = n;
+      if (l.kind === 'gen' && l.genId) {
+        const g = this.generations.find((x) => x.id === l.genId);
+        if (g) { g.meta = Object.assign({}, g.meta || {}, { name: n }); }
+        fetch('/studio/generations/' + l.genId + '/rename', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ name: n }) }).catch(() => {});
+      }
       this.saveLayerLayout();
       this.toast('Đã đổi tên layer.');
     },
@@ -641,6 +647,31 @@ export const useStudioStore = defineStore('studio', {
       const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
       this.canvasLayers = arr;
       this.saveLayerLayout();
+    },
+    // Tên hiển thị của một generation (dùng tên tuỳ chỉnh nếu có, ngược lại "Ảnh #id").
+    genName(g) { return (g && g.meta && g.meta.name) ? g.meta.name : (g ? 'Ảnh #' + g.id : 'Ảnh'); },
+    // Tải ảnh đang active trên canvas (kết quả dùng endpoint download; ảnh nguồn tải trực tiếp).
+    async downloadActive() {
+      const l = this.canvasLayers.find((x) => x.id === this.activeLayerId && x.visible !== false);
+      if (!l || !l.image) { this.toast('Chưa có ảnh trên canvas.', 'error'); return; }
+      if (l.kind === 'gen' && l.genId) {
+        window.location.href = '/studio/generations/' + l.genId + '/download';
+        return;
+      }
+      try {
+        const res = await fetch(l.image);
+        if (!res.ok) throw new Error();
+        const blob = await res.blob();
+        const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : blob.type === 'image/gif' ? 'gif' : 'jpg';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = ((l.name || 'anh').replace(/\.[^.]+$/, '') || 'anh') + '.' + ext;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) { this.toast('Không tải được ảnh nguồn.', 'error'); }
     },
     // Ẩn/hiện layer (eye toggle). Ẩn layer đang active thì chuyển sang layer hiển thị kế tiếp.
     toggleLayerVisible(id) {

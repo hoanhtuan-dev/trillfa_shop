@@ -83,7 +83,8 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
           <!-- active image indicator + actions -->
           <div v-if="store.upscaleSrc" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
             <span class="text-[10px] text-cream-300/60">{{ store.editSource ? 'Nguồn:' : 'Kết quả:' }}</span>
-            <span class="max-w-40 truncate font-semibold text-cream-100">{{ store.editSource ? (store.editSource.name || 'Ảnh nguồn') : ('Ảnh #' + store.preview?.id) }}</span>
+            <span class="max-w-40 truncate font-semibold text-cream-100">{{ store.upscaleName }}</span>
+            <button @click="store.downloadActive()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-brand-600" title="Tải ảnh xuống">⬇</button>
             <button v-if="store.editSource" @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
             <button v-else @click="store.cleanCanvas()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-red-200 hover:bg-red-600" title="Dọn canvas (không xóa ảnh kết quả)">🗑</button>
           </div>

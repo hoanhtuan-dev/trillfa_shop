@@ -85,6 +85,7 @@ class DatabaseSeeder extends Seeder
         $this->presets();
         $this->call(FacePresetSeeder::class);
         $this->call(PosePresetSeeder::class);
+        $this->call(StylistCatalogSeeder::class);
 
         $this->command?->info('Seeded Trillfa Fa successfully.');
     }

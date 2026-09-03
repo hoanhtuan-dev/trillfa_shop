@@ -42,16 +42,25 @@ const shownPrompt = computed({
   get: () => promptLang.value === 'vi' ? promptVi.value : promptEn.value,
   set: (v) => { if (promptLang.value === 'vi') promptVi.value = v; else promptEn.value = v; },
 });
+function applyToGenerate() {
+  store.imagePromptEn = promptEn.value;
+  store.promptOpen = true; // mở popup Prompt Tạo Ảnh (ConceptCard)
+  open.value = false;      // thoát Trợ lý thiết kế
+}
+function openSettings() { window.open('/studio/stylist-data', '_blank'); }
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
-    <button @click="open=true; step='type'" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
-      <span class="min-w-0 flex-1">
-        <span class="block text-sm font-semibold text-brand-300">✨ Trợ lý thiết kế</span>
-        <span class="mt-0.5 block text-[11px] text-ink-500">AI viết prompt thiết kế theo loại trang phục</span>
-      </span>
-      <span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold text-brand-300">✨ Trợ lý thiết kế</span>
+          <span class="mt-0.5 block text-[11px] text-ink-500">AI viết prompt thiết kế theo loại trang phục</span>
+        </span>
+        <span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
+      </button>
+      <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200">⚙</button>
+    </div>
 
     <BaseModal v-model="open" title="✨ Trợ lý thiết kế" wide>
       <!-- step: type -->
@@ -60,7 +69,7 @@ const shownPrompt = computed({
         <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
           <button v-for="t in types" :key="t.id" type="button" @click="pickType(t)"
             class="group relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 bg-ink-900 transition-all duration-150 hover:border-brand-400 hover:shadow-lg hover:shadow-brand-500/15 active:scale-[0.97]">
-            <img :src="t.img" :alt="t.name" loading="lazy" class="h-full w-full object-cover opacity-90 transition-transform duration-200 group-hover:scale-105">
+            <img :src="t.thumb || t.img" :alt="t.name" loading="lazy" decoding="async" class="h-full w-full object-cover opacity-90 transition-transform duration-200 group-hover:scale-105">
             <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-1.5 pb-1.5 pt-6 text-center text-[10px] font-medium leading-tight text-white">{{ t.name }}</span>
           </button>
         </div>
@@ -97,7 +106,7 @@ const shownPrompt = computed({
         </div>
         <textarea v-model="shownPrompt" rows="5" class="input !text-xs"></textarea>
         <button @click="refine" :disabled="loading" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : '✨ Tinh chỉnh & nâng cấp' }}</button>
-        <button @click="store.imagePromptEn = promptEn; store.toast('Đã đưa prompt vào ô Tạo Ảnh.')" class="btn-brand mt-2 w-full">➡ Đưa vào Tạo Ảnh</button>
+        <button @click="applyToGenerate" class="btn-brand mt-2 w-full">➡ Đưa vào Tạo Ảnh</button>
       </template>
     </BaseModal>
   </div>
