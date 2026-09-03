@@ -95,13 +95,16 @@ class VirtualTryOnService
                     'id' => 'pp'.$p->id,
                     'name' => $p->name,
                     'skeleton' => $p->description,
-                    'image' => $p->image ?: $this->builtinPoseImageByName($p->name),
+                    'image' => studio_image_url($p->image ?: $this->builtinPoseImageByName($p->name)),
                     'preset' => true,
                 ];
             })->values()->all();
         }
 
-        return $this->builtinPosePresets();
+        return array_map(function ($p) {
+            $p['image'] = studio_image_url($p['image']);
+            return $p;
+        }, $this->builtinPosePresets());
     }
 
     /**
