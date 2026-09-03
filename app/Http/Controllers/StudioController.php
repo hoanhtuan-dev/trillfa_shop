@@ -350,6 +350,14 @@ class StudioController extends Controller
         $refs = array_slice($imgs, 1);
         $userPrompt = trim((string) $data['prompt']);
 
+        // Định danh @image1/@image2/@image3 → mô tả chuẩn cho model hiểu đúng từng ảnh.
+        $tagMap = [
+            '@image1' => 'the FIRST image (main base)',
+            '@image2' => 'the SECOND image (first reference)',
+            '@image3' => 'the THIRD image (second reference)',
+        ];
+        $userPrompt = strtr($userPrompt, $tagMap);
+
         $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
             .'The FIRST image is the main base (keep its subject and overall layout). '
             .'Blend the other '.count($refs).' reference image(s) naturally into the scene. '.$userPrompt;

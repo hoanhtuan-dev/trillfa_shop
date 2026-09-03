@@ -53,7 +53,11 @@ function makeBase(key) {
   selected.value.unshift(key);
 }
 
-function roleLabel(i) { return i === 0 ? 'Nền chính' : 'Ảnh ghép ' + (i + 1); }
+function roleLabel(i) { return '@image' + (i + 1); }
+
+function insertTag(tag) {
+  prompt.value = (prompt.value ? prompt.value + ' ' : '') + tag + ' ';
+}
 
 const step = computed(() => {
   if (!selected.value.length) return 1;
@@ -124,7 +128,7 @@ async function run() {
         </template>
         <template v-else>
           <span class="text-2xl text-ink-600">{{ i === 1 ? '🖼' : '＋' }}</span>
-          <span class="px-1 text-center text-[9px] text-cream-300/50">{{ i === 1 ? 'Nền chính' : 'Ảnh ghép' }}</span>
+          <span class="px-1 text-center text-[9px] text-cream-300/50">@image{{ i }}</span>
         </template>
       </div>
     </div>
@@ -132,10 +136,15 @@ async function run() {
     <button @click="open = true" class="btn-outline mt-2 w-full">
       {{ selected.length ? '🖼 Chọn lại ảnh' : '🖼 Chọn ảnh (2–3)' }} <span v-if="selected.length" class="text-cream-300/60">· {{ selected.length }}/3</span>
     </button>
-    <p v-if="selected.length < 2" class="mt-1 text-center text-[10px] text-cream-300/50">Mẹo: bấm ảnh muốn làm <b class="text-cream-200">nền chính</b> trước.</p>
+    <p v-if="selected.length < 2" class="mt-1 text-center text-[10px] text-cream-300/50">Mẹo: bấm ảnh muốn làm <b class="text-brand-300">@image1 (nền chính)</b> trước.</p>
 
     <label class="label mt-3">Mô tả ghép</label>
-    <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đặt sản phẩm lên bàn studio gỗ, hòa ánh sáng tự nhiên…"></textarea>
+    <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…"></textarea>
+    <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+      <span class="text-cream-300/50">Chèn nhanh:</span>
+      <button v-for="n in (selected.length || 0)" :key="n" @click="insertTag('@image' + n)"
+              class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white">@image{{ n }}</button>
+    </div>
 
     <div class="mt-2 flex items-center gap-1.5 text-xs text-cream-200">
       <span class="mr-1">Số biến thể:</span>
@@ -153,8 +162,8 @@ async function run() {
     <!-- Popup chọn ảnh -->
     <BaseModal v-model="open" title="🖼 Chọn 2–3 ảnh để ghép" wide>
       <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
-        <p class="font-semibold">💡 Cách chọn:</p>
-        <p class="mt-1 text-brand-100/80">• Bấm ảnh muốn làm <b>nền chính / bố cục</b> trước (số 1).<br>• Bấm thêm 1–2 ảnh làm thành phần ghép vào (số 2, 3).<br>• Bấm lại để bỏ chọn.</p>
+        <p class="font-semibold">💡 Cách chọn & mô tả:</p>
+        <p class="mt-1 text-brand-100/80">• Bấm ảnh làm <b>@image1</b> (nền chính / bố cục) trước.<br>• Bấm thêm 1–2 ảnh làm <b>@image2</b>, <b>@image3</b>.<br>• Trong ô mô tả, dùng <b>@image1/@image2/@image3</b> để chỉ từng ảnh — vd: "giữ nguyên @image1, đặt cô gái trong @image2…".</p>
       </div>
 
       <!-- Nút tải ảnh lên -->
