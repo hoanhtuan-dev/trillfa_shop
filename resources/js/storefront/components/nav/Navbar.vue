@@ -97,10 +97,11 @@ onBeforeUnmount(() => {
                             <Icon name="search" :size="22" />
                         </button>
 
-                        <!-- Account (desktop) -->
-                        <div v-if="user.authed" ref="accountRef" class="relative hidden sm:block">
+                        <!-- Account (always visible; hover + click) -->
+                        <div v-if="user.authed" ref="accountRef" class="relative">
                             <button
                                 @click="accountOpen = !accountOpen"
+                                @mouseenter="accountOpen = true"
                                 class="sf-btn sf-btn-ghost !p-2"
                                 :aria-expanded="accountOpen"
                                 aria-label="Tài khoản"
@@ -110,10 +111,11 @@ onBeforeUnmount(() => {
                             <Transition name="fade">
                                 <div
                                     v-if="accountOpen"
-                                    class="glass-strong absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl py-1"
+                                    class="glass-strong absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl py-1"
                                 >
                                     <div class="border-b border-cream-200 px-4 py-3">
                                         <p class="text-sm font-semibold text-ink-900">{{ user.name }}</p>
+                                        <p class="truncate text-xs text-ink-500">{{ user.email }}</p>
                                     </div>
                                     <a href="/tai-khoan" class="block px-4 py-2.5 text-sm text-ink-700 hover:bg-cream-100">Tài khoản</a>
                                     <a href="/tai-khoan/don-hang" class="block px-4 py-2.5 text-sm text-ink-700 hover:bg-cream-100">Đơn hàng</a>
@@ -126,7 +128,7 @@ onBeforeUnmount(() => {
                                 </div>
                             </Transition>
                         </div>
-                        <a v-else href="/dang-nhap" class="sf-btn sf-btn-ghost hidden !p-2 sm:inline-flex" aria-label="Đăng nhập">
+                        <a v-else href="/dang-nhap" class="sf-btn sf-btn-ghost !p-2" aria-label="Đăng nhập">
                             <Icon name="user" :size="22" />
                         </a>
 

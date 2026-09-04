@@ -133,6 +133,7 @@ export const useStudioStore = defineStore('studio', {
     _inpaintFreehandActive: false,
     inpaintFeather: 0,            // feather (px 0-50) — làm mềm mép vùng chọn
     inpaintFillColor: '#ffffff',  // màu tô cho nút "🎨 Tô" của vùng chọn
+    inpaintSelectMode: 'new',   // lasso: 'new' | 'add' | 'subtract' — chế độ cộng/trừ vùng chọn
     inpaintMaskSource: 'inpaint',  // 'inpaint' (từ card Sửa ảnh) | 'canvas' (từ thanh công cụ vùng chọn trên canvas)
     // Canvas mask overlay (dùng chung cho Inpaint brush trên canvas chính)
     brushOverlay: null,
@@ -1238,11 +1239,12 @@ export const useStudioStore = defineStore('studio', {
       const p = this.inpaintMaskPointer(e); if (!p) return;
       this._inpaintFreehandActive = true;
       this.inpaintFreehandPoints = [p];
-      // Xoá nét lasso cũ khỏi mask canvas → vùng chọn mới KHÔNG cộng dồn với vùng đã xóa trước đó.
-      if (this._inpaintMaskCtx && this._inpaintMaskCanvas) {
+      // Chế độ 'new' → xoá nét cũ; 'add'/'subtract' → giữ mask để cộng/trừ vào vùng hiện có.
+      if (this.inpaintSelectMode === 'new' && this._inpaintMaskCtx && this._inpaintMaskCanvas) {
         this._inpaintMaskCtx.clearRect(0, 0, this._inpaintMaskCanvas.width, this._inpaintMaskCanvas.height);
       }
     },
+    setInpaintSelectMode(mode) { this.inpaintSelectMode = (this.inpaintSelectMode === mode) ? 'new' : mode; },
     freehandMove(e) {
       if (!this._inpaintFreehandActive) return;
       const p = this.inpaintMaskPointer(e); if (!p) return;
@@ -1260,11 +1262,13 @@ export const useStudioStore = defineStore('studio', {
       const c = this._inpaintMaskCanvas, ctx = this._inpaintMaskCtx;
       if (!c || !ctx) { return; }
       const w = c.width, h = c.height;
+      ctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
       ctx.beginPath();
       pts.forEach((pt, i) => { const x = pt.nx * w, y = pt.ny * h; if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); } });
       ctx.closePath();
       ctx.fillStyle = 'rgba(220,38,38,0.6)';
       ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
       this._finalizeInpaintBrush();
       // Giữ điểm path để đường lasso hiển thị bền bỉ cho đến khi xóa/thoát vùng chọn.
     },

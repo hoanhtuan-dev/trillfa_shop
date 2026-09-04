@@ -385,7 +385,7 @@ function onTouchEnd(e) {
             </div>
           </div>
           <!-- canvas bg + crop toggles -->
-          <div class="absolute right-3 bottom-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
+          <div class="absolute right-3 bottom-3 z-20 flex items-center gap-2 rounded-full bg-ink-900/85 px-2.5 py-1.5 shadow-lg">
             <button @click="store.downloadActive()" :disabled="!store.upscaleSrc" class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600 text-white shadow-brand-500/40 transition-colors hover:bg-brand-500 disabled:opacity-40" title="Tải ảnh xuống"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
             <span class="h-4 w-px bg-ink-700"></span>
             <button v-for="b in ['grid','dark','white','cream']" :key="b" @click="store.canvasBg = b" class="h-6 w-6 rounded-full border" :class="store.canvasBg === b ? 'border-white' : 'border-ink-600'" :style="{ background: b === 'grid' ? 'repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 10px 10px' : b === 'dark' ? '#0a0a0f' : b === 'white' ? '#fff' : '#f5ead9' }" :title="b"></button>

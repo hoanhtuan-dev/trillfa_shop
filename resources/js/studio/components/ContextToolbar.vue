@@ -41,6 +41,14 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
     <span class="min-w-5 text-center text-[11px] text-cream-100">{{ store.inpaintFeather }}</span>
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand'">
       <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+      <template v-if="store.inpaintMaskMode === 'freehand'">
+        <button @click="store.setInpaintSelectMode('add')" :class="store.inpaintSelectMode === 'add' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="grid h-6 w-6 place-items-center rounded-full transition-colors" title="Cộng vào vùng chọn">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M12 8v8M8 12h8"/></svg>
+        </button>
+        <button @click="store.setInpaintSelectMode('subtract')" :class="store.inpaintSelectMode === 'subtract' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="grid h-6 w-6 place-items-center rounded-full transition-colors" title="Trừ khỏi vùng chọn">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M8 12h8"/></svg>
+        </button>
+      </template>
       <button @click="store.duplicateSelectedRegion()" class="flex items-center gap-1 rounded-full bg-emerald-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-emerald-600" title="Nhân đôi vùng chọn thành layer mới">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Nhân đôi
       </button>
@@ -52,7 +60,7 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
         <input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0">
       </label>
       <button @click="store.fillSelectedRegion()" class="flex items-center gap-1 rounded-full bg-sky-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-sky-600" title="Tô màu vào vùng chọn">
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3L12 24l8.5-8.5a2.12 2.12 0 0 0 0-3z"/></svg>Tô
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3L12 24l8.5-8.5a2.12 2.12 0 0 0 0-3z"/><path d="M12 2v3"/></svg>Tô
       </button>
     </template>
     <button @click="store.clearInpaintMask()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ mask hiện tại">

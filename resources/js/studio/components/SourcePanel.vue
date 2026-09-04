@@ -14,12 +14,15 @@ async function delRef(it) { try { const r = await fetch('/studio/ref-images/' + 
 function pick(it) { store.setSource(it.url, it.name); uploadOpen.value = false; }
 </script>
 <template>
-  <div class="card p-3">
-    <div class="flex items-center justify-between"><h2 class="text-sm font-semibold text-brand-300">🖼 Nguồn ảnh</h2><button v-if="store.editSource" @click="store.editSource = null" class="text-[10px] text-red-300">✕</button></div>
-    <div v-if="store.editSource" class="mt-2 flex items-center gap-2"><img :src="store.editSource.url" class="h-12 w-12 rounded-lg bg-ink-900 object-cover"><span class="truncate text-xs text-cream-200">{{ store.editSource.name }}</span></div>
-    <div class="mt-2 grid grid-cols-2 gap-1.5">
-      <button @click="openUpload" class="btn-outline btn-sm">⬆ Tải ảnh</button>
-      <button @click="loadProducts(); productOpen = true" class="btn-outline btn-sm">🛍 Từ sản phẩm</button>
+  <div class="card p-2">
+    <div class="flex items-center justify-between">
+      <span class="flex items-center gap-1 text-[11px] font-semibold text-brand-300"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>Nguồn</span>
+      <button v-if="store.editSource" @click="store.editSource = null" class="grid h-7 w-7 place-items-center rounded-lg bg-ink-800 text-red-300 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ ảnh nguồn"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div v-if="store.editSource" class="mt-2 flex items-center gap-2"><img :src="store.editSource.url" class="h-10 w-10 rounded-lg bg-ink-900 object-cover"><span class="truncate text-[10px] text-cream-200">{{ store.editSource.name }}</span></div>
+    <div class="mt-2 flex gap-1.5">
+      <button @click="openUpload" class="grid h-8 flex-1 place-items-center rounded-lg bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Tải ảnh lên"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
+      <button @click="loadProducts(); productOpen = true" class="grid h-8 flex-1 place-items-center rounded-lg bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Chọn từ sản phẩm"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></button>
     </div>
     <input ref="fileRef" type="file" accept="image/*" @change="onFile" class="hidden">
     <!-- upload popup -->
