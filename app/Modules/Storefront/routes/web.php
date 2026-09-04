@@ -69,6 +69,7 @@ Route::middleware('web')->group(function () {
     Route::get('/danh-muc/{categorySlug}', [StorefrontController::class, 'shop'])->name('shop.category');
 
     // JSON feeds.
+    Route::get('/api/storefront/product/{id}', [StorefrontController::class, 'productQuickView'])->name('storefront.product');
     Route::get('/api/storefront/home', [StorefrontController::class, 'feed'])->name('storefront.feed');
     Route::get('/api/storefront/shop', [StorefrontController::class, 'shop'])->name('storefront.shop');
     Route::get('/api/storefront/shop/{categorySlug}', [StorefrontController::class, 'shop'])->name('storefront.shop.category');

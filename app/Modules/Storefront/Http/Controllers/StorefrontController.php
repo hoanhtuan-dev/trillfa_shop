@@ -157,6 +157,18 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Quick-view product data (JSON) — full product for the modal.
+     */
+    public function productQuickView(int $id)
+    {
+        try {
+            return response()->json($this->bridge->productForQuickView($id));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            abort(404);
+        }
+    }
+
+    /**
      * Static content page — renders the Vue static SPA.
      */
     public function staticPage(string $key, ?string $slug = null)

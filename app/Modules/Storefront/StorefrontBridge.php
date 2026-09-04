@@ -415,6 +415,59 @@ class StorefrontBridge
         ]);
     }
 
+    /**
+     * Full product data for the quick-view modal (variants, specs, shipping
+     * estimate) — richer than the lightweight grid card product.
+     */
+    public function productForQuickView(int $id): array
+    {
+        $product = Product::where('id', $id)->active()->with('category', 'variants')->firstOrFail();
+
+        $price = (float) $product->min_price;
+        $compare = (float) $product->compare_price;
+        if ($compare <= $price && $product->variants->isNotEmpty()) {
+            $compare = (float) ($product->variants->where('compare_price', '>', 0)->min('compare_price') ?: 0);
+        }
+        $onSale = $compare && $compare > $price;
+
+        $fastest = app(\App\Services\CartService::class)->shippingMethods()
+            ->filter(fn ($m) => ($m->estimated_days ?? 0) > 0)
+            ->sortBy('estimated_days')->first();
+
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'slug' => $product->slug,
+            'url' => route('product.show', $product->slug),
+            'sku' => $product->sku,
+            'brand' => $product->brand,
+            'short_description' => $product->short_description,
+            'description' => $product->description,
+            'attributes' => (array) $product->attributes,
+            'tags' => (array) $product->tags,
+            'price' => $price,
+            'compare_price' => $onSale ? $compare : null,
+            'discount_percent' => $onSale ? (int) round((1 - $price / $compare) * 100) : 0,
+            'rating_avg' => (float) $product->rating_avg,
+            'rating_count' => (int) $product->rating_count,
+            'image' => $product->image_url ?: asset('images/placeholder.svg'),
+            'gallery' => $product->gallery_urls,
+            'in_stock' => $product->total_stock > 0,
+            'total_stock' => (int) $product->total_stock,
+            'category' => $product->category?->name,
+            'variants' => $product->variants->map(fn ($v) => [
+                'id' => $v->id,
+                'name' => $v->name,
+                'price' => (float) $v->price,
+                'stock' => (int) $v->stock,
+            ])->values()->all(),
+            'shipping_estimate' => $fastest ? [
+                'name' => $fastest->name,
+                'days' => $fastest->estimated_days,
+            ] : null,
+        ];
+    }
+
     public function checkoutPay($order): array
     {
         return array_merge($this->base(), ['view' => 'pay', 'order' => $this->orderSummary($order)]);
