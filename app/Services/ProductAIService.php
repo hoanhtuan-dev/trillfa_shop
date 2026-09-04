@@ -185,18 +185,13 @@ class ProductAIService
     {
         $prompt = $this->buildPrompt($input, $imageAnalysis);
 
-        // Provider order mirrors "Gợi ý từ ảnh": try the configured provider first,
-        // then the other; loop all suggest qwen models × keys for failover.
-        $provider = function_exists('studio_suggest_provider') ? studio_suggest_provider() : $this->provider;
-        $models = function_exists('studio_suggest_qwen_models') ? studio_suggest_qwen_models() : [$this->model];
-
-        if ($provider !== 'gemini') {
-            foreach ($this->qwenKeys() as $key) {
-                foreach ($models as $model) {
-                    $result = $this->callQwen($prompt, $key, $model);
-                    if ($result) {
-                        return $result;
-                    }
+        // TEXT generation — mirror the Studio StylistService chat: try Qwen TEXT
+        // models (qwen3.8-flash → …) over studio_qwen_credentials('prompt'), then Gemini.
+        foreach ($this->qwenTextModels() as $model) {
+            foreach ($this->qwenPromptKeys() as $key) {
+                $result = $this->callQwen($prompt, $key, $model);
+                if ($result) {
+                    return $result;
                 }
             }
         }
@@ -209,23 +204,17 @@ class ProductAIService
             }
         }
 
-        if ($provider === 'gemini' && $this->qwenKeys()) {
-            foreach ($this->qwenKeys() as $key) {
-                foreach ($models as $model) {
-                    $result = $this->callQwen($prompt, $key, $model);
-                    if ($result) {
-                        return $result;
-                    }
-                }
-            }
-        }
-
         return $this->stub($input, $imageAnalysis);
     }
 
-    protected function qwenKeys(): array
+    protected function qwenTextModels(): array
     {
-        $keys = function_exists('studio_qwen_credentials') ? studio_qwen_credentials('vision') : [];
+        return function_exists('studio_qwen_text_models') ? studio_qwen_text_models() : [$this->model];
+    }
+
+    protected function qwenPromptKeys(): array
+    {
+        $keys = function_exists('studio_qwen_credentials') ? studio_qwen_credentials('prompt') : [];
         if (empty($keys)) {
             $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
         }
