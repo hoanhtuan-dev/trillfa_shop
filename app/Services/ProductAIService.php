@@ -140,7 +140,7 @@ PROMPT;
         return [
             'suggested_name' => $base,
             'brand' => $brand,
-            'short_description' => 'Sản phẩm '.trim($category ? $category.' ' : '').'được tuyển chọn kỹ lưỡng, thiết kế tối giản tinh tế, chất liệu cao cấp — dễ dàng phối đồ và bền bỉ theo thời gian.',
+            'short_description' => 'Sản phẩm '.($category ? $category.' ' : '').'được tuyển chọn kỹ lưỡng, thiết kế tối giản tinh tế, chất liệu cao cấp — dễ dàng phối đồ và bền bỉ theo thời gian.',
             'description' => '<h2>Mô tả sản phẩm</h2><p>'.$base.' '.($category ? 'thuộc bộ sưu tập '.$category.' ' : '').'của Trillfa Fa — thiết kế tối giản, chất liệu cao cấp, tôn dáng và thoải mái.</p><ul><li>Chất liệu cao cấp, thân thiện môi trường</li><li>Thiết kế tối giản, dễ phối đồ</li><li>Đổi trả trong 7 ngày</li></ul><blockquote>"Tối giản không phải là ít, mà là đủ."</blockquote>',
             'meta_title' => $base.' | Trillfa Fa',
             'meta_description' => 'Khám phá '.$base.' '.($category ? 'trong ' . $category . ' ' : '').'— chất liệu cao cấp, thiết kế tối giản, giao nhanh, đổi trả dễ dàng.',
