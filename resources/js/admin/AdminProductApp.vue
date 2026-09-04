@@ -48,13 +48,27 @@ const selImages = ref([]);
 // Image the AI should look at: cover (existing or Studio-chosen), else first gallery image.
 const aiImageUrl = computed(() => coverUrl.value || product?.image || studioGallery.value[0] || '');
 
-// ---------- AI suggest (vision + iterative enrichment) ----------
+// ---------- AI suggest (vision + iterative enrichment) — queue + poll ----------
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+function applyResult(r) {
+    const d = r?.data || r || {};
+    if (d.suggested_name) form.name = d.suggested_name;
+    if (d.brand) form.brand = d.brand;
+    if (d.short_description) form.short_description = d.short_description;
+    if (d.description) form.description = d.description;
+    if (d.meta_title) form.meta_title = d.meta_title;
+    if (d.meta_description) form.meta_description = d.meta_description;
+    if (Array.isArray(d.tags) && d.tags.length) form.tags = d.tags.join(', ');
+    return d;
+}
+
 async function aiSuggest() {
     aiLoading.value = true;
     aiMsg.value = '';
     aiState.value = aiImageUrl.value ? 'analyzing' : 'suggesting';
     try {
-        const data = await apiFetch('/admin/products/ai-suggest', {
+        const res = await apiFetch('/admin/products/ai-suggest', {
             method: 'POST',
             body: {
                 name: form.name,
@@ -66,22 +80,29 @@ async function aiSuggest() {
                 force: forceReanalyze.value,
             },
         });
-        const r = data.data || {};
-        if (r.suggested_name) form.name = r.suggested_name;
-        if (r.brand) form.brand = r.brand;
-        if (r.short_description) form.short_description = r.short_description;
-        if (r.description) form.description = r.description;
-        if (r.meta_title) form.meta_title = r.meta_title;
-        if (r.meta_description) form.meta_description = r.meta_description;
-        if (Array.isArray(r.tags) && r.tags.length) form.tags = r.tags.join(', ');
-
-        if (r.source === 'stub') {
-            aiMsg.value = 'AI chưa cấu hình key — dùng gợi ý mẫu.';
+        const token = res?.token;
+        if (!token) {
+            aiMsg.value = 'Không nhận được phiên AI.';
+            return;
+        }
+        // Poll the background job until done (or ~3min).
+        const start = Date.now();
+        let done = null;
+        while (Date.now() - start < 180000) {
+            aiState.value = 'suggesting';
+            await sleep(1600);
+            const p = await apiFetch('/admin/products/ai-suggest/poll?token=' + encodeURIComponent(token));
+            if (p.status === 'done') { done = p; break; }
+        }
+        if (!done) {
+            aiMsg.value = 'AI đang bận/quá lâu — thử lại sau.';
+            return;
+        }
+        const d = applyResult(done);
+        if (d.source === 'stub') {
+            aiMsg.value = 'AI chưa cấu hình key hoặc hết quota — dùng gợi ý mẫu.';
         } else {
-            const img = data.image_analyzed
-                ? (data.analysis_cached ? ' · ảnh đã phân tích (dùng cache)' : ' · ảnh: ' + (r.description ? 'nhìn ảnh' : ''))
-                : '';
-            aiMsg.value = 'Đã làm giàu bằng ' + ai.model + img;
+            aiMsg.value = 'Đã làm giàu bằng ' + ai.model + (d.image_analyzed ? ' · ảnh: nhìn ảnh' : '');
         }
         forceReanalyze.value = false;
     } catch (e) {

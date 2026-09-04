@@ -227,6 +227,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/products', [AdminProductController::class, 'index'])->name('products.index');
     Route::post('/products/ai-suggest', [AdminProductController::class, 'aiSuggest'])->name('products.ai-suggest');
+    Route::get('/products/ai-suggest/poll', [AdminProductController::class, 'aiSuggestPoll'])->name('products.ai-suggest.poll');
     Route::get('/products/studio-images', [AdminProductController::class, 'studioImages'])->name('products.studio-images');
     Route::get('/products/create', [AdminProductController::class, 'create'])->name('products.create');
     Route::post('/products', [AdminProductController::class, 'store'])->name('products.store');

@@ -118,10 +118,6 @@ class AdminProductController extends Controller
      */
     public function aiSuggest(Request $request)
     {
-        // LLM calls (vision + text) can take a while on shared hosting; do not
-        // let PHP's max_execution_time kill the request mid-flight.
-        @set_time_limit(0);
-
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
@@ -132,35 +128,30 @@ class AdminProductController extends Controller
             'force' => ['nullable', 'boolean'],
         ]);
 
-        $service = app(ProductAIService::class);
-        $imageAnalysis = null;
-        $analysisCached = false;
-        $imageAnalyzed = false;
-
-        // Vision: analyze the product image once, cache by image hash. If image
-        // unchanged and not force, reuse the cached analysis (no re-analysis).
+        $imagePath = null;
         if (! empty($data['image_url'])) {
-            $path = $this->resolveImagePath($data['image_url']);
-            if ($path && is_file($path)) {
-                $imageAnalyzed = true;
-                $cacheKey = 'product_ai_img:'.sha1_file($path).'|'.(string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
-                if ((bool) ($data['force'] ?? false)) {
-                    \Illuminate\Support\Facades\Cache::forget($cacheKey);
-                }
-                $imageAnalysis = $service->analyzeImage($path, (bool) ($data['force'] ?? false));
-                $analysisCached = \Illuminate\Support\Facades\Cache::has($cacheKey);
-            }
+            $imagePath = $this->resolveImagePath($data['image_url']);
         }
 
-        $result = $service->generate($data, $imageAnalysis);
+        // Run in the queue worker so the HTTP request never blocks on slow /
+        // rate-limited LLM calls (no 504 on shared hosting). Frontend polls.
+        $token = (string) \Illuminate\Support\Str::uuid();
+        \App\Jobs\GenerateProductSuggestion::dispatch($token, $data, $imagePath, (bool) ($data['force'] ?? false));
 
-        return response()->json([
-            'ok' => true,
-            'data' => $result,
-            'image_analyzed' => $imageAnalyzed,
-            'analysis_cached' => $analysisCached,
-            'analysis' => $imageAnalysis,
-        ]);
+        return response()->json(['ok' => true, 'token' => $token]);
+    }
+
+    public function aiSuggestPoll(Request $request)
+    {
+        $token = (string) $request->input('token');
+        $result = \Illuminate\Support\Facades\Cache::get('product_ai:'.$token);
+        if ($result) {
+            \Illuminate\Support\Facades\Cache::forget('product_ai:'.$token);
+
+            return response()->json(['status' => 'done', 'data' => $result]);
+        }
+
+        return response()->json(['status' => 'processing']);
     }
 
     protected function resolveImagePath(string $url): ?string
