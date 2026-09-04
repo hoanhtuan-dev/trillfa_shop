@@ -71,26 +71,34 @@ class ProductAIService
             $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
         }
         foreach (array_values(array_unique($keys)) as $key) {
-            foreach ($models as $model) {
-                $base = dashscope_base_url($key).'/compatible-mode/v1';
-                try {
-                    $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
-                        'model' => $model,
-                        'messages' => [['role' => 'user', 'content' => [
-                            ['type' => 'text', 'text' => $prompt],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                        ]]],
-                        'response_format' => ['type' => 'json_object'],
-                    ]);
-                    if ($resp->ok()) {
-                        $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
-                        if ($json) {
-                            return $json;
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    // try next
+            $base = dashscope_base_url($key).'/compatible-mode/v1';
+            try {
+                $resp = Http::withToken($key)->timeout(45)->post($base.'/chat/completions', [
+                    'model' => $models[0] ?? $this->model,
+                    'messages' => [['role' => 'user', 'content' => [
+                        ['type' => 'text', 'text' => $prompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                    ]]],
+                    'response_format' => ['type' => 'json_object'],
+                ]);
+                // 429 = rate/quota limit -> stop trying (all keys/models share the quota).
+                if ($resp->status() === 429 || is_qwen_quota_error((string) $resp->body())) {
+                    return null;
                 }
+                if ($resp->ok()) {
+                    $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
+                    if ($json) {
+                        return $json;
+                    }
+                }
+                // model_not_found / unsupported -> try the next model.
+                $body = (string) $resp->body();
+                if (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404) {
+                    continue;
+                }
+                break; // other errors on this key -> next key
+            } catch (\Throwable $e) {
+                // try next key
             }
         }
 
@@ -218,13 +226,17 @@ PROMPT;
     {
         $base = dashscope_base_url($key).'/compatible-mode/v1';
         try {
-            $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
+            $resp = Http::withToken($key)->timeout(45)->post($base.'/chat/completions', [
                 'model' => $this->model,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.7,
                 'max_tokens' => 1200,
                 'response_format' => ['type' => 'json_object'],
             ]);
+            // 429 = rate/quota limit -> stop trying (shared quota across keys).
+            if ($resp->status() === 429 || is_qwen_quota_error((string) $resp->body())) {
+                return null;
+            }
             if (! $resp->ok()) {
                 return null;
             }
