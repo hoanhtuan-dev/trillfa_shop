@@ -38,6 +38,10 @@ class ProductAIService
 
     private bool $budgetStarted = false;
 
+    /** Diagnostics: what was tried and why it fell back to stub. */
+    private array $attempts = [];
+    private string $lastError = '';
+
     public function __construct()
     {
         $this->providers = product_ai_providers();
@@ -76,6 +80,13 @@ class ProductAIService
         $left = (int) floor($this->deadline - microtime(true));
 
         return max(1, min($this->timeout, $left));
+    }
+
+    private function record(string $provider, string $detail): void
+    {
+        $this->attempts[] = $provider.': '.$detail;
+        $this->lastError = $detail;
+        logger()->warning('ProductAI ['.$provider.'] '.$detail);
     }
 
     // ------------------------------------------------------------- stage 1: vision
@@ -178,7 +189,15 @@ class ProductAIService
         $prompt = $this->buildPrompt($input, $imageAnalysis);
         $result = $this->attempt('text', $prompt);
 
-        return is_array($result) ? $result : $this->stub($input, $imageAnalysis);
+        if (is_array($result)) {
+            $result['source'] = 'ai';
+            $result['reason'] = 'ok';
+            $result['attempts'] = $this->attempts;
+
+            return $result;
+        }
+
+        return $this->stub($input, $imageAnalysis);
     }
 
     /**
@@ -209,6 +228,9 @@ class ProductAIService
                 Cache::put('product_ai_img:'.$key, $understanding, $this->cacheTtl);
             }
             unset($result['understanding']);
+            $result['source'] = 'ai';
+            $result['reason'] = 'ok (vision)';
+            $result['attempts'] = $this->attempts;
             $result['image_analyzed'] = true;
             $result['analysis_cached'] = false;
 
@@ -232,6 +254,8 @@ class ProductAIService
     protected function attempt(string $kind, string $prompt, ?string $imagePath = null): ?array
     {
         if (! product_ai_enabled()) {
+            $this->record('system', 'AI Sản phẩm đang bị tắt trong cài đặt (product_ai_enabled=0)');
+
             return null;
         }
 
@@ -268,13 +292,25 @@ class ProductAIService
         }
         $keys = array_slice($keys, 0, $this->maxKeys);
 
+        if (empty($keys)) {
+            $this->record('qwen', 'no qwen/dashscope key configured ('.$kind.')');
+
+            return null;
+        }
+
+        $keyPrefix = fn (string $k) => substr($k, 0, 8).'…';
+
         foreach ($keys as $key) {
             if ($this->timedOut()) {
+                $this->record('qwen', 'budget exhausted ('.$kind.')');
+
                 return null;
             }
             $base = dashscope_base_url($key).'/compatible-mode/v1';
             foreach ($models as $model) {
                 if ($this->timedOut()) {
+                    $this->record('qwen', 'budget exhausted ('.$kind.')');
+
                     return null;
                 }
                 $content = $imagePath !== null
@@ -293,6 +329,8 @@ class ProductAIService
                         'response_format' => ['type' => 'json_object'],
                     ]);
                 } catch (\Throwable $e) {
+                    $this->record('qwen', 'network/timeout ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
+
                     continue 2; // network error on this key -> next key
                 }
 
@@ -301,17 +339,29 @@ class ProductAIService
 
                 // 429 = rate/quota limit on this key -> skip to the next key fast.
                 if ($status === 429 || is_qwen_quota_error($body)) {
+                    $this->record('qwen', '429/quota ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
+
                     continue 2;
                 }
                 // Model not on this host/account -> try the next model.
                 if ($status === 404 || str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist')) {
+                    $this->record('qwen', 'model not found ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
+
                     continue;
                 }
                 if ($resp->ok()) {
                     $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
+                    if ($json) {
+                        $this->attempts[] = 'qwen: ok ('.$kind.', '.$model.', key '.$keyPrefix($key).')';
 
-                    return $json ?: null;
+                        return $json;
+                    }
+                    $this->record('qwen', 'empty/invalid JSON ('.$kind.', '.$model.')');
+
+                    return null;
                 }
+
+                $this->record('qwen', 'HTTP '.$status.' ('.$kind.', '.$model.', key '.$keyPrefix($key).'): '.substr($body, 0, 120));
 
                 return null; // other error -> stop trying this provider
             }
@@ -324,10 +374,14 @@ class ProductAIService
     {
         $key = studio_api_key('gemini');
         if (! $key) {
+            $this->record('gemini', 'no gemini key configured');
+
             return null;
         }
 
         if ($this->timedOut()) {
+            $this->record('gemini', 'budget exhausted ('.$kind.')');
+
             return null;
         }
 
@@ -344,10 +398,18 @@ class ProductAIService
                     'contents' => [['parts' => $parts]],
                 ]);
             if ($resp->ok()) {
-                return $this->parseJson((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
+                $json = $this->parseJson((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
+                if ($json) {
+                    $this->attempts[] = 'gemini: ok ('.$kind.', '.$model.')';
+
+                    return $json;
+                }
+                $this->record('gemini', 'empty/invalid JSON ('.$kind.', '.$model.')');
+            } else {
+                $this->record('gemini', 'HTTP '.$resp->status().' ('.$kind.', '.$model.'): '.substr((string) $resp->body(), 0, 120));
             }
         } catch (\Throwable $e) {
-            // fall through
+            $this->record('gemini', 'network/timeout ('.$kind.', '.$model.')');
         }
 
         return null;
@@ -537,6 +599,8 @@ PROMPT;
             'meta_description' => 'Khám phá '.$base.' '.($fabric ? $fabric.' ' : '').'— '.$descStyle.', chất liệu cao cấp, tôn dáng, giao nhanh, đổi trả dễ dàng.',
             'tags' => array_values(array_filter([$category, $style, $color, $fabric, 'thời trang', 'phong cách', 'trillfa'])),
             'source' => 'stub',
+            'reason' => $this->lastError ?: 'offline',
+            'attempts' => $this->attempts,
         ];
     }
 }

@@ -85,7 +85,7 @@ async function aiSuggest() {
         }
         const d = applyResult(res);
         if (d.source === 'stub') {
-            aiMsg.value = 'AI chưa có key hoặc hết quota — dùng gợi ý mẫu (offline).';
+            aiMsg.value = 'Dùng gợi ý offline' + (d.reason ? ' — ' + d.reason : '') + '.';
         } else {
             aiMsg.value = 'Đã làm giàu bằng ' + (d.model || ai.model) + (d.image_analyzed ? ' · nhìn ảnh' : '');
         }
