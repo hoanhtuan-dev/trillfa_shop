@@ -62,10 +62,14 @@ class RenderImageJob implements ShouldQueue
                 if ($pasted) { $url = $pasted; }
             }
 
-            // Xóa nền AI: hậu kỳ cắt nền theo mask → trong suốt (PNG alpha).
+            // Xóa nền AI: hậu kỳ cắt nền theo mask → trong suốt (PNG alpha). Lỗi → fallback ảnh không trong suốt.
             if (($genMeta['mode'] ?? '') === 'remove-bg' && $generation->mask_image) {
-                $transparent = $images->applyTransparentBackground($url, $generation->mask_image);
-                if ($transparent) { $url = $transparent; }
+                try {
+                    $transparent = $images->applyTransparentBackground($url, $generation->mask_image);
+                    if ($transparent) { $url = $transparent; }
+                } catch (\Throwable $e) {
+                    logger()->warning('remove-bg transparent post-processing failed', ['error' => $e->getMessage()]);
+                }
             }
 
             // NOTE: Face sync ("Đồng bộ khuôn mặt") was removed from the UI. We no longer do a second

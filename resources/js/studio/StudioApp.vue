@@ -40,13 +40,8 @@ const canvasZoom = ref(null);
 const eraseOverlay = ref(null);
 const drawOverlay = ref(null);
 const blankMenuOpen = ref(false);
-const removeBgArm = ref(false);
-let removeBgTimer = null;
-function confirmRemoveBg() {
-  if (!store.activeLayer) return;
-  if (removeBgArm.value) { removeBgArm.value = false; clearTimeout(removeBgTimer); store.removeBackground(); }
-  else { removeBgArm.value = true; clearTimeout(removeBgTimer); removeBgTimer = setTimeout(() => { removeBgArm.value = false; }, 3000); }
-}
+const removeBgConfirmOpen = ref(false);
+function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackground(); }
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
 watch(eraseOverlay, (el) => store.attachEraseCanvas(el));
 watch(drawOverlay, (el) => store.attachDrawCanvas(el));
@@ -273,7 +268,7 @@ function onTouchEnd(e) {
             <div v-if="isolateActive" class="absolute inset-0">
               <div v-if="store.upscaleSrc" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div class="absolute left-0 top-0" :style="isolateLayerStyle">
-                  <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" draggable="false" @load="store.onCanvasImgLoad()" />
+                  <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />
                 </div>
               </div>
               <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
@@ -282,7 +277,7 @@ function onTouchEnd(e) {
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
-                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
+                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :class="[l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : '', l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
                   <template v-if="l.id === store.activeLayerId && !l.locked">
                     <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
                     <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>
@@ -341,7 +336,7 @@ function onTouchEnd(e) {
                 </div>
               </div>
               <button @click="store.fillActiveLayer()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-40" title="Tô màu toàn bộ layer đang chọn"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.5 11.5a2 2 0 0 1-2 1.9H8.5a2 2 0 0 1-2-1.9z"/><path d="M9 8V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v3"/><path d="M12 1v2"/></svg></button>
-              <button @click="confirmRemoveBg()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full transition-colors disabled:opacity-40" :class="removeBgArm ? 'bg-red-600 text-white' : 'bg-violet-600/70 text-white hover:bg-violet-500'" :title="removeBgArm ? 'Nhấn lại để XÁC NHẬN xóa nền (tốn credit)' : 'Xóa nền AI (giữ vùng chọn hiện tại làm chủ thể nếu có)'"><svg v-if="removeBgArm" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="m3 3 18 18"/></svg></button>
+              <button @click="removeBgConfirmOpen = true" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-violet-600/70 text-white transition-colors hover:bg-violet-500 disabled:opacity-40" title="Xóa nền AI (nền sẽ trong suốt; giữ vùng chọn hiện tại làm chủ thể nếu có)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="m3 3 18 18"/></svg></button>
             </div>
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1 lg:hidden">
               <button v-for="l in store.canvasLayers" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
@@ -355,7 +350,7 @@ function onTouchEnd(e) {
                 <button @click="store.cleanCanvas()" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">Dọn canvas</button>
               </div>
               <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
-                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40', l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']">
+                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40']">
                   <button @click="store.toggleLayerVisible(l.id)" class="grid h-5 w-5 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700" :title="l.visible ? 'Ẩn layer' : 'Hiện layer'"><span v-if="l.visible"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span><span v-else><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg></span></button>
                   <button @click="store.selectLayer(l)" class="flex min-w-0 flex-1 items-center gap-1.5 text-left">
                     <img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover">
@@ -452,6 +447,17 @@ function onTouchEnd(e) {
         <SourcePanel />
         <OutputModule />
       </aside>
+    </div>
+    <!-- Popup xác nhận xóa nền AI -->
+    <div v-if="removeBgConfirmOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="removeBgConfirmOpen = false">
+      <div class="w-full max-w-xs rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl">
+        <p class="text-sm font-semibold text-cream-100">Xóa nền AI?</p>
+        <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Nền sẽ được xóa thành <b>trong suốt</b>. Thao tác tốn <b>1 credit</b> và có thể mất vài giây.</p>
+        <div class="mt-3 flex gap-2">
+          <button @click="doRemoveBg()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500">Xóa nền</button>
+          <button @click="removeBgConfirmOpen = false" class="flex-1 rounded-lg bg-ink-800 px-3 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+        </div>
+      </div>
     </div>
     <!-- Mobile menu overlay -->
     <div v-if="menuOpen" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">

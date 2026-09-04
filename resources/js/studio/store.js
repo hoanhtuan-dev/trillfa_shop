@@ -70,6 +70,7 @@ export const useStudioStore = defineStore('studio', {
     _drawCtx: null,
     _drawDrawing: false,
     _drawLast: null,
+    _drawPressure: 1,   // áp lực bút stylus (0-1) cho cọ vẽ
     // Vẽ vùng chọn (marquee)
     regionSelectMode: false,
     regionBox: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
@@ -942,7 +943,7 @@ export const useStudioStore = defineStore('studio', {
       const steps = Math.max(1, Math.ceil(Math.hypot(to.nx - from.nx, to.ny - from.ny) * w / (r / 2)));
       for (let s = 0; s <= steps; s++) this._drawEraseDot({ nx: from.nx + (to.nx - from.nx) * (s / steps), ny: from.ny + (to.ny - from.ny) * (s / steps) });
     },
-    beginEraseBrush(e) { if (!this.eraseMode) return; this._eraseDrawing = true; this._eraseLast = this._erasePoint(e); this._drawEraseDot(this._eraseLast); },
+    beginEraseBrush(e) { if (!this.eraseMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._eraseDrawing = true; this._eraseLast = this._erasePoint(e); this._drawEraseDot(this._eraseLast); },
     eraseBrushMove(e) { if (!this._eraseDrawing) return; const p = this._erasePoint(e); this._drawEraseLine(this._eraseLast || p, p); this._eraseLast = p; },
     endEraseBrush() { this._eraseDrawing = false; this._eraseLast = null; },
     applyErase() {
@@ -998,7 +999,7 @@ export const useStudioStore = defineStore('studio', {
       this._drawCtx = el.getContext('2d');
       this._drawCtx.clearRect(0, 0, w, h);
     },
-    _drawRadius() { return Math.max(3, Math.min(150, Number(this.drawBrushSize) || 24)); },
+    _drawRadius() { const base = Math.max(3, Math.min(150, Number(this.drawBrushSize) || 24)); return base * (0.4 + 0.6 * (Number(this._drawPressure) || 1)); },
     _hexToRgba(hex, a = 1) {
       const mm = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
       if (!mm) return 'rgba(255,255,255,' + a + ')';
@@ -1028,8 +1029,8 @@ export const useStudioStore = defineStore('studio', {
       const steps = Math.max(1, Math.ceil(Math.hypot(to.nx - from.nx, to.ny - from.ny) * w / (r / 2)));
       for (let s = 0; s <= steps; s++) this._drawPaintDot({ nx: from.nx + (to.nx - from.nx) * (s / steps), ny: from.ny + (to.ny - from.ny) * (s / steps) });
     },
-    beginDrawBrush(e) { if (!this.drawMode) return; this._drawDrawing = true; this._drawLast = this._drawPoint(e); this._drawPaintDot(this._drawLast); },
-    drawBrushMove(e) { if (!this._drawDrawing) return; const p = this._drawPoint(e); this._drawPaintLine(this._drawLast || p, p); this._drawLast = p; },
+    beginDrawBrush(e) { if (!this.drawMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._drawPressure = (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) ? e.pressure : 1; this._drawDrawing = true; this._drawLast = this._drawPoint(e); this._drawPaintDot(this._drawLast); },
+    drawBrushMove(e) { if (!this._drawDrawing) return; if (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) this._drawPressure = e.pressure; const p = this._drawPoint(e); this._drawPaintLine(this._drawLast || p, p); this._drawLast = p; },
     endDrawBrush() { this._drawDrawing = false; this._drawLast = null; },
     applyDraw() {
       this.pushHistory();
@@ -1085,9 +1086,10 @@ export const useStudioStore = defineStore('studio', {
     beginLayerDrag(id, e) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l || l.locked) return;
-      this.pushHistory();
       this.setActiveLayer(id);
-      this._layerDrag = { id, sx: e.clientX, sy: e.clientY, ox: Number(l.x) || 0, oy: Number(l.y) || 0 };
+      // Snapshot lúc BẮT ĐẦU kéo (giữ lại để push vào history khi kết thúc) — không push ngay
+      // để tránh mỗi cú click (chưa kéo) làm bẩn lịch sử + lệch vị trí.
+      this._layerDrag = { id, sx: e.clientX, sy: e.clientY, ox: Number(l.x) || 0, oy: Number(l.y) || 0, snap: this._snapshot() };
     },
     layerDragMove(e) {
       const d = this._layerDrag;
@@ -1114,10 +1116,13 @@ export const useStudioStore = defineStore('studio', {
     },
     endLayerDrag() {
       if (!this._layerDrag) return;
+      const snap = this._layerDrag.snap;
       this._layerDrag = null;
       this.snapX = null;
       this.snapY = null;
       this.saveLayerLayout();
+      // Push snapshot pre-drag vào history (chỉ 1 lần, sau khi kéo xong).
+      if (snap) { this.undoStack.push(snap); if (this.undoStack.length > 50) this.undoStack.shift(); this.redoStack = []; }
     },
     // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
     deselectAll() {
