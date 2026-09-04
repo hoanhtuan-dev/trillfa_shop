@@ -114,8 +114,8 @@ const filteredProducts = computed(() => {
         <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 gap-2.5 overflow-y-auto pr-1" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
           <div v-for="it in sortedRefs" :key="it.name" class="group relative overflow-hidden rounded-xl border transition-colors" :class="isCurrent(it) ? 'border-brand-400 ring-1 ring-brand-400/60' : 'border-ink-700 hover:border-ink-600'" :title="it.name">
             <button @click="pick(it)" class="block w-full text-left">
-              <div class="relative bg-ink-950">
-                <img :src="it.url" class="block w-full object-cover" style="aspect-ratio: 1 / 1" loading="lazy" alt="">
+              <div class="relative w-full overflow-hidden bg-ink-950" style="padding-bottom: 100%">
+                <img :src="it.url" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="">
                 <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
                 <span v-else-if="isCurrent(it)" class="absolute left-1.5 top-1.5 rounded-md bg-brand-600/90 px-1.5 py-0.5 text-[9px] font-medium text-white">đang chọn</span>
               </div>
@@ -152,7 +152,7 @@ const filteredProducts = computed(() => {
           <input v-model="pquery" placeholder="Tìm sản phẩm…" class="h-9 w-full rounded-xl border border-ink-700 bg-ink-800/60 pl-9 pr-3 text-xs text-cream-100 placeholder:text-cream-300/40 focus:border-brand-500 focus:outline-none">
         </div>
         <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 grid-cols-3 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-4">
-          <button v-for="p in filteredProducts" :key="p.id" @click="store.pickFromProduct(p); productOpen=false" class="group relative h-24 overflow-hidden rounded-xl border border-ink-700 transition-colors hover:border-ink-600"><img :src="p.url" class="h-full w-full bg-ink-900 object-cover" loading="lazy" alt=""><span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span></button>
+          <button v-for="p in filteredProducts" :key="p.id" @click="store.pickFromProduct(p); productOpen=false" class="group relative w-full overflow-hidden rounded-xl border border-ink-700 transition-colors hover:border-ink-600" style="padding-bottom: 100%"><img :src="p.url" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt=""><span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span></button>
           <p v-if="!filteredProducts.length" class="col-span-full py-10 text-center text-xs text-cream-300/50">{{ products.length ? 'Không có sản phẩm khớp tìm kiếm.' : 'Chưa có sản phẩm.' }}</p>
         </div>
       </div>
