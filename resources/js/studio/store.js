@@ -58,6 +58,10 @@ export const useStudioStore = defineStore('studio', {
     _eraseCtx: null,
     _eraseDrawing: false,
     _eraseLast: null,
+    // Vẽ vùng chọn (marquee)
+    regionSelectMode: false,
+    regionBox: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
+    _regionDrag: null,
     // concept
     imagePromptEn: '',
     negativePromptEn: '',
@@ -754,8 +758,16 @@ export const useStudioStore = defineStore('studio', {
     // ── Xóa vùng (erase brush + feather) ──
     toggleErase() {
       this.eraseMode = !this.eraseMode;
-      if (this.eraseMode) { const c = document.createElement('canvas'); c.width = 1024; c.height = 1024; this._eraseCanvas = c; this._eraseCtx = c.getContext('2d'); }
+      if (this.eraseMode) { this.zoom = 1; this.pan = { x: 0, y: 0 }; } // fit khung, không zoom
       else this.applyErase();
+    },
+    // Gắn canvas overlay (DOM) làm mask để vẽ + xem trước realtime.
+    attachEraseCanvas(el) {
+      if (!el) { this._eraseCanvas = null; this._eraseCtx = null; return; }
+      el.width = 1024; el.height = 1024;
+      this._eraseCanvas = el;
+      this._eraseCtx = el.getContext('2d');
+      this._eraseCtx.clearRect(0, 0, el.width, el.height);
     },
     setEraseFeather(v) { this.eraseFeather = Number(v) || 0; },
     _eraseRadius() { return Math.max(3, Math.min(120, Number(this.eraseFeather) || 20)); },
@@ -802,6 +814,27 @@ export const useStudioStore = defineStore('studio', {
       img.onerror = () => this.toast('Không xóa được ảnh.', 'error');
       img.src = l.image;
     },
+    // ── Vẽ vùng chọn (rectangle marquee) ──
+    toggleRegionSelect() {
+      this.regionSelectMode = !this.regionSelectMode;
+      if (this.regionSelectMode) { this.zoom = 1; this.pan = { x: 0, y: 0 }; }
+    },
+    exitRegionSelect() { this.regionSelectMode = false; this._regionDrag = null; },
+    exitErase() { if (this.eraseMode) { this.eraseMode = false; this.applyErase(); } },
+    beginRegionDrag(e) {
+      if (!this.regionSelectMode) return;
+      this._regionDrag = { sx: e.clientX, sy: e.clientY, box: { ...(this.regionBox || { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }) } };
+    },
+    regionDragMove(e) {
+      const d = this._regionDrag; if (!d) return;
+      const m = this.canvasMetrics(); if (!m) return;
+      const dx = (e.clientX - d.sx) / m.vw, dy = (e.clientY - d.sy) / m.vh;
+      const b = { ...d.box };
+      b.x = Math.max(0, Math.min(1 - b.w, b.x + dx));
+      b.y = Math.max(0, Math.min(1 - b.h, b.y + dy));
+      this.regionBox = b;
+    },
+    endRegionDrag() { this._regionDrag = null; },
     // Kéo layer trên canvas để di chuyển (tách khỏi pan/zoom khung nhìn).
     beginLayerDrag(id, e) {
       const l = this.canvasLayers.find((x) => x.id === id);

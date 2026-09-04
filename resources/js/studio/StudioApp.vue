@@ -33,7 +33,9 @@ watch(() => store.previewId, (id) => { store.loadPalette(id); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
 const canvasZoom = ref(null);
+const eraseOverlay = ref(null);
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
+watch(eraseOverlay, (el) => store.attachEraseCanvas(el));
 // While crop mode is on: re-fit the box when the ratio changes, re-init when the image changes.
 watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
 // Khi đổi layer, KHÔNG reset zoom/pan — giữ nguyên khung nhìn của người dùng.
@@ -69,7 +71,7 @@ const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
 
 // ── Layer editor (composite + transform) ──
-const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode);
+const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.regionSelectMode);
 function layerStyle(l, i) {
   return {
     transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + ((l.scale || 1) * (l.flipX ? -1 : 1)) + ', ' + ((l.scale || 1) * (l.flipY ? -1 : 1)) + ')',
@@ -78,6 +80,10 @@ function layerStyle(l, i) {
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
     zIndex: i + 1,
   };
+}
+function regionBoxStyle() {
+  const b = store.regionBox || { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
+  return { left: (b.x * 100) + '%', top: (b.y * 100) + '%', width: (b.w * 100) + '%', height: (b.h * 100) + '%' };
 }
 function onLayerPointerDown(l, e) {
   if (l.locked) { store.selectLayer(l); return; }
@@ -198,9 +204,12 @@ function onTouchEnd(e) {
           <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
             <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
-              <div v-if="store.upscaleSrc" class="relative">
-                <img ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full min-w-0 select-none object-contain" :style="store.eraseMode ? {} : { transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
-                <canvas v-if="store.eraseMode" class="absolute inset-0 h-full w-full cursor-crosshair rounded bg-red-500/10" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
+              <div v-if="store.upscaleSrc" class="relative max-h-full max-w-full">
+                <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-full max-w-full min-w-0 select-none object-contain" :style="store.eraseMode ? {} : { transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
+                <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute inset-0 h-full w-full cursor-crosshair rounded bg-red-500/10" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
+                <div v-if="store.regionSelectMode" class="pointer-events-none absolute inset-0">
+                  <div class="absolute cursor-move select-none border-2 border-dashed border-brand-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" style="pointer-events:auto; touch-action:none" :style="regionBoxStyle()" @pointerdown.stop="store.beginRegionDrag($event)" @pointermove="store.regionDragMove($event)" @pointerup="store.endRegionDrag()" @pointerleave="store.endRegionDrag()" title="Kéo để di chuyển vùng chọn"></div>
+                </div>
               </div>
               <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
@@ -208,7 +217,7 @@ function onTouchEnd(e) {
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
-                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
+                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
                   <template v-if="l.id === store.activeLayerId && !l.locked">
                     <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
                     <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>
@@ -329,10 +338,9 @@ function onTouchEnd(e) {
                 <button @click="store.bringLayerTo(store.activeLayer.id, 'front')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa lên trên cùng">⤒ Lên trên</button>
                 <button @click="store.bringLayerTo(store.activeLayer.id, 'back')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa xuống dưới cùng">⤓ Xuống dưới</button>
               </div>
-              <div class="mt-1.5 grid grid-cols-3 gap-1.5">
+              <div class="mt-1.5 grid grid-cols-2 gap-1.5">
                 <button @click="store.toggleFlipX(store.activeLayer.id)" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Lật ngang layer">↔ Lật ngang</button>
                 <button @click="store.toggleFlipY(store.activeLayer.id)" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Lật dọc layer">↕ Lật dọc</button>
-                <button @click="store.toggleErase()" class="rounded-lg px-1 py-1.5 text-[9px] font-semibold" :class="store.eraseMode ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" title="Xóa vùng (feather)">🧽 Xóa vùng</button>
               </div>
             </div>
             <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="hidden w-64 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl lg:block">
