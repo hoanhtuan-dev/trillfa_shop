@@ -657,9 +657,40 @@ export const useStudioStore = defineStore('studio', {
       canvas.width = w; canvas.height = h; // nền trong suốt mặc định
       const url = canvas.toDataURL('image/png');
       const id = 'blank-' + Date.now();
-      this.pushCanvasLayer(id, 'source', 'Layer vẽ', url);
+      // Thêm TRÙNG KHỚP với layer active (cùng x/y/scale/rotation/blend), không flow ra chỗ khác.
+      this.canvasLayers.push({
+        id, kind: 'source', name: 'Layer vẽ', image: url, genId: null,
+        visible: true, locked: false,
+        x: src ? (src.x || 0) : 0, y: src ? (src.y || 0) : 0,
+        scale: src ? (src.scale || 1) : 1, rotation: src ? (src.rotation || 0) : 0,
+        opacity: src ? (src.opacity != null ? src.opacity : 1) : 1,
+        blend: src ? (src.blend || 'normal') : 'normal', flipX: false, flipY: false,
+        baseW: src ? src.baseW : undefined, baseH: src ? src.baseH : undefined,
+      });
+      this.saveLayerLayout();
       this.setActiveLayer(id);
-      this.toast('Đã thêm layer vẽ trống.');
+      this.toast('Đã thêm layer vẽ trống (trùng vị trí layer đang chọn).');
+    },
+    // Tô màu TOÀN BỘ layer đang chọn bằng màu hiện tại (inpaintFillColor).
+    async fillActiveLayer() {
+      const l = this.activeLayer;
+      if (!l) { this.toast('Chưa có layer để tô — thêm 1 layer trước.', 'error'); return; }
+      this.pushHistory();
+      let w = 1024, h = 1024;
+      if (l.image) {
+        try {
+          const img = await this._loadImageSrc(l.image);
+          if (img.naturalWidth && img.naturalHeight) { w = img.naturalWidth; h = img.naturalHeight; }
+        } catch (e) { /* giữ mặc định */ }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = this.inpaintFillColor || '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      l.image = canvas.toDataURL('image/png');
+      this.saveLayerLayout();
+      this.toast('Đã tô màu toàn bộ layer.');
     },
     // Đo kích thước thật của ảnh rồi xếp theo flow: hàng ngang (có gap), tự xuống hàng khi quá rộng.
     _positionByImageSize(id, image) {
