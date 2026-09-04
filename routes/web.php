@@ -126,6 +126,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::post('/reimagine', [StudioController::class, 'reimagine'])->name('reimagine');
     Route::post('/compose', [StudioController::class, 'compose'])->name('compose');
+    Route::post('/remove-bg', [StudioController::class, 'removeBackground'])->name('remove-bg');
     Route::post('/face-swap', [StudioController::class, 'faceSwap'])->name('face-swap');
     Route::post('/generations/{generation}/region', [StudioController::class, 'regionEdit'])->name('region');
     Route::post('/process', [StudioController::class, 'processQueue'])->name('process');

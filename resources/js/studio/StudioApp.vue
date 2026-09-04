@@ -84,7 +84,7 @@ const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
 
 // ── Layer editor (composite + transform) ──
-const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.regionSelectMode);
+const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode || store.regionSelectMode);
 function layerStyle(l, i) {
   return {
     transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + ((l.scale || 1) * (l.flipX ? -1 : 1)) + ', ' + ((l.scale || 1) * (l.flipY ? -1 : 1)) + ')',
@@ -116,6 +116,21 @@ const eraseOverlayStyle = computed(() => {
   void eraseTick.value;
   const m = store.canvasMetrics();
   if (!m || !store.eraseMode) return { display: 'none' };
+  return {
+    left: (m.vx / m.crW * 100) + '%',
+    top: (m.vy / m.crH * 100) + '%',
+    width: (m.vw / m.crW * 100) + '%',
+    height: (m.vh / m.crH * 100) + '%',
+    touchAction: 'none',
+  };
+});
+// Overlay canvas vẽ (paint) bám đúng vùng ảnh — giống erase.
+const drawTick = ref(0);
+watch([() => store.zoom, () => store.pan.x, () => store.pan.y, () => store.upscaleSrc], () => { nextTick(() => { drawTick.value++; }); });
+const drawOverlayStyle = computed(() => {
+  void drawTick.value;
+  const m = store.canvasMetrics();
+  if (!m || !store.drawMode) return { display: 'none' };
   return {
     left: (m.vx / m.crW * 100) + '%',
     top: (m.vy / m.crH * 100) + '%',
@@ -268,6 +283,8 @@ function onTouchEnd(e) {
             </div>
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->
             <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-red-500/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
+            <!-- Overlay canvas vẽ (paint): tô màu lên layer -->
+            <canvas v-if="store.drawMode" ref="drawOverlay" class="absolute z-30 cursor-crosshair rounded" :style="drawOverlayStyle" @pointerdown.stop="store.beginDrawBrush($event)" @pointermove="store.drawBrushMove($event)" @pointerup="store.endDrawBrush()" @pointerleave="store.endDrawBrush()"></canvas>
             <!-- Đường guide khi bắt điểm (snap) -->
             <div v-if="store.snapX != null" class="pointer-events-none absolute inset-y-0 z-40 w-px bg-brand-400/80" :style="{ left: 'calc(50% + ' + (store.snapX * store.zoom + store.pan.x) + 'px)' }"></div>
             <div v-if="store.snapY != null" class="pointer-events-none absolute inset-x-0 z-40 h-px bg-brand-400/80" :style="{ top: 'calc(50% + ' + (store.snapY * store.zoom + store.pan.y) + 'px)' }"></div>
@@ -305,6 +322,7 @@ function onTouchEnd(e) {
             <div class="flex items-center gap-1.5 rounded-full bg-ink-900/85 p-1.5 shadow-lg">
               <button @click="store.addBlankLayer()" class="grid h-7 w-7 place-items-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer vẽ trống (trùng vị trí layer đang chọn)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg></button>
               <button @click="store.fillActiveLayer()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-40" title="Tô màu toàn bộ layer đang chọn"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.5 11.5a2 2 0 0 1-2 1.9H8.5a2 2 0 0 1-2-1.9z"/><path d="M9 8c0-2.5 1.5-4 3-4s3 1.5 3 4"/><path d="M12 2v2"/></svg></button>
+              <button @click="store.removeBackground()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-violet-600/70 text-white transition-colors hover:bg-violet-500 disabled:opacity-40" title="Xóa nền AI (giữ vùng chọn hiện tại làm chủ thể nếu có)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="m3 3 18 18"/></svg></button>
             </div>
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1 lg:hidden">
               <button v-for="l in store.canvasLayers" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">

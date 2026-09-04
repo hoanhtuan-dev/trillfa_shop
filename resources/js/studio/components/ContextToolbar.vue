@@ -49,6 +49,9 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M8 12h8"/></svg>
         </button>
       </template>
+      <button @click="store.floatSelectedRegion()" class="flex items-center gap-1 rounded-full bg-amber-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-amber-600" title="Nâng (cắt) vùng chọn thành layer mới để di chuyển">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>Nâng
+      </button>
       <button @click="store.duplicateSelectedRegion()" class="flex items-center gap-1 rounded-full bg-emerald-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-emerald-600" title="Nhân đôi vùng chọn thành layer mới">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Nhân đôi
       </button>
@@ -100,6 +103,29 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
     <button @click="store.cancelErase()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" title="Hủy">
       <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
+  </div>
+
+  <!-- ══ Vẽ tự do (paint brush) ══ -->
+  <div v-else-if="store.drawMode" class="flex flex-wrap items-center justify-center gap-2 rounded-full bg-ink-900/95 px-3 py-1.5 text-xs font-semibold shadow-xl ring-1 ring-emerald-500/30">
+    <span class="text-[10px] text-cream-200">Cọ</span>
+    <input type="range" min="3" max="150" step="1" :value="store.drawBrushSize" @input="store.drawBrushSize = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
+    <span class="w-8 text-right text-[10px] text-cream-200">{{ store.drawBrushSize }}px</span>
+    <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+    <span class="text-[10px] text-cream-200">Đậm</span>
+    <input type="range" min="0.05" max="1" step="0.05" :value="store.drawOpacity" @input="store.drawOpacity = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-brand-500">
+    <span class="w-8 text-right text-[10px] text-cream-200">{{ Math.round(store.drawOpacity * 100) }}%</span>
+    <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+    <span class="text-[10px] text-cream-200">Mềm</span>
+    <input type="range" min="0" max="60" step="1" :value="store.drawSoftness" @input="store.drawSoftness = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-brand-500">
+    <span class="w-6 text-right text-[10px] text-cream-200">{{ store.drawSoftness }}</span>
+    <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+    <label class="relative inline-flex h-6 w-6 cursor-pointer overflow-hidden rounded-full ring-1 ring-white/20" title="Chọn màu vẽ">
+      <span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span>
+      <input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0">
+    </label>
+    <button @click="store.applyDrawNow()" class="flex items-center gap-1 rounded-full bg-emerald-600/80 px-3 py-1 text-white hover:bg-emerald-500" title="Áp dụng nét vẽ và vẽ tiếp"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>Vẽ</button>
+    <button @click="store.finishDraw()" class="flex items-center gap-1 rounded-full bg-brand-600 px-3 py-1 text-white hover:bg-brand-500"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Xong</button>
+    <button @click="store.cancelDraw()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" title="Hủy"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   </div>
 
   <!-- ══ Crop ══ -->

@@ -417,6 +417,90 @@ class StudioController extends Controller
     }
 
     /**
+     * Xóa nền AI: giữ chủ thể (mask TRẮNG), xóa/đổi nền (mask ĐEN) bằng model edit.
+     */
+    public function removeBackground(Request $request)
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:8000000'],
+            'mask_data' => ['nullable', 'string', 'max:2000000'],
+            'prompt' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $sourceUrl = $this->downscaleSource((string) $data['image'], 1600);
+
+        $maskUrl = null;
+        if (! empty($data['mask_data'])) {
+            $maskUrl = $this->buildBackgroundMask($sourceUrl, (string) $data['mask_data']);
+        }
+
+        $userPrompt = trim((string) ($data['prompt'] ?? ''));
+        $prompt = 'Remove the background. Replace the background with a clean, solid, pure white background. '
+            .'Keep the subject exactly as-is: sharp natural edges, identity, pose, proportions, colours, lighting and shadows on the subject only. '
+            .'Do not add any drop shadow, halo, outline or new element. Output must be clean and sharp — no blur, no noise, no banding, no artifacts.'
+            .($userPrompt !== '' ? ' Additional instruction: '.$userPrompt : '');
+        if ($maskUrl) {
+            $prompt .= ' A mask is provided: its WHITE region is the subject to KEEP unchanged; its BLACK region is the background to REMOVE (make pure white).';
+        }
+
+        $cost = (int) studio_config('image_credits', 1);
+
+        return $this->queueGeneration('image', [
+            'prompt' => $prompt,
+            'base_image' => $sourceUrl,
+            'mask_image' => $maskUrl,
+            'edit' => true,
+            'mode' => 'remove-bg',
+        ], $cost);
+    }
+
+    /**
+     * Tạo mask xóa nền: TRẮNG = chủ thể (giữ), ĐEN = nền (xóa).
+     * mask_data frontend theo convention ngược (ĐEN = vùng chọn) → invert.
+     */
+    protected function buildBackgroundMask(string $sourceUrl, string $brushData): ?string
+    {
+        $file = null;
+        foreach ([public_path(ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')))] as $cand) {
+            if (is_file($cand)) { $file = $cand; break; }
+        }
+        if (! $file) return null;
+        $src = @imagecreatefromstring((string) file_get_contents($file));
+        if (! $src) return null;
+        $w = imagesx($src); $h = imagesy($src);
+        imagedestroy($src);
+
+        $mask = imagecreatetruecolor($w, $h);
+        imagefilledrectangle($mask, 0, 0, $w - 1, $h - 1, imagecolorallocate($mask, 0, 0, 0)); // nền ĐEN = xóa toàn bộ
+
+        $b64 = $brushData;
+        if (str_starts_with($b64, 'data:')) { $comma = strpos($b64, ','); if ($comma !== false) { $b64 = substr($b64, $comma + 1); } }
+        $raw = base64_decode($b64, true);
+        if ($raw !== false && $raw !== '') {
+            $brushImg = @imagecreatefromstring($raw);
+            if ($brushImg) {
+                $bw = imagesx($brushImg); $bh = imagesy($brushImg);
+                if ($bw > 0 && $bh > 0) {
+                    if ($bw !== $w || $bh !== $h) {
+                        $resized = imagecreatetruecolor($w, $h);
+                        imagecopyresampled($resized, $brushImg, 0, 0, 0, 0, $w, $h, $bw, $bh);
+                        imagedestroy($brushImg);
+                        $brushImg = $resized;
+                    }
+                    imagefilter($brushImg, IMG_FILTER_NEGATE); // vùng chọn (ĐEN) → TRẮNG (giữ); nền (TRẮNG) → ĐEN (xóa)
+                    imagecopy($mask, $brushImg, 0, 0, 0, 0, $w, $h);
+                    imagedestroy($brushImg);
+                }
+            }
+        }
+
+        $name = 'studio/mask-'.Str::uuid().'.png';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($mask));
+        imagedestroy($mask);
+        return \Illuminate\Support\Facades\Storage::disk('public')->url($name);
+    }
+
+    /**
      * i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).
      * Ảnh đầu = base (giữ chủ thể/bố cục); các ảnh sau = ref images để hòa trộn vào cảnh.
      */

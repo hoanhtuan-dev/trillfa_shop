@@ -61,6 +61,15 @@ export const useStudioStore = defineStore('studio', {
     _eraseCtx: null,
     _eraseDrawing: false,
     _eraseLast: null,
+    // Vẽ tự do (paint brush) — tô màu lên layer
+    drawMode: false,
+    drawBrushSize: 24,   // độ dày cọ (px 3-150)
+    drawOpacity: 1,      // độ đậm nét (0-1)
+    drawSoftness: 15,    // độ mềm mép (0-60)
+    _drawCanvas: null,
+    _drawCtx: null,
+    _drawDrawing: false,
+    _drawLast: null,
     // Vẽ vùng chọn (marquee)
     regionSelectMode: false,
     regionBox: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
@@ -302,6 +311,24 @@ export const useStudioStore = defineStore('studio', {
         this.processQueue();
         return items;
       } catch (e) { this.toast(e.message || 'Lỗi tạo lại ảnh.', 'error'); return null; }
+    },
+    // Xóa nền AI: giữ chủ thể (vùng chọn hiện tại nếu có), xóa nền bằng model edit.
+    async removeBackground() {
+      const l = this.activeLayer;
+      if (!l || !l.image) { this.toast('Chọn 1 layer ảnh để xóa nền.', 'error'); return null; }
+      try {
+        const d = await this.api('/studio/remove-bg', {
+          image: l.image,
+          mask_data: this.inpaintBrushData || undefined, // vùng chọn lasso/brush hiện tại (nếu có) = chủ thể
+          prompt: '',
+        });
+        if (d.generation_id) {
+          this.addGen({ id: d.generation_id, type: 'image', status: d.status || 'pending', model: d.model || 'qwen-image-edit', provider: d.provider || 'qwen', media_url: d.media_url, error: d.error, credits_cost: d.credits_cost ?? 1, created_at: 'Vừa xóa nền' });
+          if (d.credits_left != null) this.creditsLeft = d.credits_left;
+          this.pollGeneration(d.generation_id);
+        }
+        return d;
+      } catch (e) { this.toast(e.message || 'Lỗi xóa nền.', 'error'); return null; }
     },
     // i2i — Ghép (thay thế) khuôn mặt cho người mẫu
     async faceSwap(image, face) {
@@ -934,6 +961,89 @@ export const useStudioStore = defineStore('studio', {
     finishErase() { this.applyErase().then(() => { this.eraseMode = false; }); },
     // "✕ Hủy": thoát chế độ erase KHÔNG áp dụng (bỏ nét đã vẽ).
     cancelErase() { this.eraseMode = false; this.toast('Đã hủy xóa.'); },
+    // ── Vẽ tự do (paint brush): tô màu lên layer active ──
+    toggleDraw() {
+      this.drawMode = !this.drawMode;
+      if (!this.drawMode) this.applyDraw();
+    },
+    attachDrawCanvas(el) {
+      if (!el) { this._drawCanvas = null; this._drawCtx = null; return; }
+      const m = this.canvasMetrics();
+      const base = 1024;
+      let w = base, h = base;
+      if (m && m.iw && m.ih) {
+        const ia = m.iw / m.ih;
+        if (ia >= 1) { w = base; h = Math.max(1, Math.round(base / ia)); }
+        else { w = Math.max(1, Math.round(base * ia)); h = base; }
+      }
+      el.width = w; el.height = h;
+      this._drawCanvas = el;
+      this._drawCtx = el.getContext('2d');
+      this._drawCtx.clearRect(0, 0, w, h);
+    },
+    _drawRadius() { return Math.max(3, Math.min(150, Number(this.drawBrushSize) || 24)); },
+    _hexToRgba(hex, a = 1) {
+      const mm = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+      if (!mm) return 'rgba(255,255,255,' + a + ')';
+      return 'rgba(' + parseInt(mm[1], 16) + ',' + parseInt(mm[2], 16) + ',' + parseInt(mm[3], 16) + ',' + a + ')';
+    },
+    _drawPoint(e) {
+      const m = this.canvasMetrics();
+      if (!m) return { nx: 0.5, ny: 0.5 };
+      return { nx: this._clamp((e.clientX - m.crLeft - m.vx) / m.vw, 0, 1), ny: this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1) };
+    },
+    _drawPaintDot(p) {
+      const c = this._drawCtx; if (!c) return;
+      const w = this._drawCanvas.width, h = this._drawCanvas.height, r = this._drawRadius();
+      const op = Math.max(0.05, Math.min(1, Number(this.drawOpacity) || 1));
+      const f = Math.max(0, Math.min(1, (Number(this.drawSoftness) || 0) / 60));
+      const hard = Math.max(0.2, 0.9 - f * 0.7);
+      const g = c.createRadialGradient(p.nx * w, p.ny * h, 0, p.nx * w, p.ny * h, r);
+      g.addColorStop(0, this._hexToRgba(this.inpaintFillColor, op));
+      g.addColorStop(hard, this._hexToRgba(this.inpaintFillColor, op * 0.85));
+      g.addColorStop(1, this._hexToRgba(this.inpaintFillColor, 0));
+      c.fillStyle = g;
+      c.beginPath(); c.arc(p.nx * w, p.ny * h, r, 0, Math.PI * 2); c.fill();
+    },
+    _drawPaintLine(from, to) {
+      const c = this._drawCtx; if (!c) return;
+      const w = this._drawCanvas.width, r = this._drawRadius();
+      const steps = Math.max(1, Math.ceil(Math.hypot(to.nx - from.nx, to.ny - from.ny) * w / (r / 2)));
+      for (let s = 0; s <= steps; s++) this._drawPaintDot({ nx: from.nx + (to.nx - from.nx) * (s / steps), ny: from.ny + (to.ny - from.ny) * (s / steps) });
+    },
+    beginDrawBrush(e) { if (!this.drawMode) return; this._drawDrawing = true; this._drawLast = this._drawPoint(e); this._drawPaintDot(this._drawLast); },
+    drawBrushMove(e) { if (!this._drawDrawing) return; const p = this._drawPoint(e); this._drawPaintLine(this._drawLast || p, p); this._drawLast = p; },
+    endDrawBrush() { this._drawDrawing = false; this._drawLast = null; },
+    applyDraw() {
+      this.pushHistory();
+      return new Promise((resolve) => {
+        const l = this.activeLayer;
+        const dc = this._drawCanvas;
+        if (!l || !dc) { resolve(); return; }
+        const img = new Image();
+        img.onload = () => {
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.drawImage(dc, 0, 0, w, h);
+          l.image = canvas.toDataURL('image/png');
+          this.saveLayerLayout();
+          this.toast('Đã vẽ lên layer.');
+          resolve();
+        };
+        img.onerror = () => { this.toast('Không vẽ được.', 'error'); resolve(); };
+        img.src = l.image;
+      });
+    },
+    applyDrawNow() {
+      this.applyDraw().then(() => {
+        if (this._drawCtx && this._drawCanvas) this._drawCtx.clearRect(0, 0, this._drawCanvas.width, this._drawCanvas.height);
+      });
+    },
+    finishDraw() { if (!this.drawMode) return; this.applyDraw().then(() => { this.drawMode = false; }); },
+    cancelDraw() { if (!this.drawMode) return; this.drawMode = false; this.toast('Đã hủy vẽ.'); },
     // ── Vẽ vùng chọn (rectangle marquee) ──
     toggleRegionSelect() {
       this.regionSelectMode = !this.regionSelectMode;
@@ -1702,6 +1812,45 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã nhân đôi vùng chọn tại vị trí.');
       } catch (e) {
         this.toast(e.message || 'Không nhân đôi được.', 'error');
+      }
+    },
+    // Nâng (float/cut) vùng chọn: cắt nội dung khỏi layer gốc → đưa lên layer mới chồng khít để kéo đi.
+    async floatSelectedRegion() {
+      const src = this.activeLayer;
+      if (!src || !src.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      this.pushHistory();
+      try {
+        const img = await this._loadImageSrc(src.image);
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const sel = await this._buildSelectionAlpha(w, h);
+        // 1) Layer mới chứa đúng phần chọn (floating)
+        const fc = document.createElement('canvas'); fc.width = w; fc.height = h;
+        const fctx = fc.getContext('2d');
+        fctx.drawImage(img, 0, 0);
+        fctx.globalCompositeOperation = 'destination-in';
+        fctx.drawImage(sel, 0, 0);
+        const floatUrl = fc.toDataURL('image/png');
+        // 2) Cắt phần chọn khỏi layer gốc
+        const cc = document.createElement('canvas'); cc.width = w; cc.height = h;
+        const cctx = cc.getContext('2d');
+        cctx.drawImage(img, 0, 0);
+        cctx.globalCompositeOperation = 'destination-out';
+        cctx.drawImage(sel, 0, 0);
+        src.image = cc.toDataURL('image/png');
+        // 3) Thêm layer floating trùng vị trí gốc
+        const id = 'float-' + Date.now();
+        this.canvasLayers.push({
+          id, kind: 'source', name: 'Nâng vùng chọn', image: floatUrl, genId: null,
+          visible: true, locked: false,
+          x: src.x || 0, y: src.y || 0, scale: src.scale || 1, rotation: src.rotation || 0,
+          opacity: src.opacity != null ? src.opacity : 1, blend: src.blend || 'normal', flipX: false, flipY: false,
+          baseW: src.baseW, baseH: src.baseH,
+        });
+        this.saveLayerLayout();
+        this.setActiveLayer(id);
+        this.toast('Đã nâng vùng chọn thành layer mới — kéo để di chuyển.');
+      } catch (e) {
+        this.toast(e.message || 'Không nâng được.', 'error');
       }
     },
     // ── Undo / Redo (lịch sử layer) ──
