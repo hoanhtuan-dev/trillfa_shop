@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import CompareSlider from './CompareSlider.vue';
+import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 
 const prompt = ref('');
@@ -76,9 +77,9 @@ function roleLabel(i) { return '@image' + (i + 1); }
 
 // Vai trò slot theo chế độ
 const slotRoles = computed(() => mode.value === 'tryon'
-  ? ['👗 Trang phục', '🧍 Pose', '🖼 Bối cảnh (tùy chọn)']
+  ? ['Trang phục', 'Pose', 'Bối cảnh (tùy chọn)']
   : mode.value === 'faceswap'
-    ? ['🧍 Người mẫu', '👤 Khuôn mặt', 'Ảnh ghép (tùy chọn)']
+    ? ['Người mẫu', 'Khuôn mặt', 'Ảnh ghép (tùy chọn)']
     : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
 function setTryon() {
@@ -149,26 +150,26 @@ async function run() {
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
-    <h2 class="mb-1 font-display text-base font-semibold text-brand-300">🧩 Ghép ảnh</h2>
+    <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
     <p class="text-[11px] text-ink-500">Hòa trộn 2–3 ảnh thành 1.</p>
 
     <!-- Chip chế độ -->
     <div class="mt-2.5 flex gap-1.5">
       <button @click="setCompose()"
               :class="mode === 'compose' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🧩 Ghép tự do</button>
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">Ghép tự do</button>
       <button @click="setTryon()"
               :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">🕺 Thử đồ ảo</button>
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">Thử đồ ảo</button>
       <button @click="setFaceSwap()"
               :class="mode === 'faceswap' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">👤 Thay khuôn mặt</button>
+              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">Thay khuôn mặt</button>
     </div>
     <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
-      @image1 = 👗 trang phục · @image2 = 🧍 pose · @image3 = 🖼 bối cảnh (tùy chọn)
+      @image1 = trang phục · @image2 = pose · @image3 = bối cảnh (tùy chọn)
     </p>
     <p v-if="mode === 'faceswap'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
-      @image1 = 🧍 người mẫu · @image2 = 👤 khuôn mặt · @image3 = ảnh ghép (tùy chọn)
+      @image1 = người mẫu · @image2 = khuôn mặt · @image3 = ảnh ghép (tùy chọn)
     </p>
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-3 grid grid-cols-3 gap-1.5">
@@ -179,11 +180,11 @@ async function run() {
           <img :src="selected[i-1].url" class="h-full w-full object-cover">
           <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ i }}</span>
           <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ slotRoles[i-1] }}</span>
-          <span @click.stop="removeSlot(i-1)" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">✕</span>
+          <span @click.stop="removeSlot(i-1)" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white"><StudioIcon name="x" size="h-3 w-3" /></span>
           <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>
-          <span class="text-xl text-ink-600">{{ i === 1 ? '🖼' : '＋' }}</span>
+          <span class="grid h-6 w-6 place-items-center text-ink-600"><StudioIcon name="image" size="h-5 w-5" v-if="i === 1" /><span v-else>＋</span></span>
           <span class="px-1 text-center text-[9px] font-medium text-cream-300/60">{{ slotRoles[i-1] }}</span>
           <span class="px-1 text-center text-[9px] text-cream-300/40">@image{{ i }}</span>
         </template>
@@ -206,7 +207,7 @@ async function run() {
     </div>
 
     <button @click="run" :disabled="busy || selectedCount < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
-      {{ busy ? 'Đang ghép…' : '🧩 Ghép ảnh' }} <span v-if="!busy" class="opacity-70">· {{ store.imageCreditCost }} credit</span>
+      {{ busy ? 'Đang ghép…' : 'Ghép ảnh' }} <span v-if="!busy" class="opacity-70">· {{ store.imageCreditCost }} credit</span>
     </button>
 
     <!-- Tiến độ (giống Inpaint) -->
@@ -216,46 +217,46 @@ async function run() {
         <span class="font-semibold">{{ store.composeStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang ghép ảnh…' }}</span>
       </div>
       <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-cream-200/80">
-        <span>⏱ <b>{{ fmt(elapsedSec) }}</b></span>
+        <span><b>{{ fmt(elapsedSec) }}</b></span>
         <span>{{ doneCount }}/{{ store.composeGenIds.length }} biến thể</span>
-        <button @click="store.cancelCompose()" class="ml-auto rounded-full bg-red-600/25 px-2.5 py-1 font-semibold text-red-200 hover:bg-red-600">✕ Hủy</button>
+        <button @click="store.cancelCompose()" class="ml-auto rounded-full bg-red-600/25 px-2.5 py-1 font-semibold text-red-200 hover:bg-red-600">Hủy</button>
       </div>
       <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full animate-pulse rounded-full bg-brand-400" :style="{ width: (doneCount / Math.max(1, store.composeGenIds.length) * 100) + '%' }"></div></div>
     </div>
 
     <!-- Thành công -->
     <div v-if="store.composeStage === 'done'" class="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
-      ✅ Đã ghép xong — kết quả đã được chọn trong Outputs.
+      Đã ghép xong — kết quả đã được chọn trong Outputs.
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
     <!-- Lỗi -->
     <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-2xl border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
-      <p class="font-semibold">⚠️ Ghép ảnh thất bại</p>
+      <p class="font-semibold">Ghép ảnh thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.composeError }}</p>
       <div class="mt-2 flex gap-2">
-        <button @click="run" class="btn-brand btn-sm">🔄 Thử lại</button>
+        <button @click="run" class="btn-brand btn-sm">Thử lại</button>
         <button @click="store.clearComposeStatus()" class="btn-ghost btn-sm">Đóng</button>
       </div>
     </div>
 
     <!-- Đã hủy -->
     <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
-      🛑 Đã hủy yêu cầu ghép ảnh.
+      Đã hủy yêu cầu ghép ảnh.
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
-    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
+    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">So sánh Trước/Sau</button>
 
     <!-- Popup chọn/tải ảnh cho slot -->
-    <BaseModal v-model="open" :title="'🖼 Tải ảnh cho ' + roleLabel(targetSlot)" wide>
+    <BaseModal v-model="open" :title="'Tải ảnh cho ' + roleLabel(targetSlot)" wide>
       <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
-        <p class="font-semibold">💡 @image{{ targetSlot + 1 }} = {{ slotRoles[targetSlot] }}</p>
+        <p class="font-semibold">@image{{ targetSlot + 1 }} = {{ slotRoles[targetSlot] }}</p>
       </div>
 
       <!-- Tải từ máy -->
       <label class="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand-500/40 bg-brand-900/20 px-3 py-2.5 text-xs font-semibold text-brand-200 transition hover:bg-brand-900/40">
-        <span>{{ uploading ? '⏳ Đang tải lên…' : '📤 Tải ảnh từ máy' }}</span>
+        <span>{{ uploading ? 'Đang tải lên…' : 'Tải ảnh từ máy' }}</span>
         <input ref="fileEl" type="file" accept="image/*" class="hidden" @change="uploadImage">
       </label>
 
@@ -263,7 +264,7 @@ async function run() {
       <div class="max-h-[52vh] overflow-y-auto pr-1">
         <!-- Pose presets -->
         <template v-if="poseImages.length">
-          <p class="mb-1.5 text-xs font-semibold text-cream-200">🕺 Pose (dáng)</p>
+          <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="pose" size="h-4 w-4" /> Pose (dáng)</p>
           <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
             <button v-for="p in poseImages" :key="p.key" @click="pick(p)"
                     class="relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
@@ -275,7 +276,7 @@ async function run() {
 
         <!-- Ảnh của bạn (Outputs + đã tải lên) -->
         <template v-if="genImages.length || upImages.length">
-          <p class="mb-1.5 mt-3 text-xs font-semibold text-cream-200">🖼 Ảnh của bạn</p>
+          <p class="mb-1.5 mt-3 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="image" size="h-4 w-4" /> Ảnh của bạn</p>
           <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
             <button v-for="g in [...genImages, ...upImages]" :key="g.key" @click="pick(g)"
                     class="relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
@@ -289,6 +290,6 @@ async function run() {
     </BaseModal>
 
     <!-- So sánh Trước/Sau -->
-    <CompareSlider v-model="compareOpen" :before="baseUrl" :after="afterUrl" title="🧩 So sánh Trước/Sau khi ghép" />
+    <CompareSlider v-model="compareOpen" :before="baseUrl" :after="afterUrl" title="So sánh Trước/Sau khi ghép" />
   </div>
 </template>

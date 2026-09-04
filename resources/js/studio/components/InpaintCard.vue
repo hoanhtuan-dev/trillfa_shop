@@ -145,7 +145,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
             <button @click="v.enabled = !v.enabled"
                     class="grid h-5 w-5 shrink-0 place-items-center rounded border text-xs"
                     :class="v.enabled ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-300'">
-              {{ v.enabled ? '✓' : '' }}
+              <StudioIcon v-if="v.enabled" name="check" size="h-3 w-3" />
             </button>
             <span class="flex items-center gap-1.5 font-semibold text-cream-100"><StudioIcon :name="v.icon" size="h-4 w-4" /> {{ v.label }}</span>
             <span class="ml-auto text-[10px] text-cream-300/60">Slot {{ i + 1 }}</span>
