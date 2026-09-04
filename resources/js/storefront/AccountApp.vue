@@ -21,6 +21,20 @@ const addresses = ref(boot.addresses || []);
 const reviews = ref(boot.reviews || []);
 const shippingFee = computed(() => formatMoney(order.shipping_fee));
 
+const orderSteps = computed(() => {
+    if (order.status === 'cancelled') return { cancelled: true, steps: [] };
+    return {
+        cancelled: false,
+        steps: [
+            { label: 'Đặt hàng', done: true, date: order.created_at },
+            { label: 'Thanh toán', done: !!order.paid_at && order.payment_status === 'paid', date: order.paid_at },
+            { label: 'Đang giao', done: !!order.shipped_at, date: order.shipped_at },
+            { label: 'Hoàn thành', done: !!order.delivered_at, date: order.delivered_at },
+        ],
+    };
+});
+const activeStep = computed(() => orderSteps.value.steps.reduce((acc, s) => (s.done ? acc + 1 : acc), 0));
+
 const sLabel = { pending:'Chờ xử lý', processing:'Đang xử lý', shipped:'Đang giao', completed:'Hoàn thành', cancelled:'Đã hủy' };
 const quickLinks = [
   ['/tai-khoan/don-hang','Đơn hàng','bag','Xem lịch sử đơn hàng'],
@@ -111,6 +125,20 @@ onMounted(() => store.fetchCart());
             <div class="card-surface rounded-[1.75rem] p-6">
               <div class="flex items-center justify-between"><h2 class="font-display text-lg font-semibold text-ink-900">Đơn hàng {{ order.order_number }}</h2><BaseBadge :variant="order.status === 'completed' ? 'brand' : order.status === 'cancelled' ? 'ink' : 'clay'">{{ sLabel[order.status] || order.status }}</BaseBadge></div>
               <p class="mt-1 text-sm text-ink-500">Đặt lúc {{ order.created_at }}</p>
+
+              <!-- Tracking timeline -->
+              <div v-if="orderSteps.cancelled" class="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">Đơn hàng đã bị hủy.</div>
+              <div v-else class="mt-6 flex items-start">
+                <template v-for="(s, i) in orderSteps.steps" :key="s.label">
+                  <div class="flex shrink-0 flex-col items-center">
+                    <div class="grid h-9 w-9 place-items-center rounded-full text-xs font-semibold" :class="s.done ? 'bg-gradient-to-br from-brand-600 to-brand-500 text-white shadow-md shadow-brand-600/30' : 'bg-cream-100 text-ink-400'"><Icon v-if="s.done" name="check" :size="15" /><span v-else>{{ i + 1 }}</span></div>
+                    <p class="mt-1.5 text-[10px] font-semibold" :class="s.done ? 'text-brand-700' : 'text-ink-400'">{{ s.label }}</p>
+                    <p class="text-[10px] text-ink-400">{{ s.date || '' }}</p>
+                  </div>
+                  <div v-if="i < orderSteps.steps.length - 1" class="mx-1.5 mt-[1.125rem] h-0.5 flex-1 rounded-full" :class="i < activeStep - 1 ? 'bg-brand-500' : 'bg-cream-200'"></div>
+                </template>
+              </div>
+
               <div class="mt-5 space-y-3">
                 <div v-for="(it, i) in order.items" :key="i" class="flex items-center gap-3">
                   <div class="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-cream-100"><img v-if="it.image" :src="it.image" :alt="it.name" class="h-full w-full object-cover" /><Icon v-else name="bag" :size="20" class="p-3 text-brand-600" /></div>
@@ -132,9 +160,10 @@ onMounted(() => store.fetchCart());
               <p>Thanh toán: {{ order.payment_method }} · {{ order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán' }}</p>
               <p>Vận chuyển: {{ order.shipping_method }}</p>
             </div>
+            <button @click="store.reorder(order.items)" class="sf-btn sf-btn-primary mt-4 w-full"><Icon name="refresh" :size="16" /> Mua lại</button>
             <form v-if="order.can_cancel" method="POST" :action="'/tai-khoan/don-hang/' + order.id + '/huy'">
               <input type="hidden" name="_token" :value="csrfToken()" />
-              <button type="submit" class="sf-btn sf-btn-soft mt-4 w-full !text-red-600">Hủy đơn hàng</button>
+              <button type="submit" class="sf-btn sf-btn-soft mt-2 w-full !text-red-600">Hủy đơn hàng</button>
             </form>
           </aside>
         </div>

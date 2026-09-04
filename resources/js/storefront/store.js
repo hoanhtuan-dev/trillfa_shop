@@ -144,6 +144,37 @@ export const useStorefrontStore = defineStore('storefront', {
             }
         },
 
+        // Re-order a past order: add every line item back into the cart.
+        async reorder(items = []) {
+            const valid = (items || []).filter((i) => i.product_id);
+            if (!valid.length) {
+                this.toast('Không thể mua lại đơn hàng này.', 'error');
+                return false;
+            }
+            this.cart.adding = true;
+            try {
+                for (const item of valid) {
+                    await apiFetch('/api/cart/add', {
+                        method: 'POST',
+                        body: {
+                            product_id: item.product_id,
+                            variant_id: item.variant_id || null,
+                            quantity: item.quantity || 1,
+                        },
+                    });
+                }
+                await this.fetchCart();
+                this.toast('Đã thêm toàn bộ sản phẩm vào giỏ hàng');
+                this.openCart();
+                return true;
+            } catch (e) {
+                this.toast(e.message, 'error');
+                return false;
+            } finally {
+                this.cart.adding = false;
+            }
+        },
+
         // ---- wishlist ----
         toggleWishlist(id) {
             id = String(id);

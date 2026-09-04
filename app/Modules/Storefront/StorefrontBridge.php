@@ -348,7 +348,12 @@ class StorefrontBridge
                 'payment_status' => $order->payment_status,
                 'shipping_method' => $order->shipping_method,
                 'can_cancel' => $order->can_cancel,
+                'paid_at' => $order->paid_at?->format('d/m/Y'),
+                'shipped_at' => $order->shipped_at?->format('d/m/Y'),
+                'delivered_at' => $order->delivered_at?->format('d/m/Y'),
                 'items' => $order->items->map(fn ($i) => [
+                    'product_id' => $i->product_id,
+                    'variant_id' => $i->variant_id,
                     'name' => $i->product_name,
                     'sku' => $i->sku,
                     'price' => (float) $i->price,
