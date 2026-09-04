@@ -72,6 +72,46 @@ function onLayerPointerDown(l, e) {
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
 }
+function layerCenterScreen(l) {
+  const el = store.canvasZoom;
+  if (!el) return { cx: 0, cy: 0 };
+  const r = el.getBoundingClientRect();
+  return {
+    cx: r.left + r.width / 2 + (l.x || 0) * store.zoom + store.pan.x,
+    cy: r.top + r.height / 2 + (l.y || 0) * store.zoom + store.pan.y,
+  };
+}
+function onScalePointerDown(l, e) {
+  e.stopPropagation();
+  const c = layerCenterScreen(l);
+  const startDist = Math.hypot(e.clientX - c.cx, e.clientY - c.cy) || 1;
+  const startScale = l.scale || 1;
+  const move = (ev) => {
+    const d = Math.hypot(ev.clientX - c.cx, ev.clientY - c.cy) / startDist;
+    l.scale = Math.max(0.05, Math.min(8, startScale * d));
+  };
+  const up = () => { store.saveLayerLayout(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+function onRotatePointerDown(l, e) {
+  e.stopPropagation();
+  const c = layerCenterScreen(l);
+  const startAngle = Math.atan2(e.clientY - c.cy, e.clientX - c.cx);
+  const startRotation = l.rotation || 0;
+  const move = (ev) => {
+    const a = Math.atan2(ev.clientY - c.cy, ev.clientX - c.cx);
+    let r = startRotation + (a - startAngle) * (180 / Math.PI);
+    r = ((r % 360) + 360) % 360;
+    if (r > 180) r -= 360;
+    l.rotation = Math.round(r);
+  };
+  const up = () => { store.saveLayerLayout(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
@@ -123,7 +163,11 @@ function onLayerPointerDown(l, e) {
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
-                  <img :src="l.image" class="block max-h-[70vh] max-w-[70vw] select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
+                  <img :src="l.image" class="relative block max-h-[70vh] max-w-[70vw] select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
+                  <template v-if="l.id === store.activeLayerId && !l.locked">
+                    <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
+                    <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>
+                  </template>
                 </div>
               </div>
               <p v-if="!store.visibleLayers.length" class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
@@ -177,6 +221,10 @@ function onLayerPointerDown(l, e) {
                     <button @click="store.deleteLayer(l)" :disabled="l.locked" class="grid h-5 w-5 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600 disabled:opacity-30" :title="l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)'">🗑</button>
                   </div>
                 </div>
+              </div>
+              <div class="mt-1 grid grid-cols-2 gap-1.5 border-t border-ink-700/60 pt-1.5">
+                <button @click="store.exportComposite()" :disabled="!store.visibleLayers.length" class="rounded-lg bg-ink-800 px-2 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị và tải xuống PNG">⬇ Xuất ảnh gộp</button>
+                <button @click="store.flattenToLayer()" :disabled="!store.visibleLayers.length" class="rounded-lg bg-brand-600 px-2 py-1.5 text-[9px] font-semibold text-white hover:bg-brand-500 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị thành 1 layer mới">🧩 Gộp thành layer</button>
               </div>
             </div>
             <p v-else class="rounded-2xl bg-ink-900/50 px-2 py-2.5 text-center text-[10px] text-cream-300/40">Chưa có layer — thêm ảnh nguồn hoặc kết quả.</p>
