@@ -207,6 +207,73 @@ class ProductAIService
         return $this->stub($input, $imageAnalysis);
     }
 
+    /**
+     * ONE multimodal call: see the image + generate the full structured content
+     * + the image understanding, in a single request (like "Gợi ý từ ảnh" ~15s).
+     * The understanding is cached by image so later clicks re-use it (text-only).
+     */
+    public function generateFromImage(array $input, string $imagePath, bool $force = false): array
+    {
+        $key = sha1_file($imagePath).'|'.(string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
+        $cached = $force ? null : Cache::get('product_ai_img:'.$key);
+        if (is_array($cached)) {
+            $out = $this->generate($input, $cached);
+            $out['image_analyzed'] = true;
+            $out['analysis_cached'] = true;
+
+            return $out;
+        }
+
+        $result = $this->vision($imagePath, $this->buildImageContentPrompt($input));
+
+        // LLM returned real content (has name/description) → use it.
+        if (is_array($result) && (isset($result['suggested_name']) || isset($result['description']))) {
+            $understanding = is_array($result['understanding'] ?? null) ? $result['understanding'] : null;
+            if ($understanding) {
+                Cache::put('product_ai_img:'.$key, $understanding, 3600 * 24 * 30);
+            }
+            unset($result['understanding']);
+            $result['image_analyzed'] = true;
+            $result['analysis_cached'] = false;
+
+            return $result;
+        }
+
+        // vision() fell back to offline understanding (styles/colors only).
+        $understanding = is_array($result) ? $result : $this->offlineAnalysis($imagePath);
+        $out = $this->generate($input, $understanding);
+        $out['image_analyzed'] = true;
+
+        return $out;
+    }
+
+    protected function buildImageContentPrompt(array $input): string
+    {
+        $name = ($input['name'] ?? '') ?: 'sản phẩm thời trang/phong cách sống';
+        $category = $input['category'] ?? '';
+        $brand = $input['brand'] ?? '';
+        $hint = $input['hint'] ?? '';
+        $currentShort = $input['short_description'] ?? '';
+        $refine = $currentShort ? "\nNội dung đã viết (giữ ý chính, làm giàu hơn): {$currentShort}" : '';
+
+        return <<<PROMPT
+Bạn là chuyên gia content & SEO thời trang Việt Nam. NHÌN ẢNH sản phẩm và kết hợp thông tin người dùng để viết nội dung có cấu trúc chuẩn ngành.
+{$refine}
+Thông tin người dùng: Tên={$name}, Danh mục={$category}, Thương hiệu={$brand}, Ý tưởng={$hint}.
+Trả VỀ JSON hợp lệ duy nhất (không markdown):
+{
+  "understanding": {"styles":"phong cách","colors":"màu sắc","fabric":"chất liệu","subject":"chủ thể","feeling":"cảm giác","keywords":["k1","k2"]},
+  "suggested_name": "tên hấp dẫn (<=80)",
+  "brand": "thương hiệu",
+  "short_description": "1-2 câu (<=160)",
+  "description": "<h3>Phong cách</h3><p>…</p><h3>Chất liệu & chất lượng</h3><ul><li>…</li></ul><h3>Màu sắc</h3><p>…</p><h3>Thiết kế chi tiết</h3><ul><li>…</li></ul><h3>Phù hợp</h3><p>…</p><h3>Bảo quản</h3><ul><li>…</li></ul>",
+  "meta_title": "<=60",
+  "meta_description": "120-160 ký tự",
+  "tags": ["t1","t2","t3"]
+}
+PROMPT;
+    }
+
     protected function qwenTextModels(): array
     {
         return function_exists('studio_qwen_text_models') ? studio_qwen_text_models() : [$this->model];

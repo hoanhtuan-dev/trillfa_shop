@@ -34,16 +34,11 @@ class GenerateProductSuggestion implements ShouldQueue
     {
         @set_time_limit(300);
 
-        $understanding = null;
         if ($this->imagePath && is_file($this->imagePath)) {
-            $understanding = $service->analyzeImage($this->imagePath, $this->force);
+            $result = $service->generateFromImage($this->input, $this->imagePath, $this->force);
+        } else {
+            $result = $service->generate($this->input, null);
         }
-
-        $result = $service->generate($this->input, $understanding);
-        $result['image_analyzed'] = $understanding !== null;
-        $result['analysis_cached'] = $this->imagePath
-            ? Cache::has('product_ai_img:'.sha1_file($this->imagePath).'|'.(string) studio_config('qwen_prompt_model', 'qwen3.8-flash'))
-            : false;
         $result['source'] ??= 'stub';
 
         Cache::put('product_ai:'.$this->token, $result, 600);
