@@ -596,7 +596,7 @@ export const useStudioStore = defineStore('studio', {
     },
     goEdit(g) { this.goEditor(g, 2); },
     goVideo(g) { this.goEditor(g, 3); },
-    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { const i = this.canvasLayers.length; const GAP = 150, COLS = 3; const x = (i % COLS) * GAP, y = Math.floor(i / COLS) * GAP; this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false, x, y, scale: 1, rotation: 0, opacity: 1, blend: 'normal' }); this.saveLayerLayout(); } },
+    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { const i = this.canvasLayers.length; const GX = 150, GY = 400, COLS = 3; const x = (i % COLS) * GX, y = Math.floor(i / COLS) * GY; this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false, x, y, scale: 1, rotation: 0, opacity: 1, blend: 'normal' }); this.saveLayerLayout(); } },
     setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
@@ -715,7 +715,7 @@ export const useStudioStore = defineStore('studio', {
       if (!l) return;
       let nx = d.ox + (e.clientX - d.sx) / (this.zoom || 1);
       let ny = d.oy + (e.clientY - d.sy) / (this.zoom || 1);
-      const SNAP = 14 / (this.zoom || 1); // ≈14px trên màn hình — nhạy hơn
+      const SNAP = 20 / (this.zoom || 1); // ≈20px trên màn hình — nhạy hơn
       let sx = null, sy = null;
       // Bắt điểm vào tâm canvas (0,0) và vào các layer khác.
       if (Math.abs(nx) < SNAP) { nx = 0; sx = 0; }

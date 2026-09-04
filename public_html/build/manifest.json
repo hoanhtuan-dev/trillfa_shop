@@ -7,8 +7,8 @@
       "_ProductCard-CONNTBP3.js"
     ]
   },
-  "_GalleryModal-Bhg8Xqk6.js": {
-    "file": "assets/GalleryModal-Bhg8Xqk6.js",
+  "_GalleryModal-BtN1UU1x.js": {
+    "file": "assets/GalleryModal-BtN1UU1x.js",
     "name": "GalleryModal",
     "imports": [
       "_pinia-CJA6HZ2m.js"
@@ -120,7 +120,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-4dErFFsg.css",
+    "file": "assets/app-L45TBJIx.css",
     "name": "app",
     "names": [
       "app.css"
@@ -173,28 +173,28 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-Bu39Gf49.js",
+    "file": "assets/app-D_XeBDXR.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_GalleryModal-Bhg8Xqk6.js",
+      "_GalleryModal-BtN1UU1x.js",
       "_StylistDataManager-BDx2sRrJ.js"
     ],
     "css": [
-      "assets/app-DOhoSaYo.css"
+      "assets/app-06QKLCDY.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-u3RQUzz6.js",
+    "file": "assets/library-WwokvdCO.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_GalleryModal-Bhg8Xqk6.js"
+      "_GalleryModal-BtN1UU1x.js"
     ]
   },
   "resources/js/studio/settings.js": {
