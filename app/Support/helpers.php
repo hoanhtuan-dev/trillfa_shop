@@ -989,7 +989,7 @@ if (! function_exists('product_ai_gemini_vision_model')) {
 if (! function_exists('product_ai_timeout')) {
     function product_ai_timeout(): int
     {
-        return max(1, (int) product_ai_config('timeout_seconds', 12));
+        return max(1, (int) product_ai_config('timeout_seconds', 30));
     }
 }
 
@@ -1003,6 +1003,7 @@ if (! function_exists('product_ai_max_models')) {
 if (! function_exists('product_ai_total_budget')) {
     function product_ai_total_budget(): int
     {
+        // Hard ceiling for a whole click (vision + text share it); per-call timeout is clamped by it.
         return max(5, (int) product_ai_config('total_budget_seconds', 25));
     }
 }
