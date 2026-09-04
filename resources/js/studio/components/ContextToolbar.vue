@@ -52,7 +52,7 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
     </template>
     <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
     <span class="text-[10px] text-cream-300/70">Feather</span>
-    <input type="range" min="0" max="50" step="5" :value="store.inpaintFeather" @input="store.inpaintFeather = Number($event.target.value)" class="h-1.5 w-16 cursor-pointer accent-brand-500">
+    <input type="range" min="0" max="50" step="1" :value="store.inpaintFeather" @input="store.inpaintFeather = Number($event.target.value)" class="h-1.5 w-16 cursor-pointer accent-brand-500">
     <span class="min-w-5 text-center text-[11px] text-cream-100">{{ store.inpaintFeather }}</span>
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <span class="mx-0.5 h-4 w-px bg-ink-600"></span>

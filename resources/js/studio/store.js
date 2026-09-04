@@ -1569,7 +1569,9 @@ export const useStudioStore = defineStore('studio', {
       try {
         const img = await this._loadImageSrc(l.image);
         const w = img.naturalWidth, h = img.naturalHeight;
-        const base = 512, ia = w / h;
+        // Độ chính xác: flood-fill ở 1024 (gấp đôi 512) rồi thu nhỏ về mask canvas
+        // → mép vùng chọn được anti-alias (sub-pixel), bớt răng cưa khi phóng to ảnh.
+        const base = 1024, ia = w / h;
         const mw = ia >= 1 ? base : Math.max(1, Math.round(base * ia));
         const mh = ia >= 1 ? Math.max(1, Math.round(base / ia)) : base;
         const c = document.createElement('canvas'); c.width = mw; c.height = mh;
@@ -1613,8 +1615,9 @@ export const useStudioStore = defineStore('studio', {
         }
         tctx.putImageData(td, 0, 0);
         // Độ mịn: blur mép vùng chọn → mask có viền mềm, chống răng cưa.
+        // Nhân 2 vì xử lý ở 1024 (gấp đôi mask 512) → giá trị slider giữ nguyên cảm giác cũ.
         let selCanvas = temp;
-        const feather = Math.max(0, Math.min(20, Number(this.magicFeather) || 0));
+        const feather = Math.max(0, Math.min(20, Number(this.magicFeather) || 0)) * 2;
         if (feather > 0) {
           const blurred = document.createElement('canvas'); blurred.width = mw; blurred.height = mh;
           const bctx = blurred.getContext('2d');
@@ -1623,7 +1626,8 @@ export const useStudioStore = defineStore('studio', {
           selCanvas = blurred;
         }
         mctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
-        mctx.drawImage(selCanvas, 0, 0);
+        // Thu 1024 → kích thước mask canvas (512) — drawImage resize cho anti-alias mép.
+        mctx.drawImage(selCanvas, 0, 0, mc.width, mc.height);
         mctx.globalCompositeOperation = 'source-over';
         this._finalizeInpaintBrush();
         if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
