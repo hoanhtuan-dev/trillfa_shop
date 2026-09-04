@@ -589,6 +589,13 @@ export const useStudioStore = defineStore('studio', {
     },
     panEnd() { this._drag = null; },
     async deleteGen(g) {
+      // Layer lưu cục bộ từ canvas (saveActiveLayerToOutput) KHÔNG có record server → xóa cục bộ.
+      const isLocal = !!(g && (g.provider === 'layer' || g.model === 'layer' || String(g.id || '').startsWith('layer-')));
+      if (isLocal) {
+        this._removeGenLocal(g);
+        this.toast('Đã xóa layer khỏi Output.');
+        return true;
+      }
       try {
         const r = await fetch('/studio/generations/' + g.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } });
         const ct = (r.headers.get('content-type') || '');
@@ -596,25 +603,25 @@ export const useStudioStore = defineStore('studio', {
         // Redirect về trang login (chưa đăng nhập/hết phiên) trả HTML 200 — phải coi là THẤT BẠI
         // để không báo "Đã xóa" trong khi server thực tế chưa xóa.
         if (!r.ok || r.redirected || !ct.includes('application/json')) throw new Error(d.message || 'Không xóa được — hãy tải lại trang và thử lại.');
-        this.generations = this.generations.filter(x => x.id !== g.id);
-        // Gỡ luôn layer canvas trỏ tới ảnh vừa xóa, nếu không canvas vẫn hiển thị ảnh cũ
-        // (upscaleSrc ưu tiên active layer hơn preview).
-        const lid = String(g.id);
-        if (this.canvasLayers.some((l) => l.id === lid)) this.canvasLayers = this.canvasLayers.filter((l) => l.id !== lid);
-        // Nếu có layer 'source' được tạo từ ảnh kết quả này (pickFromResult), gỡ luôn để
-        // xóa output không để lại "ảnh ma" vẫn hiển thị trên canvas.
-        const orphanSource = g.media_url ? this.canvasLayers.find((l) => l.kind === 'source' && l.image === g.media_url) : null;
-        if (orphanSource) this.canvasLayers = this.canvasLayers.filter((l) => !(l.kind === 'source' && l.image === g.media_url));
-        if (this.activeLayerId === lid || this.previewId === g.id || (orphanSource && this.activeLayerId === orphanSource.id)) {
-          const next = this.canvasLayers.find((x) => x.visible !== false);
-          if (next) this.selectLayer(next);
-          else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
-        }
-        this.saveLayerLayout();
+        this._removeGenLocal(g);
         this.toast('Đã xóa.');
         return true;
       }
       catch (e) { this.toast(e.message || 'Lỗi xóa.', 'error'); return false; }
+    },
+    // Gỡ generation khỏi store + layer canvas liên quan (dùng chung cho xóa server & xóa cục bộ).
+    _removeGenLocal(g) {
+      this.generations = this.generations.filter(x => x.id !== g.id);
+      const lid = String(g.id);
+      if (this.canvasLayers.some((l) => l.id === lid)) this.canvasLayers = this.canvasLayers.filter((l) => l.id !== lid);
+      const orphanSource = g.media_url ? this.canvasLayers.find((l) => l.kind === 'source' && l.image === g.media_url) : null;
+      if (orphanSource) this.canvasLayers = this.canvasLayers.filter((l) => !(l.kind === 'source' && l.image === g.media_url));
+      if (this.activeLayerId === lid || this.previewId === g.id || (orphanSource && this.activeLayerId === orphanSource.id)) {
+        const next = this.canvasLayers.find((x) => x.visible !== false);
+        if (next) this.selectLayer(next);
+        else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
+      }
+      this.saveLayerLayout();
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
     // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):
@@ -704,7 +711,8 @@ export const useStudioStore = defineStore('studio', {
         const d = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(d.message || 'Không lưu được.');
         const gid = 'layer-' + Date.now();
-        this.addGen({ id: gid, type: 'image', status: 'completed', model: 'layer', provider: 'layer', media_url: d.url, error: null, credits_cost: 0, created_at: 'Vừa lưu' });
+        // Thêm generation vào Output mà KHÔNG tạo layer canvas trùng (layer active đã có trên canvas).
+        this.generations.unshift({ id: gid, type: 'image', status: 'completed', model: 'layer', provider: 'layer', media_url: d.url, error: null, credits_cost: 0, created_at: 'Vừa lưu' });
         this.toast('Đã lưu layer vào Output.');
       } catch (e) { this.toast(e.message || 'Không lưu được.', 'error'); }
     },
