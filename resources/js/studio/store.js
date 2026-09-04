@@ -699,6 +699,82 @@ export const useStudioStore = defineStore('studio', {
       this._layerDrag = null;
       this.saveLayerLayout();
     },
+    // Gộp tất cả layer đang hiển thị thành 1 ảnh PNG (data URL) theo đúng transform/opacity/blend.
+    async compositeVisible() {
+      const layers = this.canvasLayers.filter((l) => l.visible !== false && l.image);
+      if (!layers.length) throw new Error('Chưa có layer để gộp.');
+      const loaded = await Promise.all(layers.map((l) => new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve({ layer: l, img });
+        img.onerror = () => resolve({ layer: l, img: null });
+        img.src = l.image;
+      })));
+      const valid = loaded.filter((x) => x.img && x.img.naturalWidth);
+      if (!valid.length) throw new Error('Không tải được ảnh layer.');
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      valid.forEach(({ layer: l, img }) => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const s = l.scale || 1;
+        const rot = ((l.rotation || 0) * Math.PI) / 180;
+        const cos = Math.cos(rot), sin = Math.sin(rot);
+        const hw = (w * s) / 2, hh = (h * s) / 2;
+        [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([cx, cy]) => {
+          const px = cx * cos - cy * sin + (l.x || 0);
+          const py = cx * sin + cy * cos + (l.y || 0);
+          if (px < minX) minX = px; if (px > maxX) maxX = px;
+          if (py < minY) minY = py; if (py > maxY) maxY = py;
+        });
+      });
+      const pad = 8;
+      const W = Math.max(1, Math.ceil(maxX - minX + pad * 2));
+      const H = Math.max(1, Math.ceil(maxY - minY + pad * 2));
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      valid.forEach(({ layer: l, img }) => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        ctx.save();
+        ctx.translate(-minX + pad, -minY + pad);
+        ctx.translate(l.x || 0, l.y || 0);
+        ctx.rotate(((l.rotation || 0) * Math.PI) / 180);
+        ctx.scale(l.scale || 1, l.scale || 1);
+        ctx.globalAlpha = l.opacity != null ? l.opacity : 1;
+        ctx.globalCompositeOperation = (l.blend && l.blend !== 'normal') ? l.blend : 'source-over';
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      });
+      return canvas.toDataURL('image/png');
+    },
+    // Xuất ảnh gộp (tải xuống PNG).
+    async exportComposite() {
+      try {
+        const url = await this.compositeVisible();
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'composite-' + Date.now() + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        this.toast('Đã xuất ảnh gộp.');
+      } catch (e) { this.toast(e.message || 'Không gộp được.', 'error'); }
+    },
+    // Gộp layer thành 1 layer mới (upload lên server để lưu lâu dài).
+    async flattenToLayer() {
+      try {
+        const url = await this.compositeVisible();
+        const blob = await (await fetch(url)).blob();
+        const fd = new FormData();
+        fd.append('image', new File([blob], 'composite.png', { type: 'image/png' }));
+        const res = await fetch('/studio/upload-ref', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.message || 'Không gộp được.');
+        const id = 'flat-' + Date.now();
+        this.pushCanvasLayer(id, 'source', 'Gộp layer', d.url);
+        this.setActiveLayer(id);
+        this.toast('Đã gộp layer thành ảnh mới.');
+      } catch (e) { this.toast(e.message || 'Không gộp được.', 'error'); }
+    },
     // Tên hiển thị của một generation (dùng tên tuỳ chỉnh nếu có, ngược lại "Ảnh #id").
     genName(g) { return (g && g.meta && g.meta.name) ? g.meta.name : (g ? 'Ảnh #' + g.id : 'Ảnh'); },
     // Tải ảnh đang active trên canvas (kết quả dùng endpoint download; ảnh nguồn tải trực tiếp).
