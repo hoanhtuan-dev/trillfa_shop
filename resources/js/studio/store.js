@@ -1238,6 +1238,10 @@ export const useStudioStore = defineStore('studio', {
       const p = this.inpaintMaskPointer(e); if (!p) return;
       this._inpaintFreehandActive = true;
       this.inpaintFreehandPoints = [p];
+      // Xoá nét lasso cũ khỏi mask canvas → vùng chọn mới KHÔNG cộng dồn với vùng đã xóa trước đó.
+      if (this._inpaintMaskCtx && this._inpaintMaskCanvas) {
+        this._inpaintMaskCtx.clearRect(0, 0, this._inpaintMaskCanvas.width, this._inpaintMaskCanvas.height);
+      }
     },
     freehandMove(e) {
       if (!this._inpaintFreehandActive) return;

@@ -236,12 +236,9 @@ function onTouchEnd(e) {
           </div>
           <!-- Inpaint mask overlay on canvas -->
           <CanvasMaskTools />
-          <!-- active image indicator + actions -->
-          <div v-if="store.upscaleSrc" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
-            <span class="hidden text-[10px] text-cream-300/60 lg:inline">{{ store.editSource ? 'Nguồn:' : 'Kết quả:' }}</span>
-            <span class="hidden max-w-40 truncate font-semibold text-cream-100 lg:inline">{{ store.upscaleName }}</span>
-            <button @click="store.downloadActive()" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-white shadow-brand-500/40 transition-colors hover:bg-brand-500" title="Tải ảnh xuống"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-            <button v-if="store.editSource" @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
+          <!-- active image source clear -->
+          <div v-if="store.editSource" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
+            <button @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
           </div>
           <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint/erase): layer active GIỮ ĐÚNG vị trí/scale như stack — không xê dịch -->
@@ -389,6 +386,8 @@ function onTouchEnd(e) {
           </div>
           <!-- canvas bg + crop toggles -->
           <div class="absolute right-3 bottom-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
+            <button @click="store.downloadActive()" :disabled="!store.upscaleSrc" class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600 text-white shadow-brand-500/40 transition-colors hover:bg-brand-500 disabled:opacity-40" title="Tải ảnh xuống"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+            <span class="h-4 w-px bg-ink-700"></span>
             <button v-for="b in ['grid','dark','white','cream']" :key="b" @click="store.canvasBg = b" class="h-6 w-6 rounded-full border" :class="store.canvasBg === b ? 'border-white' : 'border-ink-600'" :style="{ background: b === 'grid' ? 'repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 10px 10px' : b === 'dark' ? '#0a0a0f' : b === 'white' ? '#fff' : '#f5ead9' }" :title="b"></button>
           </div>
           <!-- variant slider (bottom, only when multiple variants) -->
@@ -403,7 +402,7 @@ function onTouchEnd(e) {
         </div>
       </main>
       <!-- Right outputs (desktop) -->
-      <aside class="scrollbar-hide hidden w-80 shrink-0 flex-col space-y-3 overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-3 lg:flex">
+      <aside class="scrollbar-hide hidden w-48 shrink-0 flex-col space-y-3 overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-2 lg:flex">
         <SourcePanel />
         <OutputModule />
       </aside>
