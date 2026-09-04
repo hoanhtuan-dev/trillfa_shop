@@ -81,9 +81,10 @@ class ProductAIService
                     ]]],
                     'response_format' => ['type' => 'json_object'],
                 ]);
-                // 429 = rate/quota limit -> stop trying (all keys/models share the quota).
+                // 429 = rate/quota limit on THIS key -> fail over to the next key
+                // (e.g. token-plan exhausted -> Pay-As-You-Go).
                 if ($resp->status() === 429 || is_qwen_quota_error((string) $resp->body())) {
-                    return null;
+                    continue;
                 }
                 if ($resp->ok()) {
                     $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
@@ -91,12 +92,7 @@ class ProductAIService
                         return $json;
                     }
                 }
-                // model_not_found / unsupported -> try the next model.
-                $body = (string) $resp->body();
-                if (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404) {
-                    continue;
-                }
-                break; // other errors on this key -> next key
+                // any other failure on this key -> try the next key.
             } catch (\Throwable $e) {
                 // try next key
             }
