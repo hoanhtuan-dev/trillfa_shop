@@ -179,12 +179,12 @@ class AdminProductController extends Controller
     {
         $images = [];
 
-        // Latest generations (media_url -> served via /studio/image or direct http).
+        // Latest generations — media_url is stored as /storage/{path} (browser-
+        // usable directly), so use it unchanged.
         $gens = auth()->user()->generations()->whereNotNull('media_url')->latest()->limit(60)->get();
         foreach ($gens as $g) {
-            $media = $g->media_url;
-            $url = str_starts_with($media, 'http') ? $media : route('studio.image', ['path' => ltrim($media, '/')]);
-            $images[] = ['id' => 'gen-'.$g->id, 'url' => $url, 'type' => 'generation', 'label' => $g->prompt];
+            $media = (string) $g->media_url;
+            $images[] = ['id' => 'gen-'.$g->id, 'url' => $media, 'type' => 'generation', 'label' => $g->prompt];
         }
 
         // Public studio assets (uploaded images).
