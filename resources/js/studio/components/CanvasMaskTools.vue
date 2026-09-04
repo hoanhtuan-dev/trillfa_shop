@@ -21,7 +21,9 @@ const maskBoxStyle = computed(() => {
 });
 
 // Toàn bộ vùng ảnh hiển thị — dùng cho brush mask preview (đã lưu) phủ đúng chỗ.
+// Phải bám metricsTick để re-eval khi zoom/pan → vị trí overlay KHÔNG bị trôi.
 const fullImageStyle = computed(() => {
+  void metricsTick.value;
   const m = store.canvasMetrics();
   if (!m) return { display: 'none' };
   return {
