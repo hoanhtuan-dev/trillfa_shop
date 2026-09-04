@@ -40,6 +40,13 @@ const canvasZoom = ref(null);
 const eraseOverlay = ref(null);
 const drawOverlay = ref(null);
 const blankMenuOpen = ref(false);
+const removeBgArm = ref(false);
+let removeBgTimer = null;
+function confirmRemoveBg() {
+  if (!store.activeLayer) return;
+  if (removeBgArm.value) { removeBgArm.value = false; clearTimeout(removeBgTimer); store.removeBackground(); }
+  else { removeBgArm.value = true; clearTimeout(removeBgTimer); removeBgTimer = setTimeout(() => { removeBgArm.value = false; }, 3000); }
+}
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
 watch(eraseOverlay, (el) => store.attachEraseCanvas(el));
 watch(drawOverlay, (el) => store.attachDrawCanvas(el));
@@ -325,7 +332,7 @@ function onTouchEnd(e) {
             <div class="flex items-center gap-1.5 rounded-full bg-ink-900/85 p-1.5 shadow-lg">
               <div class="relative">
                 <button @click="blankMenuOpen = !blankMenuOpen" class="grid h-7 w-7 place-items-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer mới"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg></button>
-                <div v-if="blankMenuOpen" class="absolute right-0 top-9 flex w-44 flex-col gap-1 rounded-xl border border-ink-700 bg-ink-900/95 p-2 shadow-2xl">
+                <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-44 flex-col gap-1 rounded-xl border border-ink-700 bg-ink-900/95 p-2 shadow-2xl">
                   <p class="px-1 text-[10px] font-semibold text-cream-300/70">Nền layer mới</p>
                   <button @click="store.addBlankLayer(); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2 py-1 text-left text-[11px] text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-white/30" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
                   <div class="grid grid-cols-6 gap-1 px-1">
@@ -334,7 +341,7 @@ function onTouchEnd(e) {
                 </div>
               </div>
               <button @click="store.fillActiveLayer()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-40" title="Tô màu toàn bộ layer đang chọn"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.5 11.5a2 2 0 0 1-2 1.9H8.5a2 2 0 0 1-2-1.9z"/><path d="M9 8V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v3"/><path d="M12 1v2"/></svg></button>
-              <button @click="store.removeBackground()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-violet-600/70 text-white transition-colors hover:bg-violet-500 disabled:opacity-40" title="Xóa nền AI (giữ vùng chọn hiện tại làm chủ thể nếu có)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="m3 3 18 18"/></svg></button>
+              <button @click="confirmRemoveBg()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full transition-colors disabled:opacity-40" :class="removeBgArm ? 'bg-red-600 text-white' : 'bg-violet-600/70 text-white hover:bg-violet-500'" :title="removeBgArm ? 'Nhấn lại để XÁC NHẬN xóa nền (tốn credit)' : 'Xóa nền AI (giữ vùng chọn hiện tại làm chủ thể nếu có)'"><svg v-if="removeBgArm" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="m3 3 18 18"/></svg></button>
             </div>
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1 lg:hidden">
               <button v-for="l in store.canvasLayers" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
@@ -348,7 +355,7 @@ function onTouchEnd(e) {
                 <button @click="store.cleanCanvas()" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">Dọn canvas</button>
               </div>
               <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
-                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40', l.id === store.highlightLayerId ? 'ring-2 ring-amber-400' : '']">
+                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40', l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']">
                   <button @click="store.toggleLayerVisible(l.id)" class="grid h-5 w-5 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700" :title="l.visible ? 'Ẩn layer' : 'Hiện layer'"><span v-if="l.visible"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span><span v-else><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg></span></button>
                   <button @click="store.selectLayer(l)" class="flex min-w-0 flex-1 items-center gap-1.5 text-left">
                     <img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover">

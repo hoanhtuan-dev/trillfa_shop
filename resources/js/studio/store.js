@@ -681,6 +681,7 @@ export const useStudioStore = defineStore('studio', {
     },
     // Thêm 1 layer TRỐNG (trong suốt) để vẽ — nền tảng cho hiệu ứng sau (brush/vẽ tự do GIMP/PS).
     async addBlankLayer(bg = null) {
+      this.pushHistory();
       let w = 1024, h = 1024;
       const src = this.activeLayer;
       if (src && src.image) {
@@ -787,6 +788,7 @@ export const useStudioStore = defineStore('studio', {
     deleteLayer(item) {
       if (!item) return;
       if (item.locked) { this.toast('Layer đang khóa — mở khóa trước khi gỡ.', 'error'); return; }
+      this.pushHistory();
       const wasSource = item.kind === 'source' || item.id === 'source';
       this.canvasLayers = this.canvasLayers.filter((l) => l.id !== item.id);
       if (wasSource) this.editSource = null;
@@ -844,6 +846,7 @@ export const useStudioStore = defineStore('studio', {
     moveLayer(id, dir) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l || l.locked) return;
+      this.pushHistory();
       const i = this.canvasLayers.findIndex((x) => x.id === id);
       const j = i + (dir === 'up' ? -1 : 1);
       if (i < 0 || j < 0 || j >= this.canvasLayers.length) return;
@@ -862,6 +865,7 @@ export const useStudioStore = defineStore('studio', {
     resetLayerTransform(id) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l) return;
+      this.pushHistory();
       Object.assign(l, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, blend: 'normal' });
       this.saveLayerLayout();
     },
@@ -869,6 +873,7 @@ export const useStudioStore = defineStore('studio', {
     duplicateLayer(id) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l) return;
+      this.pushHistory();
       const copy = { ...l, id: id + '-copy-' + Date.now(), name: (l.name || 'Layer') + ' (bản sao)' };
       this.canvasLayers.push(copy);
       this.setActiveLayer(copy.id);
@@ -878,6 +883,7 @@ export const useStudioStore = defineStore('studio', {
     bringLayerTo(id, where) {
       const i = this.canvasLayers.findIndex((x) => x.id === id);
       if (i < 0) return;
+      this.pushHistory();
       const arr = this.canvasLayers.slice();
       const item = arr.splice(i, 1)[0];
       if (where === 'front') arr.push(item);
@@ -886,8 +892,8 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
     },
     // Lật ngang / lật dọc layer.
-    toggleFlipX(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; l.flipX = !l.flipX; this.saveLayerLayout(); },
-    toggleFlipY(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; l.flipY = !l.flipY; this.saveLayerLayout(); },
+    toggleFlipX(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; this.pushHistory(); l.flipX = !l.flipX; this.saveLayerLayout(); },
+    toggleFlipY(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; this.pushHistory(); l.flipY = !l.flipY; this.saveLayerLayout(); },
     // ── Xóa vùng (erase brush + feather) ──
     toggleErase() {
       this.eraseMode = !this.eraseMode;
@@ -1079,6 +1085,7 @@ export const useStudioStore = defineStore('studio', {
     beginLayerDrag(id, e) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l || l.locked) return;
+      this.pushHistory();
       this.setActiveLayer(id);
       this._layerDrag = { id, sx: e.clientX, sy: e.clientY, ox: Number(l.x) || 0, oy: Number(l.y) || 0 };
     },

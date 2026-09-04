@@ -1178,6 +1178,49 @@ class ImageAIService
         return null;
     }
 
+    /**
+     * Xóa nền → trong suốt: dùng mask (TRẮNG=chủ thể giữ, ĐEN=nền) để gán alpha cho ảnh kết quả.
+     */
+    public function applyTransparentBackground(string $imageUrl, string $maskUrl): ?string
+    {
+        $imgBin = $this->resolveImageBinary($imageUrl);
+        $maskBin = $this->resolveImageBinary($maskUrl);
+        if ($imgBin === null || $maskBin === null) return null;
+        $img = @imagecreatefromstring($imgBin);
+        $mask = @imagecreatefromstring($maskBin);
+        if (! $img || ! $mask) return null;
+
+        $w = imagesx($img); $h = imagesy($img);
+        $mw = imagesx($mask); $mh = imagesy($mask);
+        if ($mw !== $w || $mh !== $h) {
+            $resized = imagecreatetruecolor($w, $h);
+            imagecopyresampled($resized, $mask, 0, 0, 0, 0, $w, $h, $mw, $mh);
+            imagedestroy($mask);
+            $mask = $resized;
+        }
+
+        $out = imagecreatetruecolor($w, $h);
+        imagealphablending($out, false);
+        imagesavealpha($out, true);
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $m = imagecolorat($mask, $x, $y);
+                $mr = ($m >> 16) & 0xFF; // TRẮNG=giữ (đục), ĐEN=nền (trong suốt)
+                $alpha = 127 - (int) round($mr * 127 / 255);
+                $p = imagecolorat($img, $x, $y);
+                $r = ($p >> 16) & 0xFF; $g = ($p >> 8) & 0xFF; $b = $p & 0xFF;
+                imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, $r, $g, $b, $alpha));
+            }
+        }
+        imagedestroy($img); imagedestroy($mask);
+
+        ob_start(); imagepng($out); $bytes = ob_get_clean();
+        imagedestroy($out);
+        $name = 'studio/transparent-'.Str::uuid().'.png';
+        Storage::disk('public')->put($name, $bytes);
+        return Storage::disk('public')->url($name);
+    }
+
     protected function sizeFor(?string $resolution, ?string $ratio): string
     {
         // Qwen-Image only accepts a fixed set of sizes; map the ratio (and the extra

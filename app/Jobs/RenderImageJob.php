@@ -62,6 +62,12 @@ class RenderImageJob implements ShouldQueue
                 if ($pasted) { $url = $pasted; }
             }
 
+            // Xóa nền AI: hậu kỳ cắt nền theo mask → trong suốt (PNG alpha).
+            if (($genMeta['mode'] ?? '') === 'remove-bg' && $generation->mask_image) {
+                $transparent = $images->applyTransparentBackground($url, $generation->mask_image);
+                if ($transparent) { $url = $transparent; }
+            }
+
             // NOTE: Face sync ("Đồng bộ khuôn mặt") was removed from the UI. We no longer do a second
             // applyFace edit pass here — it doubled the edit time (2 edits instead of 1). Keep the edit
             // a single pass so phẫu thuật ảnh is as fast as Thay Đổi Người Mẫu.
