@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStorefrontStore } from '../../store.js';
+import { csrfToken } from '../../composables/useApi.js';
 import Icon from '../ui/Icon.vue';
 import SearchBox from './SearchBox.vue';
 import MenuNav from './MenuNav.vue';
@@ -122,7 +123,7 @@ onBeforeUnmount(() => {
                                     <a href="/yeu-thich" class="block px-4 py-2.5 text-sm text-ink-700 hover:bg-cream-100">Yêu thích</a>
                                     <a v-if="user.is_admin" href="/admin" class="block px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-cream-100">Quản trị</a>
                                     <form method="POST" action="/dang-xuat">
-                                        <input type="hidden" name="_token" :value="document.querySelector('meta[name=csrf-token]')?.content || ''" />
+                                        <input type="hidden" name="_token" :value="csrfToken()" />
                                         <button type="submit" class="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-cream-100">Đăng xuất</button>
                                     </form>
                                 </div>

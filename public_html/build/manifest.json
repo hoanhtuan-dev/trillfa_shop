@@ -6,20 +6,20 @@
       "_pinia-9imU3GMs.js"
     ]
   },
-  "_BaseButton-iL-zpUxV.js": {
-    "file": "assets/BaseButton-iL-zpUxV.js",
+  "_BaseButton-392Kpn_T.js": {
+    "file": "assets/BaseButton-392Kpn_T.js",
     "name": "BaseButton",
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
-  "_BlogCard-CLDmY0bt.js": {
-    "file": "assets/BlogCard-CLDmY0bt.js",
+  "_BlogCard-BSxkAm36.js": {
+    "file": "assets/BlogCard-BSxkAm36.js",
     "name": "BlogCard",
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js",
+      "_StorefrontLayout-gn9H4FFD.js",
       "_BaseBadge-_N8VcNgy.js"
     ]
   },
@@ -30,12 +30,12 @@
       "_pinia-9imU3GMs.js"
     ]
   },
-  "_ProductCard-kxAFJ6dj.js": {
-    "file": "assets/ProductCard-kxAFJ6dj.js",
+  "_ProductCard-D6GJesbX.js": {
+    "file": "assets/ProductCard-D6GJesbX.js",
     "name": "ProductCard",
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
   "_SkeletonCard-Bw4y50V3.js": {
@@ -45,20 +45,20 @@
       "_pinia-9imU3GMs.js"
     ]
   },
-  "_StorefrontLayout-DsV9rKm5.js": {
-    "file": "assets/StorefrontLayout-DsV9rKm5.js",
+  "_StorefrontLayout-Z76EHoAa.css": {
+    "file": "assets/StorefrontLayout-Z76EHoAa.css",
+    "src": "_StorefrontLayout-Z76EHoAa.css"
+  },
+  "_StorefrontLayout-gn9H4FFD.js": {
+    "file": "assets/StorefrontLayout-gn9H4FFD.js",
     "name": "StorefrontLayout",
     "imports": [
       "_pinia-9imU3GMs.js",
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/StorefrontLayout-dpUbQ9Qu.css"
+      "assets/StorefrontLayout-Z76EHoAa.css"
     ]
-  },
-  "_StorefrontLayout-dpUbQ9Qu.css": {
-    "file": "assets/StorefrontLayout-dpUbQ9Qu.css",
-    "src": "_StorefrontLayout-dpUbQ9Qu.css"
   },
   "_StylistDataManager-C6o-0vCw.js": {
     "file": "assets/StylistDataManager-C6o-0vCw.js",
@@ -159,139 +159,139 @@
     "isEntry": true
   },
   "resources/js/storefront/account.js": {
-    "file": "assets/account-CBsR2EeL.js",
+    "file": "assets/account-CMTO2j4Y.js",
     "name": "account",
     "src": "resources/js/storefront/account.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js",
+      "_StorefrontLayout-gn9H4FFD.js",
       "_BaseBadge-_N8VcNgy.js"
     ]
   },
   "resources/js/storefront/app.js": {
-    "file": "assets/app-C4ZtcRug.js",
+    "file": "assets/app-edxxV0tp.js",
     "name": "app",
     "src": "resources/js/storefront/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js",
-      "_BaseButton-iL-zpUxV.js",
+      "_StorefrontLayout-gn9H4FFD.js",
+      "_BaseButton-392Kpn_T.js",
       "_SkeletonCard-Bw4y50V3.js",
-      "_ProductCard-kxAFJ6dj.js",
-      "_BlogCard-CLDmY0bt.js"
+      "_ProductCard-D6GJesbX.js",
+      "_BlogCard-BSxkAm36.js"
     ]
   },
   "resources/js/storefront/auth.js": {
-    "file": "assets/auth-U0NWYqAd.js",
+    "file": "assets/auth-B_xqB5W3.js",
     "name": "auth",
     "src": "resources/js/storefront/auth.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
   "resources/js/storefront/blog-post.js": {
-    "file": "assets/blog-post-BGW4bOy3.js",
+    "file": "assets/blog-post-CRgmfWKf.js",
     "name": "blog-post",
     "src": "resources/js/storefront/blog-post.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
   "resources/js/storefront/blog.js": {
-    "file": "assets/blog-CW9a7VMM.js",
+    "file": "assets/blog-Y5aOvLoH.js",
     "name": "blog",
     "src": "resources/js/storefront/blog.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js",
-      "_BlogCard-CLDmY0bt.js"
+      "_StorefrontLayout-gn9H4FFD.js",
+      "_BlogCard-BSxkAm36.js"
     ]
   },
   "resources/js/storefront/cart.js": {
-    "file": "assets/cart-oXzhcSyU.js",
+    "file": "assets/cart-D49vLjTW.js",
     "name": "cart",
     "src": "resources/js/storefront/cart.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
   "resources/js/storefront/checkout-result.js": {
-    "file": "assets/checkout-result-vGaRKMus.js",
+    "file": "assets/checkout-result-DBOWiNw_.js",
     "name": "checkout-result",
     "src": "resources/js/storefront/checkout-result.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
   "resources/js/storefront/checkout.js": {
-    "file": "assets/checkout-1XaTtA3z.js",
+    "file": "assets/checkout-C7qGNvT7.js",
     "name": "checkout",
     "src": "resources/js/storefront/checkout.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
   "resources/js/storefront/product.js": {
-    "file": "assets/product-D-Fv07Y7.js",
+    "file": "assets/product-DAIJ0gzj.js",
     "name": "product",
     "src": "resources/js/storefront/product.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js",
-      "_BaseButton-iL-zpUxV.js",
-      "_ProductCard-kxAFJ6dj.js",
+      "_StorefrontLayout-gn9H4FFD.js",
+      "_BaseButton-392Kpn_T.js",
+      "_ProductCard-D6GJesbX.js",
       "_BaseBadge-_N8VcNgy.js"
     ]
   },
   "resources/js/storefront/shop.js": {
-    "file": "assets/shop-CYdKYpRL.js",
+    "file": "assets/shop-Bks2H7Pi.js",
     "name": "shop",
     "src": "resources/js/storefront/shop.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js",
+      "_StorefrontLayout-gn9H4FFD.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_SkeletonCard-Bw4y50V3.js",
-      "_ProductCard-kxAFJ6dj.js"
+      "_ProductCard-D6GJesbX.js"
     ],
     "css": [
       "assets/shop-BTnFaxj8.css"
     ]
   },
   "resources/js/storefront/static.js": {
-    "file": "assets/static-CZIT40KD.js",
+    "file": "assets/static-Dg3tE4T9.js",
     "name": "static",
     "src": "resources/js/storefront/static.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js"
+      "_StorefrontLayout-gn9H4FFD.js"
     ]
   },
   "resources/js/storefront/wishlist.js": {
-    "file": "assets/wishlist-C6PW40aX.js",
+    "file": "assets/wishlist-DLLnxw23.js",
     "name": "wishlist",
     "src": "resources/js/storefront/wishlist.js",
     "isEntry": true,
     "imports": [
       "_pinia-9imU3GMs.js",
-      "_StorefrontLayout-DsV9rKm5.js",
-      "_ProductCard-kxAFJ6dj.js"
+      "_StorefrontLayout-gn9H4FFD.js",
+      "_ProductCard-D6GJesbX.js"
     ]
   },
   "resources/js/studio/app.js": {

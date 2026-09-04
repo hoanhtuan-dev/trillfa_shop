@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useStorefrontStore } from './store.js';
 import { useRecentlyViewed } from './composables/useRecentlyViewed.js';
+import { formatMoney } from './composables/useFormat.js';
 
 import StorefrontLayout from './components/layout/StorefrontLayout.vue';
 import SkeletonCard from './components/ui/SkeletonCard.vue';
@@ -128,7 +129,7 @@ const saleEndsAt = computed(() => boot.value.sale_ends_at || '');
                     <img :src="p.image" :alt="p.name" class="aspect-[4/5] w-full object-cover" loading="lazy" />
                     <div class="p-3">
                         <p class="line-clamp-1 text-sm font-medium text-ink-900">{{ p.name }}</p>
-                        <p class="mt-1 text-sm font-semibold text-ink-900">{{ new Intl.NumberFormat('vi-VN').format(p.price || 0) }}₫</p>
+                        <p class="mt-1 text-sm font-semibold text-ink-900">{{ formatMoney(p.price || 0) }}</p>
                     </div>
                 </a>
             </div>

@@ -40,6 +40,10 @@ const stockText = computed(() => {
     return 'Còn hàng';
 });
 const attrs = computed(() => product.value?.attributes || {});
+const discountPct = computed(() => {
+    if (onSale.value && compare.value) return Math.round((1 - price.value / compare.value) * 100);
+    return product.value?.discount_percent || 0;
+});
 
 async function load() {
     if (!props.product?.id) return;
@@ -99,7 +103,7 @@ function toggleWishlist() { store.toggleWishlist(product.value.id); }
                                         transition: 'transform 0.18s ease-out',
                                     }"
                                 />
-                                <span v-if="onSale" class="sf-badge absolute left-3 top-3 bg-gradient-to-r from-clay-500 to-clay-600 text-white">-{{ product.discount_percent || Math.round((1 - price / compare) * 100) }}%</span>
+                                <span v-if="onSale" class="sf-badge absolute left-3 top-3 bg-gradient-to-r from-clay-500 to-clay-600 text-white">-{{ discountPct }}%</span>
                                 <span class="pointer-events-none absolute bottom-3 right-3 rounded-full bg-ink-900/60 px-2.5 py-1 text-[10px] font-medium text-cream-50 backdrop-blur">+ Hover để phóng to</span>
                             </div>
                             <div v-if="images.length > 1" class="flex gap-2 p-3">
