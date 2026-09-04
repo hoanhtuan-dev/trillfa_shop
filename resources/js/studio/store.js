@@ -130,6 +130,7 @@ export const useStudioStore = defineStore('studio', {
     _inpaintFreehandActive: false,
     inpaintFeather: 0,            // feather (px 0-50) — làm mềm mép vùng chọn
     inpaintFillColor: '#ffffff',  // màu tô cho nút "🎨 Tô" của vùng chọn
+    inpaintMaskSource: 'inpaint',  // 'inpaint' (từ card Sửa ảnh) | 'canvas' (từ thanh công cụ vùng chọn trên canvas)
     // Canvas mask overlay (dùng chung cho Inpaint brush trên canvas chính)
     brushOverlay: null,
     _brushCanvas: null,
@@ -768,10 +769,19 @@ export const useStudioStore = defineStore('studio', {
     // Gắn canvas overlay (DOM) làm mask để vẽ + xem trước realtime.
     attachEraseCanvas(el) {
       if (!el) { this._eraseCanvas = null; this._eraseCtx = null; return; }
-      el.width = 1024; el.height = 1024;
+      // Canvas theo TỈ LỆ ẢNH GỐC (không vuông 1024×1024) — nếu vuông thì nét xóa bị méo & lệch vị trí.
+      const m = this.canvasMetrics();
+      const base = 1024;
+      let w = base, h = base;
+      if (m && m.iw && m.ih) {
+        const ia = m.iw / m.ih;
+        if (ia >= 1) { w = base; h = Math.max(1, Math.round(base / ia)); }
+        else { w = Math.max(1, Math.round(base * ia)); h = base; }
+      }
+      el.width = w; el.height = h;
       this._eraseCanvas = el;
       this._eraseCtx = el.getContext('2d');
-      this._eraseCtx.clearRect(0, 0, el.width, el.height);
+      this._eraseCtx.clearRect(0, 0, w, h);
     },
     setEraseFeather(v) { this.eraseFeather = Number(v) || 0; },
     _eraseRadius() { return Math.max(3, Math.min(120, Number(this.eraseFeather) || 20)); },
@@ -1137,10 +1147,19 @@ export const useStudioStore = defineStore('studio', {
         return;
       }
       this._inpaintStopDrag && this._inpaintStopDrag();
-      this.inpaintMaskDone = true;
-      this.inpaintMaskMode = 'none'; // tắt overlay, không xoá dữ liệu
+      this.inpaintMaskMode = 'none'; // tắt overlay
       this.inpaintErase = false;
-      this.toast('Đã lưu vùng — bấm "Sửa ảnh" để xử lý.');
+      if (this.inpaintMaskSource === 'canvas') {
+        // Vùng chọn trên canvas: chỉ thoát + xoá dữ liệu, không giữ làm mask inpaint.
+        this.inpaintMaskDone = false;
+        this._inpaintMaskKind = '';
+        this.inpaintBrushData = '';
+        this.inpaintMaskSource = 'inpaint';
+        this.toast('Đã thoát vùng chọn.');
+      } else {
+        this.inpaintMaskDone = true;
+        this.toast('Đã lưu vùng — bấm "Sửa ảnh" để xử lý.');
+      }
     },
     // "Bỏ mask": xoá hoàn toàn vùng chọn/vẽ (rect + brush).
     clearInpaintMask() {
@@ -1150,18 +1169,34 @@ export const useStudioStore = defineStore('studio', {
       this._inpaintMaskKind = '';
       this.inpaintBrushData = '';
       this.inpaintErase = false;
+      this.inpaintMaskSource = 'inpaint';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
     },
     toggleInpaintMask(mode) {
       if (this.inpaintMaskMode === mode) { this.clearInpaintMask(); return; }
       if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
       if (this._inpaintDrag) this._inpaintStopDrag();
+      this.inpaintMaskSource = 'inpaint';
       this.inpaintMaskMode = mode;
       this.inpaintMaskDone = false;
       this._inpaintMaskKind = '';
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
+      if (mode === 'freehand') { this.inpaintFreehandPoints = []; this._initInpaintBrush(); }
+    },
+    // Mở vùng chọn từ THANH CÔNG CỤ CANVAS (rect/freehand) — dùng chung overlay chính xác của Inpaint,
+    // nhưng hành động là Xóa / Tô màu / Feather tại chỗ (không phải mask AI inpaint).
+    startCanvasSelect(mode) {
+      if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
+      if (this.inpaintMaskMode === mode) { this.clearInpaintMask(); return; }
+      this.inpaintMaskSource = 'canvas';
+      if (this._inpaintDrag) this._inpaintStopDrag();
+      this.inpaintMaskMode = mode;
+      this.inpaintMaskDone = false;
+      this._inpaintMaskKind = '';
+      this.inpaintBrushData = '';
+      this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this._initInpaintBrush(); }
     },
     // ── Freehand (lasso) select: vẽ tự do tạo vùng kín → mask ──

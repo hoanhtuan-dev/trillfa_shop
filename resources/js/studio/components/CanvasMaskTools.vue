@@ -166,11 +166,11 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
     <div class="pointer-events-none absolute left-3 top-3 z-20 flex">
       <!-- Đang chỉnh: công cụ -->
       <div v-if="editing" class="pointer-events-auto flex items-center gap-1.5 rounded-full bg-ink-900/95 px-2 py-1 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
-        <template v-if="store.inpaintMaskMode === 'rect'">
+        <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand'">
           <span class="px-1 text-[10px] font-medium text-cream-300/70">
-            {{ hasBox ? ('▭ ' + Math.round((store.inpaintMaskBox.w || 0) * 100) + '% × ' + Math.round((store.inpaintMaskBox.h || 0) * 100) + '%') : '▭ Kéo chọn vùng cần sửa' }}
+            {{ store.inpaintMaskMode === 'freehand' ? '✏️ Vẽ tự do — kéo chuột để khoanh vùng' : (hasBox ? ('▭ ' + Math.round((store.inpaintMaskBox.w || 0) * 100) + '% × ' + Math.round((store.inpaintMaskBox.h || 0) * 100) + '%') : '▭ Kéo chọn vùng cần sửa') }}
           </span>
-          <button @click.stop="store.confirmInpaintMask()" @pointerdown.stop class="rounded-full bg-brand-600 px-2.5 py-1 text-white transition-colors hover:bg-brand-700" title="Áp dụng vùng chọn và thoát">✅ Xong</button>
+          <button @click.stop="store.confirmInpaintMask()" @pointerdown.stop class="rounded-full bg-brand-600 px-2.5 py-1 text-white transition-colors hover:bg-brand-700" :title="store.inpaintMaskSource === 'canvas' ? 'Thoát vùng chọn' : 'Áp dụng vùng chọn và thoát'">{{ store.inpaintMaskSource === 'canvas' ? '✓ Xong' : '✅ Xong' }}</button>
         </template>
         <template v-else>
           <button @click.stop="store.inpaintErase = false" @pointerdown.stop :class="!store.inpaintErase ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="rounded-full px-2 py-0.5 transition-colors" title="Vẽ thêm vùng cần sửa">🖌 Vẽ</button>
@@ -182,7 +182,7 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
           <span class="min-w-5 text-center text-[11px] text-cream-100">{{ store.inpaintBrushSize || 10 }}</span>
           <button @click.stop="store.inpaintBrushSize = Math.min(48, (store.inpaintBrushSize||10) + 2)" @pointerdown.stop class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" title="Cọ to hơn">+</button>
           <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
-          <button @click.stop="store.confirmInpaintMask()" @pointerdown.stop class="rounded-full bg-brand-600 px-2.5 py-1 text-white transition-colors hover:bg-brand-700" title="Lưu vùng vẽ và thoát">✅ Xong</button>
+          <button @click.stop="store.confirmInpaintMask()" @pointerdown.stop class="rounded-full bg-brand-600 px-2.5 py-1 text-white transition-colors hover:bg-brand-700" :title="store.inpaintMaskSource === 'canvas' ? 'Thoát vùng chọn' : 'Lưu vùng vẽ và thoát'">{{ store.inpaintMaskSource === 'canvas' ? '✓ Xong' : '✅ Xong' }}</button>
         </template>
         <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
         <span class="text-[10px] text-cream-300/70">Feather</span>
