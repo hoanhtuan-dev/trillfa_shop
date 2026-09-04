@@ -180,6 +180,38 @@ function onLayerPointerDown(l, e) {
               </div>
             </div>
             <p v-else class="rounded-2xl bg-ink-900/50 px-2 py-2.5 text-center text-[10px] text-cream-300/40">Chưa có layer — thêm ảnh nguồn hoặc kết quả.</p>
+            <div v-if="store.activeLayer" class="rounded-2xl bg-ink-900/90 p-2 shadow-lg">
+              <div class="mb-1 flex items-center justify-between px-0.5">
+                <p class="text-[10px] font-semibold text-cream-300/60">✋ Transform</p>
+                <button @click="store.resetLayerTransform(store.activeLayer.id)" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Đưa layer về mặc định">Reset</button>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Opacity</span>
+                <input type="range" min="0" max="1" step="0.05" :value="store.activeLayer.opacity" @input="store.updateLayerTransform(store.activeLayer.id, { opacity: Number($event.target.value) })" class="h-1.5 flex-1 accent-brand-500">
+                <span class="w-8 shrink-0 text-right text-[9px] text-cream-200">{{ Math.round(store.activeLayer.opacity * 100) }}%</span>
+              </div>
+              <div class="mt-1 flex items-center gap-1.5">
+                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Blend</span>
+                <select :value="store.activeLayer.blend" @change="store.updateLayerTransform(store.activeLayer.id, { blend: $event.target.value })" class="min-w-0 flex-1 rounded bg-ink-800 px-1 py-0.5 text-[10px] text-cream-100">
+                  <option value="normal">Normal</option>
+                  <option value="multiply">Multiply</option>
+                  <option value="screen">Screen</option>
+                  <option value="overlay">Overlay</option>
+                  <option value="darken">Darken</option>
+                  <option value="lighten">Lighten</option>
+                </select>
+              </div>
+              <div class="mt-1 flex items-center gap-1.5">
+                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Scale</span>
+                <input type="range" min="0.2" max="3" step="0.05" :value="store.activeLayer.scale" @input="store.updateLayerTransform(store.activeLayer.id, { scale: Number($event.target.value) })" class="h-1.5 flex-1 accent-brand-500">
+                <span class="w-8 shrink-0 text-right text-[9px] text-cream-200">{{ Math.round(store.activeLayer.scale * 100) }}%</span>
+              </div>
+              <div class="mt-1 flex items-center gap-1.5">
+                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Xoay</span>
+                <input type="range" min="-180" max="180" step="1" :value="store.activeLayer.rotation" @input="store.updateLayerTransform(store.activeLayer.id, { rotation: Number($event.target.value) })" class="h-1.5 flex-1 accent-brand-500">
+                <span class="w-8 shrink-0 text-right text-[9px] text-cream-200">{{ store.activeLayer.rotation }}°</span>
+              </div>
+            </div>
             <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
               <div class="mb-1 text-[10px] font-semibold text-cream-300/60">🎨 Palette</div>
               <div class="grid grid-cols-3 gap-1.5">
