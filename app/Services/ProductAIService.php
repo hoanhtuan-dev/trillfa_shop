@@ -271,13 +271,13 @@ PROMPT;
         if (is_callable('getimagesize') && ($info = @getimagesize($path))) {
             $mime = $info['mime'] ?? $mime;
         }
-        // Downscale if very large to keep the request light.
-        if (strlen($data) > 4_000_000 && is_callable('imagecreatefromstring')) {
+        // Downscale aggressively so the vision request stays small/fast.
+        if (is_callable('imagecreatefromstring')) {
             try {
                 $img = @imagecreatefromstring($contents);
                 if ($img) {
                     $w = imagesx($img); $h = imagesy($img);
-                    $scale = min(1, 1024 / max($w, $h));
+                    $scale = min(1, 640 / max($w, $h));
                     if ($scale < 1) {
                         $nw = (int) ($w * $scale); $nh = (int) ($h * $scale);
                         $dst = imagecreatetruecolor($nw, $nh);

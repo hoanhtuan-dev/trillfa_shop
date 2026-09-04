@@ -104,7 +104,7 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
 const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode);
 function layerStyle(l, i) {
   return {
-    transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + ((l.scale || 1) * (l.flipX ? -1 : 1)) + ', ' + ((l.scale || 1) * (l.flipY ? -1 : 1)) + ')',
+    transform: store.layerTransformStyle(l),
     transformOrigin: 'center',
     opacity: l.opacity != null ? l.opacity : 1,
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
@@ -116,7 +116,7 @@ const isolateLayerStyle = computed(() => {
   const l = store.activeLayer;
   if (!l) return {};
   return {
-    transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + ((l.scale || 1) * (l.flipX ? -1 : 1)) + ', ' + ((l.scale || 1) * (l.flipY ? -1 : 1)) + ')',
+    transform: store.layerTransformStyle(l),
     transformOrigin: 'center',
     opacity: l.opacity != null ? l.opacity : 1,
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',

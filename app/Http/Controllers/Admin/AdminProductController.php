@@ -118,6 +118,10 @@ class AdminProductController extends Controller
      */
     public function aiSuggest(Request $request)
     {
+        // LLM calls (vision + text) can take a while on shared hosting; do not
+        // let PHP's max_execution_time kill the request mid-flight.
+        @set_time_limit(0);
+
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
