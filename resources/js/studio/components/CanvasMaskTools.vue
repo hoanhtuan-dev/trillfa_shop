@@ -82,10 +82,13 @@ function onPointerDown(e) {
 }
 
 // ── Toạ độ SVG trong KHUNG ẢNH (px layout) — normalized (0..1) × baseW/baseH ──
+// Toạ độ giữ SỐ THẬP PHÂN (0.1px layout) — nếu làm tròn về px layout nguyên thì khi phóng to
+// mỗi bước 1px layout = nhiều px màn hình → đường gãy/răng cưa.
+const fmt1 = (v) => Math.round(v * 10) / 10;
 const pt = (p) => {
   const f = frame.value;
   if (!f) return '';
-  return Math.round(p.nx * f.w) + ',' + Math.round(p.ny * f.h);
+  return fmt1(p.nx * f.w) + ',' + fmt1(p.ny * f.h);
 };
 const pathPixels = (pts) => (pts || []).map(pt).join(' ');
 const freehandPoints = computed(() => pathPixels(store.inpaintFreehandPoints));
@@ -104,7 +107,7 @@ const pathSmooth = (pts) => {
       const t = s / SAMPLES, a = 1 - t, b = t;
       const x = a * a * a * p1.x + 3 * a * a * b * cx1 + 3 * a * b * b * cx2 + b * b * b * p2.x;
       const y = a * a * a * p1.y + 3 * a * a * b * cy1 + 3 * a * b * b * cy2 + b * b * b * p2.y;
-      out.push(Math.round(x) + ',' + Math.round(y));
+      out.push(fmt1(x) + ',' + fmt1(y));
     }
   }
   return out.join(' ');
@@ -168,20 +171,20 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
         <svg v-if="store.inpaintMaskMode === 'freehand' && (store.inpaintFreehandPaths.length || store.inpaintFreehandPoints.length > 1)"
              class="pointer-events-none absolute left-0 top-0 h-full w-full">
           <template v-for="(path, idx) in freehandPaths" :key="idx">
-            <polyline :points="path" fill="none" stroke="#f43f5e" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />
+            <polyline :points="path" fill="none" stroke="#f43f5e" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
             <polygon :points="path" fill="rgba(244,63,94,0.12)" stroke="none" />
           </template>
-          <polyline v-if="store.inpaintFreehandPoints.length > 1" :points="freehandPoints" fill="none" stroke="#f43f5e" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />
+          <polyline v-if="store.inpaintFreehandPoints.length > 1" :points="freehandPoints" fill="none" stroke="#f43f5e" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
         </svg>
 
         <!-- Path (curve) select: hiển thị TẤT CẢ vùng đã đóng + path đang vẽ -->
         <svg v-if="store.inpaintMaskMode === 'path' && (store.inpaintPathRegions.length || store.inpaintPathPoints.length > 1)"
              class="pointer-events-none absolute left-0 top-0 h-full w-full">
           <template v-for="(reg, idx) in pathRegionsPixels" :key="'r'+idx">
-            <polyline :points="reg" fill="none" stroke="#a78bfa" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />
+            <polyline :points="reg" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
             <polygon :points="reg" fill="rgba(167,139,250,0.12)" stroke="none" />
           </template>
-          <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" />
+          <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
           <polygon v-if="store.inpaintPathPoints.length > 2" :points="pathSmoothPixels" fill="rgba(167,139,250,0.12)" stroke="none" />
           <template v-for="(p, i) in store.inpaintPathPoints" :key="'p'+i">
             <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)" :r="circleR" fill="#a78bfa" />
