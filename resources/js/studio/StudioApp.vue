@@ -51,6 +51,27 @@ function onCanvasKey(e) {
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
+
+// ── Layer editor (composite + transform) ──
+const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none');
+function layerStyle(l, i) {
+  return {
+    transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + (l.scale || 1) + ')',
+    transformOrigin: 'center',
+    opacity: l.opacity != null ? l.opacity : 1,
+    mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
+    zIndex: i + 1,
+  };
+}
+function onLayerPointerDown(l, e) {
+  if (l.locked) { store.selectLayer(l); return; }
+  store.beginLayerDrag(l.id, e);
+  const move = (ev) => store.layerDragMove(ev);
+  const up = () => { store.endLayerDrag(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
@@ -92,9 +113,21 @@ const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, Conce
             <button @click="store.downloadActive()" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-white shadow-brand-500/40 transition-colors hover:bg-brand-500" title="Tải ảnh xuống"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
             <button v-if="store.editSource" @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
           </div>
-          <div ref="canvasZoom" class="absolute inset-0 flex items-center justify-center p-4 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="store.panStart($event)" @pointermove="store.panMove($event)" @pointerup="store.panEnd" @pointerleave="store.panEnd">
-            <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full min-w-0 select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
-            <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
+          <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="store.panStart($event)" @pointermove="store.panMove($event)" @pointerup="store.panEnd" @pointerleave="store.panEnd">
+            <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
+            <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
+              <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full min-w-0 select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
+              <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
+            </div>
+            <!-- Chế độ stack: composite tất cả layer đang hiển thị -->
+            <div v-else class="absolute inset-0">
+              <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
+                <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
+                  <img :src="l.image" class="block max-h-[70vh] max-w-[70vw] select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
+                </div>
+              </div>
+              <p v-if="!store.visibleLayers.length" class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
+            </div>
             <div v-if="store.cropMode && store.upscaleSrc" class="pointer-events-none absolute inset-0" style="z-index:30">
               <div class="absolute cursor-move select-none" style="pointer-events:auto; touch-action:none" :style="store.cropStyle()" @pointerdown.stop="store.cropStart($event,'move')" @dblclick="store.toggleCrop" title="Kéo để di chuyển · nhấn đúp để hủy">
                 <div class="pointer-events-none absolute inset-0 border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);"></div>

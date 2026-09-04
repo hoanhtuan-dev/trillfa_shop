@@ -47,6 +47,7 @@ export const useStudioStore = defineStore('studio', {
     pan: { x: 0, y: 0 },
     canvasBg: 'grid',
     _drag: null,
+    _layerDrag: null,
     // concept
     imagePromptEn: '',
     negativePromptEn: '',
@@ -663,6 +664,39 @@ export const useStudioStore = defineStore('studio', {
       const arr = this.canvasLayers.slice();
       const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
       this.canvasLayers = arr;
+      this.saveLayerLayout();
+    },
+    // ── Transform layer (vị trí / kích thước / xoay / opacity / blend) ──
+    updateLayerTransform(id, patch) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l) return;
+      Object.assign(l, patch);
+      this.saveLayerLayout();
+    },
+    resetLayerTransform(id) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l) return;
+      Object.assign(l, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, blend: 'normal' });
+      this.saveLayerLayout();
+    },
+    // Kéo layer trên canvas để di chuyển (tách khỏi pan/zoom khung nhìn).
+    beginLayerDrag(id, e) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l || l.locked) return;
+      this.setActiveLayer(id);
+      this._layerDrag = { id, sx: e.clientX, sy: e.clientY, ox: Number(l.x) || 0, oy: Number(l.y) || 0 };
+    },
+    layerDragMove(e) {
+      const d = this._layerDrag;
+      if (!d) return;
+      const l = this.canvasLayers.find((x) => x.id === d.id);
+      if (!l) return;
+      l.x = d.ox + (e.clientX - d.sx) / (this.zoom || 1);
+      l.y = d.oy + (e.clientY - d.sy) / (this.zoom || 1);
+    },
+    endLayerDrag() {
+      if (!this._layerDrag) return;
+      this._layerDrag = null;
       this.saveLayerLayout();
     },
     // Tên hiển thị của một generation (dùng tên tuỳ chỉnh nếu có, ngược lại "Ảnh #id").
