@@ -137,20 +137,29 @@ class AdminProductController extends Controller
         // qwen3.8-flash works fast, and the bounded attempts + per-call timeout +
         // wall-clock deadline guarantee a result well under the gateway 504 limit.
         // This removes the fragile queue-worker + poll dependency on shared hosting.
-        @set_time_limit(90);
+        @set_time_limit(60);
 
-        /** @var \App\Services\ProductAIService $service */
-        $service = app(\App\Services\ProductAIService::class);
-        if ($imagePath && is_file($imagePath)) {
-            $result = $service->generateFromImage($data, $imagePath, (bool) ($data['force'] ?? false));
-        } else {
-            $result = $service->generate($data, null);
+        try {
+            /** @var \App\Services\ProductAIService $service */
+            $service = app(\App\Services\ProductAIService::class);
+            if ($imagePath && is_file($imagePath)) {
+                $result = $service->generateFromImage($data, $imagePath, (bool) ($data['force'] ?? false));
+            } else {
+                $result = $service->generate($data, null);
+            }
+            $result['source'] ??= 'stub';
+            $result['model'] = $result['model'] ?? (string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
+            $result['provider'] = $result['provider'] ?? (string) studio_config('prompt_provider', 'qwen');
+
+            return response()->json(['status' => 'done', 'data' => $result]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'status' => 'error',
+                'error' => 'AI gặp lỗi kỹ thuật — vui lòng thử lại. ('.$e->getMessage().')',
+            ], 500);
         }
-        $result['source'] ??= 'stub';
-        $result['model'] = $result['model'] ?? (string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
-        $result['provider'] = $result['provider'] ?? (string) studio_config('prompt_provider', 'qwen');
-
-        return response()->json(['status' => 'done', 'data' => $result]);
     }
 
     public function aiSuggestPoll(Request $request)

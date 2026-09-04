@@ -33,8 +33,10 @@ class ProductAIService
     protected float $temperature;
     protected int $maxTokens;
 
-    /** Hard wall-clock deadline for the current attempt (sync request must never 504). */
+    /** Hard wall-clock deadline for the whole operation (sync request must never 504). */
     private float $deadline = 0.0;
+
+    private bool $budgetStarted = false;
 
     public function __construct()
     {
@@ -47,6 +49,20 @@ class ProductAIService
         $this->cacheTtl = product_ai_cache_ttl();
         $this->temperature = product_ai_temperature();
         $this->maxTokens = product_ai_max_tokens();
+    }
+
+    /**
+     * Arm the wall-clock budget ONCE for the whole public operation. Vision + the
+     * text fallback share this single budget so the whole request always returns
+     * well before the gateway/proxy timeout (no 504).
+     */
+    private function startBudget(): void
+    {
+        if ($this->budgetStarted) {
+            return;
+        }
+        $this->budgetStarted = true;
+        $this->deadline = microtime(true) + $this->totalBudget;
     }
 
     private function timedOut(): bool
@@ -69,6 +85,8 @@ class ProductAIService
         if (! is_file($imagePath)) {
             return null;
         }
+
+        $this->startBudget();
 
         $key = $this->imageCacheKey($imagePath);
         if (! $force) {
@@ -155,6 +173,8 @@ class ProductAIService
      */
     public function generate(array $input, ?array $imageAnalysis = null): array
     {
+        $this->startBudget();
+
         $prompt = $this->buildPrompt($input, $imageAnalysis);
         $result = $this->attempt('text', $prompt);
 
@@ -168,6 +188,8 @@ class ProductAIService
      */
     public function generateFromImage(array $input, string $imagePath, bool $force = false): array
     {
+        $this->startBudget();
+
         $key = $this->imageCacheKey($imagePath);
         $cached = $force ? null : Cache::get('product_ai_img:'.$key);
         if (is_array($cached)) {
@@ -212,8 +234,6 @@ class ProductAIService
         if (! product_ai_enabled()) {
             return null;
         }
-
-        $this->deadline = microtime(true) + $this->totalBudget;
 
         foreach ($this->providers as $provider) {
             if ($this->timedOut()) {

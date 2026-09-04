@@ -98,8 +98,8 @@ return [
         'qwen_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_VISION_MODELS', ''), // '' = theo studio_suggest_qwen_models
         'gemini_text_model' => env('STUDIO_PRODUCT_AI_GEMINI_TEXT_MODEL', 'gemini-2.5-flash'),
         'gemini_vision_model' => env('STUDIO_PRODUCT_AI_GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
-        'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 12),
-        'total_budget_seconds' => (int) env('STUDIO_PRODUCT_AI_TOTAL_BUDGET', 45), // trần tổng cho một lần bấm AI
+        'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 10),
+        'total_budget_seconds' => (int) env('STUDIO_PRODUCT_AI_TOTAL_BUDGET', 20), // trần tổng cho một lần bấm AI
         'max_models' => (int) env('STUDIO_PRODUCT_AI_MAX_MODELS', 2),
         'max_keys' => (int) env('STUDIO_PRODUCT_AI_MAX_KEYS', 3),
         'downscale_max' => (int) env('STUDIO_PRODUCT_AI_DOWNSCALE_MAX', 640),
