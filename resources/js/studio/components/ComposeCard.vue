@@ -154,13 +154,13 @@ async function run() {
 
     <!-- Chip chế độ -->
     <div class="mt-3 flex gap-2">
-      <button @click="setCompose()"
+      <button @click="setCompose()" title="Ghép tự do: hòa trộn nhiều ảnh"
               :class="mode === 'compose' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="layers" size="h-5 w-5" /> Ghép tự do</button>
-      <button @click="setTryon()"
+      <button @click="setTryon()" title="Thử đồ ảo: mặc trang phục lên người mẫu"
               :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="pose" size="h-5 w-5" /> Thử đồ ảo</button>
-      <button @click="setFaceSwap()"
+      <button @click="setFaceSwap()" title="Thay khuôn mặt người mẫu"
               :class="mode === 'faceswap' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="user" size="h-5 w-5" /> Thay khuôn mặt</button>
     </div>
@@ -172,14 +172,14 @@ async function run() {
     </p>
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-4 grid grid-cols-3 gap-2">
-      <button v-for="i in 3" :key="i" @click="openSlot(i - 1)"
+      <button v-for="i in 3" :key="i" @click="openSlot(i - 1)" title="Bấm để tải/chọn ảnh"
               class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-xl border transition"
               :class="selected[i-1] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-700 bg-ink-900/40 hover:border-brand-400'">
         <template v-if="selected[i-1]">
           <img :src="selected[i-1].url" class="h-full w-full object-cover">
           <span class="absolute left-1 top-1 rounded-full bg-brand-500 px-1.5 text-[9px] font-bold text-white">{{ i }}</span>
           <span class="absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] font-semibold text-cream-100">{{ slotRoles[i-1] }}</span>
-          <span @click.stop="removeSlot(i-1)" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white"><StudioIcon name="x" size="h-3 w-3" /></span>
+          <span @click.stop="removeSlot(i-1)" title="Bỏ ảnh khỏi slot" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white"><StudioIcon name="x" size="h-3 w-3" /></span>
           <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>

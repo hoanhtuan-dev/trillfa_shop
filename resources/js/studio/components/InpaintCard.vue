@@ -70,17 +70,17 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 
     <!-- Mask tools: chọn vùng trên canvas chính -->
     <div v-if="store.preview?.media_url" class="mt-3 flex flex-wrap gap-1.5">
-      <button @click="store.toggleInpaintMask('rect')"
+      <button @click="store.toggleInpaintMask('rect')" title="Chọn vùng chữ nhật trên canvas"
               :class="store.inpaintMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
         <StudioIcon name="scan" size="h-3.5 w-3.5" /> Chọn vùng
       </button>
-      <button @click="store.toggleInpaintMask('brush')"
+      <button @click="store.toggleInpaintMask('brush')" title="Vẽ mask bằng cọ"
               :class="store.inpaintMaskMode === 'brush' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
         <StudioIcon name="brush" size="h-3.5 w-3.5" /> Vẽ mask
       </button>
-      <button @click="store.toggleInpaintMask('freehand')"
+      <button @click="store.toggleInpaintMask('freehand')" title="Vẽ vùng tự do bằng cọ"
               :class="store.inpaintMaskMode === 'freehand' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
         <StudioIcon name="spline" size="h-3.5 w-3.5" /> Vẽ tự do
@@ -91,7 +91,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
               title="Bỏ vùng hiện tại để kéo chọn vùng mới">
         Vẽ lại
       </button>
-      <button v-if="maskActive || store.inpaintMaskDone" @click="store.clearInpaintMask()"
+      <button v-if="maskActive || store.inpaintMaskDone" @click="store.clearInpaintMask()" title="Bỏ mask hiện tại"
               class="rounded-full bg-red-600/25 px-2 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">
         Bỏ mask
       </button>
@@ -121,7 +121,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 
     <!-- Render đa góc (nút vuông giống slot nền chính) -->
     <div class="mt-4">
-      <button @click="mvOpen = true"
+      <button @click="mvOpen = true" title="Render nhiều góc chụp từ 1 ảnh"
               class="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-dashed border-ink-700 bg-ink-900/40 transition hover:border-brand-400">
         <span class="grid h-9 w-9 place-items-center rounded-full bg-ink-800/70 text-cream-300/70"><StudioIcon name="camera" size="h-5 w-5" /></span>
         <span class="text-xs font-medium text-cream-200">Render đa góc</span>

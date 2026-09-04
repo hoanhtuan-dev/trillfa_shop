@@ -346,9 +346,9 @@ async function doEnrichPreview() {
       <template v-else>
         <!-- ── Top bar: History + Templates + Credit ── -->
         <div class="mb-3 flex items-center gap-2">
-          <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showHistory ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử</span></button>
-          <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="template" size="h-3.5 w-3.5" /> Templates</span></button>
-          <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showPresets ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Preset</span></button>
+          <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" title="Xem lịch sử prompt" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showHistory ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử</span></button>
+          <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" title="Prompt templates có sẵn" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="template" size="h-3.5 w-3.5" /> Templates</span></button>
+          <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" title="Prompt đã lưu từ Trợ lý thiết kế" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showPresets ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Preset</span></button>
           <span class="ml-auto text-xs text-cream-300/40">~{{ creditEstimate }} credit</span>
         </div>
 
@@ -440,10 +440,10 @@ async function doEnrichPreview() {
 
         <!-- ── Nâng cao + Preview Enrich: nút bấm rõ ràng ── -->
         <div class="my-3 flex gap-2">
-          <button @click="showAdvanced = !showAdvanced" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showAdvanced ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
+          <button @click="showAdvanced = !showAdvanced" title="Thiết lập negative prompt" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showAdvanced ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
             {{ showAdvanced ? '▾' : '▸' }} Nâng cao (negative prompt)
           </button>
-          <button @click="openEnrichPreview" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showEnrich ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
+          <button @click="openEnrichPreview" title="Xem trước prompt sau khi làm giàu" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showEnrich ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
             <span class="flex items-center justify-center gap-1"><StudioIcon name="wand" size="h-3.5 w-3.5" /> Preview Enrich</span>
           </button>
         </div>

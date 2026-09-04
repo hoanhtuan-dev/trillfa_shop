@@ -25,18 +25,18 @@ function setv(field, val) { store[field] = Number(val); store.saveUpscaleMemory(
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,150,120,.13), rgba(74,122,144,.06));">
     <div class="flex items-center justify-between">
       <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="maximize" /> Nâng cấp ảnh</h2>
-      <button @click="popupOpen = true" class="btn-outline btn-sm whitespace-nowrap"><StudioIcon name="gear" size="h-3.5 w-3.5" /> Cài đặt</button>
+      <button @click="popupOpen = true" title="Cài đặt & presets nâng cấp ảnh" class="btn-outline btn-sm whitespace-nowrap"><StudioIcon name="gear" size="h-3.5 w-3.5" /> Cài đặt</button>
     </div>
     <template v-if="store.upscaleSrc"><div class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5"><img :src="store.upscaleSrc" class="h-16 w-16 rounded-xl bg-ink-900 object-cover"><div class="min-w-0 text-xs text-cream-200"><p class="truncate font-semibold">{{ store.upscaleName }}</p><p class="text-cream-300/60">{{ store.upscaleScale }}x</p></div></div></template>
     <div v-else class="mt-3 text-xs text-cream-300/60">Chọn ảnh để nâng cấp.</div>
     <label class="label mt-3">Độ phóng to</label>
     <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs"><span class="shrink-0 font-medium text-cream-200">Độ phóng</span><input type="range" min="1" max="4" step="1" :value="store.upscaleScale" @input="setv('upscaleScale', $event.target.value)" class="h-2 w-full cursor-pointer accent-brand-500"><span class="shrink-0 font-semibold text-cream-50">{{ store.upscaleScale }}x</span></div>
     <button @click="runUpscale" :disabled="store.upscaling || !store.upscaleSrc" class="btn-brand mt-3 w-full whitespace-nowrap">{{ store.upscaling ? 'Đang nâng cấp…' : 'Nâng cấp Ảnh' }}</button>
-    <button v-if="beforeUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap"><StudioIcon name="columns" size="h-3.5 w-3.5" /> So sánh Trước/Sau</button>
+    <button v-if="beforeUrl && afterUrl" @click="compareOpen = true" title="So sánh ảnh trước/sau khi nâng cấp" class="btn-outline mt-1.5 w-full whitespace-nowrap"><StudioIcon name="columns" size="h-3.5 w-3.5" /> So sánh Trước/Sau</button>
     <!-- Settings + presets popup -->
     <div v-if="popupOpen" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" @click.self="popupOpen=false">
       <div class="scrollbar-hide max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl border border-brand-500/30 bg-ink-900 p-5" @click.stop>
-        <div class="mb-3 flex items-center justify-between"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="gear" /> Cài đặt & presets</span><button @click="popupOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200"><StudioIcon name="x" /></button></div>
+        <div class="mb-3 flex items-center justify-between"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="gear" /> Cài đặt & presets</span><button @click="popupOpen=false" title="Đóng" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200"><StudioIcon name="x" /></button></div>
         <div class="space-y-2.5">
           <div v-for="(f,i) in [['upscaleRefine','Tinh chỉnh AI'],['studioPhotoreal','Studio Chân thực'],['lightShadow','Ánh sáng & Bóng đổ'],['sharpen','Tăng nét chi tiết'],['clarity','Độ nổi khối'],['vibrance','Màu sống động']]" :key="f[0]">
             <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs"><span class="w-40 shrink-0 font-medium text-cream-200">{{ f[1] }}</span><input type="range" min="0" max="10" step="1" :value="store[f[0]]" @input="setv(f[0], $event.target.value)" class="h-2 w-full cursor-pointer accent-brand-500"><span class="shrink-0 font-semibold text-cream-50">{{ store[f[0]] }}</span></div>
@@ -44,13 +44,13 @@ function setv(field, val) { store[field] = Number(val); store.saveUpscaleMemory(
         </div>
         <div class="mt-4 flex gap-1.5">
           <input v-model="presetName" placeholder="Tên preset…" class="input !py-1.5">
-          <button @click="store.savePreset(presetName); presetName=''" class="btn-brand btn-sm whitespace-nowrap"><StudioIcon name="save" size="h-3.5 w-3.5" /> Lưu preset</button>
+          <button @click="store.savePreset(presetName); presetName=''" title="Lưu cấu hình hiện tại thành preset" class="btn-brand btn-sm whitespace-nowrap"><StudioIcon name="save" size="h-3.5 w-3.5" /> Lưu preset</button>
         </div>
         <div v-if="store.upscalePresets.length" class="mt-3 space-y-1.5">
           <p class="text-xs font-semibold text-cream-200">Presets</p>
           <div v-for="p in store.upscalePresets" :key="p.name" class="flex items-center gap-2 rounded-xl border border-ink-700 bg-ink-800 p-2 text-xs">
             <button @click="store.applyPreset(p)" class="flex-1 text-left text-cream-100 hover:text-brand-300">{{ p.name }} <span class="text-cream-300/50">· {{ p.scale }}x</span></button>
-            <button @click="store.deletePreset(p.name)" class="grid h-6 w-6 place-items-center rounded-full bg-red-600/20 text-red-200 hover:bg-red-600"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            <button @click="store.deletePreset(p.name)" title="Xóa preset" class="grid h-6 w-6 place-items-center rounded-full bg-red-600/20 text-red-200 hover:bg-red-600"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>
         </div>
       </div>
