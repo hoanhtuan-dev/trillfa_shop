@@ -15,7 +15,6 @@ export const useStudioStore = defineStore('studio', {
     generations: [],
     creditsLeft: 0,
     imageCreditCost: 1,  // chi phí credit cho 1 ảnh (load từ defaults)
-    canvasImg: '',
     // film / reframe / swap share the source image (editSource || preview)
     editSource: null,
     texture: 5,
@@ -75,10 +74,7 @@ export const useStudioStore = defineStore('studio', {
     _drawHasStrokes: false, // đã có nét thật? (tránh push history/bake khi không vẽ gì)
     _drawPressure: 1,   // áp lực bút stylus (0-1) cho cọ vẽ
     _drawBusy: false,    // chống bake trùng khi đang áp dụng nét vẽ
-    // Vẽ vùng chọn (marquee)
-    regionSelectMode: false,
-    regionBox: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
-    _regionDrag: null,
+    _flattenBusy: false, // đang chuẩn hoá transform layer (xoay/lật) — chống gọi song song
     // concept
     imagePromptEn: '',
     negativePromptEn: '',
@@ -249,7 +245,6 @@ export const useStudioStore = defineStore('studio', {
       this.previewId = null;
       this.preview = null;
       this.editSource = null;
-      this.canvasImg = '';
       this.canvasLayers = [];
       this.activeLayerId = '';
       this.loadUpscaleMemory();
@@ -919,7 +914,6 @@ export const useStudioStore = defineStore('studio', {
       this.previewId = null;
       this.preview = null;
       this.editSource = null;
-      this.canvasImg = '';
       this.canvasLayers = [];
       this.activeLayerId = '';
       this.palette = [];
@@ -1013,9 +1007,10 @@ export const useStudioStore = defineStore('studio', {
     toggleFlipX(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; this.pushHistory(); l.flipX = !l.flipX; this.saveLayerLayout(); },
     toggleFlipY(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; this.pushHistory(); l.flipY = !l.flipY; this.saveLayerLayout(); },
     // ── Xóa vùng (erase brush + feather) ──
-    toggleErase() {
+    async toggleErase() {
       const l = this.activeLayer;
       if (l && l.locked) { this.toast('Layer đang khóa — mở khóa trước khi xóa.', 'error'); return; }
+      if (!this.eraseMode && !(await this.flattenActiveLayerTransform())) return;
       this.eraseMode = !this.eraseMode;
       // KHÔNG reset zoom/pan — đóng băng vị trí & độ thu phóng hiện tại khi chọn công cụ.
       if (!this.eraseMode) this.applyErase();
@@ -1111,9 +1106,10 @@ export const useStudioStore = defineStore('studio', {
     // "✕ Hủy": thoát chế độ erase KHÔNG áp dụng (bỏ nét đã vẽ).
     cancelErase() { if (!this.eraseMode) return; this.eraseMode = false; this.toast('Đã hủy xóa.'); },
     // ── Vẽ tự do (paint brush): tô màu lên layer active ──
-    toggleDraw() {
+    async toggleDraw() {
       const l = this.activeLayer;
       if (l && l.locked) { this.toast('Layer đang khóa — mở khóa trước khi vẽ.', 'error'); return; }
+      if (!this.drawMode && !(await this.flattenActiveLayerTransform())) return;
       this.drawMode = !this.drawMode;
       if (!this.drawMode) this.applyDraw();
     },
@@ -1206,26 +1202,72 @@ export const useStudioStore = defineStore('studio', {
     },
     finishDraw() { if (!this.drawMode) return; this.applyDraw().then(() => { this.drawMode = false; }); },
     cancelDraw() { if (!this.drawMode) return; this.drawMode = false; this.toast('Đã hủy vẽ.'); },
-    // ── Vẽ vùng chọn (rectangle marquee) ──
-    toggleRegionSelect() {
-      this.regionSelectMode = !this.regionSelectMode;
-    },
-    exitRegionSelect() { this.regionSelectMode = false; this._regionDrag = null; },
     exitErase() { if (this.eraseMode) { this.eraseMode = false; this.applyErase(); } },
-    beginRegionDrag(e) {
-      if (!this.regionSelectMode) return;
-      this._regionDrag = { sx: e.clientX, sy: e.clientY, box: { ...(this.regionBox || { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }) } };
+    // ── Chuẩn hoá transform layer (xoay/lật) trước khi sửa pixel ──
+    // Overlay vẽ/xóa/lasso tính theo khung hiển thị (chưa kể rotation/flip) nên trên layer bị XOAY
+    // hoặc LẬT, nét cọ/đường lasso và vùng áp dụng LỆCH khỏi nội dung người dùng nhìn thấy (khi
+    // phóng to lệch càng rõ). Khi bật công cụ sửa pixel trên layer như vậy ta "rasterize" transform:
+    // nội dung được xoay/lật vào 1 ảnh mới (giữ NGUYÊN vị trí/kích thước hiển thị) rồi reset
+    // rotation/flip → mọi overlay chuẩn hoá theo ảnh hoạt động chính xác. Ctrl+Z hoàn lại bản gốc.
+    _needsFlatten(l) {
+      if (!l || !l.image) return false;
+      const rot = Math.abs((Number(l.rotation) || 0) % 360);
+      return (rot > 0.5 && rot < 359.5) || !!l.flipX || !!l.flipY;
     },
-    regionDragMove(e) {
-      const d = this._regionDrag; if (!d) return;
-      const m = this.canvasMetrics(); if (!m) return;
-      const dx = (e.clientX - d.sx) / m.vw, dy = (e.clientY - d.sy) / m.vh;
-      const b = { ...d.box };
-      b.x = Math.max(0, Math.min(1 - b.w, b.x + dx));
-      b.y = Math.max(0, Math.min(1 - b.h, b.y + dy));
-      this.regionBox = b;
+    // Gọi trước khi bật erase/draw/region-select. Trả true khi sẵn sàng sửa (đã flatten nếu cần).
+    async flattenActiveLayerTransform() {
+      if (this._flattenBusy) return false;
+      const l = this.activeLayer;
+      if (!this._needsFlatten(l)) return true;
+      try {
+        this._flattenBusy = true;
+        const img = await this._loadImageSrc(l.image);
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        if (!nw || !nh) return false;
+        const rot = ((Number(l.rotation) || 0) * Math.PI) / 180;
+        const cosR = Math.abs(Math.cos(rot)), sinR = Math.abs(Math.sin(rot));
+        const W = Math.max(1, Math.ceil(nw * cosR + nh * sinR));
+        const H = Math.max(1, Math.ceil(nw * sinR + nh * cosR));
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(W / 2, H / 2);
+        // Khớp CSS `transform: rotate(θ) scale(sx,sy)` (scale trước rồi rotate) → ctx.rotate rồi scale.
+        ctx.rotate(rot);
+        ctx.scale(l.flipX ? -1 : 1, l.flipY ? -1 : 1);
+        ctx.drawImage(img, -nw / 2, -nh / 2);
+        const MAX = 512;
+        const k = Math.min(1, MAX / W, MAX / H);
+        const newBaseW = W * k, newBaseH = H * k;
+        // Kích thước hiển thị CŨ (không gian base, trước zoom) để giữ layer KHÔNG nhảy cỡ.
+        const kOld = Math.min(1, MAX / nw, MAX / nh);
+        const oldBaseW = Number(l.baseW) || (nw * kOld);
+        const oldBaseH = Number(l.baseH) || (nh * kOld);
+        const sOld = Math.max(0.05, Math.min(8, Number(l.scale) || 1));
+        const visW = oldBaseW * cosR + oldBaseH * sinR; // bbox hiển thị (CSS px, chưa zoom)
+        const visH = oldBaseW * sinR + oldBaseH * cosR;
+        // newBase tỉ lệ đúng visW/visH (đồng dạng) nên 1 hệ số scale giữ đúng cả 2 chiều.
+        let sNew = (visW * sOld) / Math.max(1, newBaseW);
+        sNew = Math.max(0.05, Math.min(8, sNew));
+        this.pushHistory(); // undo = khôi phục layer gốc (ảnh + transform)
+        l.image = canvas.toDataURL('image/png');
+        l.rotation = 0; l.flipX = false; l.flipY = false;
+        l.baseW = newBaseW; l.baseH = newBaseH;
+        l.scale = sNew;
+        // Pixel đã khác generation gốc (nếu layer là kết quả AI) → trở thành ảnh cục bộ để
+        // download/lưu/inpaint không nhầm với file gốc trên server.
+        if (l.kind === 'gen' && l.genId) {
+          l.kind = 'source'; l.genId = null;
+          if (this.activeLayerId === l.id) { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; }
+        }
+        this.saveLayerLayout();
+        this.toast('Đã áp xoay/lật vào ảnh để chỉnh sửa đúng vị trí — Ctrl+Z nếu muốn hoàn lại.');
+        return true;
+      } catch (e) {
+        this.toast('Không chuẩn hoá được ảnh xoay/lật.', 'error');
+        return false;
+      } finally { this._flattenBusy = false; }
     },
-    endRegionDrag() { this._regionDrag = null; },
     // Kéo layer trên canvas để di chuyển (tách khỏi pan/zoom khung nhìn).
     beginLayerDrag(id, e) {
       const l = this.canvasLayers.find((x) => x.id === id);
@@ -1594,9 +1636,11 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintPathRegions = [];
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
     },
-    toggleInpaintMask(mode) {
+    async toggleInpaintMask(mode) {
       if (this.inpaintMaskMode === mode) { this.clearInpaintMask(); return; }
       if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
+      // Vẽ mask trên layer bị xoay/lật → vùng chọn lệch khỏi nội dung hiển thị; chuẩn hoá trước.
+      if (!(await this.flattenActiveLayerTransform())) return;
       if (this._inpaintDrag) this._inpaintStopDrag();
       this.inpaintMaskSource = 'inpaint';
       this.inpaintMaskMode = mode;
@@ -1611,9 +1655,11 @@ export const useStudioStore = defineStore('studio', {
     },
     // Mở vùng chọn từ THANH CÔNG CỤ CANVAS (rect/freehand) — dùng chung overlay chính xác của Inpaint,
     // nhưng hành động là Xóa / Tô màu / Feather tại chỗ (không phải mask AI inpaint).
-    startCanvasSelect(mode) {
+    async startCanvasSelect(mode) {
       if (this.inpaintStage === 'send' || this.inpaintStage === 'processing') { this.toast('Đang xử lý — chờ xong rồi chọn vùng.', 'error'); return; }
       if (this.inpaintMaskMode === mode) { this.clearInpaintMask(); return; }
+      // Lasso/rect/vùng chọn cũng thao tác theo pixel layer → cần layer thẳng hàng (không xoay/lật).
+      if (!(await this.flattenActiveLayerTransform())) return;
       this.inpaintMaskSource = 'canvas';
       if (this._inpaintDrag) this._inpaintStopDrag();
       this.inpaintMaskMode = mode;

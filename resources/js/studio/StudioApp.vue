@@ -1,11 +1,9 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue';
 import { useStudioStore } from './store.js';
-import SourceCard from './components/SourceCard.vue';
 import SuggestCard from './components/SuggestCard.vue';
 import ConceptCard from './components/ConceptCard.vue';
 import StylistCard from './components/StylistCard.vue';
-import PaletteTextureCard from './components/PaletteTextureCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 // [SWAP TẠM ẨN] import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
@@ -31,8 +29,9 @@ const renameValue = ref('');
 function startRename(l) { renamingId.value = l.id; renameValue.value = l.name || ''; }
 function commitRename() { if (!renamingId.value) return; store.renameLayer(renamingId.value, renameValue.value); renamingId.value = null; }
 function cancelRename() { renamingId.value = null; }
-onMounted(async () => { store.load(); store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); });
-onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); });
+function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
+onMounted(async () => { store.load(); store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('resize', onCanvasResize); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.

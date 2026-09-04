@@ -155,8 +155,9 @@ function onKeyDown(e) {
     if (store.inpaintMaskMode === 'brush') { e.preventDefault(); store.undoInpaintBrush(); }
   }
 }
-onMounted(() => { window.addEventListener('keydown', onKeyDown); });
-onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window.removeEventListener('keydown', onKeyDown); });
+function onResize() { nextTick(() => { metricsTick.value++; }); }
+onMounted(() => { window.addEventListener('keydown', onKeyDown); window.addEventListener('resize', onResize); });
+onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window.removeEventListener('keydown', onKeyDown); window.removeEventListener('resize', onResize); });
 </script>
 <template>
   <div v-if="visible" class="absolute inset-0 z-31 select-none" :class="editing ? 'cursor-crosshair' : 'cursor-default'"

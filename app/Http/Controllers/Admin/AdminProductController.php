@@ -124,11 +124,51 @@ class AdminProductController extends Controller
             'brand' => ['nullable', 'string', 'max:120'],
             'hint' => ['nullable', 'string', 'max:1000'],
             'short_description' => ['nullable', 'string', 'max:500'],
+            'image_url' => ['nullable', 'string', 'max:2048'],
+            'force' => ['nullable', 'boolean'],
         ]);
 
-        $result = app(ProductAIService::class)->generate($data);
+        $service = app(ProductAIService::class);
+        $imageAnalysis = null;
+        $analysisCached = false;
+        $imageAnalyzed = false;
 
-        return response()->json(['ok' => true, 'data' => $result]);
+        // Vision: analyze the product image once, cache by image hash. If image
+        // unchanged and not force, reuse the cached analysis (no re-analysis).
+        if (! empty($data['image_url'])) {
+            $path = $this->resolveImagePath($data['image_url']);
+            if ($path && is_file($path)) {
+                $imageAnalyzed = true;
+                $cacheKey = 'product_ai_img:'.sha1_file($path).'|'.(string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
+                if ((bool) ($data['force'] ?? false)) {
+                    \Illuminate\Support\Facades\Cache::forget($cacheKey);
+                }
+                $imageAnalysis = $service->analyzeImage($path, (bool) ($data['force'] ?? false));
+                $analysisCached = \Illuminate\Support\Facades\Cache::has($cacheKey);
+            }
+        }
+
+        $result = $service->generate($data, $imageAnalysis);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $result,
+            'image_analyzed' => $imageAnalyzed,
+            'analysis_cached' => $analysisCached,
+            'analysis' => $imageAnalysis,
+        ]);
+    }
+
+    protected function resolveImagePath(string $url): ?string
+    {
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        foreach ([public_path($path), storage_path('app/public/'.$path)] as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**
