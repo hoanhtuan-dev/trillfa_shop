@@ -10,12 +10,17 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
 <template>
   <!-- ══ Vùng chọn (rect/freehand/brush) ══ -->
   <div v-if="store.inpaintMaskMode !== 'none'" class="flex flex-wrap items-center justify-center gap-2 rounded-full bg-ink-900/95 px-3 py-1.5 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
-    <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path'">
+    <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <template v-if="store.inpaintMaskMode === 'path'">
         <button @click="store.pathClose()" class="flex items-center gap-1 rounded-full bg-violet-600 px-2.5 py-1 text-white transition-colors hover:bg-violet-500" title="Đóng vùng chọn từ đường cong">Đóng</button>
         <button @click="store.pathUndoPoint()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Bỏ điểm neo cuối">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
         </button>
+      </template>
+      <template v-if="store.inpaintMaskMode === 'magic'">
+        <span class="text-[10px] text-cream-300/70">Ngưỡng</span>
+        <input type="range" min="2" max="128" step="2" :value="store.magicTolerance" @input="store.magicTolerance = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-brand-500">
+        <span class="min-w-7 text-center text-[11px] text-cream-100">{{ store.magicTolerance }}</span>
       </template>
       <button @click="store.confirmInpaintMask()" class="flex items-center gap-1 rounded-full bg-brand-600 px-2.5 py-1 text-white transition-colors hover:bg-brand-700" :title="store.inpaintMaskSource === 'canvas' ? 'Thoát vùng chọn' : 'Áp dụng vùng chọn và thoát'">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Xong
@@ -45,9 +50,9 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
     <span class="text-[10px] text-cream-300/70">Feather</span>
     <input type="range" min="0" max="50" step="5" :value="store.inpaintFeather" @input="store.inpaintFeather = Number($event.target.value)" class="h-1.5 w-16 cursor-pointer accent-brand-500">
     <span class="min-w-5 text-center text-[11px] text-cream-100">{{ store.inpaintFeather }}</span>
-    <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path'">
+    <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
-      <template v-if="store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path'">
+      <template v-if="store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
         <button @click="store.setInpaintSelectMode('add')" :class="store.inpaintSelectMode === 'add' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" class="grid h-6 w-6 place-items-center rounded-full transition-colors" title="Cộng vào vùng chọn">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M12 8v8M8 12h8"/></svg>
         </button>

@@ -63,6 +63,10 @@ function onPointerDown(e) {
     store.pathAddPoint(e);
     return;
   }
+  if (store.inpaintMaskMode === 'magic') {
+    store.magicWand(e);
+    return;
+  }
   store.inpaintMaskStart(e);
 }
 

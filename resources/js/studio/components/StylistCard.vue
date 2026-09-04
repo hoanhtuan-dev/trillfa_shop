@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import StylistDataManager from './StylistDataManager.vue';
+import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 const open = ref(false);
 const settingsOpen = ref(false);
@@ -55,16 +56,13 @@ function openSettings() { settingsOpen.value = true; }
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
     <div class="flex items-center gap-2">
       <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
-        <span class="min-w-0 flex-1">
-          <span class="block text-sm font-semibold text-brand-300">✨ Trợ lý thiết kế</span>
-          <span class="mt-0.5 block text-[11px] text-ink-500">AI viết prompt thiết kế theo loại trang phục</span>
-        </span>
+        <span class="min-w-0 flex-1"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Trợ lý thiết kế</span></span>
         <span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
       </button>
-      <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200">⚙</button>
+      <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200"><StudioIcon name="gear" /></button>
     </div>
 
-    <BaseModal v-model="open" title="✨ Trợ lý thiết kế" wide>
+    <BaseModal v-model="open" title="Trợ lý thiết kế" wide>
       <!-- step: type -->
       <template v-if="step === 'type'">
         <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">Chọn loại trang phục</p>
@@ -81,7 +79,7 @@ function openSettings() { settingsOpen.value = true; }
       <template v-else-if="step === 'survey'">
         <div class="mb-3 flex items-center justify-between">
           <p class="text-xs font-semibold text-cream-100">{{ typeName }}</p>
-          <button @click="step='type'" class="btn-outline btn-sm">↩ Đổi loại</button>
+          <button @click="step='type'" class="btn-outline btn-sm">Đổi loại</button>
         </div>
         <p v-if="loading" class="py-6 text-center text-xs text-cream-300/60">Đang tải câu hỏi…</p>
         <div v-else class="space-y-3">
@@ -94,7 +92,7 @@ function openSettings() { settingsOpen.value = true; }
             <p v-if="selectedCount(q.key)" class="mt-1 text-[10px] text-cream-300/50">Đã chọn {{ selectedCount(q.key) }} mục</p>
           </div>
         </div>
-        <button @click="submitPrompt" :disabled="loading" class="btn-brand mt-3 w-full">{{ loading ? 'Đang tạo…' : '✨ Tạo prompt thiết kế' }}</button>
+        <button @click="submitPrompt" :disabled="loading" class="btn-brand mt-3 w-full">{{ loading ? 'Đang tạo…' : 'Tạo prompt thiết kế' }}</button>
       </template>
 
       <!-- step: result -->
@@ -104,15 +102,15 @@ function openSettings() { settingsOpen.value = true; }
             <button @click="promptLang='en'" :class="promptLang==='en' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">EN</button>
             <button @click="promptLang='vi'" :class="promptLang==='vi' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">VI</button>
           </div>
-          <button @click="backToSurvey" class="btn-outline btn-sm">↩ Chỉnh lại</button>
+          <button @click="backToSurvey" class="btn-outline btn-sm">Chỉnh lại</button>
         </div>
         <textarea v-model="shownPrompt" rows="5" class="input !text-xs"></textarea>
-        <button @click="refine" :disabled="loading" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : '✨ Tinh chỉnh & nâng cấp' }}</button>
-        <button @click="applyToGenerate" class="btn-brand mt-2 w-full">➡ Đưa vào Tạo Ảnh</button>
+        <button @click="refine" :disabled="loading" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : 'Tinh chỉnh & nâng cấp' }}</button>
+        <button @click="applyToGenerate" class="btn-brand mt-2 w-full">Đưa vào Tạo Ảnh</button>
       </template>
     </BaseModal>
 
-    <BaseModal v-model="settingsOpen" title="⚙ Quản lý data Trợ lý thiết kế" wide>
+    <BaseModal v-model="settingsOpen" title="Quản lý data Trợ lý thiết kế" wide>
       <StylistDataManager />
     </BaseModal>
   </div>

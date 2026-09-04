@@ -145,6 +145,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintFreehandPaths: [],     // các nét lasso ĐÃ hoàn thành
     inpaintPathPoints: [],        // điểm neo đang vẽ cho vùng chọn bằng đường cong (path/curve)
     inpaintPathRegions: [],       // các vùng path ĐÃ đóng (để preview hiển thị đủ nhiều vùng)
+    magicTolerance: 32,           // ngưỡng màu cho Magic Wand (0-128)
     _inpaintFreehandActive: false,
     inpaintFeather: 0,            // feather (px 0-50) — làm mềm mép vùng chọn
     inpaintFillColor: '#ffffff',  // màu tô cho nút "🎨 Tô" của vùng chọn
@@ -1399,6 +1400,9 @@ export const useStudioStore = defineStore('studio', {
       } else if (this.inpaintMaskMode === 'path') {
         if (!this.inpaintBrushData) { this.toast('Chưa đóng vùng chọn — thêm điểm rồi bấm "Đóng".', 'error'); return; }
         this._inpaintMaskKind = 'brush'; // path tạo mask_data như brush
+      } else if (this.inpaintMaskMode === 'magic') {
+        if (!this.inpaintBrushData) { this.toast('Chưa chọn vùng — bấm vào ảnh để chọn theo màu.', 'error'); return; }
+        this._inpaintMaskKind = 'brush'; // magic tạo mask_data như brush
       } else {
         return;
       }
@@ -1449,6 +1453,7 @@ export const useStudioStore = defineStore('studio', {
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
       if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this._initInpaintBrush(); }
+      if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // Mở vùng chọn từ THANH CÔNG CỤ CANVAS (rect/freehand) — dùng chung overlay chính xác của Inpaint,
     // nhưng hành động là Xóa / Tô màu / Feather tại chỗ (không phải mask AI inpaint).
@@ -1464,6 +1469,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
       if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this._initInpaintBrush(); }
+      if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // ── Freehand (lasso) select: vẽ tự do tạo vùng kín → mask ──
     freehandStart(e) {
@@ -1554,6 +1560,68 @@ export const useStudioStore = defineStore('studio', {
       // Sau lần đóng đầu tiên, chuyển sang 'add' → các path sau tự cộng dồn (dễ vẽ đa vùng).
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
       this.toast('Đã tạo vùng chọn — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
+    },
+    // ── Magic Wand: click chọn vùng theo màu tương tự (flood-fill theo ngưỡng) ──
+    async magicWand(e) {
+      if (this.inpaintMaskMode !== 'magic') return;
+      e.stopPropagation();
+      const p = this.inpaintMaskPointer(e); if (!p) return;
+      const l = this.activeLayer;
+      if (!l || !l.image) { this.toast('Chọn 1 layer ảnh để dùng Magic Wand.', 'error'); return; }
+      const tol = Math.max(2, Math.min(128, Number(this.magicTolerance) || 32));
+      try {
+        const img = await this._loadImageSrc(l.image);
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const base = 512, ia = w / h;
+        const mw = ia >= 1 ? base : Math.max(1, Math.round(base * ia));
+        const mh = ia >= 1 ? Math.max(1, Math.round(base / ia)) : base;
+        const c = document.createElement('canvas'); c.width = mw; c.height = mh;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, mw, mh);
+        const id = ctx.getImageData(0, 0, mw, mh);
+        const d = id.data;
+        const sx = Math.min(mw - 1, Math.max(0, Math.round(p.nx * mw)));
+        const sy = Math.min(mh - 1, Math.max(0, Math.round(p.ny * mh)));
+        const si = (sy * mw + sx) * 4;
+        const sr = d[si], sg = d[si + 1], sb = d[si + 2];
+        // Flood-fill (stack/DFS) theo ngưỡng màu
+        const visited = new Uint8Array(mw * mh);
+        const stack = [sy * mw + sx];
+        visited[sy * mw + sx] = 1;
+        const thresh = tol * 3;
+        while (stack.length) {
+          const idx = stack.pop();
+          const x = idx % mw, y = (idx / mw) | 0;
+          const neighbors = y > 0 ? [idx - mw] : [];
+          if (y < mh - 1) neighbors.push(idx + mw);
+          if (x > 0) neighbors.push(idx - 1);
+          if (x < mw - 1) neighbors.push(idx + 1);
+          for (const ni of neighbors) {
+            if (visited[ni]) continue;
+            const pi = ni * 4;
+            const diff = Math.abs(d[pi] - sr) + Math.abs(d[pi + 1] - sg) + Math.abs(d[pi + 2] - sb);
+            if (diff <= thresh) { visited[ni] = 1; stack.push(ni); }
+          }
+        }
+        // Tạo temp canvas chứa vùng chọn (đỏ), rồi vẽ lên mask canvas theo add/subtract.
+        if (!this._inpaintMaskCtx) this._initInpaintBrush();
+        const mc = this._inpaintMaskCanvas, mctx = this._inpaintMaskCtx;
+        if (!mc || !mctx) return;
+        if (this.inpaintSelectMode === 'new') { mctx.clearRect(0, 0, mc.width, mc.height); this.inpaintPathRegions = []; }
+        const temp = document.createElement('canvas'); temp.width = mw; temp.height = mh;
+        const tctx = temp.getContext('2d');
+        const td = tctx.createImageData(mw, mh);
+        for (let i = 0; i < mw * mh; i++) {
+          if (visited[i]) { td.data[i * 4] = 220; td.data[i * 4 + 1] = 38; td.data[i * 4 + 2] = 38; td.data[i * 4 + 3] = 255; }
+        }
+        tctx.putImageData(td, 0, 0);
+        mctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
+        mctx.drawImage(temp, 0, 0);
+        mctx.globalCompositeOperation = 'source-over';
+        this._finalizeInpaintBrush();
+        if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
+        this.toast('Đã chọn vùng theo màu.');
+      } catch (err) { this.toast('Không chọn được vùng.', 'error'); }
     },
     inpaintMaskPointer(e) {
       const m = this.canvasMetrics();
