@@ -107,29 +107,29 @@ class ProductAIService
             }
         }
 
-        $prompt = 'Đây là ảnh sản phẩm thời trang/phong cách sống. Phân tích và chỉ trả JSON hợp lệ: '
-            .'{"styles":"phong cách","colors":"màu chủ đạo","fabric":"chất liệu","subject":"chủ thể/đối tượng",'
-            .'"garment":"loại trang phục","keywords":["từ khóa","..."],"feeling":"cảm giác/thông điệp"}.'
-            .' Viết ngắn gọn, tiếng Việt, dùng cho content & SEO.';
+        $result = $this->attempt('vision', $this->buildVisionPrompt(), $imagePath);
 
-        $result = $this->vision($imagePath, $prompt);
-
+        // Only cache a REAL LLM understanding — offline GD stays uncached so a
+        // later click retries the model when quota/network recovers.
         if (is_array($result)) {
             Cache::put('product_ai_img:'.$key, $result, $this->cacheTtl);
+
+            return $result;
         }
 
-        return $result;
+        return $this->offlineAnalysis($imagePath);
     }
 
     /**
-     * Vision with an ALWAYS-non-empty result: provider attempts (qwen → gemini),
-     * then the deterministic offline GD color analysis.
+     * LIGHT vision prompt: understand the image only (short output, fast) — the
+     * heavy content/SEO generation runs in the separate, fast TEXT step (qwen3.8-flash).
      */
-    protected function vision(string $imagePath, string $prompt): ?array
+    protected function buildVisionPrompt(): string
     {
-        $result = $this->attempt('vision', $prompt, $imagePath);
-
-        return is_array($result) ? $result : $this->offlineAnalysis($imagePath);
+        return 'Đây là ảnh sản phẩm thời trang/phong cách sống. Phân tích NGẮN GỌN và chỉ trả JSON hợp lệ duy nhất: '
+            .'{"styles":"phong cách","colors":"màu chủ đạo","fabric":"chất liệu","subject":"chủ thể/đối tượng",'
+            .'"garment":"loại trang phục","keywords":["từ khóa","..."],"feeling":"cảm giác/thông điệp"}.'
+            .' Viết tiếng Việt, dùng cho content & SEO.';
     }
 
     /**
@@ -201,46 +201,34 @@ class ProductAIService
     }
 
     /**
-     * ONE multimodal call: see the image + generate the full structured content
-     * + the image understanding, in a single request (like "Gợi ý từ ảnh" ~15s).
-     * The understanding is cached by image hash so later clicks re-use it (text-only).
+     * TWO fast steps (total well under the gateway timeout):
+     *  1) LIGHT vision — understand the image (short output, cached by image hash).
+     *  2) FAST text — qwen3.8-flash writes the full structured content + SEO from
+     *     (form fields + understanding). This is the reliable, user-confirmed path.
+     * Vision failure never blocks content: it degrades to GD offline analysis and
+     * the TEXT step still produces a real AI result.
      */
     public function generateFromImage(array $input, string $imagePath, bool $force = false): array
     {
         $this->startBudget();
 
         $key = $this->imageCacheKey($imagePath);
-        $cached = $force ? null : Cache::get('product_ai_img:'.$key);
-        if (is_array($cached)) {
-            $out = $this->generate($input, $cached);
-            $out['image_analyzed'] = true;
-            $out['analysis_cached'] = true;
+        $understanding = $force ? null : Cache::get('product_ai_img:'.$key);
+        $cached = is_array($understanding);
 
-            return $out;
-        }
-
-        $result = $this->attempt('vision', $this->buildImageContentPrompt($input), $imagePath);
-
-        // LLM returned real content (has name/description) → use it.
-        if (is_array($result) && (isset($result['suggested_name']) || isset($result['description']))) {
-            $understanding = is_array($result['understanding'] ?? null) ? $result['understanding'] : null;
-            if ($understanding) {
+        if (! $cached) {
+            $understanding = $this->attempt('vision', $this->buildVisionPrompt(), $imagePath);
+            if (is_array($understanding)) {
                 Cache::put('product_ai_img:'.$key, $understanding, $this->cacheTtl);
+            } else {
+                // Offline GD analysis is NOT cached, so the model is retried later.
+                $understanding = $this->offlineAnalysis($imagePath);
             }
-            unset($result['understanding']);
-            $result['source'] = 'ai';
-            $result['reason'] = 'ok (vision)';
-            $result['attempts'] = $this->attempts;
-            $result['image_analyzed'] = true;
-            $result['analysis_cached'] = false;
-
-            return $result;
         }
 
-        // vision() fell back to offline understanding (styles/colors only).
-        $understanding = is_array($result) ? $result : $this->offlineAnalysis($imagePath);
-        $out = $this->generate($input, $understanding);
+        $out = $this->generate($input, is_array($understanding) ? $understanding : null);
         $out['image_analyzed'] = true;
+        $out['analysis_cached'] = $cached;
 
         return $out;
     }
@@ -416,33 +404,6 @@ class ProductAIService
     }
 
     // ------------------------------------------------------------- prompts
-
-    protected function buildImageContentPrompt(array $input): string
-    {
-        $name = ($input['name'] ?? '') ?: 'sản phẩm thời trang/phong cách sống';
-        $category = $input['category'] ?? '';
-        $brand = $input['brand'] ?? '';
-        $hint = $input['hint'] ?? '';
-        $currentShort = $input['short_description'] ?? '';
-        $refine = $currentShort ? "\nNội dung đã viết (giữ ý chính, làm giàu hơn): {$currentShort}" : '';
-
-        return <<<PROMPT
-Bạn là chuyên gia content & SEO thời trang Việt Nam. NHÌN ẢNH sản phẩm và kết hợp thông tin người dùng để viết nội dung có cấu trúc chuẩn ngành.
-{$refine}
-Thông tin người dùng: Tên={$name}, Danh mục={$category}, Thương hiệu={$brand}, Ý tưởng={$hint}.
-Trả VỀ JSON hợp lệ duy nhất (không markdown):
-{
-  "understanding": {"styles":"phong cách","colors":"màu sắc","fabric":"chất liệu","subject":"chủ thể","feeling":"cảm giác","keywords":["k1","k2"]},
-  "suggested_name": "tên hấp dẫn (<=80)",
-  "brand": "thương hiệu",
-  "short_description": "1-2 câu (<=160)",
-  "description": "<h3>Phong cách</h3><p>…</p><h3>Chất liệu & chất lượng</h3><ul><li>…</li></ul><h3>Màu sắc</h3><p>…</p><h3>Thiết kế chi tiết</h3><ul><li>…</li></ul><h3>Phù hợp</h3><p>…</p><h3>Bảo quản</h3><ul><li>…</li></ul>",
-  "meta_title": "<=60",
-  "meta_description": "120-160 ký tự",
-  "tags": ["t1","t2","t3"]
-}
-PROMPT;
-    }
 
     protected function buildPrompt(array $input, ?array $imageAnalysis): string
     {
@@ -628,8 +589,23 @@ PROMPT;
             'meta_description' => 'Khám phá '.$base.' '.($fabric ? $fabric.' ' : '').'— '.$descStyle.', chất liệu cao cấp, tôn dáng, giao nhanh, đổi trả dễ dàng.',
             'tags' => array_values(array_filter([$category, $style, $color, $fabric, 'thời trang', 'phong cách', 'trillfa'])),
             'source' => 'stub',
-            'reason' => $this->lastError ?: 'offline',
+            'reason' => $this->failureReason(),
             'attempts' => $this->attempts,
         ];
+    }
+
+    /**
+     * Human-readable failure summary for the UI — Qwen (primary) failures first,
+     * so the message never misleadingly highlights the Gemini fallback.
+     */
+    private function failureReason(): string
+    {
+        foreach ($this->attempts as $a) {
+            if (str_starts_with($a, 'qwen:')) {
+                return $a;
+            }
+        }
+
+        return $this->lastError ?: 'offline';
     }
 }

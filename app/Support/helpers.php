@@ -989,7 +989,7 @@ if (! function_exists('product_ai_gemini_vision_model')) {
 if (! function_exists('product_ai_timeout')) {
     function product_ai_timeout(): int
     {
-        return max(1, (int) product_ai_config('timeout_seconds', 10));
+        return max(1, (int) product_ai_config('timeout_seconds', 12));
     }
 }
 
@@ -1003,7 +1003,7 @@ if (! function_exists('product_ai_max_models')) {
 if (! function_exists('product_ai_total_budget')) {
     function product_ai_total_budget(): int
     {
-        return max(5, (int) product_ai_config('total_budget_seconds', 20));
+        return max(5, (int) product_ai_config('total_budget_seconds', 25));
     }
 }
 
