@@ -16,6 +16,14 @@ const onSale = computed(() => !!props.product.compare_price);
 const discount = computed(() => props.product.discount_percent || 0);
 const isWishlisted = computed(() => store.wishlistHas(props.product.id));
 
+// A second image (first gallery photo different from the cover) shown on hover.
+const hoverImage = computed(() => {
+    const g = props.product.gallery || [];
+    const first = g.find((img) => img !== props.product.image);
+    return first || '';
+});
+const hasHoverImage = computed(() => !!hoverImage.value);
+
 function addToCart() {
     store.addToCart(props.product.id, 1);
 }
@@ -28,12 +36,20 @@ function addToCart() {
             :href="product.url"
             class="relative block overflow-hidden rounded-[1.75rem] bg-cream-100 ring-1 ring-cream-200/70 transition-shadow duration-300 group-hover:ring-brand-300/40 group-hover:shadow-lg group-hover:shadow-ink-900/10"
         >
-            <div class="aspect-[4/5] w-full overflow-hidden">
+            <div class="relative aspect-[4/5] w-full overflow-hidden">
                 <img
                     :src="product.image"
                     :alt="product.name"
                     loading="lazy"
-                    class="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
+                    class="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-[1.06]"
+                    :class="hasHoverImage ? 'group-hover:opacity-0' : ''"
+                />
+                <img
+                    v-if="hasHoverImage"
+                    :src="hoverImage"
+                    :alt="product.name"
+                    loading="lazy"
+                    class="absolute inset-0 h-full w-full object-cover opacity-0 scale-110 transition-all duration-700 ease-out group-hover:opacity-100 group-hover:scale-100"
                 />
             </div>
 

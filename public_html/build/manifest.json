@@ -1,16 +1,31 @@
 {
-  "_GalleryModal-BS1iiCyk.js": {
-    "file": "assets/GalleryModal-BS1iiCyk.js",
+  "_GalleryModal-DcuGqIXf.js": {
+    "file": "assets/GalleryModal-DcuGqIXf.js",
     "name": "GalleryModal",
     "imports": [
-      "_pinia-DuGY3yDm.js"
+      "_pinia-CJA6HZ2m.js"
     ]
   },
-  "_StylistDataManager-2N8ly6fG.js": {
-    "file": "assets/StylistDataManager-2N8ly6fG.js",
+  "_ProductCard-8vgc_Snn.js": {
+    "file": "assets/ProductCard-8vgc_Snn.js",
+    "name": "ProductCard",
+    "imports": [
+      "_pinia-CJA6HZ2m.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js"
+    ],
+    "css": [
+      "assets/ProductCard-D5k1nk1s.css"
+    ]
+  },
+  "_ProductCard-D5k1nk1s.css": {
+    "file": "assets/ProductCard-D5k1nk1s.css",
+    "src": "_ProductCard-D5k1nk1s.css"
+  },
+  "_StylistDataManager-BDx2sRrJ.js": {
+    "file": "assets/StylistDataManager-BDx2sRrJ.js",
     "name": "StylistDataManager",
     "imports": [
-      "_pinia-DuGY3yDm.js"
+      "_pinia-CJA6HZ2m.js"
     ]
   },
   "__plugin-vue_export-helper-BDNMzG2s.js": {
@@ -85,12 +100,12 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "_pinia-DuGY3yDm.js": {
-    "file": "assets/pinia-DuGY3yDm.js",
+  "_pinia-CJA6HZ2m.js": {
+    "file": "assets/pinia-CJA6HZ2m.js",
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-74gEmyPv.css",
+    "file": "assets/app-CI8GWwJY.css",
     "name": "app",
     "names": [
       "app.css"
@@ -105,60 +120,71 @@
     "isEntry": true
   },
   "resources/js/storefront/app.js": {
-    "file": "assets/app-Ppi3Ss5m.js",
+    "file": "assets/app-DOn0Pbkx.js",
     "name": "app",
     "src": "resources/js/storefront/app.js",
     "isEntry": true,
     "imports": [
-      "_pinia-DuGY3yDm.js",
+      "_pinia-CJA6HZ2m.js",
+      "_ProductCard-8vgc_Snn.js"
+    ]
+  },
+  "resources/js/storefront/shop.js": {
+    "file": "assets/shop-DEoMg6DX.js",
+    "name": "shop",
+    "src": "resources/js/storefront/shop.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-CJA6HZ2m.js",
+      "_ProductCard-8vgc_Snn.js",
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/app-D5k1nk1s.css"
+      "assets/shop-C3R3LSvQ.css"
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-B_UzuJ9t.js",
+    "file": "assets/app-5PDHXzHO.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
-      "_pinia-DuGY3yDm.js",
+      "_pinia-CJA6HZ2m.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_GalleryModal-BS1iiCyk.js",
-      "_StylistDataManager-2N8ly6fG.js"
+      "_GalleryModal-DcuGqIXf.js",
+      "_StylistDataManager-BDx2sRrJ.js"
     ],
     "css": [
       "assets/app-BrwRqOhF.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-B191kZi5.js",
+    "file": "assets/library-BVo-YRXo.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
-      "_pinia-DuGY3yDm.js",
-      "_GalleryModal-BS1iiCyk.js"
+      "_pinia-CJA6HZ2m.js",
+      "_GalleryModal-DcuGqIXf.js"
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-D5bwtBmy.js",
+    "file": "assets/settings-CV_aJtJX.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
-      "_pinia-DuGY3yDm.js"
+      "_pinia-CJA6HZ2m.js"
     ]
   },
   "resources/js/studio/stylist-data.js": {
-    "file": "assets/stylist-data-DfqLW6ol.js",
+    "file": "assets/stylist-data-D8uYmXf3.js",
     "name": "stylist-data",
     "src": "resources/js/studio/stylist-data.js",
     "isEntry": true,
     "imports": [
-      "_pinia-DuGY3yDm.js",
-      "_StylistDataManager-2N8ly6fG.js"
+      "_pinia-CJA6HZ2m.js",
+      "_StylistDataManager-BDx2sRrJ.js"
     ]
   }
 }

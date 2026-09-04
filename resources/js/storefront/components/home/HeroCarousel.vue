@@ -40,7 +40,7 @@ onBeforeUnmount(stop);
         <!-- Slides track -->
         <div class="relative">
             <div
-                class="flex transition-transform duration-700 ease-out"
+                class="flex transition-transform duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
                 :style="{ transform: 'translateX(-' + index * 100 + '%)' }"
             >
                 <div v-for="(slide, i) in slides" :key="slide.id" class="relative w-full shrink-0">
@@ -71,6 +71,24 @@ onBeforeUnmount(stop);
                     </div>
                 </div>
             </div>
+
+            <!-- Prev / Next (desktop) -->
+            <template v-if="count > 1">
+                <button
+                    @click="goTo(index - 1)"
+                    class="absolute left-4 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full glass text-ink-900 shadow-lg transition-transform hover:scale-110 lg:grid"
+                    aria-label="Bài trước"
+                >
+                    <Icon name="chevron-left" :size="22" />
+                </button>
+                <button
+                    @click="goTo(index + 1)"
+                    class="absolute right-4 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full glass text-ink-900 shadow-lg transition-transform hover:scale-110 lg:grid"
+                    aria-label="Bài sau"
+                >
+                    <Icon name="chevron-right" :size="22" />
+                </button>
+            </template>
 
             <!-- Dots -->
             <div v-if="count > 1" class="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
