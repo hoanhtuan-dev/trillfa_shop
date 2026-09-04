@@ -34,6 +34,15 @@ const fullImageStyle = computed(() => {
 
 const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.inpaintMaskBox.h || 0) >= 0.02);
 
+// Làm mờ vùng NGOÀI vùng chọn: invert mask rồi multiply → vùng chọn sáng rõ, phần đảo (ngoài) tối đi.
+// mask quy ước: đen=vùng chọn, trắng=ngoài → invert(1) đổi thành trắng=vùng chọn(giữ sáng), đen=ngoài(tối).
+const showDimOverlay = computed(() => {
+  if (!store.inpaintBrushData) return false;
+  const mode = store.inpaintMaskMode;
+  return mode === 'freehand' || mode === 'path' || mode === 'magic' || mode === 'rect';
+});
+const invertedRect = computed(() => store.inpaintMaskMode === 'rect' && !!store.inpaintBrushData);
+
 // Kích thước canvas brush theo TỈ LỆ ẢNH GỐC (natural iw:ih), scale về cạnh dài 512.
 // Quan trọng: KHÔNG vuông cứng 512×512 — nếu ảnh dọc/ngang thì mask bị ép méo và lệch vị trí.
 const brushCanvasSize = computed(() => {
@@ -155,6 +164,11 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
             class="pointer-events-none absolute z-10 rounded-lg"
             :style="brushOverlayStyle"></canvas>
 
+    <!-- Làm mờ vùng ĐẢO NGƯỢC (ngoài vùng chọn) — magic/freehand/path + rect đã đảo -->
+    <img v-if="showDimOverlay" :src="'data:image/png;base64,' + store.inpaintBrushData"
+         class="pointer-events-none absolute z-10 rounded-lg mix-blend-multiply"
+         :style="{ ...fullImageStyle, filter: 'invert(1)', opacity: 0.55 }" alt="Vùng chọn" />
+
     <!-- Freehand (lasso): hiển thị TẤT CẢ nét đã hoàn thành + nét đang kéo (GIMP-style) -->
     <svg v-if="store.inpaintMaskMode === 'freehand' && (store.inpaintFreehandPaths.length || store.inpaintFreehandPoints.length > 1)"
          class="pointer-events-none absolute inset-0 z-10 h-full w-full">
@@ -188,7 +202,7 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
              @dblclick.stop="store.resetInpaintMaskBox()"
              title="Kéo để di chuyển · đúp chuột để vẽ lại vùng">
           <div class="pointer-events-none absolute -inset-px border-2 border-dashed border-brand-300"></div>
-          <div class="pointer-events-none absolute -inset-px" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);"></div>
+          <div v-if="!invertedRect" class="pointer-events-none absolute -inset-px" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);"></div>
           <div class="absolute -left-3 -top-3 h-6 w-6 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('nw', $event)" title="Kéo góc"></div>
           <div class="absolute -right-3 -top-3 h-6 w-6 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('ne', $event)" title="Kéo góc"></div>
           <div class="absolute -bottom-3 -left-3 h-6 w-6 cursor-nesw-resize rounded-sm border-2 border-white bg-brand-400 shadow" style="pointer-events:auto; touch-action:none" @pointerdown.stop="store.beginInpaintDrag('sw', $event)" title="Kéo góc"></div>
