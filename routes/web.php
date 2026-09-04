@@ -82,7 +82,6 @@ Route::post('/hoan-thien-tai-khoan/{order}', [QuickCheckoutController::class, 'c
 
 // Account (auth)
 Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function () {
-    Route::get('/', [AccountController::class, 'dashboard'])->name('dashboard');
     Route::get('/don-hang', [AccountController::class, 'orders'])->name('orders');
     Route::get('/don-hang/{order}', [AccountController::class, 'order'])->name('order');
     Route::post('/don-hang/{order}/huy', [AccountController::class, 'cancelOrder'])->name('order.cancel');

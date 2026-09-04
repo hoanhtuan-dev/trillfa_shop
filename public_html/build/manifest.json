@@ -144,7 +144,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Dmf95Pgp.css",
+    "file": "assets/app-De4DNWGi.css",
     "name": "app",
     "names": [
       "app.css"
@@ -157,6 +157,17 @@
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
+  },
+  "resources/js/storefront/account.js": {
+    "file": "assets/account-Bvp4rNue.js",
+    "name": "account",
+    "src": "resources/js/storefront/account.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-9imU3GMs.js",
+      "_StorefrontLayout-p3AJkv3O.js",
+      "_BaseBadge-_N8VcNgy.js"
+    ]
   },
   "resources/js/storefront/app.js": {
     "file": "assets/app--5tokYQl.js",
