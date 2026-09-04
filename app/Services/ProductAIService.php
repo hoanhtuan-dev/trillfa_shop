@@ -62,8 +62,9 @@ class ProductAIService
 
     protected function vision(string $imagePath, string $prompt): ?array
     {
-        // Qwen (multimodal) — reuse the Studio's working vision setup so the
-        // same key + model list (qwen3.8-flash …) that /studio uses is used here.
+        // Same model/key strategy as the Studio "Gợi ý từ ảnh": loop ALL
+        // studio_suggest_qwen_models() × studio_qwen_credentials('vision'),
+        // then Gemini, then a deterministic offline GD color fallback.
         [$b64, $mime] = $this->imageBase64($imagePath);
         $models = function_exists('studio_suggest_qwen_models') ? studio_suggest_qwen_models() : [$this->model];
         $keys = function_exists('studio_qwen_credentials') ? studio_qwen_credentials('vision') : [];
@@ -72,36 +73,41 @@ class ProductAIService
         }
         foreach (array_values(array_unique($keys)) as $key) {
             $base = dashscope_base_url($key).'/compatible-mode/v1';
-            try {
-                $resp = Http::withToken($key)->timeout(25)->post($base.'/chat/completions', [
-                    'model' => $models[0] ?? $this->model,
-                    'messages' => [['role' => 'user', 'content' => [
-                        ['type' => 'text', 'text' => $prompt],
-                        ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                    ]]],
-                    'response_format' => ['type' => 'json_object'],
-                ]);
-                // 429 = rate/quota limit on THIS key -> fail over to the next key
-                // (e.g. token-plan exhausted -> Pay-As-You-Go).
-                if ($resp->status() === 429 || is_qwen_quota_error((string) $resp->body())) {
+            foreach ($models as $model) {
+                try {
+                    $resp = Http::withToken($key)->timeout(25)->post($base.'/chat/completions', [
+                        'model' => $model,
+                        'messages' => [['role' => 'user', 'content' => [
+                            ['type' => 'text', 'text' => $prompt],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                        ]]],
+                        'response_format' => ['type' => 'json_object'],
+                    ]);
+                    // 429 = rate/quota limit on this key -> skip the rest of this key.
+                    if ($resp->status() === 429 || is_qwen_quota_error((string) $resp->body())) {
+                        continue 2;
+                    }
+                    if ($resp->ok()) {
+                        $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
+                        if ($json) {
+                            return $json;
+                        }
+                    }
+                    $body = (string) $resp->body();
+                    if (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404) {
+                        continue; // try next model
+                    }
+                    break; // other error on this model -> next key
+                } catch (\Throwable $e) {
                     continue;
                 }
-                if ($resp->ok()) {
-                    $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
-                    if ($json) {
-                        return $json;
-                    }
-                }
-                // any other failure on this key -> try the next key.
-            } catch (\Throwable $e) {
-                // try next key
             }
         }
 
         // Gemini vision fallback.
         $geminiKey = studio_api_key('gemini');
         if ($geminiKey) {
-            $model = studio_config('qwen_vision_model', 'gemini-2.5-flash');
+            $model = function_exists('studio_suggest_gemini_model') ? studio_suggest_gemini_model() : studio_config('qwen_vision_model', 'gemini-2.5-flash');
             $b64 = base64_encode(file_get_contents($imagePath));
             try {
                 $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(30)
@@ -119,7 +125,54 @@ class ProductAIService
             }
         }
 
-        return null;
+        // Offline GD color analysis — always produces a usable understanding.
+        return $this->offlineAnalysis($imagePath);
+    }
+
+    /**
+     * Deterministic offline analysis (GD): dominant/warmth/brightness -> a small
+     * understanding so the AI always has something to reference without a key.
+     */
+    protected function offlineAnalysis(string $imagePath): array
+    {
+        try {
+            $img = @imagecreatefromstring(@file_get_contents($imagePath));
+            if (! $img) {
+                return [];
+            }
+            $w = imagesx($img); $h = imagesy($img);
+            $step = max(1, (int) round(max($w, $h) / 48));
+            $rs = 0; $gs = 0; $bs = 0; $n = 0; $warm = 0; $bright = 0;
+            for ($x = 0; $x < $w; $x += $step) {
+                for ($y = 0; $y < $h; $y += $step) {
+                    $c = imagecolorat($img, $x, $y);
+                    $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                    $rs += $r; $gs += $g; $bs += $b; $n++;
+                    $warm += ($r > $b ? $r - $b : $b - $r) === ($r > $b ? $r - $b : 0) ? ($r - $b) : 0;
+                    $bright += ($r + $g + $b) / 3;
+                }
+            }
+            imagedestroy($img);
+            $r = $n ? (int) round($rs / $n) : 128;
+            $g = $n ? (int) round($gs / $n) : 128;
+            $b = $n ? (int) round($bs / $n) : 128;
+            $avg = ($r + $g + $b) / 3;
+            $warmth = ($r - $b);
+            $style = $warmth > 20 ? 'ấm áp, tự nhiên' : ($warmth < -20 ? 'lạnh, hiện đại thanh lịch' : 'trung tính, tối giản');
+            $brightness = $avg > 170 ? 'sáng, tươi' : ($avg < 90 ? 'đậm, sang trọng' : 'trung bình');
+            $color = $r > $g + 30 && $r > $b + 30 ? 'tông đỏ/nâu' : ($g > $r && $g > $b ? 'tông xanh' : ($b > $r && $b > $g ? 'tông xanh dương' : 'tông trung tính'));
+
+            return [
+                'styles' => $style,
+                'colors' => $color.' ('.sprintf('#%02x%02x%02x', $r, $g, $b).')',
+                'fabric' => $brightness,
+                'subject' => 'hình ảnh sản phẩm',
+                'feeling' => $style.', '.$brightness,
+                'keywords' => [$color, $style],
+            ];
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     // ------------------------------------------------------------- stage 2: generate
@@ -132,11 +185,18 @@ class ProductAIService
     {
         $prompt = $this->buildPrompt($input, $imageAnalysis);
 
-        if ($this->provider !== 'gemini') {
+        // Provider order mirrors "Gợi ý từ ảnh": try the configured provider first,
+        // then the other; loop all suggest qwen models × keys for failover.
+        $provider = function_exists('studio_suggest_provider') ? studio_suggest_provider() : $this->provider;
+        $models = function_exists('studio_suggest_qwen_models') ? studio_suggest_qwen_models() : [$this->model];
+
+        if ($provider !== 'gemini') {
             foreach ($this->qwenKeys() as $key) {
-                $result = $this->callQwen($prompt, $key);
-                if ($result) {
-                    return $result;
+                foreach ($models as $model) {
+                    $result = $this->callQwen($prompt, $key, $model);
+                    if ($result) {
+                        return $result;
+                    }
                 }
             }
         }
@@ -146,6 +206,17 @@ class ProductAIService
             $result = $this->callGemini($prompt, $geminiKey);
             if ($result) {
                 return $result;
+            }
+        }
+
+        if ($provider === 'gemini' && $this->qwenKeys()) {
+            foreach ($this->qwenKeys() as $key) {
+                foreach ($models as $model) {
+                    $result = $this->callQwen($prompt, $key, $model);
+                    if ($result) {
+                        return $result;
+                    }
+                }
             }
         }
 
@@ -218,12 +289,12 @@ Chỉ TRẢ VỀ JSON hợp lệ (không markdown, không giải thích):
 PROMPT;
     }
 
-    protected function callQwen(string $prompt, string $key): ?array
+    protected function callQwen(string $prompt, string $key, ?string $model = null): ?array
     {
         $base = dashscope_base_url($key).'/compatible-mode/v1';
         try {
             $resp = Http::withToken($key)->timeout(25)->post($base.'/chat/completions', [
-                'model' => $this->model,
+                'model' => $model ?: $this->model,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.7,
                 'max_tokens' => 1200,
