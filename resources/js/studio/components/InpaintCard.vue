@@ -122,9 +122,9 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <!-- Render đa góc (nút vuông giống slot nền chính) -->
     <div class="mt-4">
       <button @click="mvOpen = true"
-              class="flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-ink-700 bg-ink-900/40 transition hover:border-brand-400">
-        <span class="grid h-8 w-8 place-items-center rounded-full bg-ink-800/70 text-cream-300/70"><StudioIcon name="camera" size="h-4 w-4" /></span>
-        <span class="text-[10px] font-medium text-cream-200">Render đa góc</span>
+              class="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-dashed border-ink-700 bg-ink-900/40 transition hover:border-brand-400">
+        <span class="grid h-9 w-9 place-items-center rounded-full bg-ink-800/70 text-cream-300/70"><StudioIcon name="camera" size="h-5 w-5" /></span>
+        <span class="text-xs font-medium text-cream-200">Render đa góc</span>
       </button>
     </div>
 

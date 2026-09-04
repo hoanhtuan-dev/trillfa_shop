@@ -156,13 +156,13 @@ async function run() {
     <div class="mt-3 flex gap-2">
       <button @click="setCompose()"
               :class="mode === 'compose' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors"><StudioIcon name="layers" size="h-3.5 w-3.5" /> Ghép tự do</button>
+              class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="layers" size="h-5 w-5" /> Ghép tự do</button>
       <button @click="setTryon()"
               :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors"><StudioIcon name="pose" size="h-3.5 w-3.5" /> Thử đồ ảo</button>
+              class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="pose" size="h-5 w-5" /> Thử đồ ảo</button>
       <button @click="setFaceSwap()"
               :class="mode === 'faceswap' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors"><StudioIcon name="user" size="h-3.5 w-3.5" /> Thay khuôn mặt</button>
+              class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="user" size="h-5 w-5" /> Thay khuôn mặt</button>
     </div>
     <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = trang phục · @image2 = pose · @image3 = bối cảnh (tùy chọn)
