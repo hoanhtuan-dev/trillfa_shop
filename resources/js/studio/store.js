@@ -692,6 +692,22 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
       this.toast('Đã tô màu toàn bộ layer.');
     },
+    // Lưu layer active (kể cả layer vẽ/fill/duplicate chưa từng là generation) vào Output.
+    async saveActiveLayerToOutput() {
+      const l = this.activeLayer;
+      if (!l || !l.image) { this.toast('Chưa có layer để lưu.', 'error'); return; }
+      try {
+        const blob = await (await fetch(l.image)).blob();
+        const fd = new FormData();
+        fd.append('image', new File([blob], 'layer-' + Date.now() + '.png', { type: 'image/png' }));
+        const res = await fetch('/studio/upload-ref', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.message || 'Không lưu được.');
+        const gid = 'layer-' + Date.now();
+        this.addGen({ id: gid, type: 'image', status: 'completed', model: 'layer', provider: 'layer', media_url: d.url, error: null, credits_cost: 0, created_at: 'Vừa lưu' });
+        this.toast('Đã lưu layer vào Output.');
+      } catch (e) { this.toast(e.message || 'Không lưu được.', 'error'); }
+    },
     // Đo kích thước thật của ảnh rồi xếp theo flow: hàng ngang (có gap), tự xuống hàng khi quá rộng.
     _positionByImageSize(id, image) {
       const MAX = 512, GAP = 24;

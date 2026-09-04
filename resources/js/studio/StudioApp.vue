@@ -210,7 +210,7 @@ function onTouchEnd(e) {
     <!-- Mobile top bar -->
     <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-cream-200">☰</button>
-      <span class="font-display text-sm font-semibold">Studio (Vue)</span>
+      <span class="font-display text-sm font-semibold">Studio</span>
       <button @click="outputOpen = true" class="rounded-lg bg-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-200">Kết quả ({{ store.generations.length }})</button>
     </div>
     <div class="flex flex-1 overflow-hidden">
@@ -304,7 +304,7 @@ function onTouchEnd(e) {
             <!-- Luôn hiển thị: thêm layer + tô màu toàn bộ layer -->
             <div class="flex items-center gap-1.5 rounded-full bg-ink-900/85 p-1.5 shadow-lg">
               <button @click="store.addBlankLayer()" class="grid h-7 w-7 place-items-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer vẽ trống (trùng vị trí layer đang chọn)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg></button>
-              <button @click="store.fillActiveLayer()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-40" title="Tô màu toàn bộ layer đang chọn"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3L12 24l8.5-8.5a2.12 2.12 0 0 0 0-3z"/><path d="M12 2v3"/></svg></button>
+              <button @click="store.fillActiveLayer()" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-40" title="Tô màu toàn bộ layer đang chọn"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.5 11.5a2 2 0 0 1-2 1.9H8.5a2 2 0 0 1-2-1.9z"/><path d="M9 8c0-2.5 1.5-4 3-4s3 1.5 3 4"/><path d="M12 2v2"/></svg></button>
             </div>
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1 lg:hidden">
               <button v-for="l in store.canvasLayers" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
@@ -338,6 +338,7 @@ function onTouchEnd(e) {
                 <button @click="store.exportComposite()" :disabled="!store.visibleLayers.length" class="flex items-center justify-center gap-1 rounded-lg bg-ink-800 px-2 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị và tải xuống PNG"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Xuất</span></button>
                 <button @click="store.flattenToLayer()" :disabled="!store.visibleLayers.length" class="flex items-center justify-center gap-1 rounded-lg bg-brand-600 px-2 py-1.5 text-[9px] font-semibold text-white hover:bg-brand-500 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị thành 1 layer mới"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg><span>Gộp</span></button>
               </div>
+              <button @click="store.saveActiveLayerToOutput()" :disabled="!store.activeLayer" class="mt-1.5 flex w-full items-center justify-center gap-1 rounded-lg bg-ink-800 px-2 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Lưu layer đang chọn vào Output"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg><span>Lưu Output</span></button>
             </div>
             <p v-if="!store.canvasLayers.length" class="rounded-lg bg-ink-900/50 px-2 py-1.5 text-center text-[10px] text-cream-300/40">Chưa có layer.</p>
             <div v-if="store.activeLayer" class="hidden w-64 rounded-2xl bg-ink-900/90 p-2 shadow-lg lg:block">

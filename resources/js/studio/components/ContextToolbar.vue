@@ -60,7 +60,7 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
         <input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0">
       </label>
       <button @click="store.fillSelectedRegion()" class="flex items-center gap-1 rounded-full bg-sky-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-sky-600" title="Tô màu vào vùng chọn">
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3L12 24l8.5-8.5a2.12 2.12 0 0 0 0-3z"/><path d="M12 2v3"/></svg>Tô
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.5 11.5a2 2 0 0 1-2 1.9H8.5a2 2 0 0 1-2-1.9z"/><path d="M9 8c0-2.5 1.5-4 3-4s3 1.5 3 4"/><path d="M12 2v2"/></svg>Tô
       </button>
     </template>
     <button @click="store.clearInpaintMask()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ mask hiện tại">
