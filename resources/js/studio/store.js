@@ -51,6 +51,13 @@ export const useStudioStore = defineStore('studio', {
     snapX: null,
     snapY: null,
     _pinch: null,
+    // Xóa vùng (erase) với feather
+    eraseMode: false,
+    eraseFeather: 20,
+    _eraseCanvas: null,
+    _eraseCtx: null,
+    _eraseDrawing: false,
+    _eraseLast: null,
     // concept
     imagePromptEn: '',
     negativePromptEn: '',
@@ -601,7 +608,42 @@ export const useStudioStore = defineStore('studio', {
     },
     goEdit(g) { this.goEditor(g, 2); },
     goVideo(g) { this.goEditor(g, 3); },
-    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { const i = this.canvasLayers.length; const GX = 320, GY = 460, COLS = 3; const x = (i % COLS) * GX, y = Math.floor(i / COLS) * GY; this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false, x, y, scale: 1, rotation: 0, opacity: 1, blend: 'normal' }); this.saveLayerLayout(); } },
+    pushCanvasLayer(id, kind, name, image, genId) {
+      if (!id || !image) return;
+      if (this.canvasLayers.some(l => l.id === id)) return;
+      const i = this.canvasLayers.length;
+      const x = (i % 3) * 360, y = Math.floor(i / 3) * 460; // vị trí tạm, sẽ căn lại theo kích thước thật
+      this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false, x, y, scale: 1, rotation: 0, opacity: 1, blend: 'normal', flipX: false, flipY: false });
+      this.saveLayerLayout();
+      this._positionByImageSize(id, image);
+    },
+    // Đo kích thước thật của ảnh rồi xếp theo flow: hàng ngang (có gap), tự xuống hàng khi quá rộng.
+    _positionByImageSize(id, image) {
+      const MAX = 512, GAP = 24;
+      const img = new Image();
+      img.onload = () => {
+        const l = this.canvasLayers.find((x) => x.id === id);
+        if (!l) return;
+        const base = Math.min(1, MAX / img.naturalWidth, MAX / img.naturalHeight);
+        l.baseW = img.naturalWidth * base;
+        l.baseH = img.naturalHeight * base;
+        const prev = this.canvasLayers.filter((x) => x.id !== id && x.baseW != null);
+        if (!prev.length) { l.x = 0; l.y = 0; }
+        else {
+          const last = prev[prev.length - 1];
+          const lw = (last.baseW || MAX) * (last.scale || 1);
+          const lh = (last.baseH || MAX) * (last.scale || 1);
+          let nx = (last.x || 0) + lw / 2 + l.baseW / 2 + GAP;
+          let ny = last.y || 0;
+          const ROW_MAX = 3 * (MAX + GAP);
+          if (nx > ROW_MAX) { nx = 0; ny = (last.y || 0) + lh + GAP; }
+          l.x = nx; l.y = ny;
+        }
+        this.saveLayerLayout();
+      };
+      img.onerror = () => {};
+      img.src = image;
+    },
     setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
@@ -706,6 +748,60 @@ export const useStudioStore = defineStore('studio', {
       this.canvasLayers = arr;
       this.saveLayerLayout();
     },
+    // Lật ngang / lật dọc layer.
+    toggleFlipX(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; l.flipX = !l.flipX; this.saveLayerLayout(); },
+    toggleFlipY(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; l.flipY = !l.flipY; this.saveLayerLayout(); },
+    // ── Xóa vùng (erase brush + feather) ──
+    toggleErase() {
+      this.eraseMode = !this.eraseMode;
+      if (this.eraseMode) { const c = document.createElement('canvas'); c.width = 1024; c.height = 1024; this._eraseCanvas = c; this._eraseCtx = c.getContext('2d'); }
+      else this.applyErase();
+    },
+    setEraseFeather(v) { this.eraseFeather = Number(v) || 0; },
+    _eraseRadius() { return Math.max(3, Math.min(120, Number(this.eraseFeather) || 20)); },
+    _erasePoint(e) {
+      const m = this.canvasMetrics();
+      if (!m) return { nx: 0.5, ny: 0.5 };
+      return { nx: this._clamp((e.clientX - m.crLeft - m.vx) / m.vw, 0, 1), ny: this._clamp((e.clientY - m.crTop - m.vy) / m.vh, 0, 1) };
+    },
+    _drawEraseDot(p) {
+      const c = this._eraseCtx; if (!c) return;
+      const w = this._eraseCanvas.width, h = this._eraseCanvas.height, r = this._eraseRadius();
+      const g = c.createRadialGradient(p.nx * w, p.ny * h, 0, p.nx * w, p.ny * h, r);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(0.55, 'rgba(0,0,0,0.85)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = g;
+      c.beginPath(); c.arc(p.nx * w, p.ny * h, r, 0, Math.PI * 2); c.fill();
+    },
+    _drawEraseLine(from, to) {
+      const c = this._eraseCtx; if (!c) return;
+      const w = this._eraseCanvas.width, r = this._eraseRadius();
+      const steps = Math.max(1, Math.ceil(Math.hypot(to.nx - from.nx, to.ny - from.ny) * w / (r / 2)));
+      for (let s = 0; s <= steps; s++) this._drawEraseDot({ nx: from.nx + (to.nx - from.nx) * (s / steps), ny: from.ny + (to.ny - from.ny) * (s / steps) });
+    },
+    beginEraseBrush(e) { if (!this.eraseMode) return; this._eraseDrawing = true; this._eraseLast = this._erasePoint(e); this._drawEraseDot(this._eraseLast); },
+    eraseBrushMove(e) { if (!this._eraseDrawing) return; const p = this._erasePoint(e); this._drawEraseLine(this._eraseLast || p, p); this._eraseLast = p; },
+    endEraseBrush() { this._eraseDrawing = false; this._eraseLast = null; },
+    applyErase() {
+      const l = this.activeLayer;
+      if (!l || !this._eraseCanvas) return;
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.drawImage(this._eraseCanvas, 0, 0, w, h);
+        l.image = canvas.toDataURL('image/png');
+        this._eraseCtx && this._eraseCtx.clearRect(0, 0, this._eraseCanvas.width, this._eraseCanvas.height);
+        this.saveLayerLayout();
+        this.toast('Đã xóa vùng.');
+      };
+      img.onerror = () => this.toast('Không xóa được ảnh.', 'error');
+      img.src = l.image;
+    },
     // Kéo layer trên canvas để di chuyển (tách khỏi pan/zoom khung nhìn).
     beginLayerDrag(id, e) {
       const l = this.canvasLayers.find((x) => x.id === id);
@@ -795,7 +891,7 @@ export const useStudioStore = defineStore('studio', {
         ctx.translate(-minX + pad, -minY + pad);
         ctx.translate(l.x || 0, l.y || 0);
         ctx.rotate(((l.rotation || 0) * Math.PI) / 180);
-        ctx.scale(l.scale || 1, l.scale || 1);
+        ctx.scale((l.scale || 1) * (l.flipX ? -1 : 1), (l.scale || 1) * (l.flipY ? -1 : 1));
         ctx.globalAlpha = l.opacity != null ? l.opacity : 1;
         ctx.globalCompositeOperation = (l.blend && l.blend !== 'normal') ? l.blend : 'source-over';
         ctx.drawImage(img, -w / 2, -h / 2, w, h);
@@ -890,7 +986,7 @@ export const useStudioStore = defineStore('studio', {
         this.canvasLayers = (Array.isArray(d.layers) ? d.layers : [])
           .filter((l) => l && l.image)
           .filter((l) => l.kind !== 'gen' || (l.genId != null && genIds.has(Number(l.genId))))
-          .map((l) => ({ id: l.id, kind: l.kind, name: l.name, image: l.image, genId: l.genId, visible: l.visible !== false, locked: !!l.locked, x: Number(l.x) || 0, y: Number(l.y) || 0, scale: (l.scale != null ? Number(l.scale) : 1) || 1, rotation: Number(l.rotation) || 0, opacity: l.opacity != null ? Number(l.opacity) : 1, blend: l.blend || 'normal' }));
+          .map((l) => ({ id: l.id, kind: l.kind, name: l.name, image: l.image, genId: l.genId, visible: l.visible !== false, locked: !!l.locked, x: Number(l.x) || 0, y: Number(l.y) || 0, scale: (l.scale != null ? Number(l.scale) : 1) || 1, rotation: Number(l.rotation) || 0, opacity: l.opacity != null ? Number(l.opacity) : 1, blend: l.blend || 'normal', baseW: Number(l.baseW) || null, baseH: Number(l.baseH) || null, flipX: !!l.flipX, flipY: !!l.flipY }));
         const active = this.canvasLayers.find((l) => l.id === d.activeLayerId && l.visible !== false);
         if (active) this.setActiveLayer(active.id);
         else { this.activeLayerId = ''; this.saveLayerLayout(); }

@@ -247,6 +247,47 @@ class StorefrontBridge
     }
 
     /**
+     * Checkout payload — cart data comes client-side via /api/cart; here we pass
+     * the shipping/payment methods and the customer's default address.
+     */
+    public function checkout(): array
+    {
+        $shippingMethods = app(\App\Services\CartService::class)->shippingMethods();
+        $paymentMethods = \App\Models\PaymentMethod::active()->orderBy('sort_order')->get();
+        $user = auth()->user();
+        $address = $user?->addresses()->where('is_default', true)->first();
+
+        return array_merge($this->base(), [
+            'user' => array_merge($this->user(), [
+                'email' => $user?->email,
+                'phone' => $user?->phone,
+            ]),
+            'shipping_methods' => $shippingMethods->map(fn ($m) => [
+                'code' => $m->code,
+                'name' => $m->name,
+                'description' => $m->description,
+                'fee' => (float) $m->fee,
+                'free_threshold' => $m->free_threshold !== null ? (float) $m->free_threshold : null,
+                'estimated_days' => $m->estimated_days,
+            ])->values()->all(),
+            'payment_methods' => $paymentMethods->map(fn ($m) => [
+                'code' => $m->code,
+                'name' => $m->name,
+                'description' => $m->description,
+                'fee' => (float) $m->fee,
+            ])->values()->all(),
+            'default_address' => $address ? [
+                'name' => $address->name,
+                'phone' => $address->phone,
+                'address' => $address->address,
+                'ward' => $address->ward,
+                'district' => $address->district,
+                'province' => $address->province,
+            ] : null,
+        ]);
+    }
+
+    /**
      * Return saved products for the wishlist (client passes the persisted ids).
      */
     public function wishlistProducts(array $ids): array

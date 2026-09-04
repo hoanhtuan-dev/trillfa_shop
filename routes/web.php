@@ -69,7 +69,6 @@ Route::post('/danh-gia/{review}/huu-ich', [ReviewController::class, 'helpful'])-
 
 // Checkout
 Route::middleware('auth')->group(function () {
-    Route::get('/thanh-toan', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/thanh-toan', [CheckoutController::class, 'store'])->name('checkout.store');
     Route::get('/thanh-toan/{order}/thanh-toan', [CheckoutController::class, 'pay'])->name('checkout.pay');
     Route::post('/thanh-toan/{order}/thanh-toan', [CheckoutController::class, 'confirmPay'])->name('checkout.confirm');

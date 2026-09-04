@@ -69,10 +69,10 @@ const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
 
 // ── Layer editor (composite + transform) ──
-const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none');
+const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode);
 function layerStyle(l, i) {
   return {
-    transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + (l.scale || 1) + ')',
+    transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + ((l.scale || 1) * (l.flipX ? -1 : 1)) + ', ' + ((l.scale || 1) * (l.flipY ? -1 : 1)) + ')',
     transformOrigin: 'center',
     opacity: l.opacity != null ? l.opacity : 1,
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',

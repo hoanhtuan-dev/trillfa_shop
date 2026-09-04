@@ -29,6 +29,10 @@ Route::middleware('web')->group(function () {
     Route::get('/yeu-thich', [StorefrontController::class, 'wishlist'])->name('wishlist.index');
     Route::get('/api/storefront/wishlist', [StorefrontController::class, 'wishlistFeed'])->name('storefront.wishlist');
 
+    // Checkout (order creation stays on the legacy POST /thanh-toan endpoint).
+    Route::get('/thanh-toan', [StorefrontController::class, 'checkout'])
+        ->name('checkout.show')->middleware('auth');
+
     // Shop listing (all products + per-category).
     Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
     Route::get('/danh-muc/{categorySlug}', [StorefrontController::class, 'shop'])->name('shop.category');

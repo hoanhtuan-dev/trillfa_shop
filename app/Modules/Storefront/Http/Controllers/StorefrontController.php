@@ -85,6 +85,21 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Checkout page — renders the Vue checkout SPA (order is created by the
+     * existing CheckoutController@store endpoint).
+     */
+    public function checkout()
+    {
+        if (app(\App\Services\CartService::class)->count() === 0) {
+            return redirect()->route('cart.show');
+        }
+
+        seo()->title('Thanh toán | '.setting('site_name'));
+
+        return view('storefront.checkout', ['boot' => $this->bridge->checkout()]);
+    }
+
+    /**
      * Wishlist page — renders the Vue wishlist SPA (ids are client-side).
      */
     public function wishlist()
