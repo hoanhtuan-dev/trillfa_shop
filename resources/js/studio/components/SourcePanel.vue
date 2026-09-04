@@ -112,19 +112,17 @@ const filteredProducts = computed(() => {
         </button>
 
         <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 gap-2.5 overflow-y-auto pr-1" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
-          <div v-for="it in sortedRefs" :key="it.name" class="group relative overflow-hidden rounded-xl border transition-colors" :class="isCurrent(it) ? 'border-brand-400 ring-1 ring-brand-400/60' : 'border-ink-700 hover:border-ink-600'" :title="it.name">
-            <button @click="pick(it)" class="block w-full text-left">
-              <div class="relative w-full overflow-hidden bg-ink-950" style="padding-bottom: 100%">
-                <img :src="it.url" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="">
-                <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
-                <span v-else-if="isCurrent(it)" class="absolute left-1.5 top-1.5 rounded-md bg-brand-600/90 px-1.5 py-0.5 text-[9px] font-medium text-white">đang chọn</span>
-              </div>
-              <div class="px-1.5 py-1.5">
-                <p class="truncate text-[10px] font-medium text-cream-100">{{ it.name }}</p>
-                <p class="truncate text-[9px] text-cream-300/55">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }} · {{ fmtDate(it.mtime) }}</p>
-              </div>
+          <div v-for="it in sortedRefs" :key="it.name" class="group relative aspect-square overflow-hidden rounded-xl border transition-colors" :class="isCurrent(it) ? 'border-brand-400 ring-1 ring-brand-400/60' : 'border-ink-700 hover:border-ink-600'" :title="it.name">
+            <button @click="pick(it)" class="absolute inset-0">
+              <img :src="it.url" class="h-full w-full bg-ink-900 object-cover" loading="lazy" alt="">
             </button>
+            <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
+            <span v-else-if="isCurrent(it)" class="absolute left-1.5 top-1.5 rounded-md bg-brand-600/90 px-1.5 py-0.5 text-[9px] font-medium text-white">đang chọn</span>
             <button v-if="!it.used" @click="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white transition-colors hover:bg-red-500 group-hover:grid" title="Xóa ảnh"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1 pt-5">
+              <p class="truncate text-[10px] font-medium text-cream-100">{{ it.name }}</p>
+              <p class="truncate text-[9px] text-cream-300/75">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }} · {{ fmtDate(it.mtime) }}</p>
+            </div>
           </div>
           <div v-if="!sortedRefs.length" class="col-span-full flex flex-col items-center justify-center gap-2 py-10 text-center">
             <svg class="h-10 w-10 text-cream-300/25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -152,7 +150,7 @@ const filteredProducts = computed(() => {
           <input v-model="pquery" placeholder="Tìm sản phẩm…" class="h-9 w-full rounded-xl border border-ink-700 bg-ink-800/60 pl-9 pr-3 text-xs text-cream-100 placeholder:text-cream-300/40 focus:border-brand-500 focus:outline-none">
         </div>
         <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 grid-cols-3 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-4">
-          <button v-for="p in filteredProducts" :key="p.id" @click="store.pickFromProduct(p); productOpen=false" class="group relative w-full overflow-hidden rounded-xl border border-ink-700 transition-colors hover:border-ink-600" style="padding-bottom: 100%"><img :src="p.url" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt=""><span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span></button>
+          <button v-for="p in filteredProducts" :key="p.id" @click="store.pickFromProduct(p); productOpen=false" class="group relative aspect-square overflow-hidden rounded-xl border border-ink-700 transition-colors hover:border-ink-600"><img :src="p.url" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt=""><span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span></button>
           <p v-if="!filteredProducts.length" class="col-span-full py-10 text-center text-xs text-cream-300/50">{{ products.length ? 'Không có sản phẩm khớp tìm kiếm.' : 'Chưa có sản phẩm.' }}</p>
         </div>
       </div>
