@@ -16,8 +16,11 @@ async function onFile(e) {
   const files = Array.from(e.target.files || []);
   if (fileRef.value) fileRef.value.value = '';
   if (!files.length) return;
-  for (const f of files) { await store.uploadRef(f, false); }
+  let lastUrl = null, lastName = '';
+  for (const f of files) { const d = await store.uploadRef(f, false); if (d && d.url) { lastUrl = d.url; lastName = f.name; } }
   await loadRefs();
+  // Đưa ảnh vừa tải vào canvas NGAY (setSource đã tự thay ảnh nguồn cũ).
+  if (lastUrl) store.setSource(lastUrl, lastName);
   store.toast(files.length > 1 ? 'Đã tải ' + files.length + ' ảnh.' : 'Đã tải ảnh.');
 }
 async function delRef(it) { try { const r = await fetch('/studio/ref-images/' + it.name, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); const d = await r.json(); if (!r.ok) { store.toast(d.message || 'Không xóa được.', 'error'); return; } loadRefs(); store.toast('Đã xóa ảnh.'); } catch(e){ store.toast('Lỗi xóa.', 'error'); } }
