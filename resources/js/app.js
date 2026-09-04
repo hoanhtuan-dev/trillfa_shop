@@ -463,13 +463,9 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
-// ---------- PWA / Service Worker ----------
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js').catch(function (err) {
-            console.warn('Service worker registration failed:', err);
-        });
-    });
-}
+// PWA / Service Worker đã LOẠI BỎ: /sw.js (scope "/") từng được legacy Alpine pages đăng ký và
+// kiểm soát cả /studio → preload JS bị "cross-world service worker resource mismatch" + phục vụ
+// HTML/asset cũ qua cache (network-first nhưng vẫn gây lệch bản). Studio & storefront (Vue) đều
+// tự unregister SW dư; không còn nơi nào đăng ký lại /sw.js nữa.
 
 Alpine.start();

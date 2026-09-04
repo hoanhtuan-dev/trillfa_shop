@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#34322b">
     <meta name="color-scheme" content="light">
+    @include('partials.remove-service-worker')
     <title>@yield('title', 'Trillfa Studio') · Trillfa Fa</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     @if(file_exists(public_path('build/manifest.json')))
