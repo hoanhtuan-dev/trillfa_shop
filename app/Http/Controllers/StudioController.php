@@ -1257,7 +1257,18 @@ RULES:
         foreach ($files as $f) {
             $name = basename($f);
             $used = \App\Models\Generation::where('media_url', 'like', '%'.$name.'%')->exists();
-            $items[] = ['name' => $name, 'url' => '/storage/studio/ref/'.$name, 'used' => $used];
+            $mtime = is_file($f) ? (int) filemtime($f) : 0;
+            $size = is_file($f) ? (int) filesize($f) : 0;
+            $dims = @getimagesize($f);
+            $items[] = [
+                'name' => $name,
+                'url' => '/storage/studio/ref/'.$name,
+                'used' => $used,
+                'size' => $size,
+                'mtime' => $mtime ?: 0,
+                'width' => $dims[0] ?? 0,
+                'height' => $dims[1] ?? 0,
+            ];
         }
         return response()->json(['items' => $items]);
     }

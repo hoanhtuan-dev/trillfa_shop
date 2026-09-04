@@ -1292,13 +1292,14 @@ export const useStudioStore = defineStore('studio', {
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
     setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.pushCanvasLayer('source', 'source', this.editSource.name, url); this.setActiveLayer('source'); this.toast('Đã chọn ảnh nguồn.'); },
-    async uploadRef(file) {
+    async uploadRef(file, select = true) {
       if (!file) { this.toast('Chọn file ảnh.', 'error'); return; }
       const fd = new FormData(); fd.append('image', file);
       const res = await fetch('/studio/upload-ref', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { this.toast(d.message || 'Lỗi tải ảnh.', 'error'); return; }
-      this.setSource(d.url, file.name); return d.url;
+      if (select) this.setSource(d.url, file.name);
+      return d;
     },
     pickFromProduct(p) { this.setSource(p.url, p.name); },
     pickFromResult(g) { this.setSource(g.media_url, 'Ảnh kết quả #' + g.id); },
