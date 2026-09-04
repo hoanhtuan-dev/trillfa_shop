@@ -488,17 +488,60 @@ export const useStudioStore = defineStore('studio', {
     // ── Reframe / Crop ──
     _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); },
     ratioAspect() { const p = (this.reframeRatio || '3:4').split(':').map(Number); return p[1] ? p[0] / p[1] : 0.75; },
-    // Geometry of the *visible* (object-contain) image inside the pan container, in container space.
+    // Geometry của vùng ảnh HIỂN THỊ trong pan container (toạ độ container px).
+    // Layer đang "identity" (không xoay/lật — mọi công cụ sửa pixel đều flatten trước) → TÍNH
+    // thuần bằng số liệu store (zoom/pan/x/y/scale/baseW/baseH) thay vì đo getBoundingClientRect
+    // của <img>. Đo DOM khiến overlay/preview phụ thuộc thứ tự render giữa các component: khi
+    // phóng to, một component có thể đọc rect lúc style zoom chưa được patch → preview bị TRÔI
+    // khỏi vùng thật (thu nhỏ về thì hết). Vì hàm này chỉ đọc state reactive nên mọi computed
+    // tự cập nhật đúng ngay trong cùng một flush — khớp 100% ở mọi mức zoom/pan.
+    // (Layer còn xoay/lật → fallback đo DOM như cũ, cho crop/reframe chạy trên layer chưa flatten.)
     canvasMetrics() {
       const img = this.cvImg, cont = this.canvasZoom;
       if (!img || !cont) return null;
-      const ir = img.getBoundingClientRect(), cr = cont.getBoundingClientRect();
-      if (!ir.width || !ir.height || !cr.width || !cr.height) return null;
+      const cr = cont.getBoundingClientRect();
+      if (!cr.width || !cr.height) return null;
       const iw = img.naturalWidth || 1, ih = img.naturalHeight || 1;
-      const ia = iw / ih, box = ir.width / ir.height;
-      let vw, vh;
-      if (ia > box) { vw = ir.width; vh = ir.width / ia; } else { vh = ir.height; vw = ir.height * ia; }
-      return { vw, vh, vx: ir.left - cr.left + (ir.width - vw) / 2, vy: ir.top - cr.top + (ir.height - vh) / 2, crW: cr.width, crH: cr.height, crLeft: cr.left, crTop: cr.top, ia, iw, ih };
+      const l = this.activeLayer;
+      const rot = l ? Math.abs((Number(l.rotation) || 0) % 360) : 0;
+      if (!l || (rot > 0.5 && rot < 359.5) || l.flipX || l.flipY) {
+        // Bản DOM gốc (bbox thật của <img> — tính cả xoay/lật).
+        const ir = img.getBoundingClientRect();
+        if (!ir.width || !ir.height) return null;
+        const ia = iw / ih, box = ir.width / ir.height;
+        let vw, vh;
+        if (ia > box) { vw = ir.width; vh = ir.width / ia; } else { vh = ir.height; vw = ir.height * ia; }
+        return { vw, vh, vx: ir.left - cr.left + (ir.width - vw) / 2, vy: ir.top - cr.top + (ir.height - vh) / 2, crW: cr.width, crH: cr.height, crLeft: cr.left, crTop: cr.top, ia, iw, ih };
+      }
+      // Identity: kích thước layout của <img> = baseW/baseH (cạnh dài ≤ 512px hiển thị).
+      let Lw = Number(l.baseW), Lh = Number(l.baseH);
+      if (!Lw || Lw < 1 || !Lh || Lh < 1) {
+        if (iw > 1 && ih > 1) {
+          const cap = Math.min(1, 512 / iw, 512 / ih);
+          Lw = iw * cap; Lh = ih * cap;
+        } else {
+          // Ảnh chưa decode & chưa có baseW — không đoán bừa (L=1px); về nhánh DOM (null nếu chưa có layout).
+          const ir = img.getBoundingClientRect();
+          if (!ir.width || !ir.height) return null;
+          const ia = iw / ih, box = ir.width / ir.height;
+          let vw, vh;
+          if (ia > box) { vw = ir.width; vh = ir.width / ia; } else { vh = ir.height; vw = ir.height * ia; }
+          return { vw, vh, vx: ir.left - cr.left + (ir.width - vw) / 2, vy: ir.top - cr.top + (ir.height - vh) / 2, crW: cr.width, crH: cr.height, crLeft: cr.left, crTop: cr.top, ia: iw / ih, iw, ih };
+        }
+      }
+      const z = Math.max(0.05, this.zoom || 1);
+      const s = Math.max(0.05, Math.min(8, Number(l.scale) || 1));
+      const f = s * z; // tỉ lệ hiển thị thực (base px → màn hình)
+      const x = Number(l.x) || 0, y = Number(l.y) || 0;
+      // Tâm ảnh cách tâm container: z*(x,y) + pan (pan ở screen px, x/y ở layout px).
+      return {
+        vw: Lw * f,
+        vh: Lh * f,
+        vx: cr.width / 2 + (this.pan ? this.pan.x : 0) + z * x - (Lw * f) / 2,
+        vy: cr.height / 2 + (this.pan ? this.pan.y : 0) + z * y - (Lh * f) / 2,
+        crW: cr.width, crH: cr.height, crLeft: cr.left, crTop: cr.top,
+        ia: iw / ih, iw, ih,
+      };
     },
     cropStyle() {
       const m = this.canvasMetrics(); if (!m) return { display: 'none' };
