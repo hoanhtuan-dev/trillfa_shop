@@ -73,4 +73,26 @@ class StorefrontController extends Controller
             'boot' => $payload,
         ]);
     }
+
+    /**
+     * Product detail page — renders the Vue product SPA.
+     */
+    public function product(string $slug)
+    {
+        try {
+            $payload = $this->bridge->productDetail($slug);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            abort(404);
+        }
+
+        $p = $payload['product'];
+        seo()->title($p['name'].' | '.setting('site_name'))
+            ->description($p['short_description'] ?: setting('site_name'))
+            ->canonical($p['url'])
+            ->image($p['image']);
+
+        return view('storefront.product', [
+            'boot' => $payload,
+        ]);
+    }
 }

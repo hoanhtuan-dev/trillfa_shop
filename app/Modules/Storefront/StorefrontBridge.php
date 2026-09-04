@@ -119,6 +119,70 @@ class StorefrontBridge
         ];
     }
 
+    /**
+     * Product detail payload for the Vue product SPA — includes the shared base
+     * (site/user/nav/contact/categories) the layout needs plus the product.
+     */
+    public function productDetail(string $slug): array
+    {
+        $product = Product::where('slug', $slug)->active()
+            ->with('category', 'variants', 'reviews.user')->firstOrFail();
+
+        $price = (float) $product->min_price;
+        $compare = (float) $product->compare_price;
+        if ($compare <= $price && $product->variants->isNotEmpty()) {
+            $compare = (float) ($product->variants->where('compare_price', '>', 0)->min('compare_price') ?: 0);
+        }
+        $onSale = $compare && $compare > $price;
+
+        return [
+            'site' => $this->site(),
+            'user' => $this->user(),
+            'nav' => $this->nav('header'),
+            'contact' => $this->contact(),
+            'categories' => $this->categories(),
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'slug' => $product->slug,
+                'url' => route('product.show', $product->slug),
+                'sku' => $product->sku,
+                'brand' => $product->brand,
+                'short_description' => $product->short_description,
+                'description' => $product->description,
+                'attributes' => (array) $product->attributes,
+                'tags' => (array) $product->tags,
+                'price' => $price,
+                'compare_price' => $onSale ? $compare : null,
+                'discount_percent' => $onSale ? (int) round((1 - $price / $compare) * 100) : 0,
+                'rating_avg' => (float) $product->rating_avg,
+                'rating_count' => (int) $product->rating_count,
+                'image' => $product->image_url ?: asset('images/placeholder.svg'),
+                'gallery' => $product->gallery_urls,
+                'in_stock' => $product->total_stock > 0,
+                'total_stock' => (int) $product->total_stock,
+                'category' => $product->category?->name,
+                'variants' => $product->variants->map(fn ($v) => [
+                    'id' => $v->id,
+                    'name' => $v->name,
+                    'options' => (array) $v->options,
+                    'price' => (float) $v->price,
+                    'stock' => (int) $v->stock,
+                ])->values()->all(),
+                'reviews' => $product->reviews->take(5)->map(fn ($r) => [
+                    'name' => $r->user?->name,
+                    'rating' => (int) $r->rating,
+                    'title' => $r->title,
+                    'body' => $r->body,
+                    'created_at' => $r->created_at?->format('d/m/Y'),
+                ])->values()->all(),
+            ],
+            'related' => Product::where('category_id', $product->category_id)
+                ->where('id', '!=', $product->id)->active()->inStock()
+                ->limit(4)->get()->map(fn ($p) => $this->product($p))->values()->all(),
+        ];
+    }
+
     // ---------------------------------------------------------------- sections
 
     public function site(): array

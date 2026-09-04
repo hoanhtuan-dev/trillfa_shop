@@ -45,8 +45,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 Route::get('/robots.txt', [RobotsController::class, 'index'])->name('robots');
 
-// Shop (owned by the Storefront module now — Vue SPA).
-Route::get('/san-pham/{slug}', [ProductController::class, 'show'])->name('product.show');
+// Shop & product pages are owned by the Storefront module (Vue SPA).
 
 // Cart
 Route::get('/gio-hang', [CartController::class, 'show'])->name('cart.show');
