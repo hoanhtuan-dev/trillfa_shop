@@ -764,8 +764,8 @@ export const useStudioStore = defineStore('studio', {
     // ── Xóa vùng (erase brush + feather) ──
     toggleErase() {
       this.eraseMode = !this.eraseMode;
-      if (this.eraseMode) { this.zoom = 1; this.pan = { x: 0, y: 0 }; } // fit khung, không zoom
-      else this.applyErase();
+      // KHÔNG reset zoom/pan — đóng băng vị trí & độ thu phóng hiện tại khi chọn công cụ.
+      if (!this.eraseMode) this.applyErase();
     },
     // Gắn canvas overlay (DOM) làm mask để vẽ + xem trước realtime.
     attachEraseCanvas(el) {
@@ -838,7 +838,6 @@ export const useStudioStore = defineStore('studio', {
     // ── Vẽ vùng chọn (rectangle marquee) ──
     toggleRegionSelect() {
       this.regionSelectMode = !this.regionSelectMode;
-      if (this.regionSelectMode) { this.zoom = 1; this.pan = { x: 0, y: 0 }; }
     },
     exitRegionSelect() { this.regionSelectMode = false; this._regionDrag = null; },
     exitErase() { if (this.eraseMode) { this.eraseMode = false; this.applyErase(); } },

@@ -85,6 +85,19 @@ function regionBoxStyle() {
   const b = store.regionBox || { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
   return { left: (b.x * 100) + '%', top: (b.y * 100) + '%', width: (b.w * 100) + '%', height: (b.h * 100) + '%' };
 }
+// Overlay canvas xóa bám đúng vùng ảnh hiển thị (chịu zoom/pan) — khớp canvasMetrics.
+const eraseOverlayStyle = computed(() => {
+  const m = store.canvasMetrics();
+  void store.zoom; void store.pan.x; void store.pan.y; // re-eval khi zoom/pan đổi
+  if (!m || !store.eraseMode) return { display: 'none' };
+  return {
+    left: (m.vx / m.crW * 100) + '%',
+    top: (m.vy / m.crH * 100) + '%',
+    width: (m.vw / m.crW * 100) + '%',
+    height: (m.vh / m.crH * 100) + '%',
+    touchAction: 'none',
+  };
+});
 function onLayerPointerDown(l, e) {
   if (l.locked) { store.selectLayer(l); return; }
   store.beginLayerDrag(l.id, e);
@@ -205,8 +218,7 @@ function onTouchEnd(e) {
             <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
             <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
               <div v-if="store.upscaleSrc" class="relative max-h-full max-w-full">
-                <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-full max-w-full min-w-0 select-none object-contain" :style="store.eraseMode ? {} : { transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
-                <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute inset-0 h-full w-full cursor-crosshair rounded bg-red-500/10" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
+                <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-full max-w-full min-w-0 select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
                 <div v-if="store.regionSelectMode" class="pointer-events-none absolute inset-0">
                   <div class="absolute cursor-move select-none border-2 border-dashed border-brand-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" style="pointer-events:auto; touch-action:none" :style="regionBoxStyle()" @pointerdown.stop="store.beginRegionDrag($event)" @pointermove="store.regionDragMove($event)" @pointerup="store.endRegionDrag()" @pointerleave="store.endRegionDrag()" title="Kéo để di chuyển vùng chọn"></div>
                 </div>
@@ -226,6 +238,8 @@ function onTouchEnd(e) {
               </div>
               <p v-if="!store.visibleLayers.length" class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
+            <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->
+            <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-red-500/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
             <!-- Đường guide khi bắt điểm (snap) -->
             <div v-if="store.snapX != null" class="pointer-events-none absolute inset-y-0 z-40 w-px bg-brand-400/80" :style="{ left: 'calc(50% + ' + (store.snapX * store.zoom + store.pan.x) + 'px)' }"></div>
             <div v-if="store.snapY != null" class="pointer-events-none absolute inset-x-0 z-40 h-px bg-brand-400/80" :style="{ top: 'calc(50% + ' + (store.snapY * store.zoom + store.pan.y) + 'px)' }"></div>
