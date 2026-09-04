@@ -143,7 +143,8 @@ export const useStudioStore = defineStore('studio', {
     _inpaintDrew: false,         // đã kéo thật (>4px) khi vẽ vùng mới?
     inpaintFreehandPoints: [],    // path lasso đang vẽ [{nx, ny}] — hiển thị đường GIMP
     inpaintFreehandPaths: [],     // các nét lasso ĐÃ hoàn thành
-    inpaintPathPoints: [],        // điểm neo cho vùng chọn bằng đường cong (path/curve) (để preview cộng/trừ hiển thị đủ)
+    inpaintPathPoints: [],        // điểm neo đang vẽ cho vùng chọn bằng đường cong (path/curve)
+    inpaintPathRegions: [],       // các vùng path ĐÃ đóng (để preview hiển thị đủ nhiều vùng)
     _inpaintFreehandActive: false,
     inpaintFeather: 0,            // feather (px 0-50) — làm mềm mép vùng chọn
     inpaintFillColor: '#ffffff',  // màu tô cho nút "🎨 Tô" của vùng chọn
@@ -1406,6 +1407,8 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintErase = false;
       this.inpaintFreehandPoints = [];
       this.inpaintFreehandPaths = [];
+      this.inpaintPathPoints = [];
+      this.inpaintPathRegions = [];
       if (this.inpaintMaskSource === 'canvas') {
         // Vùng chọn trên canvas: chỉ thoát + xoá dữ liệu, không giữ làm mask inpaint.
         this.inpaintMaskDone = false;
@@ -1430,6 +1433,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintFreehandPoints = [];
       this.inpaintFreehandPaths = [];
       this.inpaintPathPoints = [];
+      this.inpaintPathRegions = [];
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
     },
     toggleInpaintMask(mode) {
@@ -1444,7 +1448,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this._initInpaintBrush(); }
     },
     // Mở vùng chọn từ THANH CÔNG CỤ CANVAS (rect/freehand) — dùng chung overlay chính xác của Inpaint,
     // nhưng hành động là Xóa / Tô màu / Feather tại chỗ (không phải mask AI inpaint).
@@ -1459,7 +1463,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this._initInpaintBrush(); }
     },
     // ── Freehand (lasso) select: vẽ tự do tạo vùng kín → mask ──
     freehandStart(e) {
@@ -1525,6 +1529,11 @@ export const useStudioStore = defineStore('studio', {
       const c = this._inpaintMaskCanvas, ctx = this._inpaintMaskCtx;
       if (!c || !ctx) return;
       const w = c.width, h = c.height;
+      // 'new' → chọn mới (xoá mask + regions cũ); 'add'/'subtract' → cộng/trừ vào vùng hiện có.
+      if (this.inpaintSelectMode === 'new') {
+        ctx.clearRect(0, 0, w, h);
+        this.inpaintPathRegions = [];
+      }
       const P = pts.map((p) => ({ x: p.nx * w, y: p.ny * h }));
       const n = P.length;
       ctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
@@ -1539,8 +1548,12 @@ export const useStudioStore = defineStore('studio', {
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
       this._finalizeInpaintBrush();
-      this.inpaintPathPoints = []; // xoá điểm để vẽ path tiếp theo (cộng/trừ)
-      this.toast('Đã tạo vùng chọn từ đường cong — bấm Xóa/Tô/Nhân đôi hoặc Xong.');
+      // Lưu vùng đã đóng để preview hiển thị ĐỦ nhiều vùng; xoá điểm để vẽ path tiếp theo.
+      this.inpaintPathRegions.push(pts.map((p) => ({ nx: p.nx, ny: p.ny })));
+      this.inpaintPathPoints = [];
+      // Sau lần đóng đầu tiên, chuyển sang 'add' → các path sau tự cộng dồn (dễ vẽ đa vùng).
+      if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
+      this.toast('Đã tạo vùng chọn — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
     },
     inpaintMaskPointer(e) {
       const m = this.canvasMetrics();

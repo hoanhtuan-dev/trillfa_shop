@@ -75,10 +75,8 @@ const pathPixels = (pts) => {
 const freehandPoints = computed(() => { void metricsTick.value; return pathPixels(store.inpaintFreehandPoints); });
 const freehandPaths = computed(() => { void metricsTick.value; return store.inpaintFreehandPaths.map((pts) => pathPixels(pts)); });
 // Đường cong path/curve: lấy mẫu Catmull-Rom (đóng kín) qua các điểm neo.
-const pathSmoothPixels = computed(() => {
-  void metricsTick.value;
+const pathSmooth = (pts) => {
   const m = store.canvasMetrics();
-  const pts = store.inpaintPathPoints;
   if (!m || pts.length < 2) return '';
   const P = pts.map((p) => ({ x: p.nx, y: p.ny }));
   const n = P.length, SAMPLES = 24, out = [];
@@ -94,7 +92,9 @@ const pathSmoothPixels = computed(() => {
     }
   }
   return out.join(' ');
-});
+};
+const pathSmoothPixels = computed(() => { void metricsTick.value; return pathSmooth(store.inpaintPathPoints); });
+const pathRegionsPixels = computed(() => { void metricsTick.value; return store.inpaintPathRegions.map((pts) => pathSmooth(pts)); });
 
 // ── Brush: canvas overlay THẬT phủ đúng vùng ảnh hiển thị (nét vẽ hiện ngay, đỏ 60%) ──
 const metricsTick = ref(0);
@@ -161,12 +161,16 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
       <polyline v-if="store.inpaintFreehandPoints.length > 1" :points="freehandPoints" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
     </svg>
 
-    <!-- Path (curve) select: đường cong mượt qua các điểm neo -->
-    <svg v-if="store.inpaintMaskMode === 'path' && store.inpaintPathPoints.length > 1"
+    <!-- Path (curve) select: hiển thị TẤT CẢ vùng đã đóng + path đang vẽ -->
+    <svg v-if="store.inpaintMaskMode === 'path' && (store.inpaintPathRegions.length || store.inpaintPathPoints.length > 1)"
          class="pointer-events-none absolute inset-0 z-10 h-full w-full">
-      <polyline :points="pathSmoothPixels" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      <template v-for="(reg, idx) in pathRegionsPixels" :key="'r'+idx">
+        <polyline :points="reg" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+        <polygon :points="reg" fill="rgba(167,139,250,0.12)" stroke="none" />
+      </template>
+      <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
       <polygon v-if="store.inpaintPathPoints.length > 2" :points="pathSmoothPixels" fill="rgba(167,139,250,0.12)" stroke="none" />
-      <template v-for="(p, i) in store.inpaintPathPoints" :key="i">
+      <template v-for="(p, i) in store.inpaintPathPoints" :key="'p'+i">
         <circle :cx="Math.round(store.canvasMetrics().vx + p.nx * store.canvasMetrics().vw)" :cy="Math.round(store.canvasMetrics().vy + p.ny * store.canvasMetrics().vh)" r="3" fill="#a78bfa" />
       </template>
     </svg>
