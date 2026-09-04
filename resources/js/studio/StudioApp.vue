@@ -292,14 +292,14 @@ function onTouchEnd(e) {
             <input type="range" min="0" max="60" step="1" :value="store.eraseFeather" @input="store.eraseFeather = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
             <span class="w-6 text-right text-[10px] text-cream-200">{{ store.eraseFeather }}</span>
             <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
-            <button @click="store.applyEraseNow()" class="rounded-full bg-red-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500" title="Áp dụng nét đã xóa và vẽ tiếp">🗑 Xóa</button>
-            <button @click="store.finishErase()" class="rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-500">✓ Xong</button>
-            <button @click="store.cancelErase()" class="rounded-full bg-ink-700 px-2.5 py-1 text-xs font-semibold text-cream-200 hover:bg-ink-600">✕</button>
+            <button @click="store.applyEraseNow()" class="flex items-center gap-1 rounded-full bg-red-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500" title="Áp dụng nét đã xóa và vẽ tiếp"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Xóa</button>
+            <button @click="store.finishErase()" class="flex items-center gap-1 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-500"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Xong</button>
+            <button @click="store.cancelErase()" class="rounded-full bg-ink-700 px-2.5 py-1 text-xs font-semibold text-cream-200 hover:bg-ink-600"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
           </div>
           <!-- Canvas toolbar: undo/redo + zoom -->
           <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
-            <button @click="store.undo()" :disabled="!store.undoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Hoàn tác (Ctrl+Z)">↶</button>
-            <button @click="store.redo()" :disabled="!store.redoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Làm lại (Ctrl+Y)">↷</button>
+            <button @click="store.undo()" :disabled="!store.undoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Hoàn tác (Ctrl+Z)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></button>
+            <button @click="store.redo()" :disabled="!store.redoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Làm lại (Ctrl+Y)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg></button>
             <span class="h-4 w-px bg-ink-700"></span>
             <button @click="store.zoomOut()" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700">−</button>
             <button @click="store.zoomFit()" class="rounded-full px-2 py-1 text-xs text-cream-200 hover:bg-ink-700">Vừa</button>
