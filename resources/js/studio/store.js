@@ -61,6 +61,7 @@ export const useStudioStore = defineStore('studio', {
     _eraseCtx: null,
     _eraseDrawing: false,
     _eraseLast: null,
+    _eraseHasStrokes: false, // đã có nét thật? (tránh push history/bake khi không xoá gì)
     _eraseBusy: false,   // chống bake trùng khi đang áp dụng nét xóa
     // Vẽ tự do (paint brush) — tô màu lên layer
     drawMode: false,
@@ -71,6 +72,7 @@ export const useStudioStore = defineStore('studio', {
     _drawCtx: null,
     _drawDrawing: false,
     _drawLast: null,
+    _drawHasStrokes: false, // đã có nét thật? (tránh push history/bake khi không vẽ gì)
     _drawPressure: 1,   // áp lực bút stylus (0-1) cho cọ vẽ
     _drawBusy: false,    // chống bake trùng khi đang áp dụng nét vẽ
     // Vẽ vùng chọn (marquee)
@@ -177,6 +179,7 @@ export const useStudioStore = defineStore('studio', {
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
     redoStack: [],   // lịch sử làm lại
     highlightLayerId: '',  // layer mới tạo cần viền nổi bật tạm thời
+    imgTick: 0,            // tăng mỗi khi ảnh isolate load xong — overlay đo lại vị trí/kích thước
   }),
   getters: {
     upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
@@ -185,6 +188,9 @@ export const useStudioStore = defineStore('studio', {
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
     activeLayer() { return this.canvasLayers.find(x => x.id === this.activeLayerId) || null; },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
+    // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
+    // ảnh. canvasLayers giữ thứ tự vẽ (zIndex), getter này chỉ đảo để hiển thị panel.
+    layersFrontFirst() { return this.canvasLayers.slice().reverse(); },
   },
   actions: {
     async api(url, body = {}, signal = null) {
@@ -547,7 +553,15 @@ export const useStudioStore = defineStore('studio', {
         this._cropStop(null);
       }
     },
-    onCanvasImgLoad() { if (this.cropMode) this.initCropBox(); },
+    onCanvasImgLoad() {
+      this.imgTick++; // overlay đang bật cần đo lại sau khi ảnh decode xong (kích thước thật)
+      if (this.cropMode) this.initCropBox();
+      // Ảnh load xong có thể làm overlay erase/draw được gắn LÚC ẢNH CHƯA DECODE bị sai kích thước
+      // (gắn với ratio mặc định vuông). Re-attach để khớp tỉ lệ thật của ảnh; nét vẽ trước đó sẽ
+      // bị xoá nhưng trước khi ảnh hiển thị thì chưa thể vẽ gì có ý nghĩa — nên an toàn.
+      if (this.eraseMode && this._eraseCanvas) this.attachEraseCanvas(this._eraseCanvas);
+      if (this.drawMode && this._drawCanvas) this.attachDrawCanvas(this._drawCanvas);
+    },
     cropStart(e, key) {
       if (!this.cropMode) return;
       // NOTE: no preventDefault() here — canceling pointerdown would also suppress the
@@ -605,7 +619,7 @@ export const useStudioStore = defineStore('studio', {
       this.cropBox = b;
     },
     async confirmCrop() {
-      if (!this.cropMode) return;
+      if (!this.cropMode || this.reframing) return;
       const img = this.cvImg;
       if (!img) { this.toast('Chưa có ảnh trên canvas.', 'error'); return; }
       const iw = img.naturalWidth, ih = img.naturalHeight;
@@ -652,7 +666,37 @@ export const useStudioStore = defineStore('studio', {
     deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
     zoomIn() { this.zoomAt(0, 0, 1.5); },
     zoomOut() { this.zoomAt(0, 0, 1 / 1.5); },
-    zoomFit() { this.zoom = 1; this.pan = { x: 0, y: 0 }; },
+    // "Vừa": thu/phóng cho VỪA KHUNG nhìn — tính bbox các layer đang hiển thị (ở zoom 1, đã tính
+    // rotation/scale) rồi chọn zoom = min(cw/bbw, ch/bbh). Trước đây chỉ reset zoom=1/pan=0 nên
+    // ảnh nhỏ/ảnh đã di chuyển không bao giờ "vừa" được với vùng canvas.
+    zoomFit() {
+      const cont = this.canvasZoom;
+      const layers = this.canvasLayers.filter((l) => l.visible !== false && l.image);
+      if (!cont || !layers.length) { this.zoom = 1; this.pan = { x: 0, y: 0 }; return; }
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      layers.forEach((l) => {
+        const bw = Number(l.baseW) || 512, bh = Number(l.baseH) || 512;
+        const s = Number(l.scale) || 1;
+        const rot = ((Number(l.rotation) || 0) * Math.PI) / 180;
+        const cos = Math.cos(rot), sin = Math.sin(rot);
+        const hw = (bw * s) / 2, hh = (bh * s) / 2;
+        const x = Number(l.x) || 0, y = Number(l.y) || 0;
+        [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([cx, cy]) => {
+          const px = cx * cos - cy * sin + x;
+          const py = cx * sin + cy * cos + y;
+          if (px < minX) minX = px; if (px > maxX) maxX = px;
+          if (py < minY) minY = py; if (py > maxY) maxY = py;
+        });
+      });
+      const r = cont.getBoundingClientRect();
+      const cw = Math.max(1, r.width - 64), ch = Math.max(1, r.height - 64);
+      const bw2 = Math.max(1, maxX - minX), bh2 = Math.max(1, maxY - minY);
+      // Giới hạn trên 100% để "Vừa" luôn là cái nhìn tổng thể (không phóng to hơn ảnh thật).
+      const z = Math.max(0.05, Math.min(1, Math.min(cw / bw2, ch / bh2)));
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+      this.zoom = z;
+      this.pan = { x: -cx * z, y: -cy * z };
+    },
     // Pinch-zoom (2 ngón) trên cảm ứng.
     beginPinch(t1, t2) { this._pinch = { dist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1, zoom: this.zoom }; this._drag = null; },
     pinchMove(t1, t2) { if (!this._pinch) return; const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1; this.zoom = Math.max(0.1, Math.min(8, this._pinch.zoom * (dist / this._pinch.dist))); },
@@ -858,6 +902,18 @@ export const useStudioStore = defineStore('studio', {
       }
       this.saveLayerLayout();
     },
+    // Bỏ ĐÚNG ảnh nguồn đang dùng (id 'source' HOẶC các layer src-* do thêm nhiều ảnh) khỏi canvas.
+    // clearSource() cũ chỉ xoá layer id 'source' → với ảnh nguồn có id 'src-…' thì ảnh vẫn nằm
+    // trên canvas dù nút "Bỏ ảnh nguồn" đã ẩn (trạng thái treo, gây nhầm).
+    removeEditSource() {
+      const src = this.editSource;
+      if (!src) return;
+      const pool = this.canvasLayers.filter((x) => x.kind === 'source' && x.image === src.url);
+      if (!pool.length) { this.editSource = null; this.saveLayerLayout(); return; }
+      // Ưu tiên layer đang active (nhiều layer có thể dùng chung URL sau duplicate).
+      const l = pool.find((x) => x.id === this.activeLayerId) || pool[0];
+      this.deleteLayer(l); // xoá layer + chuyển active đúng cách (tôn trọng lock)
+    },
     // Dọn sạch canvas + toàn bộ layer (chỉ xóa trạng thái hiển thị — KHÔNG xóa output/ảnh kết quả).
     cleanCanvas() {
       this.previewId = null;
@@ -890,13 +946,17 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
       this.toast('Đã đổi tên layer.');
     },
-    // Di chuyển layer lên/xuống trong danh sách (không ảnh hưởng output).
+    // Di chuyển layer lên/xuống TRONG NGĂN XẾP (không ảnh hưởng output).
+    // Quy ước: mảng canvasLayers[0..n-1] = dưới→trên (zIndex = vị trí mảng); ngăn xếp HIỂN THỊ
+    // front-first (layer trên cùng danh sách = đang ở TRƯỚC). Vì vậy:
+    //   'up'   = lên đầu danh sách = RA PHÍA TRƯỚC (index +1)
+    //   'down' = xuống cuối danh sách = VỀ PHÍA SAU (index -1)
     moveLayer(id, dir) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l || l.locked) return;
       this.pushHistory();
       const i = this.canvasLayers.findIndex((x) => x.id === id);
-      const j = i + (dir === 'up' ? -1 : 1);
+      const j = i + (dir === 'up' ? 1 : -1);
       if (i < 0 || j < 0 || j >= this.canvasLayers.length) return;
       const arr = this.canvasLayers.slice();
       const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
@@ -917,13 +977,23 @@ export const useStudioStore = defineStore('studio', {
       Object.assign(l, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, blend: 'normal' });
       this.saveLayerLayout();
     },
-    // Nhân đôi layer (giữ nguyên transform, tạo id + tên mới).
+    // Nhân đôi layer (giữ nguyên transform, tạo id + tên mới). Bản sao được đẩy lệch 12px để
+    // phân biệt ngay với bản gốc (đang chồng khít) + viền highlight như layer mới.
     duplicateLayer(id) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l) return;
       this.pushHistory();
-      const copy = { ...l, id: id + '-copy-' + Date.now(), name: (l.name || 'Layer') + ' (bản sao)' };
+      const copy = {
+        ...l,
+        id: id + '-copy-' + Date.now(),
+        name: (l.name || 'Layer') + ' (bản sao)',
+        x: (Number(l.x) || 0) + 12,
+        y: (Number(l.y) || 0) + 12,
+      };
       this.canvasLayers.push(copy);
+      this.highlightLayerId = copy.id;
+      clearTimeout(this._highlightTimer);
+      this._highlightTimer = setTimeout(() => { if (this.highlightLayerId === copy.id) this.highlightLayerId = ''; }, 2500);
       this.setActiveLayer(copy.id);
       this.saveLayerLayout();
     },
@@ -944,6 +1014,8 @@ export const useStudioStore = defineStore('studio', {
     toggleFlipY(id) { const l = this.canvasLayers.find((x) => x.id === id); if (!l) return; this.pushHistory(); l.flipY = !l.flipY; this.saveLayerLayout(); },
     // ── Xóa vùng (erase brush + feather) ──
     toggleErase() {
+      const l = this.activeLayer;
+      if (l && l.locked) { this.toast('Layer đang khóa — mở khóa trước khi xóa.', 'error'); return; }
       this.eraseMode = !this.eraseMode;
       // KHÔNG reset zoom/pan — đóng băng vị trí & độ thu phóng hiện tại khi chọn công cụ.
       if (!this.eraseMode) this.applyErase();
@@ -951,19 +1023,20 @@ export const useStudioStore = defineStore('studio', {
     // Gắn canvas overlay (DOM) làm mask để vẽ + xem trước realtime.
     attachEraseCanvas(el) {
       if (!el) { this._eraseCanvas = null; this._eraseCtx = null; return; }
-      // Canvas theo TỈ LỆ ẢNH GỐC (không vuông 1024×1024) — nếu vuông thì nét xóa bị méo & lệch vị trí.
+      // Canvas theo TỈ LỆ HIỂN THỊ của ảnh trên canvas (không vuông cứng) — nếu vuông thì nét xóa
+      // bị méo & lệch vị trí khi bake. Dùng vw/vh (vùng ảnh hiển thị) thay vì naturalWidth:
+      // đúng tỉ lệ NGAY CẢ khi ảnh chưa decode xong (naturalWidth = 0) vì vw/vh đã có sau layout.
       const m = this.canvasMetrics();
       const base = 1024;
+      const ratio = m && m.vw && m.vh ? m.vw / m.vh : 1;
       let w = base, h = base;
-      if (m && m.iw && m.ih) {
-        const ia = m.iw / m.ih;
-        if (ia >= 1) { w = base; h = Math.max(1, Math.round(base / ia)); }
-        else { w = Math.max(1, Math.round(base * ia)); h = base; }
-      }
+      if (ratio >= 1) h = Math.max(1, Math.round(base / ratio));
+      else w = Math.max(1, Math.round(base * ratio));
       el.width = w; el.height = h;
       this._eraseCanvas = el;
       this._eraseCtx = el.getContext('2d');
       this._eraseCtx.clearRect(0, 0, w, h);
+      this._eraseHasStrokes = false; // canvas mới → chưa có nét
     },
     setEraseFeather(v) { this.eraseFeather = Number(v) || 0; },
     _eraseRadius() { return Math.max(3, Math.min(150, Number(this.eraseBrushSize) || 24)); },
@@ -990,17 +1063,25 @@ export const useStudioStore = defineStore('studio', {
       const steps = Math.max(1, Math.ceil(Math.hypot(to.nx - from.nx, to.ny - from.ny) * w / (r / 2)));
       for (let s = 0; s <= steps; s++) this._drawEraseDot({ nx: from.nx + (to.nx - from.nx) * (s / steps), ny: from.ny + (to.ny - from.ny) * (s / steps) });
     },
-    beginEraseBrush(e) { if (!this.eraseMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._eraseDrawing = true; this._eraseLast = this._erasePoint(e); this._drawEraseDot(this._eraseLast); },
+    beginEraseBrush(e) { if (!this.eraseMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._eraseDrawing = true; this._eraseLast = this._erasePoint(e); this._eraseHasStrokes = true; this._drawEraseDot(this._eraseLast); },
     eraseBrushMove(e) { if (!this._eraseDrawing) return; const p = this._erasePoint(e); this._drawEraseLine(this._eraseLast || p, p); this._eraseLast = p; },
     endEraseBrush() { this._eraseDrawing = false; this._eraseLast = null; },
     applyErase() {
       if (this._eraseBusy) return Promise.resolve();
+      // Không có nét thật → không push history / không bake (tránh undo rác khi chỉ bật/tắt công cụ).
+      if (!this._eraseHasStrokes) return Promise.resolve();
       this.pushHistory();
       this._eraseBusy = true;
+      this._eraseHasStrokes = false;
       return new Promise((resolve) => {
         const l = this.activeLayer;
         const ec = this._eraseCanvas;
-        if (!l || !ec) { this._eraseBusy = false; resolve(); return; }
+        if (!l || l.locked || !ec) {
+          if (l && l.locked) this.toast('Layer đang khóa — mở khóa trước khi xóa.', 'error');
+          this._eraseBusy = false;
+          resolve();
+          return;
+        }
         const img = new Image();
         img.onload = () => {
           const w = img.naturalWidth, h = img.naturalHeight;
@@ -1026,28 +1107,30 @@ export const useStudioStore = defineStore('studio', {
       });
     },
     // "✓ Xong": hoàn tất xóa — áp dụng nét còn lại rồi thoát chế độ.
-    finishErase() { this.applyErase().then(() => { this.eraseMode = false; }); },
+    finishErase() { if (!this.eraseMode) return; this.applyErase().then(() => { this.eraseMode = false; }); },
     // "✕ Hủy": thoát chế độ erase KHÔNG áp dụng (bỏ nét đã vẽ).
-    cancelErase() { this.eraseMode = false; this.toast('Đã hủy xóa.'); },
+    cancelErase() { if (!this.eraseMode) return; this.eraseMode = false; this.toast('Đã hủy xóa.'); },
     // ── Vẽ tự do (paint brush): tô màu lên layer active ──
     toggleDraw() {
+      const l = this.activeLayer;
+      if (l && l.locked) { this.toast('Layer đang khóa — mở khóa trước khi vẽ.', 'error'); return; }
       this.drawMode = !this.drawMode;
       if (!this.drawMode) this.applyDraw();
     },
     attachDrawCanvas(el) {
       if (!el) { this._drawCanvas = null; this._drawCtx = null; return; }
+      // Canvas theo TỈ LỆ HIỂN THỊ (không vuông cứng) — khớp đúng tỉ lệ ảnh kể cả khi chưa decode.
       const m = this.canvasMetrics();
       const base = 1024;
+      const ratio = m && m.vw && m.vh ? m.vw / m.vh : 1;
       let w = base, h = base;
-      if (m && m.iw && m.ih) {
-        const ia = m.iw / m.ih;
-        if (ia >= 1) { w = base; h = Math.max(1, Math.round(base / ia)); }
-        else { w = Math.max(1, Math.round(base * ia)); h = base; }
-      }
+      if (ratio >= 1) h = Math.max(1, Math.round(base / ratio));
+      else w = Math.max(1, Math.round(base * ratio));
       el.width = w; el.height = h;
       this._drawCanvas = el;
       this._drawCtx = el.getContext('2d');
       this._drawCtx.clearRect(0, 0, w, h);
+      this._drawHasStrokes = false; // canvas mới → chưa có nét
     },
     _drawRadius() { const base = Math.max(3, Math.min(150, Number(this.drawBrushSize) || 24)); return base * (0.4 + 0.6 * (Number(this._drawPressure) || 1)); },
     _hexToRgba(hex, a = 1) {
@@ -1079,17 +1162,25 @@ export const useStudioStore = defineStore('studio', {
       const steps = Math.max(1, Math.ceil(Math.hypot(to.nx - from.nx, to.ny - from.ny) * w / (r / 2)));
       for (let s = 0; s <= steps; s++) this._drawPaintDot({ nx: from.nx + (to.nx - from.nx) * (s / steps), ny: from.ny + (to.ny - from.ny) * (s / steps) });
     },
-    beginDrawBrush(e) { if (!this.drawMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._drawPressure = (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) ? e.pressure : 1; this._drawDrawing = true; this._drawLast = this._drawPoint(e); this._drawPaintDot(this._drawLast); },
+    beginDrawBrush(e) { if (!this.drawMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._drawPressure = (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) ? e.pressure : 1; this._drawDrawing = true; this._drawLast = this._drawPoint(e); this._drawHasStrokes = true; this._drawPaintDot(this._drawLast); },
     drawBrushMove(e) { if (!this._drawDrawing) return; if (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) this._drawPressure = e.pressure; const p = this._drawPoint(e); this._drawPaintLine(this._drawLast || p, p); this._drawLast = p; },
     endDrawBrush() { this._drawDrawing = false; this._drawLast = null; },
     applyDraw() {
       if (this._drawBusy) return Promise.resolve();
+      // Không có nét thật → không push history / không bake.
+      if (!this._drawHasStrokes) return Promise.resolve();
       this.pushHistory();
       this._drawBusy = true;
+      this._drawHasStrokes = false;
       return new Promise((resolve) => {
         const l = this.activeLayer;
         const dc = this._drawCanvas;
-        if (!l || !dc) { this._drawBusy = false; resolve(); return; }
+        if (!l || l.locked || !dc) {
+          if (l && l.locked) this.toast('Layer đang khóa — mở khóa trước khi vẽ.', 'error');
+          this._drawBusy = false;
+          resolve();
+          return;
+        }
         const img = new Image();
         img.onload = () => {
           const w = img.naturalWidth, h = img.naturalHeight;
@@ -1578,6 +1669,9 @@ export const useStudioStore = defineStore('studio', {
       // Lưu nét đã hoàn thành vào paths để preview hiển thị ĐỦ các lần cộng/trừ.
       this.inpaintFreehandPaths.push(pts.map((p) => ({ nx: p.nx, ny: p.ny })));
       this.inpaintFreehandPoints = [];
+      // Sau vòng lasso đầu tiên chuyển sang 'add' (giống path/magic) — vẽ tiếp sẽ CỘNG DỒN
+      // vùng thay vì vô tình XOÁ vùng vừa khoanh (bấm nút ➕ nếu muốn chủ động thêm).
+      if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
     },
     // ── Path (curve) select: click thêm điểm neo → đường cong mượt → đóng để tạo vùng chọn ──
     pathAddPoint(e) {
@@ -2041,6 +2135,7 @@ export const useStudioStore = defineStore('studio', {
     async _applySelectionToLayer(action, color) {
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      if (l.locked) { this.toast('Layer đang khóa — mở khóa trước khi xóa/tô vùng chọn.', 'error'); return; }
       const maskData = this.inpaintBrushData; // capture đồng bộ
       this.pushHistory();
       try {
@@ -2075,6 +2170,7 @@ export const useStudioStore = defineStore('studio', {
     async duplicateSelectedRegion() {
       const src = this.activeLayer;
       if (!src || !src.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      if (src.locked) { this.toast('Layer đang khóa — mở khóa trước khi nhân đôi vùng chọn.', 'error'); return; }
       const maskData = this.inpaintBrushData; // capture đồng bộ
       this.pushHistory();
       try {
@@ -2107,6 +2203,7 @@ export const useStudioStore = defineStore('studio', {
     async floatSelectedRegion() {
       const src = this.activeLayer;
       if (!src || !src.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      if (src.locked) { this.toast('Layer đang khóa — mở khóa trước khi nâng vùng chọn.', 'error'); return; }
       const maskData = this.inpaintBrushData; // capture đồng bộ
       this.pushHistory();
       try {

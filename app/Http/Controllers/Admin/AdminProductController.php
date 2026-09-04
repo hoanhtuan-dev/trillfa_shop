@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Generation;
 use App\Models\Product;
+use App\Services\ProductAIService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -33,9 +35,7 @@ class AdminProductController extends Controller
 
     public function create()
     {
-        $categories = Category::active()->orderBy('sort_order')->get();
-
-        return view('admin.products.form', compact('categories'))->with('product', new Product());
+        return $this->renderVue(new Product());
     }
 
     public function store(Request $request)
@@ -51,10 +51,112 @@ class AdminProductController extends Controller
 
     public function edit(Product $product)
     {
-        $categories = Category::active()->orderBy('sort_order')->get();
         $product->load('variants');
 
-        return view('admin.products.form', compact('categories', 'product'));
+        return $this->renderVue($product);
+    }
+
+    /**
+     * Render the Vue product create/edit SPA (card-based, Studio + AI).
+     */
+    protected function renderVue(Product $product)
+    {
+        $categories = Category::active()->orderBy('sort_order')->with('children')->get();
+
+        return view('admin.products.vue', [
+            'boot' => [
+                'product' => $product->exists ? $this->productPayload($product) : null,
+                'categories' => $categories->map(fn ($c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'slug' => $c->slug,
+                    'children' => $c->children->map(fn ($ch) => ['id' => $ch->id, 'name' => $ch->name])->values()->all(),
+                ])->values()->all(),
+                'ai' => [
+                    'model' => (string) studio_config('qwen_prompt_model', 'qwen3.8-flash'),
+                    'provider' => (string) studio_config('prompt_provider', 'qwen'),
+                    'enabled' => true,
+                ],
+            ],
+        ]);
+    }
+
+    protected function productPayload(Product $product): array
+    {
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'slug' => $product->slug,
+            'sku' => $product->sku,
+            'brand' => $product->brand,
+            'category_id' => $product->category_id,
+            'short_description' => $product->short_description,
+            'description' => $product->description,
+            'price' => (float) $product->price,
+            'compare_price' => $product->compare_price !== null ? (float) $product->compare_price : null,
+            'cost_price' => $product->cost_price !== null ? (float) $product->cost_price : null,
+            'stock' => (int) $product->stock,
+            'featured' => (bool) $product->featured,
+            'is_active' => (bool) $product->is_active,
+            'meta_title' => $product->meta_title,
+            'meta_description' => $product->meta_description,
+            'tags' => (array) $product->tags,
+            'image' => $product->image_url,
+            'gallery' => $product->gallery_urls,
+            'variants' => $product->variants->map(fn ($v) => [
+                'name' => $v->name,
+                'sku' => $v->sku,
+                'price' => (float) $v->price,
+                'compare_price' => $v->compare_price !== null ? (float) $v->compare_price : null,
+                'stock' => (int) $v->stock,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * Deep-AI content + SEO suggestions (qwen configurable).
+     */
+    public function aiSuggest(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:120'],
+            'brand' => ['nullable', 'string', 'max:120'],
+            'hint' => ['nullable', 'string', 'max:1000'],
+            'short_description' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $result = app(ProductAIService::class)->generate($data);
+
+        return response()->json(['ok' => true, 'data' => $result]);
+    }
+
+    /**
+     * Studio library image feed for the product image picker. Returns the
+     * admin's latest generations + public studio assets.
+     */
+    public function studioImages(Request $request)
+    {
+        $images = [];
+
+        // Latest generations (media_url -> served via /studio/image or direct http).
+        $gens = auth()->user()->generations()->whereNotNull('media_url')->latest()->limit(60)->get();
+        foreach ($gens as $g) {
+            $media = $g->media_url;
+            $url = str_starts_with($media, 'http') ? $media : route('studio.image', ['path' => ltrim($media, '/')]);
+            $images[] = ['id' => 'gen-'.$g->id, 'url' => $url, 'type' => 'generation', 'label' => $g->prompt];
+        }
+
+        // Public studio assets (uploaded images).
+        $assetsDir = public_path('studio/images/assets');
+        if (is_dir($assetsDir)) {
+            foreach (glob($assetsDir.'/*.{png,jpg,jpeg,webp}', GLOB_BRACE) as $f) {
+                $name = basename($f);
+                $images[] = ['id' => 'asset-'.$name, 'url' => asset('studio/images/assets/'.$name), 'type' => 'asset', 'label' => $name];
+            }
+        }
+
+        return response()->json(['images' => $images]);
     }
 
     public function update(Request $request, Product $product)
@@ -145,6 +247,13 @@ class AdminProductController extends Controller
                 if ($file->isValid()) {
                     $gallery[] = $file->store('products', 'public');
                 }
+            }
+        }
+
+        // Merge Studio/library images (absolute URLs selected in the Vue form).
+        foreach (array_values(array_filter((array) $request->input('studio_gallery', []))) as $path) {
+            if (is_string($path) && $path !== '' && ! in_array($path, $gallery, true)) {
+                $gallery[] = $path;
             }
         }
 

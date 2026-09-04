@@ -182,5 +182,5 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
   </div>
 
   <!-- ══ Placeholder ══ -->
-  <span v-else class="text-[11px] font-medium text-cream-300/50">Chọn công cụ từ thanh dọc bên trái</span>
+  <span v-else class="text-[11px] font-medium text-cream-300/50">Chọn công cụ từ thanh công cụ cạnh canvas (Esc = hủy · Enter = xong)</span>
 </template>

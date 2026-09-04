@@ -53,11 +53,23 @@ watch(() => store.upscaleSrc, () => {
   if (store.cropMode) store.initCropBox();
 });
 function onCanvasKey(e) {
-  if (!store.cropMode && store.inpaintMaskMode === 'none') return;
+  const editing = store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode;
+  if (!editing) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-  if (e.key === 'Escape') { if (store.inpaintMaskMode !== 'none') { store.inpaintMaskMode = 'none'; store.inpaintBrushData = ''; } else store.toggleCrop(); }
-  else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON') && store.inpaintMaskMode === 'none') store.confirmCrop();
+  if (e.key === 'Escape') {
+    // Thoát an toàn theo ưu tiên: vùng chọn/mask → vẽ → xóa → crop.
+    if (store.inpaintMaskMode !== 'none') store.clearInpaintMask();
+    else if (store.drawMode) store.cancelDraw();
+    else if (store.eraseMode) store.cancelErase();
+    else if (store.cropMode) store.toggleCrop();
+  } else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) {
+    // Hoàn tất công cụ đang dùng (Enter = "Xong").
+    if (store.cropMode) store.confirmCrop();
+    else if (store.inpaintMaskMode !== 'none') store.confirmInpaintMask();
+    else if (store.eraseMode) store.finishErase();
+    else if (store.drawMode) store.finishDraw();
+  }
 }
 // Phím tắt cho layer (chế độ stack): mũi tên di chuyển, Ctrl/Cmd+D nhân đôi.
 function onLayerKeys(e) {
@@ -90,7 +102,7 @@ const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
 
 // ── Layer editor (composite + transform) ──
-const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode || store.regionSelectMode);
+const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode);
 function layerStyle(l, i) {
   return {
     transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + ((l.scale || 1) * (l.flipX ? -1 : 1)) + ', ' + ((l.scale || 1) * (l.flipY ? -1 : 1)) + ')',
@@ -99,10 +111,6 @@ function layerStyle(l, i) {
     mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
     zIndex: i + 1,
   };
-}
-function regionBoxStyle() {
-  const b = store.regionBox || { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
-  return { left: (b.x * 100) + '%', top: (b.y * 100) + '%', width: (b.w * 100) + '%', height: (b.h * 100) + '%' };
 }
 // Transform của layer active trong chế độ isolate — giữ ĐÚNG vị trí/scale/rotation như ở stack (không xê dịch).
 const isolateLayerStyle = computed(() => {
@@ -117,7 +125,12 @@ const isolateLayerStyle = computed(() => {
 });
 // Overlay canvas xóa bám đúng vùng ảnh hiển thị (chịu zoom/pan) — khớp canvasMetrics.
 const eraseTick = ref(0);
-watch([() => store.zoom, () => store.pan.x, () => store.pan.y, () => store.upscaleSrc], () => { nextTick(() => { eraseTick.value++; }); });
+watch([() => store.zoom, () => store.pan.x, () => store.pan.y, () => store.upscaleSrc, () => store.imgTick], () => { nextTick(() => { eraseTick.value++; }); });
+// Kích hoạt công cụ / ảnh isolate thay đổi → overlay chưa đo được vị trí ngay trong render đầu
+// (img vừa được tạo). Bump tick SAU khi patch để khung vẽ/overlay hiện đúng vị trí từ giây đầu.
+watch([() => store.cropMode, () => store.inpaintMaskMode, () => store.eraseMode, () => store.drawMode, () => store.cvImg, () => store.imgTick], () => {
+  nextTick(() => { eraseTick.value++; drawTick.value++; });
+});
 const eraseOverlayStyle = computed(() => {
   void eraseTick.value;
   const m = store.canvasMetrics();
@@ -254,15 +267,13 @@ function onTouchEnd(e) {
           </div>
           <!-- ══ Vùng canvas (dưới dock) ══ -->
           <div class="relative flex-1 overflow-hidden">
-          <!-- Floating tools (Reframe + Film Look) — desktop only -->
-          <div class="hidden lg:block">
-            <RegionTools />
-          </div>
+          <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->
+          <RegionTools />
           <!-- Inpaint mask overlay on canvas -->
           <CanvasMaskTools />
           <!-- active image source clear -->
           <div v-if="store.editSource" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
-            <button @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
+            <button @click="store.removeEditSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
           </div>
           <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint/erase): layer active GIỮ ĐÚNG vị trí/scale như stack — không xê dịch -->
@@ -340,7 +351,7 @@ function onTouchEnd(e) {
               <button @click="removeBgConfirmOpen = true" :disabled="!store.activeLayer" class="grid h-7 w-7 place-items-center rounded-full bg-violet-600/70 text-white transition-colors hover:bg-violet-500 disabled:opacity-40" title="Xóa nền AI (nền sẽ trong suốt; giữ vùng chọn hiện tại làm chủ thể nếu có)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="m3 3 18 18"/></svg></button>
             </div>
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1 lg:hidden">
-              <button v-for="l in store.canvasLayers" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
+              <button v-for="l in store.layersFrontFirst" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
                 <img :src="l.image" class="h-6 w-6 object-cover" />
               </button>
               <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-6 w-6 shrink-0 place-items-center rounded-sm text-red-300 hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
@@ -351,7 +362,7 @@ function onTouchEnd(e) {
                 <button @click="store.cleanCanvas()" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">Dọn canvas</button>
               </div>
               <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
-                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40']">
+                <div v-for="(l, i) in store.layersFrontFirst" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40']">
                   <button @click="store.toggleLayerVisible(l.id)" class="grid h-5 w-5 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700" :title="l.visible ? 'Ẩn layer' : 'Hiện layer'"><span v-if="l.visible"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span><span v-else><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg></span></button>
                   <button @click="store.selectLayer(l)" class="flex min-w-0 flex-1 items-center gap-1.5 text-left">
                     <img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover">

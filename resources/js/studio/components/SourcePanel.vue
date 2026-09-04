@@ -85,7 +85,7 @@ const sortedProducts = computed(() => {
   <div class="card p-2">
     <div class="flex items-center justify-between">
       <span class="flex items-center gap-1 text-[11px] font-semibold text-brand-300"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>Nguồn</span>
-      <button v-if="store.editSource" @click="store.editSource = null" class="grid h-7 w-7 place-items-center rounded-lg bg-ink-800 text-red-300 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ ảnh nguồn"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      <button v-if="store.editSource" @click="store.removeEditSource()" class="grid h-7 w-7 place-items-center rounded-lg bg-ink-800 text-red-300 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ ảnh nguồn khỏi canvas"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div v-if="store.editSource" class="mt-2 flex items-center gap-2"><img :src="store.editSource.url" class="h-10 w-10 rounded-lg bg-ink-900 object-cover"><span class="truncate text-[10px] text-cream-200">{{ store.editSource.name }}</span></div>
     <div class="mt-2 flex gap-1.5">
