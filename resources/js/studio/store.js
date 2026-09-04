@@ -1291,7 +1291,15 @@ export const useStudioStore = defineStore('studio', {
     },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
     hideBatch() { this.showBatch = false; },
-    setSource(url, name) { this.editSource = { url, name: name || 'Ảnh nguồn' }; this.pushCanvasLayer('source', 'source', this.editSource.name, url); this.setActiveLayer('source'); this.toast('Đã chọn ảnh nguồn.'); },
+    setSource(url, name) {
+      this.editSource = { url, name: name || 'Ảnh nguồn' };
+      // Bỏ layer 'source' CŨ trước khi thêm ảnh mới — nếu không pushCanvasLayer bị chặn
+      // do trùng id 'source' → ảnh mới không vào được canvas khi canvas vẫn còn ảnh cũ.
+      this.canvasLayers = this.canvasLayers.filter((l) => l.id !== 'source');
+      this.pushCanvasLayer('source', 'source', this.editSource.name, url);
+      this.setActiveLayer('source');
+      this.toast('Đã chọn ảnh nguồn.');
+    },
     async uploadRef(file, select = true) {
       if (!file) { this.toast('Chọn file ảnh.', 'error'); return; }
       const fd = new FormData(); fd.append('image', file);
