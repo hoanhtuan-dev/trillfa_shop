@@ -50,10 +50,10 @@ onBeforeUnmount(stop);
                         <div class="absolute inset-0 bg-gradient-to-r from-ink-950/80 via-ink-900/40 to-transparent"></div>
                         <!-- glass content card -->
                         <div class="sf-container relative z-10 flex h-full items-center">
-                            <div class="max-w-xl">
-                                <div class="glass !rounded-2xl p-6 sm:p-8">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-200">{{ slide.subtitle }}</p>
-                                    <h1 class="mt-2 font-display text-4xl font-semibold leading-tight text-white text-balance sm:text-6xl">{{ slide.title }}</h1>
+                            <div class="w-full max-w-xl min-w-0">
+                                <div class="glass max-w-full !rounded-2xl p-5 sm:p-8">
+                                    <p class="truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-200">{{ slide.subtitle }}</p>
+                                    <h1 class="mt-2 font-display text-3xl font-semibold leading-tight text-white text-balance sm:text-6xl">{{ slide.title }}</h1>
                                     <BaseButton
                                         v-if="slide.button_text"
                                         :href="slide.button_link"
