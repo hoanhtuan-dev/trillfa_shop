@@ -114,8 +114,8 @@ const filteredProducts = computed(() => {
         <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 gap-2.5 overflow-y-auto pr-1" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
           <div v-for="it in sortedRefs" :key="it.name" class="group relative overflow-hidden rounded-xl border transition-colors" :class="isCurrent(it) ? 'border-brand-400 ring-1 ring-brand-400/60' : 'border-ink-700 hover:border-ink-600'" :title="it.name">
             <button @click="pick(it)" class="block w-full text-left">
-              <div class="relative bg-ink-950" style="aspect-ratio: 1 / 1">
-                <img :src="it.url" class="h-full w-full object-cover" loading="lazy" alt="">
+              <div class="relative bg-ink-950">
+                <img :src="it.url" class="block w-full object-cover" style="aspect-ratio: 1 / 1" loading="lazy" alt="">
                 <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
                 <span v-else-if="isCurrent(it)" class="absolute left-1.5 top-1.5 rounded-md bg-brand-600/90 px-1.5 py-0.5 text-[9px] font-medium text-white">đang chọn</span>
               </div>
