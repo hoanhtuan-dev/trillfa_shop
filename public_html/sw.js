@@ -1,4 +1,4 @@
-const CACHE = 'trillfa-fa-v1';
+const CACHE = 'trillfa-fa-v2';
 const APP_SHELL = [
   '/',
   '/images/logo.png',

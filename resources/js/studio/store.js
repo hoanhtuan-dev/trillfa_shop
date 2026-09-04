@@ -139,6 +139,7 @@ export const useStudioStore = defineStore('studio', {
 
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
     activeLayer() { return this.canvasLayers.find(x => x.id === this.activeLayerId) || null; },
+    visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
   },
   actions: {
     async api(url, body = {}, signal = null) {
@@ -592,7 +593,7 @@ export const useStudioStore = defineStore('studio', {
     },
     goEdit(g) { this.goEditor(g, 2); },
     goVideo(g) { this.goEditor(g, 3); },
-    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false }); this.saveLayerLayout(); } },
+    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false, x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, blend: 'normal' }); this.saveLayerLayout(); } },
     setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
@@ -722,7 +723,7 @@ export const useStudioStore = defineStore('studio', {
         this.canvasLayers = (Array.isArray(d.layers) ? d.layers : [])
           .filter((l) => l && l.image)
           .filter((l) => l.kind !== 'gen' || (l.genId != null && genIds.has(Number(l.genId))))
-          .map((l) => ({ id: l.id, kind: l.kind, name: l.name, image: l.image, genId: l.genId, visible: l.visible !== false, locked: !!l.locked }));
+          .map((l) => ({ id: l.id, kind: l.kind, name: l.name, image: l.image, genId: l.genId, visible: l.visible !== false, locked: !!l.locked, x: Number(l.x) || 0, y: Number(l.y) || 0, scale: (l.scale != null ? Number(l.scale) : 1) || 1, rotation: Number(l.rotation) || 0, opacity: l.opacity != null ? Number(l.opacity) : 1, blend: l.blend || 'normal' }));
         const active = this.canvasLayers.find((l) => l.id === d.activeLayerId && l.visible !== false);
         if (active) this.setActiveLayer(active.id);
         else { this.activeLayerId = ''; this.saveLayerLayout(); }
