@@ -25,6 +25,10 @@ Route::middleware('web')->group(function () {
     Route::get('/blog', [StorefrontController::class, 'blogIndex'])->name('blog.index');
     Route::get('/blog/{slug}', [StorefrontController::class, 'blogPost'])->name('blog.show');
 
+    // Wishlist.
+    Route::get('/yeu-thich', [StorefrontController::class, 'wishlist'])->name('wishlist.index');
+    Route::get('/api/storefront/wishlist', [StorefrontController::class, 'wishlistFeed'])->name('storefront.wishlist');
+
     // Shop listing (all products + per-category).
     Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
     Route::get('/danh-muc/{categorySlug}', [StorefrontController::class, 'shop'])->name('shop.category');

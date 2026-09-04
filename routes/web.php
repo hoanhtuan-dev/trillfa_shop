@@ -58,9 +58,8 @@ Route::middleware('guest')->group(function () {
 });
 Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
 
-// Wishlist
+// Wishlist page owned by the Storefront module; keep the legacy toggle endpoint.
 Route::middleware('auth')->group(function () {
-    Route::get('/yeu-thich', [WishlistController::class, 'index'])->name('wishlist.index');
     Route::post('/yeu-thich/toggle', [WishlistController::class, 'toggle'])->name('wishlist.toggle');
 });
 

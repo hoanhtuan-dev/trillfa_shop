@@ -232,6 +232,17 @@
       "assets/shop-BTnFaxj8.css"
     ]
   },
+  "resources/js/storefront/wishlist.js": {
+    "file": "assets/wishlist-CTLe0VXm.js",
+    "name": "wishlist",
+    "src": "resources/js/storefront/wishlist.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-CJA6HZ2m.js",
+      "_StorefrontLayout-BzB5c0W_.js",
+      "_ProductCard-HPiacwX_.js"
+    ]
+  },
   "resources/js/studio/app.js": {
     "file": "assets/app-BBxNFDbV.js",
     "name": "app",

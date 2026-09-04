@@ -85,6 +85,26 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Wishlist page — renders the Vue wishlist SPA (ids are client-side).
+     */
+    public function wishlist()
+    {
+        seo()->title('Yêu thích | '.setting('site_name'));
+
+        return view('storefront.wishlist', ['boot' => $this->bridge->base()]);
+    }
+
+    /**
+     * Wishlist JSON feed — returns products for the given saved ids.
+     */
+    public function wishlistFeed(Request $request)
+    {
+        $ids = explode(',', (string) $request->input('ids', ''));
+
+        return response()->json(['products' => $this->bridge->wishlistProducts($ids)]);
+    }
+
+    /**
      * Blog index — renders the Vue blog SPA.
      */
     public function blogIndex()

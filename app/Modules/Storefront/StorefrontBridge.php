@@ -246,6 +246,20 @@ class StorefrontBridge
         ]);
     }
 
+    /**
+     * Return saved products for the wishlist (client passes the persisted ids).
+     */
+    public function wishlistProducts(array $ids): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (empty($ids)) {
+            return [];
+        }
+
+        return Product::whereIn('id', $ids)->active()->with('category')
+            ->get()->map(fn ($p) => $this->product($p))->values()->all();
+    }
+
     // ---------------------------------------------------------------- sections
 
     public function site(): array
