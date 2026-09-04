@@ -162,6 +162,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::post('/settings/models', [StudioController::class, 'updateModelSettings'])->name('settings.models');
     Route::post('/settings/suggest', [StudioController::class, 'updateSuggestSettings'])->name('settings.suggest');
+    Route::post('/settings/product-ai', [StudioController::class, 'updateProductAiSettings'])->name('settings.product-ai');
     Route::post('/settings/faceswap', [StudioController::class, 'saveFaceswapPrompt'])->name('settings.faceswap');
     Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');

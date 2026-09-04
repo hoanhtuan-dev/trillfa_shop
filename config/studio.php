@@ -85,6 +85,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | AI Sản phẩm (Product AI — content + SEO assistant trong form sản phẩm)
+    |--------------------------------------------------------------------------
+    | Cấu hình RIÊNG cho trợ lý viết mô tả / SEO ở trang tạo-sửa sản phẩm (admin).
+    | Ưu tiên Qwen trước (qwen3.8-flash …) rồi mới Gemini; mọi model/key đều đọc
+    | từ đây (DB Settings → env → config) nên nâng cấp model sau này không cần sửa code.
+    */
+    'product_ai' => [
+        'enabled' => (bool) env('STUDIO_PRODUCT_AI_ENABLED', true),
+        'provider_order' => env('STUDIO_PRODUCT_AI_PROVIDER_ORDER', 'qwen,gemini'), // qwen trước
+        'qwen_text_models' => env('STUDIO_PRODUCT_AI_QWEN_TEXT_MODELS', ''), // '' = theo studio_qwen_text_models
+        'qwen_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_VISION_MODELS', ''), // '' = theo studio_suggest_qwen_models
+        'gemini_text_model' => env('STUDIO_PRODUCT_AI_GEMINI_TEXT_MODEL', 'gemini-2.5-flash'),
+        'gemini_vision_model' => env('STUDIO_PRODUCT_AI_GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
+        'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 12),
+        'max_models' => (int) env('STUDIO_PRODUCT_AI_MAX_MODELS', 2),
+        'max_keys' => (int) env('STUDIO_PRODUCT_AI_MAX_KEYS', 3),
+        'downscale_max' => (int) env('STUDIO_PRODUCT_AI_DOWNSCALE_MAX', 640),
+        'cache_ttl_hours' => (int) env('STUDIO_PRODUCT_AI_CACHE_TTL_HOURS', 720), // 30 ngày
+        'temperature' => (float) env('STUDIO_PRODUCT_AI_TEMPERATURE', 0.7),
+        'max_tokens' => (int) env('STUDIO_PRODUCT_AI_MAX_TOKENS', 1200),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | AI providers (optional)
     |--------------------------------------------------------------------------
     | Set these in .env when you have real API keys. When empty the services

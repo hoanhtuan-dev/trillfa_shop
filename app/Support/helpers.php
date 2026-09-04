@@ -899,3 +899,139 @@ function studio_qwen_text_models(): array
     return array_values(array_unique(array_filter($candidates)));
 }
 
+/*
+|--------------------------------------------------------------------------
+| AI Sản phẩm (Product AI) — cấu hình riêng cho trợ lý content/SEO trong form sản phẩm
+|--------------------------------------------------------------------------
+| Ưu tiên Qwen trước, rồi Gemini. Mọi thứ (thứ tự provider, danh sách model, key,
+| timeout, giới hạn số lần thử, downscale ảnh, cache) đều đọc từ DB Settings → env
+| → config/studio.php để sau này nâng cấp model mà không cần sửa code.
+*/
+if (! function_exists('product_ai_config')) {
+    function product_ai_config(string $key, $default = null)
+    {
+        $stored = setting('product_ai_'.$key);
+
+        return $stored !== null ? (string) $stored : config('studio.product_ai.'.$key, $default);
+    }
+}
+
+if (! function_exists('product_ai_enabled')) {
+    function product_ai_enabled(): bool
+    {
+        return filter_var(product_ai_config('enabled', true), FILTER_VALIDATE_BOOLEAN);
+    }
+}
+
+if (! function_exists('product_ai_providers')) {
+    /**
+     * Thứ tự provider được thử (Qwen trước mặc định). Luôn đảm bảo có cả qwen + gemini
+     * trong danh sách hợp lệ; Qwen được đặt đầu nếu admin bỏ sót thứ tự.
+     */
+    function product_ai_providers(): array
+    {
+        $raw = array_values(array_filter(array_map('trim', explode(',', strtolower((string) product_ai_config('provider_order', 'qwen,gemini'))))));
+        $valid = [];
+        foreach ($raw as $p) {
+            if (in_array($p, ['qwen', 'gemini'], true) && ! in_array($p, $valid, true)) {
+                $valid[] = $p;
+            }
+        }
+        foreach (['qwen', 'gemini'] as $p) {
+            if (! in_array($p, $valid, true)) {
+                $valid[] = $p;
+            }
+        }
+
+        return $valid;
+    }
+}
+
+if (! function_exists('product_ai_qwen_text_models')) {
+    function product_ai_qwen_text_models(): array
+    {
+        $custom = array_values(array_filter(array_map('trim', explode(',', (string) product_ai_config('qwen_text_models', '')))));
+
+        return $custom ?: array_values(studio_qwen_text_models());
+    }
+}
+
+if (! function_exists('product_ai_qwen_vision_models')) {
+    function product_ai_qwen_vision_models(): array
+    {
+        $custom = array_values(array_filter(
+            array_map('trim', explode(',', (string) product_ai_config('qwen_vision_models', ''))),
+            fn ($m) => $m !== '' && is_qwen_vision_capable($m)
+        ));
+
+        return $custom ?: array_values(studio_suggest_qwen_models());
+    }
+}
+
+if (! function_exists('product_ai_gemini_text_model')) {
+    function product_ai_gemini_text_model(): string
+    {
+        $m = trim((string) product_ai_config('gemini_text_model', 'gemini-2.5-flash'));
+
+        return str_starts_with(strtolower($m), 'gemini') ? $m : 'gemini-2.5-flash';
+    }
+}
+
+if (! function_exists('product_ai_gemini_vision_model')) {
+    function product_ai_gemini_vision_model(): string
+    {
+        $m = trim((string) product_ai_config('gemini_vision_model', 'gemini-2.5-flash'));
+
+        return str_starts_with(strtolower($m), 'gemini') ? $m : 'gemini-2.5-flash';
+    }
+}
+
+if (! function_exists('product_ai_timeout')) {
+    function product_ai_timeout(): int
+    {
+        return max(1, (int) product_ai_config('timeout_seconds', 12));
+    }
+}
+
+if (! function_exists('product_ai_max_models')) {
+    function product_ai_max_models(): int
+    {
+        return max(1, (int) product_ai_config('max_models', 2));
+    }
+}
+
+if (! function_exists('product_ai_max_keys')) {
+    function product_ai_max_keys(): int
+    {
+        return max(1, (int) product_ai_config('max_keys', 3));
+    }
+}
+
+if (! function_exists('product_ai_downscale_max')) {
+    function product_ai_downscale_max(): int
+    {
+        return max(64, min(4096, (int) product_ai_config('downscale_max', 640)));
+    }
+}
+
+if (! function_exists('product_ai_cache_ttl')) {
+    function product_ai_cache_ttl(): int
+    {
+        return max(0, (int) product_ai_config('cache_ttl_hours', 720)) * 3600;
+    }
+}
+
+if (! function_exists('product_ai_temperature')) {
+    function product_ai_temperature(): float
+    {
+        return (float) product_ai_config('temperature', 0.7);
+    }
+}
+
+if (! function_exists('product_ai_max_tokens')) {
+    function product_ai_max_tokens(): int
+    {
+        return max(128, (int) product_ai_config('max_tokens', 1200));
+    }
+}
+

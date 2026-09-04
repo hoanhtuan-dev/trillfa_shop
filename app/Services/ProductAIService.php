@@ -6,28 +6,42 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Deep AI assistance for the product create/edit form.
+ * Deep AI assistance for the product create/edit form (admin).
  *
- * Two-stage flow:
- *  1) analyzeImage() — reads the product cover image (vision, qwen3.8-flash /
- *     configurable) and returns a structured "understanding" (styles, colors,
- *     fabric, subject, keywords). Result is cached by image hash so re-clicking
- *     with the same image does NOT re-analyze.
- *  2) generate() — combines the current form state + the (cached) image
- *     analysis + your hint to produce / ENRICH product content + SEO. Each
- *     call refines based on what you've typed so far.
+ * Config-driven and provider-ordered: it reads EVERYTHING (provider order, model
+ * lists, API keys, timeouts, attempt bounds, image downscale, cache TTL) from
+ * product_ai_* settings (DB -> env -> config/studio.php). Qwen is tried FIRST,
+ * then Gemini — both over vision (multimodal single call) and text. Every path
+ * ends in a deterministic offline fallback so the feature never returns empty.
  *
- * Falls back to a deterministic stub when no API key is configured.
+ * Two modes:
+ *  - generateFromImage(): one multimodal call (see image + write full structured
+ *    content + SEO) — the "Gợi ý từ ảnh" approach (~15s when a key works). The
+ *    image understanding is cached by image hash, so later clicks (same image)
+ *    only re-run the cheap TEXT step.
+ *  - generate(): text-only — combines form state + (cached) understanding + hint.
  */
 class ProductAIService
 {
-    protected string $provider;
-    protected string $model;
+    protected array $providers;
+    protected int $timeout;
+    protected int $maxModels;
+    protected int $maxKeys;
+    protected int $downscaleMax;
+    protected int $cacheTtl;
+    protected float $temperature;
+    protected int $maxTokens;
 
     public function __construct()
     {
-        $this->provider = strtolower((string) studio_config('prompt_provider', 'qwen'));
-        $this->model = (string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
+        $this->providers = product_ai_providers();
+        $this->timeout = product_ai_timeout();
+        $this->maxModels = product_ai_max_models();
+        $this->maxKeys = product_ai_max_keys();
+        $this->downscaleMax = product_ai_downscale_max();
+        $this->cacheTtl = product_ai_cache_ttl();
+        $this->temperature = product_ai_temperature();
+        $this->maxTokens = product_ai_max_tokens();
     }
 
     // ------------------------------------------------------------- stage 1: vision
@@ -38,7 +52,7 @@ class ProductAIService
             return null;
         }
 
-        $key = sha1_file($imagePath).'|'.$this->model;
+        $key = $this->imageCacheKey($imagePath);
         if (! $force) {
             $cached = Cache::get('product_ai_img:'.$key);
             if (is_array($cached)) {
@@ -54,83 +68,21 @@ class ProductAIService
         $result = $this->vision($imagePath, $prompt);
 
         if (is_array($result)) {
-            Cache::put('product_ai_img:'.$key, $result, 3600 * 24 * 30);
+            Cache::put('product_ai_img:'.$key, $result, $this->cacheTtl);
         }
 
         return $result;
     }
 
+    /**
+     * Vision with an ALWAYS-non-empty result: provider attempts (qwen → gemini),
+     * then the deterministic offline GD color analysis.
+     */
     protected function vision(string $imagePath, string $prompt): ?array
     {
-        // Same model/key strategy as the Studio "Gợi ý từ ảnh": loop ALL
-        // studio_suggest_qwen_models() × studio_qwen_credentials('vision'),
-        // then Gemini, then a deterministic offline GD color fallback.
-        [$b64, $mime] = $this->imageBase64($imagePath);
-        $models = function_exists('studio_suggest_qwen_models') ? studio_suggest_qwen_models() : [$this->model];
-        $keys = function_exists('studio_qwen_credentials') ? studio_qwen_credentials('vision') : [];
-        if (empty($keys)) {
-            $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
-        }
-        // Bound attempts so the queued job always finishes well within the
-        // frontend 180s poll window: 2 models × 3 keys × ~12s timeout max.
-        $models = array_slice(array_values($models), 0, 2);
-        $keys = array_slice(array_values(array_unique(array_filter($keys))), 0, 3);
-        foreach (array_values(array_unique($keys)) as $key) {
-            $base = dashscope_base_url($key).'/compatible-mode/v1';
-            foreach ($models as $model) {
-                try {
-                    $resp = Http::withToken($key)->timeout(12)->post($base.'/chat/completions', [
-                        'model' => $model,
-                        'messages' => [['role' => 'user', 'content' => [
-                            ['type' => 'text', 'text' => $prompt],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                        ]]],
-                        'response_format' => ['type' => 'json_object'],
-                    ]);
-                    // 429 = rate/quota limit on this key -> skip the rest of this key.
-                    if ($resp->status() === 429 || is_qwen_quota_error((string) $resp->body())) {
-                        continue 2;
-                    }
-                    if ($resp->ok()) {
-                        $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
-                        if ($json) {
-                            return $json;
-                        }
-                    }
-                    $body = (string) $resp->body();
-                    if (str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist') || $resp->status() === 404) {
-                        continue; // try next model
-                    }
-                    break; // other error on this model -> next key
-                } catch (\Throwable $e) {
-                    continue;
-                }
-            }
-        }
+        $result = $this->attempt('vision', $prompt, $imagePath);
 
-        // Gemini vision fallback.
-        $geminiKey = studio_api_key('gemini');
-        if ($geminiKey) {
-            $model = function_exists('studio_suggest_gemini_model') ? studio_suggest_gemini_model() : studio_config('qwen_vision_model', 'gemini-2.5-flash');
-            $b64 = base64_encode(file_get_contents($imagePath));
-            try {
-                $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(15)
-                    ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
-                        'contents' => [['parts' => [['text' => $prompt], ['inline_data' => ['mime_type' => 'image/jpeg', 'data' => $b64]]]]],
-                    ]);
-                if ($resp->ok()) {
-                    $json = $this->parseJson((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
-                    if ($json) {
-                        return $json;
-                    }
-                }
-            } catch (\Throwable $e) {
-                // fall through
-            }
-        }
-
-        // Offline GD color analysis — always produces a usable understanding.
-        return $this->offlineAnalysis($imagePath);
+        return is_array($result) ? $result : $this->offlineAnalysis($imagePath);
     }
 
     /**
@@ -146,14 +98,12 @@ class ProductAIService
             }
             $w = imagesx($img); $h = imagesy($img);
             $step = max(1, (int) round(max($w, $h) / 48));
-            $rs = 0; $gs = 0; $bs = 0; $n = 0; $warm = 0; $bright = 0;
+            $rs = 0; $gs = 0; $bs = 0; $n = 0;
             for ($x = 0; $x < $w; $x += $step) {
                 for ($y = 0; $y < $h; $y += $step) {
                     $c = imagecolorat($img, $x, $y);
                     $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
                     $rs += $r; $gs += $g; $bs += $b; $n++;
-                    $warm += ($r > $b ? $r - $b : $b - $r) === ($r > $b ? $r - $b : 0) ? ($r - $b) : 0;
-                    $bright += ($r + $g + $b) / 3;
                 }
             }
             imagedestroy($img);
@@ -188,37 +138,19 @@ class ProductAIService
     public function generate(array $input, ?array $imageAnalysis = null): array
     {
         $prompt = $this->buildPrompt($input, $imageAnalysis);
+        $result = $this->attempt('text', $prompt);
 
-        // TEXT generation — mirror the Studio StylistService chat: try Qwen TEXT
-        // models (qwen3.8-flash → …) over studio_qwen_credentials('prompt'), then Gemini.
-        foreach ($this->qwenTextModels() as $model) {
-            foreach ($this->qwenPromptKeys() as $key) {
-                $result = $this->callQwen($prompt, $key, $model);
-                if ($result) {
-                    return $result;
-                }
-            }
-        }
-
-        $geminiKey = studio_api_key('gemini');
-        if ($geminiKey) {
-            $result = $this->callGemini($prompt, $geminiKey);
-            if ($result) {
-                return $result;
-            }
-        }
-
-        return $this->stub($input, $imageAnalysis);
+        return is_array($result) ? $result : $this->stub($input, $imageAnalysis);
     }
 
     /**
      * ONE multimodal call: see the image + generate the full structured content
      * + the image understanding, in a single request (like "Gợi ý từ ảnh" ~15s).
-     * The understanding is cached by image so later clicks re-use it (text-only).
+     * The understanding is cached by image hash so later clicks re-use it (text-only).
      */
     public function generateFromImage(array $input, string $imagePath, bool $force = false): array
     {
-        $key = sha1_file($imagePath).'|'.(string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
+        $key = $this->imageCacheKey($imagePath);
         $cached = $force ? null : Cache::get('product_ai_img:'.$key);
         if (is_array($cached)) {
             $out = $this->generate($input, $cached);
@@ -228,13 +160,13 @@ class ProductAIService
             return $out;
         }
 
-        $result = $this->vision($imagePath, $this->buildImageContentPrompt($input));
+        $result = $this->attempt('vision', $this->buildImageContentPrompt($input), $imagePath);
 
         // LLM returned real content (has name/description) → use it.
         if (is_array($result) && (isset($result['suggested_name']) || isset($result['description']))) {
             $understanding = is_array($result['understanding'] ?? null) ? $result['understanding'] : null;
             if ($understanding) {
-                Cache::put('product_ai_img:'.$key, $understanding, 3600 * 24 * 30);
+                Cache::put('product_ai_img:'.$key, $understanding, $this->cacheTtl);
             }
             unset($result['understanding']);
             $result['image_analyzed'] = true;
@@ -250,6 +182,125 @@ class ProductAIService
 
         return $out;
     }
+
+    // ------------------------------------------------------------- provider attempts
+
+    /**
+     * Try each provider in the configured order (qwen first). Returns a parsed
+     * JSON result array, or null when no provider succeeded (caller falls back).
+     */
+    protected function attempt(string $kind, string $prompt, ?string $imagePath = null): ?array
+    {
+        if (! product_ai_enabled()) {
+            return null;
+        }
+
+        foreach ($this->providers as $provider) {
+            $result = $provider === 'qwen'
+                ? $this->attemptQwen($kind, $prompt, $imagePath)
+                : $this->attemptGemini($kind, $prompt, $imagePath);
+
+            if (is_array($result)) {
+                return $result;
+            }
+        }
+
+        return null;
+    }
+
+    protected function attemptQwen(string $kind, string $prompt, ?string $imagePath): ?array
+    {
+        $models = array_slice(array_values(
+            $kind === 'vision' ? product_ai_qwen_vision_models() : product_ai_qwen_text_models()
+        ), 0, $this->maxModels);
+        if (empty($models)) {
+            $models = ['qwen3.8-flash'];
+        }
+
+        $keys = array_values(array_unique(array_filter(
+            studio_qwen_credentials($kind === 'vision' ? 'vision' : 'prompt')
+        )));
+        if (empty($keys)) {
+            $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
+        }
+        $keys = array_slice($keys, 0, $this->maxKeys);
+
+        foreach ($keys as $key) {
+            $base = dashscope_base_url($key).'/compatible-mode/v1';
+            foreach ($models as $model) {
+                $content = $imagePath !== null
+                    ? [
+                        ['type' => 'text', 'text' => $prompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => $this->imageDataUri($imagePath)]],
+                    ]
+                    : $prompt;
+
+                try {
+                    $resp = Http::withToken($key)->timeout($this->timeout)->post($base.'/chat/completions', [
+                        'model' => $model,
+                        'messages' => [['role' => 'user', 'content' => $content]],
+                        'temperature' => $this->temperature,
+                        'max_tokens' => $this->maxTokens,
+                        'response_format' => ['type' => 'json_object'],
+                    ]);
+                } catch (\Throwable $e) {
+                    continue 2; // network error on this key -> next key
+                }
+
+                $status = $resp->status();
+                $body = (string) $resp->body();
+
+                // 429 = rate/quota limit on this key -> skip to the next key fast.
+                if ($status === 429 || is_qwen_quota_error($body)) {
+                    continue 2;
+                }
+                // Model not on this host/account -> try the next model.
+                if ($status === 404 || str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist')) {
+                    continue;
+                }
+                if ($resp->ok()) {
+                    $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
+
+                    return $json ?: null;
+                }
+
+                return null; // other error -> stop trying this provider
+            }
+        }
+
+        return null;
+    }
+
+    protected function attemptGemini(string $kind, string $prompt, ?string $imagePath): ?array
+    {
+        $key = studio_api_key('gemini');
+        if (! $key) {
+            return null;
+        }
+
+        $model = $kind === 'vision' ? product_ai_gemini_vision_model() : product_ai_gemini_text_model();
+        $parts = [['text' => $prompt]];
+        if ($imagePath !== null) {
+            [$b64, $mime] = $this->imageBase64($imagePath);
+            $parts[] = ['inline_data' => ['mime_type' => $mime, 'data' => $b64]];
+        }
+
+        try {
+            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($this->timeout + 3)
+                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
+                    'contents' => [['parts' => $parts]],
+                ]);
+            if ($resp->ok()) {
+                return $this->parseJson((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
+            }
+        } catch (\Throwable $e) {
+            // fall through
+        }
+
+        return null;
+    }
+
+    // ------------------------------------------------------------- prompts
 
     protected function buildImageContentPrompt(array $input): string
     {
@@ -276,23 +327,6 @@ Trả VỀ JSON hợp lệ duy nhất (không markdown):
   "tags": ["t1","t2","t3"]
 }
 PROMPT;
-    }
-
-    protected function qwenTextModels(): array
-    {
-        $models = function_exists('studio_qwen_text_models') ? studio_qwen_text_models() : [$this->model];
-
-        return array_slice(array_values($models), 0, 2);
-    }
-
-    protected function qwenPromptKeys(): array
-    {
-        $keys = function_exists('studio_qwen_credentials') ? studio_qwen_credentials('prompt') : [];
-        if (empty($keys)) {
-            $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
-        }
-
-        return array_slice(array_values(array_unique(array_filter($keys))), 0, 3);
     }
 
     protected function buildPrompt(array $input, ?array $imageAnalysis): string
@@ -351,46 +385,7 @@ Chỉ TRẢ VỀ JSON hợp lệ (không markdown, không giải thích):
 PROMPT;
     }
 
-    protected function callQwen(string $prompt, string $key, ?string $model = null): ?array
-    {
-        $base = dashscope_base_url($key).'/compatible-mode/v1';
-        try {
-            $resp = Http::withToken($key)->timeout(12)->post($base.'/chat/completions', [
-                'model' => $model ?: $this->model,
-                'messages' => [['role' => 'user', 'content' => $prompt]],
-                'temperature' => 0.7,
-                'max_tokens' => 1200,
-                'response_format' => ['type' => 'json_object'],
-            ]);
-            // 429 = rate/quota limit -> stop trying (shared quota across keys).
-            if ($resp->status() === 429 || is_qwen_quota_error((string) $resp->body())) {
-                return null;
-            }
-            if (! $resp->ok()) {
-                return null;
-            }
-            return $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    protected function callGemini(string $prompt, string $key): ?array
-    {
-        $model = studio_config('prompt_model', 'gemini-2.5-flash');
-        try {
-            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(15)
-                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
-                    'contents' => [['parts' => [['text' => $prompt]]]],
-                ]);
-            if (! $resp->ok()) {
-                return null;
-            }
-            return $this->parseJson((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
+    // ------------------------------------------------------------- helpers
 
     protected function parseJson(string $text): ?array
     {
@@ -404,26 +399,33 @@ PROMPT;
         return is_array($json) ? $json : null;
     }
 
+    protected function imageCacheKey(string $imagePath): string
+    {
+        $fingerprint = is_file($imagePath) ? sha1_file($imagePath) : md5($imagePath);
+
+        return $fingerprint.'|'.implode(',', $this->providers);
+    }
+
     protected function imageBase64(string $path): array
     {
         $mime = 'image/jpeg';
-        $contents = file_get_contents($path);
-        $data = base64_encode($contents);
-        if (is_callable('getimagesize') && ($info = @getimagesize($path))) {
+        $contents = @file_get_contents($path);
+        $data = base64_encode((string) $contents);
+        if (function_exists('getimagesize') && ($info = @getimagesize($path))) {
             $mime = $info['mime'] ?? $mime;
         }
         // Downscale aggressively so the vision request stays small/fast.
-        if (is_callable('imagecreatefromstring')) {
+        if (function_exists('imagecreatefromstring')) {
             try {
-                $img = @imagecreatefromstring($contents);
+                $img = @imagecreatefromstring((string) $contents);
                 if ($img) {
                     $w = imagesx($img); $h = imagesy($img);
-                    $scale = min(1, 640 / max($w, $h));
+                    $scale = min(1, $this->downscaleMax / max($w, $h));
                     if ($scale < 1) {
                         $nw = (int) ($w * $scale); $nh = (int) ($h * $scale);
                         $dst = imagecreatetruecolor($nw, $nh);
                         imagecopyresampled($dst, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
-                        ob_start(); imagejpeg($dst, null, 88); $data = base64_encode(ob_get_clean());
+                        ob_start(); imagejpeg($dst, null, 88); $data = base64_encode((string) ob_get_clean());
                     }
                 }
             } catch (\Throwable $e) {
@@ -433,13 +435,18 @@ PROMPT;
         return [$data, $mime];
     }
 
+    protected function imageDataUri(string $path): string
+    {
+        [$b64, $mime] = $this->imageBase64($path);
+
+        return 'data:'.$mime.';base64,'.$b64;
+    }
+
     protected function stub(array $input, ?array $imageAnalysis): array
     {
         $base = ($input['name'] ?? 'Sản phẩm') ?: 'Sản phẩm thời trang';
         $category = $input['category'] ?? '';
         $brand = $input['brand'] ?? 'Trillfa';
-        $color = $imageAnalysis['colors'] ?? '';
-        $fabric = $imageAnalysis['fabric'] ?? '';
 
         $style = $imageAnalysis['styles'] ?? '';
         $fabric = $imageAnalysis['fabric'] ?? '';

@@ -11,6 +11,7 @@
         <button @click="tab='models'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='models' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🤖 Model</button>
         <button @click="tab='faces'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='faces' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">💃 Dáng & Khuôn mặt</button>
         <button @click="tab='suggest'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='suggest' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">💡 Gợi ý từ ảnh</button>
+        <button @click="tab='productai'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='productai' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🧠 AI Sản phẩm</button>
         <button @click="tab='keys'" class="rounded-xl px-3 py-2 transition-colors" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🔑 API Keys</button>
     </div>
 
@@ -306,6 +307,92 @@
         </div>
 
         <button type="submit" class="btn-brand">💾 Lưu cấu hình "Gợi ý từ ảnh"</button>
+        @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
+    </form>
+    </div>
+
+    <div x-show="tab==='productai'">
+    {{-- ===== Cấu hình RIÊNG "🧠 AI Sản phẩm" — trợ lý content/SEO trong form sản phẩm ===== --}}
+    <form method="POST" action="{{ route('studio.settings.product-ai') }}" class="card mt-6 space-y-4 p-6">
+        @csrf
+        <h2 class="font-display text-base font-semibold text-ink-900">🧠 AI Sản phẩm (Content + SEO)</h2>
+        <p class="text-xs text-ink-500">Cấu hình <b>provider + model + kỹ thuật riêng</b> cho trợ lý viết mô tả/SEO ở trang tạo-sửa sản phẩm. <b>Ưu tiên Qwen trước</b> (qwen3.8-flash …) rồi mới Gemini; mọi model/key đều đọc từ đây nên nâng cấp model sau này không cần sửa code.</p>
+
+        <div class="rounded-xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
+            <label class="flex items-center gap-2 font-semibold text-brand-100">
+                <input type="checkbox" name="pai_enabled" value="1" @if(old('pai_enabled', product_ai_enabled() ? '1' : null)) checked @endif class="h-4 w-4 accent-brand-600">
+                Bật tính năng
+            </label>
+            <p class="mt-1">Khi tắt, nút AI vẫn chạy nhưng bỏ qua gọi API (dùng nội dung offline/stub — luôn trả kết quả, không tốn phí).</p>
+        </div>
+
+        <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
+            <h3 class="mb-3 font-display text-sm font-semibold text-ink-900">Provider & Model</h3>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="sm:col-span-2">
+                    <label class="label">Thứ tự provider (ưu tiên thử trước)</label>
+                    <input type="text" name="pai_provider_order" value="{{ old('pai_provider_order', implode(',', product_ai_providers())) }}" class="input !py-2" placeholder="qwen,gemini">
+                    <p class="mt-1 text-xs text-ink-500">Phân cách dấu phẩy. Provider <strong>đầu tiên được thử trước</strong> — mặc định <code class="rounded bg-white px-1">qwen,gemini</code> (Qwen ưu tiên).</p>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label">Qwen TEXT models (ưu tiên, phân cách dấu phẩy)</label>
+                    <input type="text" name="pai_qwen_text_models" value="{{ old('pai_qwen_text_models', implode(',', product_ai_qwen_text_models())) }}" class="input !py-2" placeholder="qwen3.8-flash, qwen3.8-max">
+                    <p class="mt-1 text-xs text-ink-500">Model đầu = ưu tiên cao nhất. Để trống theo cài đặt chung (studio_qwen_text_models). Dùng endpoint chat OpenAI-compatible.</p>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="label">Qwen VISION models (ưu tiên, phân cách dấu phẩy)</label>
+                    <input type="text" name="pai_qwen_vision_models" value="{{ old('pai_qwen_vision_models', implode(',', product_ai_qwen_vision_models())) }}" class="input !py-2" placeholder="qwen3.8-flash, qwen3.8-max, qwen-vl-max">
+                    <p class="mt-1 text-xs text-ink-500">Dùng cho "Gợi ý từ ảnh" của sản phẩm (multimodal). Để trống theo cài đặt "Gợi ý từ ảnh".</p>
+                </div>
+                <div>
+                    <label class="label">Gemini TEXT model</label>
+                    <input type="text" name="pai_gemini_text_model" value="{{ old('pai_gemini_text_model', product_ai_gemini_text_model()) }}" class="input !py-2" placeholder="gemini-2.5-flash">
+                </div>
+                <div>
+                    <label class="label">Gemini VISION model</label>
+                    <input type="text" name="pai_gemini_vision_model" value="{{ old('pai_gemini_vision_model', product_ai_gemini_vision_model()) }}" class="input !py-2" placeholder="gemini-2.5-flash">
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-cream-200 bg-cream-50 p-4">
+            <h3 class="mb-3 font-display text-sm font-semibold text-ink-900">Kỹ thuật (độ tin cậy & tốc độ)</h3>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="label">Timeout mỗi request (giây)</label>
+                    <input type="number" name="pai_timeout_seconds" min="1" max="120" value="{{ old('pai_timeout_seconds', product_ai_timeout()) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">Giảm để bỏ qua key/model treo nhanh hơn; tăng nếu model chậm. Giữ nhỏ để job hoàn tất trong cửa sổ poll của form.</p>
+                </div>
+                <div>
+                    <label class="label">Số model thử tối đa / provider</label>
+                    <input type="number" name="pai_max_models" min="1" max="10" value="{{ old('pai_max_models', product_ai_max_models()) }}" class="input !py-2">
+                </div>
+                <div>
+                    <label class="label">Số key thử tối đa / provider</label>
+                    <input type="number" name="pai_max_keys" min="1" max="10" value="{{ old('pai_max_keys', product_ai_max_keys()) }}" class="input !py-2">
+                </div>
+                <div>
+                    <label class="label">Giới hạn downscale ảnh (px)</label>
+                    <input type="number" name="pai_downscale_max" min="64" max="4096" value="{{ old('pai_downscale_max', product_ai_downscale_max()) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">Ảnh lớn hơn sẽ thu nhỏ trước khi gửi để giảm token/chi phí.</p>
+                </div>
+                <div>
+                    <label class="label">Cache phân tích ảnh (giờ)</label>
+                    <input type="number" name="pai_cache_ttl_hours" min="0" max="8760" value="{{ old('pai_cache_ttl_hours', (int) round(product_ai_cache_ttl() / 3600)) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">Phân tích ảnh được cache theo hash ảnh; nhấn lại với ảnh cũ sẽ chỉ chạy TEXT (nhanh hơn nhiều).</p>
+                </div>
+                <div>
+                    <label class="label">Nhiệt độ (0–2)</label>
+                    <input type="number" step="0.1" name="pai_temperature" min="0" max="2" value="{{ old('pai_temperature', product_ai_temperature()) }}" class="input !py-2">
+                </div>
+                <div>
+                    <label class="label">Max tokens</label>
+                    <input type="number" name="pai_max_tokens" min="128" max="8192" value="{{ old('pai_max_tokens', product_ai_max_tokens()) }}" class="input !py-2">
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-brand">💾 Lưu cấu hình "AI Sản phẩm"</button>
         @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </form>
     </div>
