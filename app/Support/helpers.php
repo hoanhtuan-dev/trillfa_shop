@@ -219,9 +219,9 @@ if (! function_exists('studio_suggest_enabled')) {
 if (! function_exists('studio_suggest_provider')) {
     function studio_suggest_provider(): string
     {
-        $p = strtolower((string) studio_suggest_config('provider', 'gemini'));
+        $p = strtolower((string) studio_suggest_config('provider', 'qwen'));
 
-        return in_array($p, ['gemini', 'qwen'], true) ? $p : 'gemini';
+        return in_array($p, ['gemini', 'qwen'], true) ? $p : 'qwen';
     }
 }
 
@@ -767,7 +767,7 @@ if (! function_exists('studio_candidate_key')) {
  */
 function studio_vision_model(?string $provider = null): string
 {
-    $provider = $provider ?: (string) studio_config('vision_provider', 'gemini');
+    $provider = $provider ?: (string) studio_config('vision_provider', 'qwen');
 
     if ($provider === 'qwen') {
         $m = studio_qwen_vision_default();
@@ -965,6 +965,32 @@ if (! function_exists('product_ai_qwen_vision_models')) {
         ));
 
         return $custom ?: array_values(studio_suggest_qwen_models());
+    }
+}
+
+if (! function_exists('product_ai_qwen_paygo_text_models')) {
+    /**
+     * Model TEXT cho key Pay-As-You-Go (dashscope-intl). qwen3.8-flash/max là model
+     * Token-Plan (sk-sp-…); gửi chúng sang dashscope-intl sẽ treo/timeout. Dùng các
+     * model cổ điển có sẵn trên dashscope-intl.
+     */
+    function product_ai_qwen_paygo_text_models(): array
+    {
+        $custom = array_values(array_filter(array_map('trim', explode(',', (string) product_ai_config('qwen_paygo_text_models', '')))));
+
+        return $custom ?: ['qwen-plus', 'qwen-turbo', 'qwen-max'];
+    }
+}
+
+if (! function_exists('product_ai_qwen_paygo_vision_models')) {
+    function product_ai_qwen_paygo_vision_models(): array
+    {
+        $custom = array_values(array_filter(
+            array_map('trim', explode(',', (string) product_ai_config('qwen_paygo_vision_models', ''))),
+            fn ($m) => $m !== '' && is_qwen_vision_capable($m)
+        ));
+
+        return $custom ?: ['qwen-vl-max', 'qwen-vl-plus'];
     }
 }
 

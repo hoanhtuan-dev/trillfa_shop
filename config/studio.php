@@ -21,7 +21,7 @@ return [
     | You can override each on the Studio Settings page; the values below are
     | the defaults and are also read from env.
     */
-    'prompt_provider' => env('STUDIO_PROMPT_PROVIDER', 'gemini'), // gemini | qwen
+    'prompt_provider' => env('STUDIO_PROMPT_PROVIDER', 'qwen'), // qwen | gemini — Qwen ưu tiên
     'prompt_model' => env('STUDIO_PROMPT_MODEL', 'gemini-2.5-flash'),
     'qwen_prompt_model' => env('STUDIO_QWEN_PROMPT_MODEL', 'qwen3.8-flash'), // multimodal mặc định (đọc ảnh/video/text)
     'qwen_max_model' => env('STUDIO_QWEN_MAX_MODEL', 'qwen3.8-max'), // chất lượng cao hơn cho vision/chat
@@ -48,7 +48,7 @@ return [
     'brand_name' => env('STUDIO_BRAND_NAME', ''),
     'gemini_image_model' => env('STUDIO_GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
     'video_model' => env('STUDIO_VIDEO_MODEL', 'wan2.5-t2v'),
-    'vision_provider' => env('STUDIO_VISION_PROVIDER', 'gemini'), // gemini | qwen (đa phương thức qwen3.8-flash/max)
+    'vision_provider' => env('STUDIO_VISION_PROVIDER', 'qwen'), // qwen | gemini — Qwen đa phương thức ưu tiên
     'vision_model' => env('STUDIO_VISION_MODEL', 'gemini-2.5-flash'),
     'qwen_vision_model' => env('STUDIO_QWEN_VISION_MODEL', 'qwen3.8-flash'), // multimodal: flash (nhanh) / qwen3.8-max (mạnh), vẫn giữ fallback qwen-vl-*
     'image_resolution' => env('STUDIO_IMAGE_RESOLUTION', '2K'), // 1K | 2K
@@ -71,7 +71,7 @@ return [
     */
     'suggest' => [
         'enabled' => (bool) env('STUDIO_SUGGEST_ENABLED', true),
-        'provider' => env('STUDIO_SUGGEST_PROVIDER', 'gemini'), // gemini | qwen
+        'provider' => env('STUDIO_SUGGEST_PROVIDER', 'qwen'), // qwen | gemini — Qwen ưu tiên
         'gemini_model' => env('STUDIO_SUGGEST_GEMINI_MODEL', 'gemini-2.5-flash'),
         'qwen_model' => env('STUDIO_SUGGEST_QWEN_MODEL', 'qwen3.8-flash'), // multimodal chính
         'qwen_models' => env('STUDIO_SUGGEST_QWEN_MODELS', ''), // danh sách ưu tiên, phân cách dấu phẩy
@@ -96,6 +96,8 @@ return [
         'provider_order' => env('STUDIO_PRODUCT_AI_PROVIDER_ORDER', 'qwen,gemini'), // qwen trước
         'qwen_text_models' => env('STUDIO_PRODUCT_AI_QWEN_TEXT_MODELS', ''), // '' = theo studio_qwen_text_models
         'qwen_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_VISION_MODELS', ''), // '' = theo studio_suggest_qwen_models
+        'qwen_paygo_text_models' => env('STUDIO_PRODUCT_AI_QWEN_PAYGO_TEXT_MODELS', ''), // '' = qwen-plus,turbo (dashscope-intl)
+        'qwen_paygo_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_PAYGO_VISION_MODELS', ''), // '' = qwen-vl-max,plus
         'gemini_text_model' => env('STUDIO_PRODUCT_AI_GEMINI_TEXT_MODEL', 'gemini-2.5-flash'),
         'gemini_vision_model' => env('STUDIO_PRODUCT_AI_GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
         'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 30), // đủ cho call text ~15s (không cắt ngang như 12s cũ)

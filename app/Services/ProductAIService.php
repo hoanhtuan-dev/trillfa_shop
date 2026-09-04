@@ -306,8 +306,19 @@ class ProductAIService
 
                 return null;
             }
+
+            // KEY-AWARE model list: qwen3.8-flash/max only exist on the Token-Plan
+            // host (sk-sp-…); on Pay-As-You-Go (sk-…/sk-ws-…) use the classic
+            // dashscope-intl models (qwen-plus/turbo text, qwen-vl-max/plus vision)
+            // otherwise the request HANGS until timeout.
+            $isPlan = str_starts_with($key, 'sk-sp-');
+            $keyModels = $isPlan
+                ? $models
+                : ($kind === 'vision' ? product_ai_qwen_paygo_vision_models() : product_ai_qwen_paygo_text_models());
+            $keyModels = array_slice(array_values(array_unique($keyModels)), 0, $this->maxModels);
+
             $base = dashscope_base_url($key).'/compatible-mode/v1';
-            foreach ($models as $model) {
+            foreach ($keyModels as $model) {
                 if ($this->timedOut()) {
                     $this->record('qwen', 'budget exhausted ('.$kind.')');
 
@@ -330,6 +341,8 @@ class ProductAIService
                         'response_format' => ['type' => 'json_object'],
                     ]);
                 } catch (\Throwable $e) {
+                    // A key that hangs is useless for this task — remember it and move on.
+                    Cache::put('product_ai_bad_key:'.$keyId($key), true, 300);
                     $this->record('qwen', 'network/timeout ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
 
                     continue 2; // network error on this key -> next key
@@ -355,6 +368,7 @@ class ProductAIService
                     $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
                     if ($json) {
                         Cache::put('product_ai_good_key:'.$kind, $keyId($key), 3600);
+                        Cache::forget('product_ai_bad_key:'.$keyId($key));
                         $this->attempts[] = 'qwen: ok ('.$kind.', '.$model.', key '.$keyPrefix($key).')';
 
                         return $json;
