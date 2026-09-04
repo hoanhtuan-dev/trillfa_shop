@@ -20,6 +20,11 @@ const store = useStudioStore();
         class="grid h-11 w-11 place-items-center rounded-xl border transition-colors" title="Vẽ vùng chọn tự do (lasso) · Xóa / Tô màu / Feather">
         <svg class="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c0-7 2-11 6-13 1.5-.7 3-1 5-1"/><path d="M11 5c3-2 6-1 8 2 2 3 2 8-2 11-2.5 1.9-5.5 2-8 1"/><path d="M8 13c-1.5 1.5-2 3.5-1 5.5"/><path d="M3 21l4-4"/></svg>
       </button>
+      <button @click="store.finishDraw(); store.startCanvasSelect('path'); store.reframeOpen = false; store.filmOpen = false; store.exitErase()"
+        :class="(store.inpaintMaskMode === 'path' && store.inpaintMaskSource === 'canvas') ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'text-cream-200 border-transparent hover:bg-ink-700'"
+        class="grid h-11 w-11 place-items-center rounded-xl border transition-colors" title="Vùng chọn bằng đường cong (path/curve) · click thêm điểm · Đóng để tạo vùng">
+        <svg class="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z"/><path d="m18 13-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18"/><path d="m2.3 2.3 7.286 7.286"/><circle cx="11" cy="11" r="2"/></svg>
+      </button>
       <button @click="store.toggleDraw(); store.reframeOpen = false; store.filmOpen = false; store.clearInpaintMask(); store.exitErase()"
         :class="store.drawMode ? 'bg-brand-600 text-white border-brand-400 shadow-brand-500/40' : 'text-cream-200 border-transparent hover:bg-ink-700'"
         class="grid h-11 w-11 place-items-center rounded-xl border transition-colors" title="Vẽ tự do (brush)">

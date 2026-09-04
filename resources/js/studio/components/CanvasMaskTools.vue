@@ -59,6 +59,10 @@ function onPointerDown(e) {
     window.addEventListener('pointerup', onFhUp);
     return;
   }
+  if (store.inpaintMaskMode === 'path') {
+    store.pathAddPoint(e);
+    return;
+  }
   store.inpaintMaskStart(e);
 }
 
@@ -70,6 +74,27 @@ const pathPixels = (pts) => {
 };
 const freehandPoints = computed(() => { void metricsTick.value; return pathPixels(store.inpaintFreehandPoints); });
 const freehandPaths = computed(() => { void metricsTick.value; return store.inpaintFreehandPaths.map((pts) => pathPixels(pts)); });
+// Đường cong path/curve: lấy mẫu Catmull-Rom (đóng kín) qua các điểm neo.
+const pathSmoothPixels = computed(() => {
+  void metricsTick.value;
+  const m = store.canvasMetrics();
+  const pts = store.inpaintPathPoints;
+  if (!m || pts.length < 2) return '';
+  const P = pts.map((p) => ({ x: p.nx, y: p.ny }));
+  const n = P.length, SAMPLES = 24, out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+    const cx1 = p1.x + (p2.x - p0.x) / 6, cy1 = p1.y + (p2.y - p0.y) / 6;
+    const cx2 = p2.x - (p3.x - p1.x) / 6, cy2 = p2.y - (p3.y - p1.y) / 6;
+    for (let s = 0; s < SAMPLES; s++) {
+      const t = s / SAMPLES, a = 1 - t, b = t;
+      const x = a * a * a * p1.x + 3 * a * a * b * cx1 + 3 * a * b * b * cx2 + b * b * b * p2.x;
+      const y = a * a * a * p1.y + 3 * a * a * b * cy1 + 3 * a * b * b * cy2 + b * b * b * p2.y;
+      out.push(Math.round(m.vx + x * m.vw) + ',' + Math.round(m.vy + y * m.vh));
+    }
+  }
+  return out.join(' ');
+});
 
 // ── Brush: canvas overlay THẬT phủ đúng vùng ảnh hiển thị (nét vẽ hiện ngay, đỏ 60%) ──
 const metricsTick = ref(0);
@@ -134,6 +159,16 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
         <polygon :points="path" fill="rgba(244,63,94,0.12)" stroke="none" />
       </template>
       <polyline v-if="store.inpaintFreehandPoints.length > 1" :points="freehandPoints" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>
+
+    <!-- Path (curve) select: đường cong mượt qua các điểm neo -->
+    <svg v-if="store.inpaintMaskMode === 'path' && store.inpaintPathPoints.length > 1"
+         class="pointer-events-none absolute inset-0 z-10 h-full w-full">
+      <polyline :points="pathSmoothPixels" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      <polygon v-if="store.inpaintPathPoints.length > 2" :points="pathSmoothPixels" fill="rgba(167,139,250,0.12)" stroke="none" />
+      <template v-for="(p, i) in store.inpaintPathPoints" :key="i">
+        <circle :cx="Math.round(store.canvasMetrics().vx + p.nx * store.canvasMetrics().vw)" :cy="Math.round(store.canvasMetrics().vy + p.ny * store.canvasMetrics().vh)" r="3" fill="#a78bfa" />
+      </template>
     </svg>
 
     <!-- Rect: box + handles (chỉ khi ĐANG chỉnh) -->
