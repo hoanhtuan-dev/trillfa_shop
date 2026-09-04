@@ -33,9 +33,16 @@ Route::middleware('web')->group(function () {
     Route::get('/thanh-toan', [StorefrontController::class, 'checkout'])
         ->name('checkout.show')->middleware('auth');
 
-    // Account dashboard (auth).
-    Route::get('/tai-khoan', [StorefrontController::class, 'accountDashboard'])
-        ->name('account.dashboard')->middleware('auth');
+    // Account area (auth) — GET pages; CRUD actions stay on the legacy endpoints.
+    Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function () {
+        Route::get('/', [StorefrontController::class, 'accountDashboard'])->name('dashboard');
+        Route::get('/don-hang', [StorefrontController::class, 'accountOrders'])->name('orders');
+        Route::get('/don-hang/{order}', [StorefrontController::class, 'accountOrder'])->name('order');
+        Route::get('/ho-so', [StorefrontController::class, 'accountProfile'])->name('profile');
+        Route::get('/dia-chi', [StorefrontController::class, 'accountAddresses'])->name('addresses');
+        Route::get('/danh-gia', [StorefrontController::class, 'accountReviews'])->name('reviews');
+        Route::get('/mat-khau', [StorefrontController::class, 'accountPassword'])->name('password');
+    });
 
     // Auth (submission posts to the legacy POST /dang-nhap, /dang-ky).
     Route::get('/dang-nhap', [StorefrontController::class, 'auth'])

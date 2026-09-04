@@ -159,7 +159,7 @@
     "isEntry": true
   },
   "resources/js/storefront/account.js": {
-    "file": "assets/account-Bvp4rNue.js",
+    "file": "assets/account-229-pMvl.js",
     "name": "account",
     "src": "resources/js/storefront/account.js",
     "isEntry": true,
@@ -275,7 +275,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-u59FtefQ.js",
+    "file": "assets/app-BV5Y0mJ0.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -290,7 +290,7 @@
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-wJkfZMPa.js",
+    "file": "assets/library-BT913mDA.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,

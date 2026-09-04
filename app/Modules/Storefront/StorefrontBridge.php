@@ -317,6 +317,117 @@ class StorefrontBridge
         ]);
     }
 
+    public function accountOrders(): array
+    {
+        $user = auth()->user();
+        $orders = $user->orders()->with('items')->latest()->paginate(10);
+
+        return array_merge($this->base(), [
+            'view' => 'orders',
+            'orders' => $orders->getCollection()->map(fn ($o) => $this->orderCard($o))->values()->all(),
+            'total' => $orders->total(),
+            'last_page' => $orders->lastPage(),
+            'current_page' => $orders->currentPage(),
+        ]);
+    }
+
+    public function accountOrder($order): array
+    {
+        return array_merge($this->base(), [
+            'view' => 'order',
+            'order' => [
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'created_at' => $order->created_at?->format('d/m/Y H:i'),
+                'subtotal' => (float) $order->subtotal,
+                'discount' => (float) $order->discount,
+                'shipping_fee' => (float) $order->shipping_fee,
+                'total' => (float) $order->total,
+                'payment_method' => $order->payment_method,
+                'payment_status' => $order->payment_status,
+                'shipping_method' => $order->shipping_method,
+                'can_cancel' => $order->can_cancel,
+                'items' => $order->items->map(fn ($i) => [
+                    'name' => $i->product_name,
+                    'sku' => $i->sku,
+                    'price' => (float) $i->price,
+                    'quantity' => (int) $i->quantity,
+                    'subtotal' => (float) $i->subtotal,
+                    'image' => $i->image ? asset_image($i->image) : null,
+                ])->values()->all(),
+            ],
+        ]);
+    }
+
+    public function accountProfile(): array
+    {
+        $user = auth()->user();
+
+        return array_merge($this->base(), [
+            'view' => 'profile',
+            'profile' => [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+            ],
+        ]);
+    }
+
+    public function accountAddresses(): array
+    {
+        $addresses = auth()->user()->addresses()->latest()->get();
+
+        return array_merge($this->base(), [
+            'view' => 'addresses',
+            'addresses' => $addresses->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'phone' => $a->phone,
+                'address' => $a->address,
+                'ward' => $a->ward,
+                'district' => $a->district,
+                'province' => $a->province,
+                'is_default' => (bool) $a->is_default,
+            ])->values()->all(),
+        ]);
+    }
+
+    public function accountPassword(): array
+    {
+        return array_merge($this->base(), ['view' => 'password']);
+    }
+
+    public function accountReviews(): array
+    {
+        $reviews = auth()->user()->reviews()->with('product')->latest()->get();
+
+        return array_merge($this->base(), [
+            'view' => 'reviews',
+            'reviews' => $reviews->map(fn ($r) => [
+                'id' => $r->id,
+                'rating' => (int) $r->rating,
+                'title' => $r->title,
+                'body' => $r->body,
+                'product' => $r->product?->name,
+                'product_url' => $r->product ? route('product.show', $r->product->slug) : '#',
+                'created_at' => $r->created_at?->format('d/m/Y'),
+            ])->values()->all(),
+        ]);
+    }
+
+    protected function orderCard($o): array
+    {
+        return [
+            'id' => $o->id,
+            'order_number' => $o->order_number,
+            'total' => (float) $o->total,
+            'status' => $o->status,
+            'created_at' => $o->created_at?->format('d/m/Y'),
+            'items_count' => $o->items_count ?? $o->items->count(),
+            'url' => route('account.order', $o),
+        ];
+    }
+
     /**
      * Return saved products for the wishlist (client passes the persisted ids).
      */

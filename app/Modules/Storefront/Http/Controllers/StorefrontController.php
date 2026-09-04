@@ -94,6 +94,50 @@ class StorefrontController extends Controller
         return view('storefront.account', ['boot' => $this->bridge->accountDashboard()]);
     }
 
+    public function accountOrders()
+    {
+        seo()->title('Đơn hàng | '.setting('site_name'));
+
+        return view('storefront.account', ['boot' => $this->bridge->accountOrders()]);
+    }
+
+    public function accountOrder(\App\Models\Order $order)
+    {
+        abort_unless($order->user_id === auth()->id(), 403);
+
+        seo()->title('Đơn hàng '.$order->order_number.' | '.setting('site_name'));
+
+        return view('storefront.account', ['boot' => $this->bridge->accountOrder($order)]);
+    }
+
+    public function accountProfile()
+    {
+        seo()->title('Hồ sơ | '.setting('site_name'));
+
+        return view('storefront.account', ['boot' => $this->bridge->accountProfile()]);
+    }
+
+    public function accountAddresses()
+    {
+        seo()->title('Địa chỉ | '.setting('site_name'));
+
+        return view('storefront.account', ['boot' => $this->bridge->accountAddresses()]);
+    }
+
+    public function accountReviews()
+    {
+        seo()->title('Đánh giá | '.setting('site_name'));
+
+        return view('storefront.account', ['boot' => $this->bridge->accountReviews()]);
+    }
+
+    public function accountPassword()
+    {
+        seo()->title('Mật khẩu | '.setting('site_name'));
+
+        return view('storefront.account', ['boot' => $this->bridge->accountPassword()]);
+    }
+
     /**
      * Auth page (login/register) — renders the Vue auth SPA. Submission posts
      * natively to the existing AuthController login/register endpoints.

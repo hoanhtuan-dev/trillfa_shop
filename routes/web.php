@@ -82,17 +82,13 @@ Route::post('/hoan-thien-tai-khoan/{order}', [QuickCheckoutController::class, 'c
 
 // Account (auth)
 Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function () {
-    Route::get('/don-hang', [AccountController::class, 'orders'])->name('orders');
-    Route::get('/don-hang/{order}', [AccountController::class, 'order'])->name('order');
+    // CRUD action endpoints only (GET pages are owned by the Storefront module).
     Route::post('/don-hang/{order}/huy', [AccountController::class, 'cancelOrder'])->name('order.cancel');
-    Route::get('/ho-so', [AccountController::class, 'profile'])->name('profile');
     Route::post('/ho-so', [AccountController::class, 'updateProfile'])->name('profile.update');
     Route::post('/mat-khau', [AccountController::class, 'changePassword'])->name('password.update');
-    Route::get('/dia-chi', [AccountController::class, 'addresses'])->name('addresses');
     Route::post('/dia-chi', [AccountController::class, 'storeAddress'])->name('addresses.store');
     Route::put('/dia-chi/{address}', [AccountController::class, 'updateAddress'])->name('addresses.update');
     Route::delete('/dia-chi/{address}', [AccountController::class, 'deleteAddress'])->name('addresses.delete');
-    Route::get('/danh-gia', [AccountController::class, 'reviews'])->name('reviews');
 });
 
 // Trillfa Studio — INTERNAL only (admin team). Not a public customer service.
