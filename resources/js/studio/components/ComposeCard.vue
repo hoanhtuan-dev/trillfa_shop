@@ -153,16 +153,16 @@ async function run() {
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
 
     <!-- Chip chế độ -->
-    <div class="mt-2.5 flex gap-1.5">
+    <div class="mt-3 flex gap-2">
       <button @click="setCompose()"
               :class="mode === 'compose' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">Ghép tự do</button>
+              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors"><StudioIcon name="layers" size="h-3.5 w-3.5" /> Ghép tự do</button>
       <button @click="setTryon()"
               :class="mode === 'tryon' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">Thử đồ ảo</button>
+              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors"><StudioIcon name="pose" size="h-3.5 w-3.5" /> Thử đồ ảo</button>
       <button @click="setFaceSwap()"
               :class="mode === 'faceswap' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors">Thay khuôn mặt</button>
+              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors"><StudioIcon name="user" size="h-3.5 w-3.5" /> Thay khuôn mặt</button>
     </div>
     <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = trang phục · @image2 = pose · @image3 = bối cảnh (tùy chọn)
@@ -171,7 +171,7 @@ async function run() {
       @image1 = người mẫu · @image2 = khuôn mặt · @image3 = ảnh ghép (tùy chọn)
     </p>
     <!-- 3 slot ảnh: bấm để tải/chọn -->
-    <div class="mt-3 grid grid-cols-3 gap-1.5">
+    <div class="mt-4 grid grid-cols-3 gap-2">
       <button v-for="i in 3" :key="i" @click="openSlot(i - 1)"
               class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-xl border transition"
               :class="selected[i-1] ? 'border-brand-500 bg-ink-900' : 'border-dashed border-ink-700 bg-ink-900/40 hover:border-brand-400'">
@@ -183,21 +183,21 @@ async function run() {
           <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>
-          <span class="grid h-8 w-8 place-items-center rounded-full bg-ink-800/70 text-cream-300/70"><StudioIcon name="camera" size="h-4 w-4" v-if="i === 1" /><span v-else class="text-base">＋</span></span>
+          <span class="grid h-6 w-6 place-items-center text-ink-600"><StudioIcon name="image" size="h-5 w-5" v-if="i === 1" /><span v-else>＋</span></span>
           <span class="px-1 text-center text-[9px] font-medium text-cream-300/60">{{ slotRoles[i-1] }}</span>
           <span class="px-1 text-center text-[9px] text-cream-300/40">@image{{ i }}</span>
         </template>
       </button>
     </div>
 
-    <label class="label mt-3">Mô tả ghép</label>
+    <label class="label mt-4">Mô tả ghép</label>
     <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…"></textarea>
     <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
       <button v-for="n in 3" :key="n" @click="insertTag('@image' + n)"
               class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white">@image{{ n }}</button>
     </div>
 
-    <div class="mt-2 flex items-center gap-1.5 text-xs text-cream-200">
+    <div class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
       <span class="mr-1">Số biến thể:</span>
       <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
               :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"

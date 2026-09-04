@@ -69,7 +69,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh kết quả trong <b>Outputs</b> để sửa.</div>
 
     <!-- Mask tools: chọn vùng trên canvas chính -->
-    <div v-if="store.preview?.media_url" class="mt-2 flex gap-1.5">
+    <div v-if="store.preview?.media_url" class="mt-3 flex flex-wrap gap-1.5">
       <button @click="store.toggleInpaintMask('rect')"
               :class="store.inpaintMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
@@ -119,15 +119,13 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       </div>
     </div>
 
-    <!-- Chip nhanh -->
-    <div class="mt-3">
-      <p class="text-[10px] font-semibold text-cream-300/70">Gợi ý nhanh</p>
-      <div class="mt-1.5 flex flex-wrap gap-1.5">
-        <button @click="mvOpen = true"
-                class="rounded-full border border-ink-700 bg-ink-800/60 px-2.5 py-1 text-[11px] font-medium text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/20">
-          Render đa góc
-        </button>
-      </div>
+    <!-- Render đa góc (nút vuông giống slot nền chính) -->
+    <div class="mt-4">
+      <button @click="mvOpen = true"
+              class="flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-ink-700 bg-ink-900/40 transition hover:border-brand-400">
+        <span class="grid h-8 w-8 place-items-center rounded-full bg-ink-800/70 text-cream-300/70"><StudioIcon name="camera" size="h-4 w-4" /></span>
+        <span class="text-[10px] font-medium text-cream-200">Render đa góc</span>
+      </button>
     </div>
 
     <!-- Modal render đa góc: 4 slot + hướng dẫn + kiểm soát -->
@@ -162,7 +160,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
       </div>
     </BaseModal>
 
-    <label class="label mt-3">Mô tả chỉnh sửa</label>
+    <label class="label mt-4">Mô tả chỉnh sửa</label>
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước…"></textarea>
     <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ store.inpaintPrompt.length }}/1000</p>
 
