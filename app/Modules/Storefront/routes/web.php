@@ -18,6 +18,9 @@ Route::middleware('web')->group(function () {
     // Product detail.
     Route::get('/san-pham/{slug}', [StorefrontController::class, 'product'])->name('product.show');
 
+    // Cart.
+    Route::get('/gio-hang', [StorefrontController::class, 'cart'])->name('cart.show');
+
     // Shop listing (all products + per-category).
     Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
     Route::get('/danh-muc/{categorySlug}', [StorefrontController::class, 'shop'])->name('shop.category');

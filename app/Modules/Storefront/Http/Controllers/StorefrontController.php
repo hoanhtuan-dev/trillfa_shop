@@ -75,6 +75,16 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Cart page — renders the Vue cart SPA (cart data is client-side via /api/cart).
+     */
+    public function cart()
+    {
+        seo()->title('Giỏ hàng | '.setting('site_name'));
+
+        return view('storefront.cart', ['boot' => $this->bridge->base()]);
+    }
+
+    /**
      * Product detail page — renders the Vue product SPA.
      */
     public function product(string $slug)

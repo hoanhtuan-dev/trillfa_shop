@@ -183,6 +183,21 @@ class StorefrontBridge
         ];
     }
 
+    /**
+     * Base payload the shared layout needs on any storefront page
+     * (site/user/nav/contact/categories). Page-specific data is appended.
+     */
+    public function base(): array
+    {
+        return [
+            'site' => $this->site(),
+            'user' => $this->user(),
+            'nav' => $this->nav('header'),
+            'contact' => $this->contact(),
+            'categories' => $this->categories(),
+        ];
+    }
+
     // ---------------------------------------------------------------- sections
 
     public function site(): array

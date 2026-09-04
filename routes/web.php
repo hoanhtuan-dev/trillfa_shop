@@ -47,7 +47,7 @@ Route::get('/robots.txt', [RobotsController::class, 'index'])->name('robots');
 // Shop & product pages are owned by the Storefront module (Vue SPA).
 
 // Cart
-Route::get('/gio-hang', [CartController::class, 'show'])->name('cart.show');
+// (cart page is owned by the Storefront module)
 
 // Auth
 Route::middleware('guest')->group(function () {
