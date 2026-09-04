@@ -31,9 +31,10 @@ const renameValue = ref('');
 function startRename(l) { renamingId.value = l.id; renameValue.value = l.name || ''; }
 function commitRename() { if (!renamingId.value) return; store.renameLayer(renamingId.value, renameValue.value); renamingId.value = null; }
 function cancelRename() { renamingId.value = null; }
-onMounted(async () => { store.load(); store.loadPalette(store.previewId); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); });
+onMounted(async () => { store.load(); store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); });
-watch(() => store.previewId, (id) => { store.loadPalette(id); });
+// Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
+watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
 const canvasZoom = ref(null);
@@ -418,7 +419,7 @@ function onTouchEnd(e) {
                 <button @click="store.toggleFlipY(store.activeLayer.id)" class="flex items-center justify-center gap-1 rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Lật dọc layer"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M21 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3"/><path d="M4 12H2"/><path d="M10 12H8"/><path d="M16 12h-2"/><path d="M22 12h-2"/></svg><span>Dọc</span></button>
               </div>
             </div>
-            <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="hidden w-64 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl lg:block">
+            <div v-if="store.palette.length && store.step !== 3 && store.upscaleSrc" class="hidden w-64 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl lg:block">
               <div class="mb-1 flex items-center gap-1 text-[10px] font-semibold text-cream-300/60"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg><span>Palette</span></div>
               <div class="grid grid-cols-3 gap-1.5">
                 <button v-for="c in store.palette.slice(0, 8)" :key="c" @click="copyColor(c)" class="h-7 w-full rounded-md border border-ink-700 transition hover:scale-105" :style="{ background: c }" :title="'Nhấn để copy ' + c"></button>

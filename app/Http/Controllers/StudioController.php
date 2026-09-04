@@ -3764,7 +3764,9 @@ RULES:
     {
         $items = Product::where('is_active', true)->whereNotNull('image')
             ->latest()->limit(40)->get(['id', 'name', 'image'])
-            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'url' => $p->image_url])
+            // URL TƯƠNG ĐỐI (không dùng asset() tuyệt đối) — ảnh tải được từ mọi host
+            // (localhost/127.0.0.1/IP…) giống convention /studio/ref-images.
+            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'url' => rel_image_url($p->image)])
             ->filter(fn ($i) => ! empty($i['url']))
             ->values();
 

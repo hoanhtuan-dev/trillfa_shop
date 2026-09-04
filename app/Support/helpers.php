@@ -94,6 +94,26 @@ if (! function_exists('asset_image')) {
     }
 }
 
+if (! function_exists('rel_image_url')) {
+    /** Đường dẫn ảnh TƯƠNG ĐỐI (không kèm host) — dùng cho API để ảnh tải được từ mọi host. */
+    function rel_image_url(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, 'samples/')) {
+            return '/'.$path;
+        }
+
+        return '/storage/'.$path;
+    }
+}
+
 if (! function_exists('seo')) {
     function seo(): \App\Support\Seo
     {

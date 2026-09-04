@@ -405,6 +405,47 @@ export const useStudioStore = defineStore('studio', {
       try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
       catch (e) { this.palette = []; }
     },
+    // Palette màu cho ẢNH BẤT KỲ (source/uploaded/product/result/dataURL) — trích màu NGAY TRÊN TRÌNH DUYỆT.
+    async loadPaletteFromImage(url) {
+      if (!url) { this.palette = []; return; }
+      try { this.palette = await this._extractColors(url); }
+      catch (e) { this.palette = []; }
+    },
+    _extractColors(url) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const W = 64;
+            const H = Math.max(1, Math.round((img.naturalHeight || 1) * (W / (img.naturalWidth || 1))));
+            const c = document.createElement('canvas'); c.width = W; c.height = H;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, W, H);
+            const d = ctx.getImageData(0, 0, W, H).data;
+            // Bucket màu giống backend: quantize /32, cộng dồn trung bình, lấy 8 màu nhiều nhất.
+            const buckets = new Map();
+            for (let i = 0; i < d.length; i += 4) {
+              const a = d[i + 3];
+              if (a < 128) continue; // bỏ pixel trong suốt
+              const r = d[i], g = d[i + 1], b = d[i + 2];
+              const key = ((r / 32) | 0) + ',' + ((g / 32) | 0) + ',' + ((b / 32) | 0);
+              let bk = buckets.get(key);
+              if (!bk) { bk = { n: 0, r: 0, g: 0, b: 0 }; buckets.set(key, bk); }
+              bk.n++; bk.r += r; bk.g += g; bk.b += b;
+            }
+            const sorted = [...buckets.values()].sort((a, b) => b.n - a.n).slice(0, 8);
+            const colors = sorted.map((bk) => {
+              const rr = Math.round(bk.r / bk.n), gg = Math.round(bk.g / bk.n), bb = Math.round(bk.b / bk.n);
+              return '#' + [rr, gg, bb].map((v) => v.toString(16).padStart(2, '0')).join('');
+            });
+            resolve(colors);
+          } catch (e) { resolve([]); }
+        };
+        img.onerror = () => resolve([]);
+        img.src = url;
+      });
+    },
     async renderVideo() {
       if (!this.videoPromptEn && !this.videoSourceId) { this.toast('Chọn ảnh nguồn hoặc nhập prompt video.', 'error'); return; }
       if (this.videoBusy) return;
@@ -1311,6 +1352,22 @@ export const useStudioStore = defineStore('studio', {
     },
     pickFromProduct(p) { this.setSource(p.url, p.name); },
     pickFromResult(g) { this.setSource(g.media_url, 'Ảnh kết quả #' + g.id); },
+    // Đưa NHIỀU ảnh vào canvas cùng lúc (mỗi ảnh 1 layer nguồn riêng, đặt cạnh nhau).
+    addImagesToCanvas(items) {
+      const list = (items || []).filter((it) => it && it.url);
+      if (!list.length) return;
+      // Chỉ gỡ layer 'source' cũ 1 lần khi có ít nhất 1 ảnh mới.
+      this.canvasLayers = this.canvasLayers.filter((l) => l.id !== 'source');
+      let lastId = '';
+      list.forEach((img, i) => {
+        const id = i === 0 ? 'source' : 'src-' + Date.now() + '-' + i;
+        this.pushCanvasLayer(id, 'source', img.name || 'Ảnh nguồn', img.url);
+        lastId = id;
+      });
+      if (lastId) this.setActiveLayer(lastId);
+      this.saveLayerLayout();
+      this.toast('Đã đưa ' + list.length + ' ảnh vào canvas.');
+    },
     async translate(promptTo) { if (!promptTo) { this.toast('Nhập prompt.', 'error'); return; } this.suggestResult = this.suggestResult || {}; try { const d = await this.api('/studio/translate', { text: promptTo, direction: 'vi' }); this.suggestResult.prompt_vi = d.text || d; this.toast('Đã dịch sang tiếng Việt.'); } catch (e) { this.toast(e.message || 'Lỗi dịch.', 'error'); } },
     async suggestStyle(image) {
       if (!this.suggestEnabled) { this.toast('Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt.', 'error'); return; }
