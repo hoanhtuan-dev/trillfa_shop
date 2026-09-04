@@ -61,6 +61,7 @@ export const useStudioStore = defineStore('studio', {
     _eraseCtx: null,
     _eraseDrawing: false,
     _eraseLast: null,
+    _eraseBusy: false,   // chống bake trùng khi đang áp dụng nét xóa
     // Vẽ tự do (paint brush) — tô màu lên layer
     drawMode: false,
     drawBrushSize: 24,   // độ dày cọ (px 3-150)
@@ -71,6 +72,7 @@ export const useStudioStore = defineStore('studio', {
     _drawDrawing: false,
     _drawLast: null,
     _drawPressure: 1,   // áp lực bút stylus (0-1) cho cọ vẽ
+    _drawBusy: false,    // chống bake trùng khi đang áp dụng nét vẽ
     // Vẽ vùng chọn (marquee)
     regionSelectMode: false,
     regionBox: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
@@ -947,11 +949,13 @@ export const useStudioStore = defineStore('studio', {
     eraseBrushMove(e) { if (!this._eraseDrawing) return; const p = this._erasePoint(e); this._drawEraseLine(this._eraseLast || p, p); this._eraseLast = p; },
     endEraseBrush() { this._eraseDrawing = false; this._eraseLast = null; },
     applyErase() {
+      if (this._eraseBusy) return Promise.resolve();
       this.pushHistory();
+      this._eraseBusy = true;
       return new Promise((resolve) => {
         const l = this.activeLayer;
         const ec = this._eraseCanvas;
-        if (!l || !ec) { resolve(); return; }
+        if (!l || !ec) { this._eraseBusy = false; resolve(); return; }
         const img = new Image();
         img.onload = () => {
           const w = img.naturalWidth, h = img.naturalHeight;
@@ -963,9 +967,10 @@ export const useStudioStore = defineStore('studio', {
           l.image = canvas.toDataURL('image/png');
           this.saveLayerLayout();
           this.toast('Đã xóa vùng.');
+          this._eraseBusy = false;
           resolve();
         };
-        img.onerror = () => { this.toast('Không xóa được ảnh.', 'error'); resolve(); };
+        img.onerror = () => { this.toast('Không xóa được ảnh.', 'error'); this._eraseBusy = false; resolve(); };
         img.src = l.image;
       });
     },
@@ -1033,11 +1038,13 @@ export const useStudioStore = defineStore('studio', {
     drawBrushMove(e) { if (!this._drawDrawing) return; if (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) this._drawPressure = e.pressure; const p = this._drawPoint(e); this._drawPaintLine(this._drawLast || p, p); this._drawLast = p; },
     endDrawBrush() { this._drawDrawing = false; this._drawLast = null; },
     applyDraw() {
+      if (this._drawBusy) return Promise.resolve();
       this.pushHistory();
+      this._drawBusy = true;
       return new Promise((resolve) => {
         const l = this.activeLayer;
         const dc = this._drawCanvas;
-        if (!l || !dc) { resolve(); return; }
+        if (!l || !dc) { this._drawBusy = false; resolve(); return; }
         const img = new Image();
         img.onload = () => {
           const w = img.naturalWidth, h = img.naturalHeight;
@@ -1049,9 +1056,10 @@ export const useStudioStore = defineStore('studio', {
           l.image = canvas.toDataURL('image/png');
           this.saveLayerLayout();
           this.toast('Đã vẽ lên layer.');
+          this._drawBusy = false;
           resolve();
         };
-        img.onerror = () => { this.toast('Không vẽ được.', 'error'); resolve(); };
+        img.onerror = () => { this.toast('Không vẽ được.', 'error'); this._drawBusy = false; resolve(); };
         img.src = l.image;
       });
     },
@@ -1740,7 +1748,7 @@ export const useStudioStore = defineStore('studio', {
       });
     },
     // Canvas alpha (trắng=vùng chọn, trong suốt=ngoài) theo kích thước layer, có feather.
-    async _buildSelectionAlpha(w, h) {
+    async _buildSelectionAlpha(w, h, maskData = null) {
       const sel = document.createElement('canvas'); sel.width = w; sel.height = h;
       const sctx = sel.getContext('2d');
       const mode = this.inpaintMaskMode;
@@ -1750,9 +1758,10 @@ export const useStudioStore = defineStore('studio', {
         sctx.fillStyle = '#fff';
         sctx.fillRect(b.x * w, b.y * h, b.w * w, b.h * h);
       } else {
-        // freehand/brush → mask PNG (đen=vùng chọn)
-        if (!this.inpaintBrushData) throw new Error('Chưa vẽ vùng chọn.');
-        const mimg = await this._loadImageSrc('data:image/png;base64,' + this.inpaintBrushData);
+        // freehand/brush → mask PNG (đen=vùng chọn). Dùng maskData ĐÃ CAPTURE (ổn định, không đổi giữa chừng).
+        const data = maskData ?? this.inpaintBrushData;
+        if (!data) throw new Error('Chưa vẽ vùng chọn.');
+        const mimg = await this._loadImageSrc('data:image/png;base64,' + data);
         const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
         const tctx = tmp.getContext('2d');
         tctx.drawImage(mimg, 0, 0, w, h);
@@ -1777,11 +1786,12 @@ export const useStudioStore = defineStore('studio', {
     async _applySelectionToLayer(action, color) {
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      const maskData = this.inpaintBrushData; // capture đồng bộ
       this.pushHistory();
       try {
         const img = await this._loadImageSrc(l.image);
         const w = img.naturalWidth, h = img.naturalHeight;
-        const sel = await this._buildSelectionAlpha(w, h);
+        const sel = await this._buildSelectionAlpha(w, h, maskData);
         const out = document.createElement('canvas'); out.width = w; out.height = h;
         const octx = out.getContext('2d');
         octx.drawImage(img, 0, 0);
@@ -1810,11 +1820,12 @@ export const useStudioStore = defineStore('studio', {
     async duplicateSelectedRegion() {
       const src = this.activeLayer;
       if (!src || !src.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      const maskData = this.inpaintBrushData; // capture đồng bộ
       this.pushHistory();
       try {
         const img = await this._loadImageSrc(src.image);
         const w = img.naturalWidth, h = img.naturalHeight;
-        const sel = await this._buildSelectionAlpha(w, h);
+        const sel = await this._buildSelectionAlpha(w, h, maskData);
         const out = document.createElement('canvas'); out.width = w; out.height = h;
         const octx = out.getContext('2d');
         octx.drawImage(img, 0, 0);
@@ -1841,11 +1852,12 @@ export const useStudioStore = defineStore('studio', {
     async floatSelectedRegion() {
       const src = this.activeLayer;
       if (!src || !src.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      const maskData = this.inpaintBrushData; // capture đồng bộ
       this.pushHistory();
       try {
         const img = await this._loadImageSrc(src.image);
         const w = img.naturalWidth, h = img.naturalHeight;
-        const sel = await this._buildSelectionAlpha(w, h);
+        const sel = await this._buildSelectionAlpha(w, h, maskData);
         // 1) Layer mới chứa đúng phần chọn (floating)
         const fc = document.createElement('canvas'); fc.width = w; fc.height = h;
         const fctx = fc.getContext('2d');
