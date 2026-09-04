@@ -452,7 +452,7 @@ function onTouchEnd(e) {
     <div v-if="removeBgConfirmOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="removeBgConfirmOpen = false">
       <div class="w-full max-w-xs rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl">
         <p class="text-sm font-semibold text-cream-100">Xóa nền AI?</p>
-        <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Nền sẽ được xóa thành <b>trong suốt</b> (PNG alpha). Bạn cần <b>vẽ lasso quanh chủ thể</b> trước. Tốn <b>1 credit</b>.</p>
+        <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Nền sẽ được xóa thành <b>trong suốt</b> (PNG alpha). AI tự nhận diện chủ thể — <b>vẽ lasso quanh chủ thể</b> nếu muốn chính xác hơn. Tốn <b>1 credit</b>.</p>
         <div class="mt-3 flex gap-2">
           <button @click="doRemoveBg()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500">Xóa nền</button>
           <button @click="removeBgConfirmOpen = false" class="flex-1 rounded-lg bg-ink-800 px-3 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>

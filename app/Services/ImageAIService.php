@@ -1231,6 +1231,57 @@ class ImageAIService
         return Storage::disk('public')->url($name);
     }
 
+    /**
+     * Xóa nền tự động khi KHÔNG có mask lasso: model đã thay nền thành trắng tinh.
+     * Flood-fill từ 4 cạnh để tìm vùng nền trắng (nối với viền ảnh), tạo mask rồi cắt alpha.
+     */
+    public function applyAutoTransparentBackground(string $imageUrl): ?string
+    {
+        $imgBin = $this->resolveImageBinary($imageUrl);
+        if ($imgBin === null) return null;
+        $img = @imagecreatefromstring($imgBin);
+        if (! $img) return null;
+        $w = imagesx($img); $h = imagesy($img);
+
+        // Flood-fill nền trắng (gần trắng, nối với 4 cạnh ảnh).
+        $visited = array_fill(0, $w * $h, 0);
+        $stack = [];
+        $push = function ($x, $y) use (&$stack, &$visited, $img, $w, $h) {
+            if ($x < 0 || $y < 0 || $x >= $w || $y >= $h) return;
+            $idx = $y * $w + $x;
+            if ($visited[$idx]) return;
+            $c = imagecolorat($img, $x, $y);
+            $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+            if ($r >= 235 && $g >= 235 && $b >= 235) { $visited[$idx] = 1; $stack[] = $idx; }
+        };
+        for ($x = 0; $x < $w; $x++) { $push($x, 0); $push($x, $h - 1); }
+        for ($y = 0; $y < $h; $y++) { $push(0, $y); $push($w - 1, $y); }
+        while ($stack) {
+            $idx = array_pop($stack);
+            $x = $idx % $w; $y = intdiv($idx, $w);
+            $push($x, $y - 1); $push($x, $y + 1); $push($x - 1, $y); $push($x + 1, $y);
+        }
+
+        // Mask: TRẮNG = giữ (chủ thể), ĐEN = nền (xóa). Mặc định giữ toàn bộ, rồi ghi đen vùng nền.
+        $mask = imagecreatetruecolor($w, $h);
+        imagefilledrectangle($mask, 0, 0, $w - 1, $h - 1, imagecolorallocate($mask, 255, 255, 255));
+        $black = imagecolorallocate($mask, 0, 0, 0);
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                if ($visited[$y * $w + $x]) imagesetpixel($mask, $x, $y, $black);
+            }
+        }
+        imagedestroy($img);
+
+        ob_start(); imagepng($mask); $bytes = ob_get_clean();
+        imagedestroy($mask);
+        $name = 'studio/mask-'.Str::uuid().'.png';
+        Storage::disk('public')->put($name, $bytes);
+
+        // Dùng chung hậu kỳ decontaminate (blur + co mép) như khi có mask lasso.
+        return $this->applyTransparentBackground($imageUrl, Storage::disk('public')->url($name));
+    }
+
     protected function sizeFor(?string $resolution, ?string $ratio): string
     {
         // Qwen-Image only accepts a fixed set of sizes; map the ratio (and the extra

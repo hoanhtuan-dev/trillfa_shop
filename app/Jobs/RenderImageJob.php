@@ -62,10 +62,14 @@ class RenderImageJob implements ShouldQueue
                 if ($pasted) { $url = $pasted; }
             }
 
-            // Xóa nền AI: hậu kỳ cắt nền theo mask → trong suốt (PNG alpha). Lỗi → fallback ảnh không trong suốt.
-            if (($genMeta['mode'] ?? '') === 'remove-bg' && $generation->mask_image) {
+            // Xóa nền AI: hậu kỳ cắt nền thành trong suốt (PNG alpha).
+            // Có mask lasso → cắt theo mask; KHÔNG có mask → tự nhận diện nền trắng (auto).
+            // Lỗi → fallback ảnh không trong suốt.
+            if (($genMeta['mode'] ?? '') === 'remove-bg') {
                 try {
-                    $transparent = $images->applyTransparentBackground($url, $generation->mask_image);
+                    $transparent = $generation->mask_image
+                        ? $images->applyTransparentBackground($url, $generation->mask_image)
+                        : $images->applyAutoTransparentBackground($url);
                     if ($transparent) { $url = $transparent; }
                 } catch (\Throwable $e) {
                     logger()->warning('remove-bg transparent post-processing failed', ['error' => $e->getMessage()]);

@@ -145,7 +145,8 @@ export const useStudioStore = defineStore('studio', {
     inpaintFreehandPaths: [],     // các nét lasso ĐÃ hoàn thành
     inpaintPathPoints: [],        // điểm neo đang vẽ cho vùng chọn bằng đường cong (path/curve)
     inpaintPathRegions: [],       // các vùng path ĐÃ đóng (để preview hiển thị đủ nhiều vùng)
-    magicTolerance: 32,           // ngưỡng màu cho Magic Wand (0-128)
+    magicTolerance: 32,           // ngưỡng màu cho Magic Wand (1-128)
+    magicFeather: 0,             // độ mịn Magic Wand (blur px 0-20) — làm mềm mép vùng chọn
     _inpaintFreehandActive: false,
     inpaintFeather: 0,            // feather (px 0-50) — làm mềm mép vùng chọn
     inpaintFillColor: '#ffffff',  // màu tô cho nút "🎨 Tô" của vùng chọn
@@ -324,15 +325,10 @@ export const useStudioStore = defineStore('studio', {
     async removeBackground() {
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chọn 1 layer ảnh để xóa nền.', 'error'); return null; }
-      // Cần mask (chủ thể) để cắt nền THÀNH TRONG SUỐT — nếu không có mask, backend không cắt alpha được.
-      if (!this.inpaintBrushData) {
-        this.toast('Vẽ lasso quanh CHỦ THỂ trước — cần mask để xóa nền thành trong suốt.', 'error');
-        return null;
-      }
       try {
         const d = await this.api('/studio/remove-bg', {
           image: l.image,
-          mask_data: this.inpaintBrushData || undefined, // vùng chọn lasso/brush hiện tại (nếu có) = chủ thể
+          mask_data: this.inpaintBrushData || undefined, // lasso tuỳ chọn — không có thì AI tự nhận diện chủ thể
           prompt: '',
         });
         if (d.generation_id) {
@@ -1569,7 +1565,7 @@ export const useStudioStore = defineStore('studio', {
       const p = this.inpaintMaskPointer(e); if (!p) return;
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chọn 1 layer ảnh để dùng Magic Wand.', 'error'); return; }
-      const tol = Math.max(2, Math.min(128, Number(this.magicTolerance) || 32));
+      const tol = Math.max(1, Math.min(128, Number(this.magicTolerance) || 32));
       try {
         const img = await this._loadImageSrc(l.image);
         const w = img.naturalWidth, h = img.naturalHeight;
@@ -1585,11 +1581,11 @@ export const useStudioStore = defineStore('studio', {
         const sy = Math.min(mh - 1, Math.max(0, Math.round(p.ny * mh)));
         const si = (sy * mw + sx) * 4;
         const sr = d[si], sg = d[si + 1], sb = d[si + 2];
-        // Flood-fill (stack/DFS) theo ngưỡng màu
+        // Flood-fill (stack/DFS) theo ngưỡng màu — EUCLIDEAN distance (chính xác hơn Manhattan).
         const visited = new Uint8Array(mw * mh);
         const stack = [sy * mw + sx];
         visited[sy * mw + sx] = 1;
-        const thresh = tol * 3;
+        const threshSq = tol * tol;
         while (stack.length) {
           const idx = stack.pop();
           const x = idx % mw, y = (idx / mw) | 0;
@@ -1600,8 +1596,8 @@ export const useStudioStore = defineStore('studio', {
           for (const ni of neighbors) {
             if (visited[ni]) continue;
             const pi = ni * 4;
-            const diff = Math.abs(d[pi] - sr) + Math.abs(d[pi + 1] - sg) + Math.abs(d[pi + 2] - sb);
-            if (diff <= thresh) { visited[ni] = 1; stack.push(ni); }
+            const dr = d[pi] - sr, dg = d[pi + 1] - sg, db = d[pi + 2] - sb;
+            if (dr * dr + dg * dg + db * db <= threshSq) { visited[ni] = 1; stack.push(ni); }
           }
         }
         // Tạo temp canvas chứa vùng chọn (đỏ), rồi vẽ lên mask canvas theo add/subtract.
@@ -1616,8 +1612,18 @@ export const useStudioStore = defineStore('studio', {
           if (visited[i]) { td.data[i * 4] = 220; td.data[i * 4 + 1] = 38; td.data[i * 4 + 2] = 38; td.data[i * 4 + 3] = 255; }
         }
         tctx.putImageData(td, 0, 0);
+        // Độ mịn: blur mép vùng chọn → mask có viền mềm, chống răng cưa.
+        let selCanvas = temp;
+        const feather = Math.max(0, Math.min(20, Number(this.magicFeather) || 0));
+        if (feather > 0) {
+          const blurred = document.createElement('canvas'); blurred.width = mw; blurred.height = mh;
+          const bctx = blurred.getContext('2d');
+          bctx.filter = 'blur(' + feather + 'px)';
+          bctx.drawImage(temp, 0, 0);
+          selCanvas = blurred;
+        }
         mctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
-        mctx.drawImage(temp, 0, 0);
+        mctx.drawImage(selCanvas, 0, 0);
         mctx.globalCompositeOperation = 'source-over';
         this._finalizeInpaintBrush();
         if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
