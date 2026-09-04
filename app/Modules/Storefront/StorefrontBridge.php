@@ -40,6 +40,7 @@ class StorefrontBridge
             'secondary' => $this->secondary(),
             'blog' => $this->blog(),
             'cta' => $this->cta(),
+            'sale_ends_at' => setting('sale_ends_at', ''),
         ];
     }
 

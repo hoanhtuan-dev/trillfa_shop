@@ -6,6 +6,7 @@ import { useRecentlyViewed } from './composables/useRecentlyViewed.js';
 import StorefrontLayout from './components/layout/StorefrontLayout.vue';
 import SkeletonCard from './components/ui/SkeletonCard.vue';
 import SectionHeading from './components/ui/SectionHeading.vue';
+import CountdownTimer from './components/ui/CountdownTimer.vue';
 
 import HeroCarousel from './components/home/HeroCarousel.vue';
 import BenefitsStrip from './components/home/BenefitsStrip.vue';
@@ -30,6 +31,7 @@ const bestsellers = computed(() => boot.value.bestsellers || { enabled: false, p
 const blog = computed(() => boot.value.blog || { enabled: false, posts: [] });
 const cta = computed(() => boot.value.cta || { enabled: false });
 const recent = useRecentlyViewed().recentlyViewed;
+const saleEndsAt = computed(() => boot.value.sale_ends_at || '');
 </script>
 
 <template>
@@ -86,6 +88,7 @@ const recent = useRecentlyViewed().recentlyViewed;
                 <div class="relative">
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">{{ onSale.kicker }}</p>
                     <h2 class="mt-2 font-display text-3xl font-semibold sm:text-4xl">{{ onSale.title }}</h2>
+                    <CountdownTimer v-if="saleEndsAt" :ends-at="saleEndsAt" class="mt-3" />
                     <div class="mt-8">
                         <ProductGrid :products="onSale.products.slice(0, 4)" />
                     </div>
