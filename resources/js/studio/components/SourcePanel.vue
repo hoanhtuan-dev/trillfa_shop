@@ -4,7 +4,7 @@ import { useStudioStore } from '../store.js';
 const store = useStudioStore();
 const productOpen = ref(false), uploadOpen = ref(false), products = ref([]), refs = ref([]);
 const fileRef = ref(null);
-const query = ref(''), sortKey = ref('newest'), pquery = ref('');
+const query = ref(''), sortKey = ref('newest'), pquery = ref(''), gridCols = ref(4);
 onMounted(loadRefs);
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
@@ -100,6 +100,10 @@ const filteredProducts = computed(() => {
             </select>
             <svg class="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-300/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </div>
+          <div class="flex h-9 items-center gap-2 rounded-xl border border-ink-700 bg-ink-800/60 px-3" title="Kích thước ô ảnh">
+            <svg class="h-4 w-4 shrink-0 text-cream-300/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <input type="range" min="2" max="8" step="1" v-model.number="gridCols" class="h-1.5 w-24 cursor-pointer accent-brand-500">
+          </div>
         </div>
 
         <button @click="fileRef.click()" class="mb-3 flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-500 hover:bg-brand-600/10 hover:text-brand-200">
@@ -107,10 +111,10 @@ const filteredProducts = computed(() => {
           Tải ảnh mới<span class="text-cream-300/50">(chọn nhiều file được)</span>
         </button>
 
-        <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 grid-cols-2 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+        <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 gap-2.5 overflow-y-auto pr-1" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
           <div v-for="it in sortedRefs" :key="it.name" class="group relative overflow-hidden rounded-xl border transition-colors" :class="isCurrent(it) ? 'border-brand-400 ring-1 ring-brand-400/60' : 'border-ink-700 hover:border-ink-600'" :title="it.name">
             <button @click="pick(it)" class="block w-full text-left">
-              <div class="relative aspect-square bg-ink-950">
+              <div class="relative bg-ink-950" style="aspect-ratio: 1 / 1">
                 <img :src="it.url" class="h-full w-full object-cover" loading="lazy" alt="">
                 <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
                 <span v-else-if="isCurrent(it)" class="absolute left-1.5 top-1.5 rounded-md bg-brand-600/90 px-1.5 py-0.5 text-[9px] font-medium text-white">đang chọn</span>
