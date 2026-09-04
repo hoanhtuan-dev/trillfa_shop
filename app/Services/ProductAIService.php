@@ -73,7 +73,7 @@ class ProductAIService
         foreach (array_values(array_unique($keys)) as $key) {
             $base = dashscope_base_url($key).'/compatible-mode/v1';
             try {
-                $resp = Http::withToken($key)->timeout(45)->post($base.'/chat/completions', [
+                $resp = Http::withToken($key)->timeout(25)->post($base.'/chat/completions', [
                     'model' => $models[0] ?? $this->model,
                     'messages' => [['role' => 'user', 'content' => [
                         ['type' => 'text', 'text' => $prompt],
@@ -104,7 +104,7 @@ class ProductAIService
             $model = studio_config('qwen_vision_model', 'gemini-2.5-flash');
             $b64 = base64_encode(file_get_contents($imagePath));
             try {
-                $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(90)
+                $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(30)
                     ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                         'contents' => [['parts' => [['text' => $prompt], ['inline_data' => ['mime_type' => 'image/jpeg', 'data' => $b64]]]]],
                     ]);
@@ -222,7 +222,7 @@ PROMPT;
     {
         $base = dashscope_base_url($key).'/compatible-mode/v1';
         try {
-            $resp = Http::withToken($key)->timeout(45)->post($base.'/chat/completions', [
+            $resp = Http::withToken($key)->timeout(25)->post($base.'/chat/completions', [
                 'model' => $this->model,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.7,
@@ -246,7 +246,7 @@ PROMPT;
     {
         $model = studio_config('prompt_model', 'gemini-2.5-flash');
         try {
-            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
+            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(30)
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                     'contents' => [['parts' => [['text' => $prompt]]]],
                 ]);
