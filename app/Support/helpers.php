@@ -1038,7 +1038,7 @@ if (! function_exists('product_ai_temperature')) {
 if (! function_exists('product_ai_max_tokens')) {
     function product_ai_max_tokens(): int
     {
-        return max(128, (int) product_ai_config('max_tokens', 1200));
+        return max(128, (int) product_ai_config('max_tokens', 1800));
     }
 }
 

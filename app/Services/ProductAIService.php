@@ -504,13 +504,42 @@ PROMPT;
 
     protected function parseJson(string $text): ?array
     {
-        $text = preg_replace('/```(?:json)?/', '', $text);
+        $text = trim((string) $text);
+        if ($text === '') {
+            return null;
+        }
+
+        // Strip markdown code fences (```json … ``` or ```…```).
+        $text = preg_replace('/^\s*```(?:json)?\s*/i', '', $text);
+        $text = preg_replace('/\s*```\s*$/', '', $text);
+
+        // Extract the first { … } span (models sometimes prefix a note).
         $start = strpos($text, '{');
         $end = strrpos($text, '}');
         if ($start !== false && $end !== false && $end > $start) {
             $text = substr($text, $start, $end - $start + 1);
         }
-        $json = json_decode(trim($text), true);
+
+        $json = json_decode($text, true);
+        if (is_array($json)) {
+            return $json;
+        }
+
+        // Common LLM slip: trailing commas before } or ].
+        $json = json_decode((string) preg_replace('/,\s*([}\]])/', '$1', $text), true);
+        if (is_array($json)) {
+            return $json;
+        }
+
+        // Last resort: unescape lone control characters that break JSON strings.
+        $repaired = preg_replace_callback('/"((?:[^"\\\\]|\\\\.)*)"/s', function ($m) {
+            $inner = (string) $m[1];
+            $inner = str_replace(["\n", "\r", "\t"], ['\\n', '\\r', '\\t'], $inner);
+
+            return '"'.$inner.'"';
+        }, $text);
+        $json = json_decode((string) $repaired, true);
+
         return is_array($json) ? $json : null;
     }
 
