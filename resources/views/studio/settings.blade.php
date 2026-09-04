@@ -361,7 +361,12 @@
                 <div>
                     <label class="label">Timeout mỗi request (giây)</label>
                     <input type="number" name="pai_timeout_seconds" min="1" max="120" value="{{ old('pai_timeout_seconds', product_ai_timeout()) }}" class="input !py-2">
-                    <p class="mt-1 text-xs text-ink-500">Giảm để bỏ qua key/model treo nhanh hơn; tăng nếu model chậm. Giữ nhỏ để job hoàn tất trong cửa sổ poll của form.</p>
+                    <p class="mt-1 text-xs text-ink-500">Giảm để bỏ qua key/model treo nhanh hơn; tăng nếu model chậm.</p>
+                </div>
+                <div>
+                    <label class="label">Trần tổng cho một lần bấm AI (giây)</label>
+                    <input type="number" name="pai_total_budget_seconds" min="5" max="120" value="{{ old('pai_total_budget_seconds', product_ai_total_budget()) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">AI chạy đồng bộ ngay trong request; vượt trần sẽ dừng gọi API và dùng gợi ý offline (luôn có kết quả, không bao giờ 504).</p>
                 </div>
                 <div>
                     <label class="label">Số model thử tối đa / provider</label>

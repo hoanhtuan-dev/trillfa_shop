@@ -25,6 +25,7 @@ class ProductAIService
 {
     protected array $providers;
     protected int $timeout;
+    protected int $totalBudget;
     protected int $maxModels;
     protected int $maxKeys;
     protected int $downscaleMax;
@@ -32,16 +33,33 @@ class ProductAIService
     protected float $temperature;
     protected int $maxTokens;
 
+    /** Hard wall-clock deadline for the current attempt (sync request must never 504). */
+    private float $deadline = 0.0;
+
     public function __construct()
     {
         $this->providers = product_ai_providers();
         $this->timeout = product_ai_timeout();
+        $this->totalBudget = product_ai_total_budget();
         $this->maxModels = product_ai_max_models();
         $this->maxKeys = product_ai_max_keys();
         $this->downscaleMax = product_ai_downscale_max();
         $this->cacheTtl = product_ai_cache_ttl();
         $this->temperature = product_ai_temperature();
         $this->maxTokens = product_ai_max_tokens();
+    }
+
+    private function timedOut(): bool
+    {
+        return $this->deadline > 0.0 && microtime(true) >= $this->deadline;
+    }
+
+    /** Remaining seconds for the next HTTP call, clamped to the per-call timeout. */
+    private function remainingTimeout(): int
+    {
+        $left = (int) floor($this->deadline - microtime(true));
+
+        return max(1, min($this->timeout, $left));
     }
 
     // ------------------------------------------------------------- stage 1: vision
@@ -195,7 +213,12 @@ class ProductAIService
             return null;
         }
 
+        $this->deadline = microtime(true) + $this->totalBudget;
+
         foreach ($this->providers as $provider) {
+            if ($this->timedOut()) {
+                return null;
+            }
             $result = $provider === 'qwen'
                 ? $this->attemptQwen($kind, $prompt, $imagePath)
                 : $this->attemptGemini($kind, $prompt, $imagePath);
@@ -226,8 +249,14 @@ class ProductAIService
         $keys = array_slice($keys, 0, $this->maxKeys);
 
         foreach ($keys as $key) {
+            if ($this->timedOut()) {
+                return null;
+            }
             $base = dashscope_base_url($key).'/compatible-mode/v1';
             foreach ($models as $model) {
+                if ($this->timedOut()) {
+                    return null;
+                }
                 $content = $imagePath !== null
                     ? [
                         ['type' => 'text', 'text' => $prompt],
@@ -236,7 +265,7 @@ class ProductAIService
                     : $prompt;
 
                 try {
-                    $resp = Http::withToken($key)->timeout($this->timeout)->post($base.'/chat/completions', [
+                    $resp = Http::withToken($key)->timeout($this->remainingTimeout())->post($base.'/chat/completions', [
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => $content]],
                         'temperature' => $this->temperature,
@@ -278,6 +307,10 @@ class ProductAIService
             return null;
         }
 
+        if ($this->timedOut()) {
+            return null;
+        }
+
         $model = $kind === 'vision' ? product_ai_gemini_vision_model() : product_ai_gemini_text_model();
         $parts = [['text' => $prompt]];
         if ($imagePath !== null) {
@@ -286,7 +319,7 @@ class ProductAIService
         }
 
         try {
-            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($this->timeout + 3)
+            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(min($this->timeout + 3, $this->remainingTimeout()))
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                     'contents' => [['parts' => $parts]],
                 ]);

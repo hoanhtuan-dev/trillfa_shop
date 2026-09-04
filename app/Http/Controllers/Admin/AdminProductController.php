@@ -133,12 +133,24 @@ class AdminProductController extends Controller
             $imagePath = $this->resolveImagePath($data['image_url']);
         }
 
-        // Run in the queue worker so the HTTP request never blocks on slow /
-        // rate-limited LLM calls (no 504 on shared hosting). Frontend polls.
-        $token = (string) \Illuminate\Support\Str::uuid();
-        \App\Jobs\GenerateProductSuggestion::dispatch($token, $data, $imagePath, (bool) ($data['force'] ?? false));
+        // Run INLINE (synchronous) with a hard total budget inside ProductAIService:
+        // qwen3.8-flash works fast, and the bounded attempts + per-call timeout +
+        // wall-clock deadline guarantee a result well under the gateway 504 limit.
+        // This removes the fragile queue-worker + poll dependency on shared hosting.
+        @set_time_limit(90);
 
-        return response()->json(['ok' => true, 'token' => $token]);
+        /** @var \App\Services\ProductAIService $service */
+        $service = app(\App\Services\ProductAIService::class);
+        if ($imagePath && is_file($imagePath)) {
+            $result = $service->generateFromImage($data, $imagePath, (bool) ($data['force'] ?? false));
+        } else {
+            $result = $service->generate($data, null);
+        }
+        $result['source'] ??= 'stub';
+        $result['model'] = $result['model'] ?? (string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
+        $result['provider'] = $result['provider'] ?? (string) studio_config('prompt_provider', 'qwen');
+
+        return response()->json(['status' => 'done', 'data' => $result]);
     }
 
     public function aiSuggestPoll(Request $request)

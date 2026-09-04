@@ -48,9 +48,7 @@ const selImages = ref([]);
 // Image the AI should look at: cover (existing or Studio-chosen), else first gallery image.
 const aiImageUrl = computed(() => coverUrl.value || product?.image || studioGallery.value[0] || '');
 
-// ---------- AI suggest (vision + iterative enrichment) — queue + poll ----------
-function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-
+// ---------- AI suggest (vision + iterative enrichment) — inline ----------
 function applyResult(r) {
     const d = r?.data || r || {};
     if (d.suggested_name) form.name = d.suggested_name;
@@ -68,6 +66,7 @@ async function aiSuggest() {
     aiMsg.value = '';
     aiState.value = aiImageUrl.value ? 'analyzing' : 'suggesting';
     try {
+        // Server runs the AI inline (bounded budget) and returns the result directly.
         const res = await apiFetch('/admin/products/ai-suggest', {
             method: 'POST',
             body: {
@@ -80,33 +79,19 @@ async function aiSuggest() {
                 force: forceReanalyze.value,
             },
         });
-        const token = res?.token;
-        if (!token) {
-            aiMsg.value = 'Không nhận được phiên AI.';
+        if (!res || res.status !== 'done' || !res.data) {
+            aiMsg.value = 'AI không trả kết quả — thử lại sau.';
             return;
         }
-        // Poll the background job until done (or ~3min).
-        const start = Date.now();
-        let done = null;
-        while (Date.now() - start < 180000) {
-            aiState.value = 'suggesting';
-            await sleep(1600);
-            const p = await apiFetch('/admin/products/ai-suggest/poll?token=' + encodeURIComponent(token));
-            if (p.status === 'done') { done = p; break; }
-        }
-        if (!done) {
-            aiMsg.value = 'AI đang bận/quá lâu — thử lại sau.';
-            return;
-        }
-        const d = applyResult(done);
+        const d = applyResult(res);
         if (d.source === 'stub') {
-            aiMsg.value = 'AI chưa cấu hình key hoặc hết quota — dùng gợi ý mẫu.';
+            aiMsg.value = 'AI chưa có key hoặc hết quota — dùng gợi ý mẫu (offline).';
         } else {
-            aiMsg.value = 'Đã làm giàu bằng ' + ai.model + (d.image_analyzed ? ' · ảnh: nhìn ảnh' : '');
+            aiMsg.value = 'Đã làm giàu bằng ' + (d.model || ai.model) + (d.image_analyzed ? ' · nhìn ảnh' : '');
         }
         forceReanalyze.value = false;
     } catch (e) {
-        aiMsg.value = e.message;
+        aiMsg.value = e.message || 'AI đang bận/quá lâu — thử lại sau.';
     } finally {
         aiLoading.value = false;
         aiState.value = '';

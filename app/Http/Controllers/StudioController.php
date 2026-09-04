@@ -3653,6 +3653,7 @@ RULES:
             'pai_gemini_text_model' => ['nullable', 'string', 'max:255'],
             'pai_gemini_vision_model' => ['nullable', 'string', 'max:255'],
             'pai_timeout_seconds' => ['nullable', 'integer', 'min:1', 'max:120'],
+            'pai_total_budget_seconds' => ['nullable', 'integer', 'min:5', 'max:120'],
             'pai_max_models' => ['nullable', 'integer', 'min:1', 'max:10'],
             'pai_max_keys' => ['nullable', 'integer', 'min:1', 'max:10'],
             'pai_downscale_max' => ['nullable', 'integer', 'min:64', 'max:4096'],
@@ -3668,6 +3669,7 @@ RULES:
         set_setting('product_ai_gemini_text_model', $data['pai_gemini_text_model'] ?? '');
         set_setting('product_ai_gemini_vision_model', $data['pai_gemini_vision_model'] ?? '');
         if (isset($data['pai_timeout_seconds'])) set_setting('product_ai_timeout_seconds', (string) $data['pai_timeout_seconds']);
+        if (isset($data['pai_total_budget_seconds'])) set_setting('product_ai_total_budget_seconds', (string) $data['pai_total_budget_seconds']);
         if (isset($data['pai_max_models'])) set_setting('product_ai_max_models', (string) $data['pai_max_models']);
         if (isset($data['pai_max_keys'])) set_setting('product_ai_max_keys', (string) $data['pai_max_keys']);
         if (isset($data['pai_downscale_max'])) set_setting('product_ai_downscale_max', (string) $data['pai_downscale_max']);

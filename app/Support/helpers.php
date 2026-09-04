@@ -1000,6 +1000,13 @@ if (! function_exists('product_ai_max_models')) {
     }
 }
 
+if (! function_exists('product_ai_total_budget')) {
+    function product_ai_total_budget(): int
+    {
+        return max(5, (int) product_ai_config('total_budget_seconds', 45));
+    }
+}
+
 if (! function_exists('product_ai_max_keys')) {
     function product_ai_max_keys(): int
     {
