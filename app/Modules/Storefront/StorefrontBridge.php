@@ -288,6 +288,36 @@ class StorefrontBridge
     }
 
     /**
+     * Account dashboard payload (auth route).
+     */
+    public function accountDashboard(): array
+    {
+        $user = auth()->user();
+
+        return array_merge($this->base(), [
+            'user' => [
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+            ],
+            'orders' => $user->orders()->withCount('items')->latest()->limit(5)->get()->map(fn ($o) => [
+                'id' => $o->id,
+                'order_number' => $o->order_number,
+                'total' => (float) $o->total,
+                'status' => $o->status,
+                'created_at' => $o->created_at?->format('d/m/Y'),
+                'items_count' => $o->items_count,
+                'url' => $o->user_id ? route('account.order', $o) : '#',
+            ])->values()->all(),
+            'counts' => [
+                'orders' => $user->orders()->count(),
+                'addresses' => $user->addresses()->count(),
+                'wishlist' => $user->wishlistProducts()->count(),
+            ],
+        ]);
+    }
+
+    /**
      * Return saved products for the wishlist (client passes the persisted ids).
      */
     public function wishlistProducts(array $ids): array

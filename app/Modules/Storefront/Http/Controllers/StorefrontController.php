@@ -85,6 +85,16 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Account dashboard — renders the Vue account SPA (auth).
+     */
+    public function accountDashboard()
+    {
+        seo()->title('Tài khoản | '.setting('site_name'));
+
+        return view('storefront.account', ['boot' => $this->bridge->accountDashboard()]);
+    }
+
+    /**
      * Auth page (login/register) — renders the Vue auth SPA. Submission posts
      * natively to the existing AuthController login/register endpoints.
      */

@@ -33,6 +33,10 @@ Route::middleware('web')->group(function () {
     Route::get('/thanh-toan', [StorefrontController::class, 'checkout'])
         ->name('checkout.show')->middleware('auth');
 
+    // Account dashboard (auth).
+    Route::get('/tai-khoan', [StorefrontController::class, 'accountDashboard'])
+        ->name('account.dashboard')->middleware('auth');
+
     // Auth (submission posts to the legacy POST /dang-nhap, /dang-ky).
     Route::get('/dang-nhap', [StorefrontController::class, 'auth'])
         ->defaults('mode', 'login')->name('login')->middleware('guest');
