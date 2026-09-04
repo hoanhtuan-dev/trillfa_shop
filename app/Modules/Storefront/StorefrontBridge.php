@@ -442,6 +442,59 @@ class StorefrontBridge
             ->get()->map(fn ($p) => $this->product($p))->values()->all();
     }
 
+    /**
+     * Static content page (about/contact/faq/privacy/terms). Content is pulled
+     * from settings; custom /trang/{slug} pages via the CustomPage model.
+     */
+    public function staticPage(string $key, ?string $slug = null): array
+    {
+        $map = [
+            'about' => [
+                'title' => setting('about_heading', 'Thời trang cho người Việt hiện đại'),
+                'intro' => setting('about_intro', 'Trillfa Fa ra đời với khát vọng mang đến trải nghiệm mua sắm trực tuyến tối giản, tinh tế nhưng đầy cảm hứng — nơi mỗi sản phẩm đều là một lựa chọn phong cách cho cuộc sống của bạn.'),
+                'image' => setting('about_image') ? asset_image(setting('about_image')) : null,
+                'body' => setting('about_body', ''),
+            ],
+            'contact' => [
+                'title' => 'Liên hệ với chúng tôi',
+                'intro' => 'Chúng tôi luôn sẵn sàng hỗ trợ bạn.',
+                'body' => '',
+            ],
+            'faq' => [
+                'title' => 'Câu hỏi thường gặp',
+                'intro' => 'Giải đáp các câu hỏi thường gặp về mua sắm tại Trillfa Fa.',
+                'body' => setting('faq_body', ''),
+            ],
+            'privacy' => [
+                'title' => 'Chính sách bảo mật',
+                'intro' => 'Chúng tôi cam kết bảo vệ thông tin cá nhân của bạn.',
+                'body' => setting('privacy_body', ''),
+            ],
+            'terms' => [
+                'title' => 'Điều khoản sử dụng',
+                'intro' => 'Vui lòng đọc kỹ điều khoản trước khi sử dụng dịch vụ.',
+                'body' => setting('terms_body', ''),
+            ],
+        ];
+
+        if ($slug) {
+            $page = \App\Models\CustomPage::where('slug', $slug)->where('is_active', true)->first();
+            if (! $page) {
+                abort(404);
+            }
+            $pageData = [
+                'title' => $page->hero_heading ?: $page->title,
+                'intro' => $page->excerpt ?: '',
+                'image' => $page->hero_image_url ?? null,
+                'body' => $page->hero_content ?: $page->body,
+            ];
+        } else {
+            $pageData = $map[$key] ?? ['title' => 'Trang', 'intro' => '', 'body' => ''];
+        }
+
+        return array_merge($this->base(), ['key' => $key, 'page' => $pageData]);
+    }
+
     // ---------------------------------------------------------------- sections
 
     public function site(): array

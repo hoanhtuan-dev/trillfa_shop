@@ -139,6 +139,19 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Static content page — renders the Vue static SPA.
+     */
+    public function staticPage(string $key, ?string $slug = null)
+    {
+        $payload = $this->bridge->staticPage($key, $slug);
+        $title = $payload['page']['title'] ?? 'Trang';
+
+        seo()->title($title.' | '.setting('site_name'))->description($payload['page']['intro'] ?? '');
+
+        return view('storefront.static', ['boot' => $payload]);
+    }
+
+    /**
      * Auth page (login/register) — renders the Vue auth SPA. Submission posts
      * natively to the existing AuthController login/register endpoints.
      */

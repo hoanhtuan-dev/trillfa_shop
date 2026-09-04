@@ -200,15 +200,10 @@ Route::prefix('blog')->name('blog.')->group(function () {
     Route::get('/danh-muc/{slug}', [BlogController::class, 'category'])->name('category');
 });
 
-// Static pages
-Route::get('/gioi-thieu', [PageController::class, 'about'])->name('page.about');
-Route::get('/lien-he', [PageController::class, 'contact'])->name('page.contact');
+// Static pages (GET routes owned by the Storefront module; keep submit action).
 Route::post('/lien-he', [PageController::class, 'sendContact'])->name('page.contact.send');
 Route::post('/dang-ky-ban-tin', [NewsletterController::class, 'subscribe'])->name('newsletter.subscribe');
-Route::get('/trang/{slug}', [PageController::class, 'show'])->name('page.show');
-Route::get('/hoi-dap', [PageController::class, 'faq'])->name('page.faq');
-Route::get('/chinh-sach-bao-mat', [PageController::class, 'privacy'])->name('page.privacy');
-Route::get('/dieu-khoan', [PageController::class, 'terms'])->name('page.terms');
+// (static page GET routes are owned by the Storefront module)
 
 // API (cart / coupon / search) — JSON
 Route::prefix('api')->name('api.')->group(function () {

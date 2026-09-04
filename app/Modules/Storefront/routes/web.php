@@ -44,6 +44,14 @@ Route::middleware('web')->group(function () {
         Route::get('/mat-khau', [StorefrontController::class, 'accountPassword'])->name('password');
     });
 
+    // Static content pages.
+    Route::get('/gioi-thieu', [StorefrontController::class, 'staticPage'])->defaults('key', 'about')->name('page.about');
+    Route::get('/lien-he', [StorefrontController::class, 'staticPage'])->defaults('key', 'contact')->name('page.contact');
+    Route::get('/hoi-dap', [StorefrontController::class, 'staticPage'])->defaults('key', 'faq')->name('page.faq');
+    Route::get('/chinh-sach-bao-mat', [StorefrontController::class, 'staticPage'])->defaults('key', 'privacy')->name('page.privacy');
+    Route::get('/dieu-khoan', [StorefrontController::class, 'staticPage'])->defaults('key', 'terms')->name('page.terms');
+    Route::get('/trang/{slug}', [StorefrontController::class, 'staticPage'])->name('page.show');
+
     // Auth (submission posts to the legacy POST /dang-nhap, /dang-ky).
     Route::get('/dang-nhap', [StorefrontController::class, 'auth'])
         ->defaults('mode', 'login')->name('login')->middleware('guest');

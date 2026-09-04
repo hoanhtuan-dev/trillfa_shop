@@ -144,7 +144,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CAV-qT7D.css",
+    "file": "assets/app-DNwoU6pr.css",
     "name": "app",
     "names": [
       "app.css"
@@ -261,6 +261,16 @@
     ],
     "css": [
       "assets/shop-BTnFaxj8.css"
+    ]
+  },
+  "resources/js/storefront/static.js": {
+    "file": "assets/static-Cn7PElQd.js",
+    "name": "static",
+    "src": "resources/js/storefront/static.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-9imU3GMs.js",
+      "_StorefrontLayout-p3AJkv3O.js"
     ]
   },
   "resources/js/storefront/wishlist.js": {
