@@ -204,11 +204,9 @@ Route::get('/garment/{id}/thumb', [StudioController::class, 'garmentThumb'])->na
 // Public studio image endpoint — phục vụ ảnh upload từ storage (không phụ thuộc symlink).
 Route::get('/studio/image/{path}', [StudioController::class, 'studioImage'])->where('path', '.*')->name('studio.image');
 
-// Blog
+// Blog category filter only — index + show are owned by the Storefront module.
 Route::prefix('blog')->name('blog.')->group(function () {
-    Route::get('/', [BlogController::class, 'index'])->name('index');
     Route::get('/danh-muc/{slug}', [BlogController::class, 'category'])->name('category');
-    Route::get('/{slug}', [BlogController::class, 'show'])->name('show');
 });
 
 // Static pages

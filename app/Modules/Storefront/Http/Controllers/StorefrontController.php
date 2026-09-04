@@ -85,6 +85,35 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Blog index — renders the Vue blog SPA.
+     */
+    public function blogIndex()
+    {
+        seo()->title('Blog | '.setting('site_name'))->canonical(route('blog.index'));
+
+        return view('storefront.blog', ['boot' => $this->bridge->blogIndex()]);
+    }
+
+    /**
+     * Blog single post — renders the Vue blog-post SPA.
+     */
+    public function blogPost(string $slug)
+    {
+        try {
+            $payload = $this->bridge->blogPost($slug);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            abort(404);
+        }
+
+        seo()->title($payload['post']['title'].' | '.setting('site_name'))
+            ->description($payload['post']['excerpt'])
+            ->canonical(route('blog.show', $slug))
+            ->image($payload['post']['image']);
+
+        return view('storefront.blog-post', ['boot' => $payload]);
+    }
+
+    /**
      * Product detail page — renders the Vue product SPA.
      */
     public function product(string $slug)

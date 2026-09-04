@@ -21,6 +21,10 @@ Route::middleware('web')->group(function () {
     // Cart.
     Route::get('/gio-hang', [StorefrontController::class, 'cart'])->name('cart.show');
 
+    // Blog.
+    Route::get('/blog', [StorefrontController::class, 'blogIndex'])->name('blog.index');
+    Route::get('/blog/{slug}', [StorefrontController::class, 'blogPost'])->name('blog.show');
+
     // Shop listing (all products + per-category).
     Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
     Route::get('/danh-muc/{categorySlug}', [StorefrontController::class, 'shop'])->name('shop.category');

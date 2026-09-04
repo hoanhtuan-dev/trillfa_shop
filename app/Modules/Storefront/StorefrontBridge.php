@@ -198,6 +198,52 @@ class StorefrontBridge
         ];
     }
 
+    /**
+     * Blog index payload for the Vue blog SPA.
+     */
+    public function blogIndex(): array
+    {
+        $posts = Post::published()->with('author', 'category')->latest()->paginate(9);
+
+        return array_merge($this->base(), [
+            'posts' => $posts->getCollection()->map(fn (Post $p) => [
+                'id' => $p->id,
+                'title' => $p->title,
+                'slug' => $p->slug,
+                'url' => route('blog.show', $p->slug),
+                'excerpt' => $p->excerpt,
+                'image' => $this->image($p->image),
+                'category' => $p->category?->name,
+                'published_at' => $p->published_at?->format('d/m/Y'),
+                'reading_time' => $p->reading_time,
+            ])->values()->all(),
+            'total' => $posts->total(),
+            'last_page' => $posts->lastPage(),
+        ]);
+    }
+
+    /**
+     * Blog single-post payload.
+     */
+    public function blogPost(string $slug): array
+    {
+        $post = Post::where('slug', $slug)->published()->with('author', 'category')->firstOrFail();
+
+        return array_merge($this->base(), [
+            'post' => [
+                'title' => $post->title,
+                'slug' => $post->slug,
+                'excerpt' => $post->excerpt,
+                'body' => $post->body,
+                'image' => $this->image($post->image),
+                'category' => $post->category?->name,
+                'published_at' => $post->published_at?->format('d/m/Y'),
+                'reading_time' => $post->reading_time,
+                'author' => $post->author?->name,
+            ],
+        ]);
+    }
+
     // ---------------------------------------------------------------- sections
 
     public function site(): array
