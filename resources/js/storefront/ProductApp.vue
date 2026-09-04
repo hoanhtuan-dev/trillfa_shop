@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useStorefrontStore } from './store.js';
 import { formatMoney } from './composables/useFormat.js';
+import { useRecentlyViewed } from './composables/useRecentlyViewed.js';
 import StorefrontLayout from './components/layout/StorefrontLayout.vue';
 import ProductCard from './components/home/ProductCard.vue';
 import SectionHeading from './components/ui/SectionHeading.vue';
@@ -52,7 +53,21 @@ function toggleWishlist() { store.toggleWishlist(product.id); }
 
 const ratingText = computed(() => (product.rating_avg ? product.rating_avg.toFixed(1) : ''));
 
-onMounted(() => store.fetchCart());
+// Free-shipping progress (based on current cart subtotal).
+const freeShipThreshold = computed(() => Number(store.site.free_shipping_threshold || 0));
+const freeShipProgress = computed(() => {
+    if (!freeShipThreshold.value) return 0;
+    return Math.min(100, Math.round((store.cart.subtotal / freeShipThreshold.value) * 100));
+});
+const remainingForFree = computed(() => {
+    if (!freeShipThreshold.value) return 0;
+    return Math.max(0, freeShipThreshold.value - store.cart.subtotal);
+});
+
+onMounted(() => {
+    store.fetchCart();
+    useRecentlyViewed().add(product);
+});
 </script>
 
 <template>
@@ -110,6 +125,17 @@ onMounted(() => store.fetchCart());
                     </div>
 
                     <p v-if="product.short_description" class="mt-5 leading-relaxed text-ink-700">{{ product.short_description }}</p>
+
+                    <!-- Free-shipping progress -->
+                    <div v-if="freeShipThreshold" class="mt-5 rounded-2xl border border-cream-200 bg-white/60 p-3">
+                        <p class="text-xs text-ink-500">
+                            <template v-if="remainingForFree > 0">Mua thêm <span class="font-semibold text-brand-700">{{ formatMoney(remainingForFree) }}</span> để được miễn phí vận chuyển.</template>
+                            <template v-else>🎉 Bạn đủ điều kiện miễn phí vận chuyển!</template>
+                        </p>
+                        <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-cream-200">
+                            <div class="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-500 transition-all" :style="{ width: freeShipProgress + '%' }"></div>
+                        </div>
+                    </div>
 
                     <!-- Variants -->
                     <div v-if="product.variants && product.variants.length" class="mt-6">

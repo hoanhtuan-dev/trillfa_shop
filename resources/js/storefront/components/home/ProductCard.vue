@@ -74,18 +74,23 @@ function addToCart() {
             </button>
 
             <!-- Hover quick-add overlay (desktop) -->
-            <div class="absolute inset-x-3 bottom-3 hidden translate-y-3 flex-col gap-1.5 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 sm:flex">
+            <div class="absolute inset-x-3 bottom-3 hidden translate-y-3 items-center gap-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 sm:flex">
                 <button
                     v-if="product.in_stock"
                     @click.prevent.stop="addToCart"
-                    class="sf-btn sf-btn-primary w-full !py-2.5 shadow-xl"
+                    class="sf-btn sf-btn-primary flex-1 !py-2.5 shadow-xl"
                 >
                     <Icon name="cart" :size="17" />
                     Thêm nhanh
                 </button>
-                <span class="rounded-full bg-ink-900/70 py-2 text-center text-xs font-semibold text-cream-50 backdrop-blur">
-                    Xem chi tiết
-                </span>
+                <button
+                    @click.prevent.stop="store.quickViewProduct = product"
+                    class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink-900/70 text-cream-50 shadow-lg backdrop-blur transition hover:bg-brand-600"
+                    title="Xem nhanh"
+                    aria-label="Xem nhanh"
+                >
+                    <Icon name="eye" :size="18" />
+                </button>
             </div>
 
             <!-- Mobile always-on add button -->

@@ -1244,7 +1244,7 @@ export const useStudioStore = defineStore('studio', {
       const p = this.inpaintMaskPointer(e); if (!p) return;
       const pts = this.inpaintFreehandPoints;
       const last = pts[pts.length - 1];
-      if (last && Math.hypot(p.nx - last.nx, p.ny - last.ny) < 0.004) return;
+      if (last && Math.hypot(p.nx - last.nx, p.ny - last.ny) < 0.002) return;
       pts.push(p);
     },
     freehandStop() {
@@ -1491,7 +1491,10 @@ export const useStudioStore = defineStore('studio', {
       const mctx = mask.getContext('2d');
       const out = mctx.createImageData(w, h);
       for (let i = 0; i < w * h; i++) {
-        const v = src.data[i * 4 + 3] > 40 ? 0 : 255;
+        // Grayscale mask chống răng cưa: nét đỏ 60% (alpha≈153) chuẩn hoá → đen(0=edit),
+        // mép anti-aliased cho gray chuyển mềm, nền chưa vẽ → trắng(255=keep).
+        const a = src.data[i * 4 + 3];
+        const v = 255 - Math.min(255, Math.round(a * (255 / 153)));
         out.data[i * 4] = v; out.data[i * 4 + 1] = v; out.data[i * 4 + 2] = v; out.data[i * 4 + 3] = 255;
       }
       mctx.putImageData(out, 0, 0);

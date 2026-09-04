@@ -225,7 +225,7 @@ function onTouchEnd(e) {
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative flex h-full flex-col overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
           <!-- ══ Toolbar dock (phía trên, full width) ══ -->
-          <div class="relative z-40 flex min-h-12 shrink-0 items-center justify-center gap-2 overflow-x-auto overflow-y-hidden border-b border-ink-700/60 bg-ink-900/70 px-3 py-1.5">
+          <div class="relative z-40 flex min-h-12 shrink-0 items-center justify-center gap-2 overflow-x-auto overflow-y-hidden border-b border-ink-700/40 px-3 py-1.5">
             <ContextToolbar />
           </div>
           <!-- ══ Vùng canvas (dưới dock) ══ -->

@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useStorefrontStore } from './store.js';
 import { apiFetch, csrfToken } from './composables/useApi.js';
 import { formatMoney } from './composables/useFormat.js';
+import { trackBeginCheckout } from './composables/useAnalytics.js';
 import StorefrontLayout from './components/layout/StorefrontLayout.vue';
 import Icon from './components/ui/Icon.vue';
 
@@ -55,7 +56,10 @@ function onSubmit() {
     }
 }
 
-onMounted(() => { store.fetchCart(); });
+onMounted(() => {
+    store.fetchCart();
+    trackBeginCheckout(store.cart);
+});
 </script>
 
 <template>

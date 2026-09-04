@@ -6,6 +6,7 @@ import Footer from '../footer/Footer.vue';
 import MobileMenu from '../nav/MobileMenu.vue';
 import CartDrawer from '../cart/CartDrawer.vue';
 import ToastHost from '../ui/ToastHost.vue';
+import QuickViewModal from '../home/QuickViewModal.vue';
 import Icon from '../ui/Icon.vue';
 
 const store = useStorefrontStore();
@@ -58,6 +59,7 @@ const active = computed(() => path);
 
         <MobileMenu />
         <CartDrawer />
+        <QuickViewModal v-if="store.quickViewProduct" :product="store.quickViewProduct" @close="store.quickViewProduct = null" />
         <ToastHost />
     </div>
 </template>

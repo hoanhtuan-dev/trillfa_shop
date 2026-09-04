@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { apiFetch } from './composables/useApi.js';
+import { trackAddToCart } from './composables/useAnalytics.js';
 
 const WISHLIST_KEY = 'trillfa_wishlist';
 
@@ -35,6 +36,7 @@ export const useStorefrontStore = defineStore('storefront', {
         cartOpen: false,
         menuOpen: false,
         searchOpen: false,
+        quickViewProduct: null,
 
         // Cart
         cart: {
@@ -105,7 +107,7 @@ export const useStorefrontStore = defineStore('storefront', {
             this.cart.coupon = data.coupon || null;
         },
 
-        async addToCart(productId, quantity = 1) {
+        async addToCart(productId, quantity = 1, product = null) {
             this.cart.adding = true;
             try {
                 await apiFetch('/api/cart/add', {
@@ -115,6 +117,7 @@ export const useStorefrontStore = defineStore('storefront', {
                 await this.fetchCart();
                 this.toast('Đã thêm vào giỏ hàng');
                 this.openCart();
+                trackAddToCart(product || { id: productId, name: 'Sản phẩm', price: 0 }, quantity);
             } catch (e) {
                 this.toast(e.message, 'error');
             } finally {

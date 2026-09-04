@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue';
 import { useStorefrontStore } from './store.js';
 import { csrfToken } from './composables/useApi.js';
 import { formatMoney } from './composables/useFormat.js';
+import { trackPurchase } from './composables/useAnalytics.js';
 import StorefrontLayout from './components/layout/StorefrontLayout.vue';
 import Icon from './components/ui/Icon.vue';
 
@@ -15,7 +16,10 @@ const order = boot.order || {};
 const isPay = computed(() => view === 'pay');
 const pmLabel = computed(() => ({ cod:'Thanh toán khi nhận hàng (COD)', bank:'Chuyển khoản ngân hàng', vnpay:'VNPay', momo:'Ví MoMo' }[order.payment_method] || order.payment_method));
 
-onMounted(() => store.fetchCart());
+onMounted(() => {
+    store.fetchCart();
+    if (view === 'success') trackPurchase(order);
+});
 </script>
 
 <template>

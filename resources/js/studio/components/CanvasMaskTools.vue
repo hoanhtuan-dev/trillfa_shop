@@ -118,7 +118,7 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
 <template>
   <div v-if="visible" class="absolute inset-0 z-31 select-none" :class="editing ? 'cursor-crosshair' : 'cursor-default'"
        style="touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;"
-       @pointerdown="onPointerDown" @contextmenu.prevent @dragstart.prevent>
+       @pointerdown="onPointerDown" @wheel.prevent="store.wheelZoom($event)" @contextmenu.prevent @dragstart.prevent>
     <!-- Brush overlay canvas: hiển thị nét vẽ mask (đỏ 60%) ngay trên ảnh khi ĐANG vẽ -->
     <canvas v-if="store.inpaintMaskMode === 'brush' && store.upscaleSrc" ref="brushCanvas"
             :width="brushCanvasSize.width" :height="brushCanvasSize.height"

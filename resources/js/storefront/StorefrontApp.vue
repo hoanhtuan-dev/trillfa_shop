@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useStorefrontStore } from './store.js';
+import { useRecentlyViewed } from './composables/useRecentlyViewed.js';
 
 import StorefrontLayout from './components/layout/StorefrontLayout.vue';
 import SkeletonCard from './components/ui/SkeletonCard.vue';
@@ -28,6 +29,7 @@ const onSale = computed(() => boot.value.on_sale || { enabled: false, products: 
 const bestsellers = computed(() => boot.value.bestsellers || { enabled: false, products: [] });
 const blog = computed(() => boot.value.blog || { enabled: false, posts: [] });
 const cta = computed(() => boot.value.cta || { enabled: false });
+const recent = useRecentlyViewed().recentlyViewed;
 </script>
 
 <template>
@@ -112,6 +114,20 @@ const cta = computed(() => boot.value.cta || { enabled: false });
             />
             <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <BlogCard v-for="p in blog.posts" :key="p.id" :post="p" />
+            </div>
+        </section>
+
+        <!-- Recently viewed -->
+        <section v-if="recent.length" v-reveal class="sf-container py-8 sm:py-12">
+            <SectionHeading kicker="Đã xem" title="Bạn đã xem" />
+            <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+                <a v-for="p in recent" :key="p.id" :href="p.url" class="group card-surface card-surface-hover overflow-hidden rounded-[1.75rem]">
+                    <img :src="p.image" :alt="p.name" class="aspect-[4/5] w-full object-cover" loading="lazy" />
+                    <div class="p-3">
+                        <p class="line-clamp-1 text-sm font-medium text-ink-900">{{ p.name }}</p>
+                        <p class="mt-1 text-sm font-semibold text-ink-900">{{ new Intl.NumberFormat('vi-VN').format(p.price || 0) }}₫</p>
+                    </div>
+                </a>
             </div>
         </section>
 
