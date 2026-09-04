@@ -162,10 +162,10 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
            :style="{ ...fullImageStyle, opacity: 0.65 }" alt="Vùng đã vẽ" />
     </div>
 
-    <!-- ══ Toolbar góc trên-trái ══ -->
-    <div class="pointer-events-none absolute left-3 top-3 z-20 flex">
+    <!-- ══ Toolbar ngữ cảnh (phía trên, căn giữa) ══ -->
+    <div class="pointer-events-none absolute top-3 left-1/2 z-20 flex max-w-[94%] -translate-x-1/2">
       <!-- Đang chỉnh: công cụ -->
-      <div v-if="editing" class="pointer-events-auto flex items-center gap-1.5 rounded-full bg-ink-900/95 px-2 py-1 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
+      <div v-if="editing" class="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-full bg-ink-900/95 px-3 py-1.5 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
         <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand'">
           <span class="px-1 text-[10px] font-medium text-cream-300/70">
             {{ store.inpaintMaskMode === 'freehand' ? '✏️ Vẽ tự do — kéo chuột để khoanh vùng' : (hasBox ? ('▭ ' + Math.round((store.inpaintMaskBox.w || 0) * 100) + '% × ' + Math.round((store.inpaintMaskBox.h || 0) * 100) + '%') : '▭ Kéo chọn vùng cần sửa') }}
@@ -201,15 +201,15 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
         <button @click.stop="store.clearInpaintMask()" @pointerdown.stop class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ mask hiện tại">✕</button>
       </div>
       <!-- Đã lưu: nút Chỉnh lại / Bỏ -->
-      <div v-else class="pointer-events-auto flex items-center gap-1.5 rounded-full bg-ink-900/95 px-2 py-1 text-xs font-semibold shadow-xl ring-1 ring-emerald-500/40">
+      <div v-else class="pointer-events-auto flex items-center gap-2 rounded-full bg-ink-900/95 px-3 py-1.5 text-xs font-semibold shadow-xl ring-1 ring-emerald-500/40">
         <span class="px-1 text-[10px] font-medium text-emerald-200">✅ Đã lưu vùng</span>
         <button @click.stop="store.toggleInpaintMask(store._inpaintMaskKind)" @pointerdown.stop class="rounded-full bg-white/10 px-2 py-0.5 text-cream-100 transition-colors hover:bg-white/20" title="Mở lại để chỉnh sửa">✏️ Chỉnh lại</button>
         <button @click.stop="store.clearInpaintMask()" @pointerdown.stop class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ mask">✕</button>
       </div>
     </div>
 
-    <!-- Hint dưới mép trái -->
-    <div v-if="editing" class="pointer-events-none absolute bottom-3 left-3 z-20 flex">
+    <!-- Hint phía dưới, căn giữa -->
+    <div v-if="editing" class="pointer-events-none absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2">
       <div class="rounded-full bg-ink-900/85 px-2.5 py-0.5 text-[10px] font-medium text-cream-300/70">
         {{ store.inpaintMaskMode === 'rect' ? 'Kéo khung để di chuyển · kéo góc để chỉnh · Esc hủy' : (store.inpaintErase ? 'Tẩy nét — sửa chỗ vẽ lỡ' : (store.inpaintBrushData ? '✅ Đã vẽ · Ctrl+Z hoàn tác' : 'Vẽ lên vùng cần sửa · Esc hủy')) }}
       </div>

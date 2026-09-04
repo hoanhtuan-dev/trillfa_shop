@@ -153,6 +153,8 @@ export const useStudioStore = defineStore('studio', {
     showBatch: false,
     canvasLayers: [],
     activeLayerId: '',
+    undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
+    redoStack: [],   // lịch sử làm lại
   }),
   getters: {
     upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
@@ -813,27 +815,37 @@ export const useStudioStore = defineStore('studio', {
     eraseBrushMove(e) { if (!this._eraseDrawing) return; const p = this._erasePoint(e); this._drawEraseLine(this._eraseLast || p, p); this._eraseLast = p; },
     endEraseBrush() { this._eraseDrawing = false; this._eraseLast = null; },
     applyErase() {
-      const l = this.activeLayer;
-      const ec = this._eraseCanvas;
-      if (!l || !ec) return;
-      const img = new Image();
-      img.onload = () => {
-        const w = img.naturalWidth, h = img.naturalHeight;
-        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.drawImage(ec, 0, 0, w, h);
-        l.image = canvas.toDataURL('image/png');
-        this.saveLayerLayout();
-        this.toast('Đã xóa vùng.');
-      };
-      img.onerror = () => this.toast('Không xóa được ảnh.', 'error');
-      img.src = l.image;
+      this.pushHistory();
+      return new Promise((resolve) => {
+        const l = this.activeLayer;
+        const ec = this._eraseCanvas;
+        if (!l || !ec) { resolve(); return; }
+        const img = new Image();
+        img.onload = () => {
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.drawImage(ec, 0, 0, w, h);
+          l.image = canvas.toDataURL('image/png');
+          this.saveLayerLayout();
+          this.toast('Đã xóa vùng.');
+          resolve();
+        };
+        img.onerror = () => { this.toast('Không xóa được ảnh.', 'error'); resolve(); };
+        img.src = l.image;
+      });
     },
-    // Nút "🗑 Xóa" trên toolbar erase: áp dụng xóa ngay rồi thoát chế độ.
-    applyEraseNow() { this.applyErase(); this.eraseMode = false; },
-    // Nút "✕ Hủy": thoát chế độ erase KHÔNG áp dụng (bỏ nét đã vẽ).
+    // "🗑 Xóa": áp dụng nét đã vẽ vào layer rồi xoá canvas — GIỮ chế độ để vẽ tiếp (không tự thoát).
+    applyEraseNow() {
+      this.applyErase().then(() => {
+        if (this._eraseCtx && this._eraseCanvas) this._eraseCtx.clearRect(0, 0, this._eraseCanvas.width, this._eraseCanvas.height);
+      });
+    },
+    // "✓ Xong": hoàn tất xóa — áp dụng nét còn lại rồi thoát chế độ.
+    finishErase() { this.applyErase().then(() => { this.eraseMode = false; }); },
+    // "✕ Hủy": thoát chế độ erase KHÔNG áp dụng (bỏ nét đã vẽ).
     cancelErase() { this.eraseMode = false; this.toast('Đã hủy xóa.'); },
     // ── Vẽ vùng chọn (rectangle marquee) ──
     toggleRegionSelect() {
@@ -1528,6 +1540,7 @@ export const useStudioStore = defineStore('studio', {
     async _applySelectionToLayer(action, color) {
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      this.pushHistory();
       try {
         const img = await this._loadImageSrc(l.image);
         const w = img.naturalWidth, h = img.naturalHeight;
@@ -1558,10 +1571,11 @@ export const useStudioStore = defineStore('studio', {
     fillSelectedRegion() { this._applySelectionToLayer('fill'); },
     // Nhân đôi vùng chọn (rect/freehand) thành 1 layer mới chứa đúng phần được chọn.
     async duplicateSelectedRegion() {
-      const l = this.activeLayer;
-      if (!l || !l.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      const src = this.activeLayer;
+      if (!src || !src.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      this.pushHistory();
       try {
-        const img = await this._loadImageSrc(l.image);
+        const img = await this._loadImageSrc(src.image);
         const w = img.naturalWidth, h = img.naturalHeight;
         const sel = await this._buildSelectionAlpha(w, h);
         const out = document.createElement('canvas'); out.width = w; out.height = h;
@@ -1571,12 +1585,55 @@ export const useStudioStore = defineStore('studio', {
         octx.drawImage(sel, 0, 0); // giữ đúng pixel trong vùng chọn, ngoài trong suốt
         const url = out.toDataURL('image/png');
         const id = 'dup-' + Date.now();
-        this.pushCanvasLayer(id, 'source', 'Nhân đôi vùng chọn', url);
+        // Nhân đôi NGAY tại vị trí vùng chọn: cùng transform với layer gốc (chồng khít, dễ kéo đi).
+        this.canvasLayers.push({
+          id, kind: 'source', name: 'Nhân đôi vùng chọn', image: url, genId: null,
+          visible: true, locked: false,
+          x: src.x || 0, y: src.y || 0, scale: src.scale || 1, rotation: src.rotation || 0,
+          opacity: src.opacity != null ? src.opacity : 1, blend: src.blend || 'normal', flipX: false, flipY: false,
+          baseW: src.baseW, baseH: src.baseH,
+        });
+        this.saveLayerLayout();
         this.setActiveLayer(id);
-        this.toast('Đã nhân đôi vùng chọn thành layer mới.');
+        this.toast('Đã nhân đôi vùng chọn tại vị trí.');
       } catch (e) {
         this.toast(e.message || 'Không nhân đôi được.', 'error');
       }
+    },
+    // ── Undo / Redo (lịch sử layer) ──
+    _snapshot() { return { layers: this.canvasLayers.map((l) => ({ ...l })), activeLayerId: this.activeLayerId }; },
+    pushHistory() {
+      this.undoStack.push(this._snapshot());
+      if (this.undoStack.length > 50) this.undoStack.shift();
+      this.redoStack = [];
+    },
+    _restoreSnapshot(snap) {
+      this.canvasLayers = snap.layers.map((l) => ({ ...l }));
+      this.activeLayerId = snap.activeLayerId;
+      const l = this.activeLayer;
+      if (l) {
+        if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; }
+        else if (l.genId) {
+          const g = this.generations.find((x) => x.id === l.genId);
+          if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; }
+          this.editSource = null;
+        } else { this.editSource = null; this.previewId = null; this.preview = null; }
+      } else { this.editSource = null; this.previewId = null; this.preview = null; }
+      this.saveLayerLayout();
+    },
+    undo() {
+      const snap = this.undoStack.pop();
+      if (!snap) { this.toast('Không còn thao tác để hoàn tác.', 'info'); return; }
+      this.redoStack.push(this._snapshot());
+      this._restoreSnapshot(snap);
+      this.toast('Đã hoàn tác.');
+    },
+    redo() {
+      const snap = this.redoStack.pop();
+      if (!snap) { this.toast('Không còn thao tác để làm lại.', 'info'); return; }
+      this.undoStack.push(this._snapshot());
+      this._restoreSnapshot(snap);
+      this.toast('Đã làm lại.');
     },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }

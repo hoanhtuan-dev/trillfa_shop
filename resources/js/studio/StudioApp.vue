@@ -27,8 +27,8 @@ const renameValue = ref('');
 function startRename(l) { renamingId.value = l.id; renameValue.value = l.name || ''; }
 function commitRename() { if (!renamingId.value) return; store.renameLayer(renamingId.value, renameValue.value); renamingId.value = null; }
 function cancelRename() { renamingId.value = null; }
-onMounted(async () => { store.load(); store.loadPalette(store.previewId); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); });
-onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); });
+onMounted(async () => { store.load(); store.loadPalette(store.previewId); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); });
 watch(() => store.previewId, (id) => { store.loadPalette(id); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
@@ -66,6 +66,15 @@ function onLayerKeys(e) {
   else return;
   e.preventDefault();
   store.updateLayerTransform(l.id, { x: (l.x || 0) + dx, y: (l.y || 0) + dy });
+}
+// Phím tắt undo/redo toàn cục (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y) — trừ khi đang vẽ mask brush.
+function onHistoryKeys(e) {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (store.inpaintMaskMode === 'brush') return; // brush dùng Ctrl+Z riêng cho undo nét vẽ
+  if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); }
+  else if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); store.redo(); }
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
@@ -180,7 +189,7 @@ function onTouchEnd(e) {
       <a href="/dang-nhap?redirect=/studio" class="shrink-0 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
     </div>
     <!-- toast (copy/status) -->
-    <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 top-4 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
+    <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
     <!-- Mobile top bar -->
     <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-cream-200">☰</button>
@@ -218,7 +227,7 @@ function onTouchEnd(e) {
             <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
             <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
               <div v-if="store.upscaleSrc" class="relative max-h-full max-w-full">
-                <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-full max-w-full min-w-0 select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
+                <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
                 <div v-if="store.regionSelectMode" class="pointer-events-none absolute inset-0">
                   <div class="absolute cursor-move select-none border-2 border-dashed border-brand-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" style="pointer-events:auto; touch-action:none" :style="regionBoxStyle()" @pointerdown.stop="store.beginRegionDrag($event)" @pointermove="store.regionDragMove($event)" @pointerup="store.endRegionDrag()" @pointerleave="store.endRegionDrag()" title="Kéo để di chuyển vùng chọn"></div>
                 </div>
@@ -262,7 +271,7 @@ function onTouchEnd(e) {
 
           </div>
           <!-- Erase toolbar (desktop only) -->
-          <div v-if="store.eraseMode" class="absolute bottom-16 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900/90 px-3 py-2 shadow-xl backdrop-blur lg:flex">
+          <div v-if="store.eraseMode" class="absolute top-3 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900/95 px-3 py-1.5 shadow-xl ring-1 ring-red-500/30 backdrop-blur lg:flex">
             <span class="text-[10px] font-semibold text-cream-200">Cọ</span>
             <input type="range" min="3" max="150" step="1" :value="store.eraseBrushSize" @input="store.eraseBrushSize = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
             <span class="w-8 text-right text-[10px] text-cream-200">{{ store.eraseBrushSize }}px</span>
@@ -271,16 +280,19 @@ function onTouchEnd(e) {
             <input type="range" min="0" max="60" step="1" :value="store.eraseFeather" @input="store.eraseFeather = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
             <span class="w-6 text-right text-[10px] text-cream-200">{{ store.eraseFeather }}</span>
             <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
-            <button @click="store.applyEraseNow()" class="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500">🗑 Xóa</button>
-            <button @click="store.cancelErase()" class="rounded-full bg-ink-700 px-3 py-1 text-xs font-semibold text-cream-200 hover:bg-ink-600">✕ Hủy</button>
+            <button @click="store.applyEraseNow()" class="rounded-full bg-red-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500" title="Áp dụng nét đã xóa và vẽ tiếp">🗑 Xóa</button>
+            <button @click="store.finishErase()" class="rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-500">✓ Xong</button>
+            <button @click="store.cancelErase()" class="rounded-full bg-ink-700 px-2.5 py-1 text-xs font-semibold text-cream-200 hover:bg-ink-600">✕</button>
           </div>
-          <!-- Canvas toolbar -->
+          <!-- Canvas toolbar: undo/redo + zoom -->
           <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
+            <button @click="store.undo()" :disabled="!store.undoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Hoàn tác (Ctrl+Z)">↶</button>
+            <button @click="store.redo()" :disabled="!store.redoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Làm lại (Ctrl+Y)">↷</button>
+            <span class="h-4 w-px bg-ink-700"></span>
             <button @click="store.zoomOut()" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700">−</button>
             <button @click="store.zoomFit()" class="rounded-full px-2 py-1 text-xs text-cream-200 hover:bg-ink-700">Vừa</button>
             <button @click="store.zoomIn()" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700">+</button>
             <span class="px-1 text-xs text-cream-200">{{ Math.round(store.zoom * 100) }}%</span>
-
           </div>
           <!-- right column: layers thumbnails (minimal) + transform/palette -->
           <div class="absolute right-3 top-3 z-20 flex flex-col items-end gap-1.5">
