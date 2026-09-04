@@ -1352,21 +1352,21 @@ export const useStudioStore = defineStore('studio', {
     },
     pickFromProduct(p) { this.setSource(p.url, p.name); },
     pickFromResult(g) { this.setSource(g.media_url, 'Ảnh kết quả #' + g.id); },
-    // Đưa NHIỀU ảnh vào canvas cùng lúc (mỗi ảnh 1 layer nguồn riêng, đặt cạnh nhau).
+    // Thêm NHIỀU ảnh vào canvas — KHÔNG xóa ảnh/layer cũ (mỗi ảnh 1 layer nguồn riêng).
     addImagesToCanvas(items) {
       const list = (items || []).filter((it) => it && it.url);
       if (!list.length) return;
-      // Chỉ gỡ layer 'source' cũ 1 lần khi có ít nhất 1 ảnh mới.
-      this.canvasLayers = this.canvasLayers.filter((l) => l.id !== 'source');
+      const ts = Date.now();
       let lastId = '';
       list.forEach((img, i) => {
-        const id = i === 0 ? 'source' : 'src-' + Date.now() + '-' + i;
+        const id = 'src-' + ts + '-' + i;
+        if (this.canvasLayers.some((l) => l.id === id)) return;
         this.pushCanvasLayer(id, 'source', img.name || 'Ảnh nguồn', img.url);
         lastId = id;
       });
       if (lastId) this.setActiveLayer(lastId);
       this.saveLayerLayout();
-      this.toast('Đã đưa ' + list.length + ' ảnh vào canvas.');
+      this.toast('Đã thêm ' + list.length + ' ảnh vào canvas.');
     },
     async translate(promptTo) { if (!promptTo) { this.toast('Nhập prompt.', 'error'); return; } this.suggestResult = this.suggestResult || {}; try { const d = await this.api('/studio/translate', { text: promptTo, direction: 'vi' }); this.suggestResult.prompt_vi = d.text || d; this.toast('Đã dịch sang tiếng Việt.'); } catch (e) { this.toast(e.message || 'Lỗi dịch.', 'error'); } },
     async suggestStyle(image) {

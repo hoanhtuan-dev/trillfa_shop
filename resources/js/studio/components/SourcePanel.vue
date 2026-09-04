@@ -10,8 +10,8 @@ const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).con
 
 async function loadRefs() { try { const r = await fetch('/studio/ref-images?_=' + Date.now(), { headers: { Accept: 'application/json' } }); const d = await r.json(); refs.value = d.items || []; } catch(e){} }
 async function loadProducts() { try { const r = await fetch('/studio/references?_=' + Date.now(), { headers: { Accept: 'application/json' } }); const d = await r.json(); products.value = d.items || []; } catch(e){} }
-function openUpload() { uploadOpen.value = true; query.value = ''; sortKey.value = 'newest'; loadRefs(); }
-function openProducts() { productOpen.value = true; pquery.value = ''; loadProducts(); }
+function openUpload() { uploadOpen.value = true; query.value = ''; sortKey.value = 'newest'; selRefs.value = []; loadRefs(); }
+function openProducts() { productOpen.value = true; pquery.value = ''; selProds.value = []; loadProducts(); }
 async function onFile(e) {
   const files = Array.from(e.target.files || []);
   if (fileRef.value) fileRef.value.value = '';
@@ -24,7 +24,15 @@ async function onFile(e) {
   store.toast(files.length > 1 ? 'Đã tải ' + files.length + ' ảnh vào canvas.' : 'Đã tải ảnh vào canvas.');
 }
 async function delRef(it) { try { const r = await fetch('/studio/ref-images/' + it.name, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); const d = await r.json(); if (!r.ok) { store.toast(d.message || 'Không xóa được.', 'error'); return; } loadRefs(); store.toast('Đã xóa ảnh.'); } catch(e){ store.toast('Lỗi xóa.', 'error'); } }
-function pick(it) { store.setSource(it.url, it.name); uploadOpen.value = false; }
+// ── Chọn NHIỀU ảnh rồi đưa vào canvas 1 lần (không xóa ảnh cũ) ──
+const selRefs = ref([]);   // ảnh đã chọn trong thư viện tải lên
+const selProds = ref([]);  // sản phẩm đã chọn
+function toggleRef(it) { const i = selRefs.value.findIndex((x) => x.name === it.name); if (i >= 0) selRefs.value.splice(i, 1); else selRefs.value.push(it); }
+function toggleProd(p) { const i = selProds.value.findIndex((x) => x.id === p.id); if (i >= 0) selProds.value.splice(i, 1); else selProds.value.push(p); }
+const isSelRef = (it) => selRefs.value.some((x) => x.name === it.name);
+const isSelProd = (p) => selProds.value.some((x) => x.id === p.id);
+function addSelRefs() { if (!selRefs.value.length) return; store.addImagesToCanvas(selRefs.value); const n = selRefs.value.length; selRefs.value = []; store.toast('Đã thêm ' + n + ' ảnh vào canvas.'); }
+function addSelProds() { if (!selProds.value.length) return; store.addImagesToCanvas(selProds.value); const n = selProds.value.length; selProds.value = []; store.toast('Đã thêm ' + n + ' ảnh sản phẩm vào canvas.'); }
 
 const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; };
 const fmtDate = (ts) => { if (!ts) return ''; const d = new Date(ts * 1000), now = new Date(); const diff = now - d, day = 86400000; if (diff < day) return 'Hôm nay'; if (diff < 2 * day) return 'Hôm qua'; if (diff < 30 * day) return Math.floor(diff / day) + ' ngày'; return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' }); };
@@ -87,7 +95,7 @@ const sortedProducts = computed(() => {
 
     <!-- ══ Upload / library popup ══ -->
     <div v-if="uploadOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" @click.self="uploadOpen=false">
-      <div class="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl">
+      <div class="flex h-[82vh] w-full max-w-3xl flex-col rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl" style="height: min(82vh, 760px)">
         <div class="mb-3 flex items-start justify-between">
           <div class="flex items-center gap-2.5">
             <div class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600/15 text-brand-300"><svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
@@ -123,11 +131,12 @@ const sortedProducts = computed(() => {
           <input ref="fileRef" type="file" accept="image/*" multiple @change="onFile" class="hidden">
         </label>
 
-        <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto pr-1" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
-          <div v-for="it in sortedRefs" :key="it.name" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isCurrent(it) ? 'border-brand-400 ring-1 ring-brand-400/60' : 'border-ink-700 hover:border-ink-600'" :title="it.name" style="padding-bottom: 100%" @click="pick(it)">
+        <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto overscroll-contain pr-1" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
+          <div v-for="it in sortedRefs" :key="it.name" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSelRef(it) ? 'border-brand-400 ring-2 ring-brand-400/70' : isCurrent(it) ? 'border-brand-400/50' : 'border-ink-700 hover:border-ink-600'" :title="it.name" style="padding-bottom: 100%" @click="toggleRef(it)">
             <img :src="it.url" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="">
             <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
             <span v-else-if="isCurrent(it)" class="absolute left-1.5 top-1.5 rounded-md bg-brand-600/90 px-1.5 py-0.5 text-[9px] font-medium text-white">đang chọn</span>
+            <span v-if="isSelRef(it)" class="pointer-events-none absolute inset-0 grid place-items-center bg-brand-600/15"><span class="grid h-9 w-9 place-items-center rounded-full bg-brand-600 text-white shadow-lg ring-2 ring-white/50"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></span>
             <button v-if="!it.used" @click.stop="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white transition-colors hover:bg-red-500 group-hover:grid" title="Xóa ảnh"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
             <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1 pt-5">
               <p class="truncate text-[10px] font-medium text-cream-100">{{ it.name }}</p>
@@ -139,12 +148,18 @@ const sortedProducts = computed(() => {
             <p class="text-xs text-cream-300/50">{{ refs.length ? 'Không có ảnh khớp tìm kiếm.' : 'Chưa có ảnh nào — tải ảnh đầu tiên lên nhé.' }}</p>
           </div>
         </div>
+        <div class="mt-3 flex shrink-0 items-center justify-between gap-2">
+          <span class="text-[11px] text-cream-300/70">{{ selRefs.length ? 'Đã chọn ' + selRefs.length + ' ảnh' : 'Nhấn chọn 1 hoặc nhiều ảnh để thêm vào canvas' }}</span>
+          <button @click="addSelRefs" :disabled="!selRefs.length" class="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40" title="Thêm ảnh đã chọn vào canvas (không xóa ảnh cũ)">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Thêm vào canvas ({{ selRefs.length }})
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- ══ Products popup ══ -->
     <div v-if="productOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" @click.self="productOpen=false">
-      <div class="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl">
+      <div class="flex h-[82vh] w-full max-w-2xl flex-col rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl" style="height: min(82vh, 680px)">
         <div class="mb-3 flex items-start justify-between">
           <div class="flex items-center gap-2.5">
             <div class="grid h-9 w-9 place-items-center rounded-xl bg-emerald-600/15 text-emerald-300"><svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
@@ -172,9 +187,19 @@ const sortedProducts = computed(() => {
             <input type="range" min="2" max="8" step="1" v-model.number="pCols" class="h-1.5 w-24 cursor-pointer accent-brand-500">
           </div>
         </div>
-        <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto pr-1" :style="{ gridTemplateColumns: 'repeat(' + pCols + ', minmax(0, 1fr))' }">
-          <button v-for="p in sortedProducts" :key="p.id" @click="store.pickFromProduct(p); productOpen=false" class="group relative overflow-hidden rounded-xl border border-ink-700 transition-colors hover:border-ink-600" style="padding-bottom: 100%"><img :src="p.url" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt=""><span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span></button>
+        <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto overscroll-contain pr-1" :style="{ gridTemplateColumns: 'repeat(' + pCols + ', minmax(0, 1fr))' }">
+          <div v-for="p in sortedProducts" :key="p.id" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSelProd(p) ? 'border-emerald-400 ring-2 ring-emerald-400/70' : 'border-ink-700 hover:border-ink-600'" :title="p.name" style="padding-bottom: 100%" @click="toggleProd(p)">
+            <img :src="p.url" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="">
+            <span v-if="isSelProd(p)" class="pointer-events-none absolute inset-0 grid place-items-center bg-emerald-500/15"><span class="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 text-white shadow-lg ring-2 ring-white/50"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></span>
+            <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span>
+          </div>
           <p v-if="!sortedProducts.length" class="col-span-full py-10 text-center text-xs text-cream-300/50">{{ products.length ? 'Không có sản phẩm khớp tìm kiếm.' : 'Chưa có sản phẩm.' }}</p>
+        </div>
+        <div class="mt-3 flex shrink-0 items-center justify-between gap-2">
+          <span class="text-[11px] text-cream-300/70">{{ selProds.length ? 'Đã chọn ' + selProds.length + ' sản phẩm' : 'Nhấn chọn 1 hoặc nhiều sản phẩm để thêm vào canvas' }}</span>
+          <button @click="addSelProds" :disabled="!selProds.length" class="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40" title="Thêm sản phẩm đã chọn vào canvas (không xóa ảnh cũ)">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Thêm vào canvas ({{ selProds.length }})
+          </button>
         </div>
       </div>
     </div>
