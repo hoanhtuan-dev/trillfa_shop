@@ -18,7 +18,10 @@ import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
 import GalleryModal from './components/GalleryModal.vue';
 const store = useStudioStore();
-function copyColor(c) { try { navigator.clipboard.writeText(c); store.toast('Đã copy ' + c); } catch (e) { store.toast('Lỗi copy.', 'error'); } }
+function copyColor(c) {
+  store.inpaintFillColor = c; // đồng bộ màu cho công cụ tô màu
+  try { navigator.clipboard.writeText(c); store.toast('Đã chọn màu ' + c); } catch (e) { store.toast('Lỗi copy.', 'error'); }
+}
 const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 const menuOpen = ref(false);
 const outputOpen = ref(false);
@@ -287,7 +290,7 @@ function onTouchEnd(e) {
 
           </div>
           <!-- Canvas toolbar: undo/redo + zoom -->
-          <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
+          <div class="absolute bottom-3 left-3 z-32 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
             <button @click="store.undo()" :disabled="!store.undoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Hoàn tác (Ctrl+Z)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></button>
             <button @click="store.redo()" :disabled="!store.redoStack.length" class="grid h-8 w-8 place-items-center rounded-full text-cream-200 hover:bg-ink-700 disabled:opacity-30" title="Làm lại (Ctrl+Y)"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg></button>
             <span class="h-4 w-px bg-ink-700"></span>
@@ -297,7 +300,7 @@ function onTouchEnd(e) {
             <span class="px-1 text-xs text-cream-200">{{ Math.round(store.zoom * 100) }}%</span>
           </div>
           <!-- right column: layers thumbnails (minimal) + transform/palette -->
-          <div class="absolute right-3 top-3 z-20 flex flex-col items-end gap-1.5">
+          <div class="absolute right-3 top-3 z-32 flex flex-col items-end gap-1.5">
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1 lg:hidden">
               <button v-for="l in store.canvasLayers" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
                 <img :src="l.image" class="h-6 w-6 object-cover" />
@@ -388,7 +391,7 @@ function onTouchEnd(e) {
             </div>
           </div>
           <!-- canvas bg + crop toggles -->
-          <div class="absolute right-3 bottom-3 z-20 flex items-center gap-2 rounded-full bg-ink-900/85 px-2.5 py-1.5 shadow-lg">
+          <div class="absolute right-3 bottom-3 z-32 flex items-center gap-2 rounded-full bg-ink-900/85 px-2.5 py-1.5 shadow-lg">
             <button @click="store.downloadActive()" :disabled="!store.upscaleSrc" class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600 text-white shadow-brand-500/40 transition-colors hover:bg-brand-500 disabled:opacity-40" title="Tải ảnh xuống"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
             <span class="h-4 w-px bg-ink-700"></span>
             <button v-for="b in ['grid','dark','white','cream']" :key="b" @click="store.canvasBg = b" class="h-6 w-6 rounded-full border" :class="store.canvasBg === b ? 'border-white' : 'border-ink-600'" :style="{ background: b === 'grid' ? 'repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 10px 10px' : b === 'dark' ? '#0a0a0f' : b === 'white' ? '#fff' : '#f5ead9' }" :title="b"></button>
