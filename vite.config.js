@@ -8,7 +8,7 @@ export default defineConfig({
     plugins: [
         vue(),
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/storefront/app.js', 'resources/js/storefront/shop.js', 'resources/js/studio/app.js', 'resources/js/studio/settings.js', 'resources/js/studio/library.js', 'resources/js/studio/stylist-data.js'],
+            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/storefront/app.js', 'resources/js/storefront/shop.js', 'resources/js/storefront/product.js', 'resources/js/studio/app.js', 'resources/js/studio/settings.js', 'resources/js/studio/library.js', 'resources/js/studio/stylist-data.js'],
             refresh: true,
             publicDirectory: 'public_html',
             fonts: [bunny('Inter', { weights: [400,500,600,700] }), bunny('Fraunces', { weights: [400,500,600,700], variants: ['italic'] })],

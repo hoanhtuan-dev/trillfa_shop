@@ -28,7 +28,6 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PageController;
-use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuickCheckoutController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RobotsController;

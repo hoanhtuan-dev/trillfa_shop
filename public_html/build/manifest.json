@@ -1,4 +1,12 @@
 {
+  "_BaseBadge-DsdVY5pt.js": {
+    "file": "assets/BaseBadge-DsdVY5pt.js",
+    "name": "BaseBadge",
+    "imports": [
+      "_pinia-CJA6HZ2m.js",
+      "_ProductCard-CONNTBP3.js"
+    ]
+  },
   "_GalleryModal-Bhg8Xqk6.js": {
     "file": "assets/GalleryModal-Bhg8Xqk6.js",
     "name": "GalleryModal",
@@ -10,8 +18,8 @@
     "file": "assets/ProductCard-B78GTz3D.css",
     "src": "_ProductCard-B78GTz3D.css"
   },
-  "_ProductCard-BKQtOxP-.js": {
-    "file": "assets/ProductCard-BKQtOxP-.js",
+  "_ProductCard-CONNTBP3.js": {
+    "file": "assets/ProductCard-CONNTBP3.js",
     "name": "ProductCard",
     "imports": [
       "_pinia-CJA6HZ2m.js",
@@ -19,6 +27,13 @@
     ],
     "css": [
       "assets/ProductCard-B78GTz3D.css"
+    ]
+  },
+  "_SkeletonCard-DY5YvfgY.js": {
+    "file": "assets/SkeletonCard-DY5YvfgY.js",
+    "name": "SkeletonCard",
+    "imports": [
+      "_pinia-CJA6HZ2m.js"
     ]
   },
   "_StylistDataManager-BDx2sRrJ.js": {
@@ -105,7 +120,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BFeiCJfR.css",
+    "file": "assets/app-4dErFFsg.css",
     "name": "app",
     "names": [
       "app.css"
@@ -120,24 +135,38 @@
     "isEntry": true
   },
   "resources/js/storefront/app.js": {
-    "file": "assets/app-CqwsfGZ3.js",
+    "file": "assets/app-JMMbPDww.js",
     "name": "app",
     "src": "resources/js/storefront/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-BKQtOxP-.js"
+      "_ProductCard-CONNTBP3.js",
+      "_SkeletonCard-DY5YvfgY.js",
+      "_BaseBadge-DsdVY5pt.js"
+    ]
+  },
+  "resources/js/storefront/product.js": {
+    "file": "assets/product-D2UM2ZlM.js",
+    "name": "product",
+    "src": "resources/js/storefront/product.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-CJA6HZ2m.js",
+      "_ProductCard-CONNTBP3.js",
+      "_BaseBadge-DsdVY5pt.js"
     ]
   },
   "resources/js/storefront/shop.js": {
-    "file": "assets/shop-BmZtwTuY.js",
+    "file": "assets/shop-D2JKEHmt.js",
     "name": "shop",
     "src": "resources/js/storefront/shop.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-BKQtOxP-.js",
-      "__plugin-vue_export-helper-BDNMzG2s.js"
+      "_ProductCard-CONNTBP3.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js",
+      "_SkeletonCard-DY5YvfgY.js"
     ],
     "css": [
       "assets/shop-C3R3LSvQ.css"
