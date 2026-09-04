@@ -610,17 +610,18 @@ PROMPT;
     }
 
     /**
-     * Human-readable failure summary for the UI — Qwen (primary) failures first,
-     * so the message never misleadingly highlights the Gemini fallback.
+     * Human-readable failure summary for the UI — the FULL attempt chain, so it's
+     * visible exactly which key/model failed (token-plan 429 vs PAYG timeout…).
      */
     private function failureReason(): string
     {
+        $parts = [];
         foreach ($this->attempts as $a) {
-            if (str_starts_with($a, 'qwen:')) {
-                return $a;
+            if (! in_array($a, $parts, true)) {
+                $parts[] = $a;
             }
         }
 
-        return $this->lastError ?: 'offline';
+        return $parts ? implode(' · ', $parts) : ($this->lastError ?: 'offline');
     }
 }

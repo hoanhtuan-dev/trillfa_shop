@@ -92,7 +92,7 @@ return [
     | từ đây (DB Settings → env → config) nên nâng cấp model sau này không cần sửa code.
     */
     'product_ai' => [
-        'enabled' => (bool) env('STUDIO_PRODUCT_AI_ENABLED', true),
+        'enabled' => (bool) env('STUDIO_PRODUCT_AI_ENABLED', false), // MẶC ĐỊNH TẮT = không gọi API = không tốn tiền
         'provider_order' => env('STUDIO_PRODUCT_AI_PROVIDER_ORDER', 'qwen,gemini'), // qwen trước
         'qwen_text_models' => env('STUDIO_PRODUCT_AI_QWEN_TEXT_MODELS', ''), // '' = theo studio_qwen_text_models
         'qwen_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_VISION_MODELS', ''), // '' = theo studio_suggest_qwen_models
