@@ -146,7 +146,9 @@ watch(brushCanvasSize, () => {
   if (store.inpaintMaskMode !== 'brush') return;
   nextTick(() => attachBrush(true));
 });
-watch([() => store.zoom, () => store.pan], () => { nextTick(() => { metricsTick.value++; }); });
+// Bám TỪNG thành phần pan.x/pan.y — panMove đổi trực tiếp pan.x/pan.y (không gán lại object)
+// nên nếu watch cả `store.pan` (tham chiếu object) sẽ KHÔNG chạy khi kéo pan → overlay trôi.
+watch([() => store.zoom, () => store.pan.x, () => store.pan.y], () => { nextTick(() => { metricsTick.value++; }); });
 
 function onKeyDown(e) {
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
