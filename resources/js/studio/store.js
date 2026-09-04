@@ -36,6 +36,8 @@ export const useStudioStore = defineStore('studio', {
     reframeRatio: '3:4',
     reframing: false,
     cropMode: false,
+    reframeOpen: false,  // hiển thị toolbar crop (dock phía trên)
+    filmOpen: false,      // hiển thị toolbar film look (dock phía trên)
     cropBox: { x: 0.15, y: 0.15, w: 0.7, h: 0.7 },
     cvImg: null,
     canvasZoom: null,
@@ -550,6 +552,16 @@ export const useStudioStore = defineStore('studio', {
         this.toast('Đã cắt giữa ' + this.reframeRatio + '.');
       } catch (e) { this.toast(e.message || 'Lỗi cắt.', 'error'); }
       finally { this.reframing = false; }
+    },
+    async applyFilmLook() {
+      if (!this.upscaleSrc || this.looking) return;
+      this.looking = true;
+      try {
+        const d = await this.api('/studio/look', { image: this.upscaleSrc, look: this.lookPreset, level: Number(this.lookLevel) || 5 });
+        this.addGen({ id: d.generation_id, type: 'image', status: 'completed', model: 'look', provider: 'look', media_url: d.media_url, error: null, credits_cost: 0, created_at: 'Vừa áp dụng' });
+        this.toast('Đã áp dụng Look ' + this.lookPreset + '.');
+      } catch (e) { this.toast(e.message || 'Lỗi áp dụng Look.', 'error'); }
+      finally { this.looking = false; }
     },
     upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, light: this.lightShadow, sharpen: this.sharpen, clarity: this.clarity, vibrance: this.vibrance }; },
     loadUpscaleMemory() {

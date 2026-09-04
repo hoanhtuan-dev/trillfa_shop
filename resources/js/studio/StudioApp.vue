@@ -12,6 +12,7 @@ import InpaintCard from './components/InpaintCard.vue';
 import ComposeCard from './components/ComposeCard.vue';
 import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
+import ContextToolbar from './components/ContextToolbar.vue';
 import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
@@ -222,7 +223,13 @@ function onTouchEnd(e) {
       </aside>
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
-        <div class="relative h-full overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
+        <div class="relative flex h-full flex-col overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
+          <!-- ══ Toolbar dock (phía trên, full width) ══ -->
+          <div class="relative z-40 flex min-h-12 shrink-0 items-center justify-center gap-2 overflow-x-auto overflow-y-hidden border-b border-ink-700/60 bg-ink-900/70 px-3 py-1.5">
+            <ContextToolbar />
+          </div>
+          <!-- ══ Vùng canvas (dưới dock) ══ -->
+          <div class="relative flex-1 overflow-hidden">
           <!-- Floating tools (Reframe + Film Look) — desktop only -->
           <div class="hidden lg:block">
             <RegionTools />
@@ -281,20 +288,6 @@ function onTouchEnd(e) {
               </div>
             </div>
 
-          </div>
-          <!-- Erase toolbar (desktop only) -->
-          <div v-if="store.eraseMode" class="absolute top-3 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900/95 px-3 py-1.5 shadow-xl ring-1 ring-red-500/30 backdrop-blur lg:flex">
-            <span class="text-[10px] font-semibold text-cream-200">Cọ</span>
-            <input type="range" min="3" max="150" step="1" :value="store.eraseBrushSize" @input="store.eraseBrushSize = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
-            <span class="w-8 text-right text-[10px] text-cream-200">{{ store.eraseBrushSize }}px</span>
-            <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
-            <span class="text-[10px] font-semibold text-cream-200">Feather</span>
-            <input type="range" min="0" max="60" step="1" :value="store.eraseFeather" @input="store.eraseFeather = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
-            <span class="w-6 text-right text-[10px] text-cream-200">{{ store.eraseFeather }}</span>
-            <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
-            <button @click="store.applyEraseNow()" class="flex items-center gap-1 rounded-full bg-red-600/80 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500" title="Áp dụng nét đã xóa và vẽ tiếp"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Xóa</button>
-            <button @click="store.finishErase()" class="flex items-center gap-1 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-500"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Xong</button>
-            <button @click="store.cancelErase()" class="rounded-full bg-ink-700 px-2.5 py-1 text-xs font-semibold text-cream-200 hover:bg-ink-600"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
           </div>
           <!-- Canvas toolbar: undo/redo + zoom -->
           <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
@@ -405,6 +398,7 @@ function onTouchEnd(e) {
               <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2" :class="store.previewId === v.id ? 'border-brand-500' : 'border-ink-700'"><img :src="v.media_url" class="h-full w-full bg-ink-900 object-cover"><span v-if="v.status !== 'completed'" class="absolute inset-0 grid place-items-center bg-black/60 text-[9px] text-cream-200">{{ v.status }}</span></button>
               <button @click="store.hideBatch()" class="ml-1 grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600">✕</button>
             </div>
+          </div>
           </div>
         </div>
       </main>
