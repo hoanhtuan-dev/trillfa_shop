@@ -1199,6 +1199,14 @@ class ImageAIService
             $mask = $resized;
         }
 
+        // Decontaminate viền trắng: blur mask để mép mềm, rồi "co" vùng đục vào trong ~1-2px
+        // (mép ngoài chủ thể do model hoà trộn với nền trắng sẽ bị cắt bỏ thay vì giữ lại viền trắng).
+        $soft = imagecreatetruecolor($w, $h);
+        imagecopy($soft, $mask, 0, 0, 0, 0, $w, $h);
+        @imagefilter($soft, IMG_FILTER_GAUSSIAN_BLUR);
+        imagedestroy($mask);
+        $mask = $soft;
+
         $out = imagecreatetruecolor($w, $h);
         imagealphablending($out, false);
         imagesavealpha($out, true);
@@ -1206,7 +1214,9 @@ class ImageAIService
             for ($x = 0; $x < $w; $x++) {
                 $m = imagecolorat($mask, $x, $y);
                 $mr = ($m >> 16) & 0xFF; // TRẮNG=giữ (đục), ĐEN=nền (trong suốt)
-                $alpha = 127 - (int) round($mr * 127 / 255);
+                // Co mép: mr<200 → trong suốt (bỏ viền trắng); 200..255 → mờ dần sang đục.
+                $mr2 = $mr < 200 ? 0 : (int) round(($mr - 200) * 255 / 55);
+                $alpha = 127 - (int) round($mr2 * 127 / 255);
                 $p = imagecolorat($img, $x, $y);
                 $r = ($p >> 16) & 0xFF; $g = ($p >> 8) & 0xFF; $b = $p & 0xFF;
                 imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, $r, $g, $b, $alpha));
