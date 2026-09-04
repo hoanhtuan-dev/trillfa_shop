@@ -1,4 +1,4 @@
-const CACHE = 'trillfa-fa-v2';
+const CACHE = 'trillfa-fa-v3';
 const APP_SHELL = [
   '/',
   '/images/logo.png',
@@ -42,20 +42,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static build / image / icon assets.
+  // Network-first for build assets (content-hashed → luôn tải bản mới), fallback cache khi offline.
   if (['/build/', '/images/', '/icons/'].some((prefix) => url.pathname.startsWith(prefix))) {
     event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((res) => {
-            if (res.ok) {
-              const clone = res.clone();
-              caches.open(CACHE).then((cache) => cache.put(request, clone));
-            }
-            return res;
-          })
-      )
+      fetch(request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request))
     );
   }
 });
