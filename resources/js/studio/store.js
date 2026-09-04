@@ -321,6 +321,11 @@ export const useStudioStore = defineStore('studio', {
     async removeBackground() {
       const l = this.activeLayer;
       if (!l || !l.image) { this.toast('Chọn 1 layer ảnh để xóa nền.', 'error'); return null; }
+      // Cần mask (chủ thể) để cắt nền THÀNH TRONG SUỐT — nếu không có mask, backend không cắt alpha được.
+      if (!this.inpaintBrushData) {
+        this.toast('Vẽ lasso quanh CHỦ THỂ trước — cần mask để xóa nền thành trong suốt.', 'error');
+        return null;
+      }
       try {
         const d = await this.api('/studio/remove-bg', {
           image: l.image,
