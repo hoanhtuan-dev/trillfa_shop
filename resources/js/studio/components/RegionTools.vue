@@ -47,7 +47,7 @@ async function applyFilmLook() {
     </div>
   </div>
 
-  <div v-if="reframeOpen || store.cropMode" class="scrollbar-hide absolute left-14 top-4 z-40 max-h-[calc(100%-2rem)] w-56 max-w-[76vw] overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-900/95 p-3 text-[11px] shadow-2xl backdrop-blur">
+  <div v-if="reframeOpen || store.cropMode" class="scrollbar-hide fixed top-16 left-1/2 z-[70] max-h-[calc(100vh-5rem)] w-64 max-w-[92vw] -translate-x-1/2 overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-900/95 p-3 text-[11px] shadow-2xl backdrop-blur">
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-xs font-semibold text-brand-300">📐 Reframe / Crop</p>
       <button @click="reframeOpen = false; if (store.cropMode) store.toggleCrop()" class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>
@@ -64,7 +64,7 @@ async function applyFilmLook() {
     </template>
   </div>
 
-  <div v-if="filmOpen || store.looking" class="scrollbar-hide absolute left-14 top-4 z-40 max-h-[calc(100%-2rem)] w-56 max-w-[76vw] overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-900/95 p-3 text-[11px] shadow-2xl backdrop-blur">
+  <div v-if="filmOpen || store.looking" class="scrollbar-hide fixed top-16 left-1/2 z-[70] max-h-[calc(100vh-5rem)] w-64 max-w-[92vw] -translate-x-1/2 overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-900/95 p-3 text-[11px] shadow-2xl backdrop-blur">
     <div class="flex items-center justify-between gap-2">
       <p class="truncate text-xs font-semibold text-brand-300">🎨 Film Look</p>
       <button @click="filmOpen = false" class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Đóng">✕</button>

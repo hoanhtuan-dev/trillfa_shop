@@ -144,7 +144,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Jd3ums6f.css",
+    "file": "assets/app-BgxkrRal.css",
     "name": "app",
     "names": [
       "app.css"
@@ -295,7 +295,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-BhQ84cdb.js",
+    "file": "assets/app-pQG2_t5r.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -306,7 +306,7 @@
       "_StylistDataManager-C6o-0vCw.js"
     ],
     "css": [
-      "assets/app-lw-xmMmS.css"
+      "assets/app-DlFMhXrc.css"
     ]
   },
   "resources/js/studio/library.js": {

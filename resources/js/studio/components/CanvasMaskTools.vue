@@ -8,6 +8,7 @@ const visible = computed(() => store.upscaleSrc && (store.inpaintMaskMode !== 'n
 const editing = computed(() => store.inpaintMaskMode !== 'none');
 
 const maskBoxStyle = computed(() => {
+  void metricsTick.value;
   const m = store.canvasMetrics();
   if (!m) return { display: 'none' };
   const b = store.inpaintMaskBox || { x: 0, y: 0, w: 0, h: 0 };
@@ -63,6 +64,7 @@ function onPointerDown(e) {
 
 // SVG path freehand (GIMP-style): điểm normalized → pixel trong container
 const freehandPoints = computed(() => {
+  void metricsTick.value;
   const m = store.canvasMetrics();
   if (!m) return '';
   return store.inpaintFreehandPoints.map(p => Math.round(m.vx + p.nx * m.vw) + ',' + Math.round(m.vy + p.ny * m.vh)).join(' ');
@@ -167,9 +169,6 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
       <!-- Đang chỉnh: công cụ -->
       <div v-if="editing" class="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-full bg-ink-900/95 px-3 py-1.5 text-xs font-semibold shadow-xl ring-1 ring-brand-500/30">
         <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand'">
-          <span class="px-1 text-[10px] font-medium text-cream-300/70">
-            {{ store.inpaintMaskMode === 'freehand' ? '✏️ Vẽ tự do — kéo chuột để khoanh vùng' : (hasBox ? ('▭ ' + Math.round((store.inpaintMaskBox.w || 0) * 100) + '% × ' + Math.round((store.inpaintMaskBox.h || 0) * 100) + '%') : '▭ Kéo chọn vùng cần sửa') }}
-          </span>
           <button @click.stop="store.confirmInpaintMask()" @pointerdown.stop class="rounded-full bg-brand-600 px-2.5 py-1 text-white transition-colors hover:bg-brand-700" :title="store.inpaintMaskSource === 'canvas' ? 'Thoát vùng chọn' : 'Áp dụng vùng chọn và thoát'">{{ store.inpaintMaskSource === 'canvas' ? '✓ Xong' : '✅ Xong' }}</button>
         </template>
         <template v-else>

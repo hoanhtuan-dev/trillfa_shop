@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue';
 import { useStudioStore } from './store.js';
 import SourceCard from './components/SourceCard.vue';
 import SuggestCard from './components/SuggestCard.vue';
@@ -94,10 +94,23 @@ function regionBoxStyle() {
   const b = store.regionBox || { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
   return { left: (b.x * 100) + '%', top: (b.y * 100) + '%', width: (b.w * 100) + '%', height: (b.h * 100) + '%' };
 }
+// Transform của layer active trong chế độ isolate — giữ ĐÚNG vị trí/scale/rotation như ở stack (không xê dịch).
+const isolateLayerStyle = computed(() => {
+  const l = store.activeLayer;
+  if (!l) return {};
+  return {
+    transform: 'translate(-50%, -50%) translate(' + (l.x || 0) + 'px, ' + (l.y || 0) + 'px) rotate(' + (l.rotation || 0) + 'deg) scale(' + ((l.scale || 1) * (l.flipX ? -1 : 1)) + ', ' + ((l.scale || 1) * (l.flipY ? -1 : 1)) + ')',
+    transformOrigin: 'center',
+    opacity: l.opacity != null ? l.opacity : 1,
+    mixBlendMode: (l.blend && l.blend !== 'normal') ? l.blend : 'normal',
+  };
+});
 // Overlay canvas xóa bám đúng vùng ảnh hiển thị (chịu zoom/pan) — khớp canvasMetrics.
+const eraseTick = ref(0);
+watch([() => store.zoom, () => store.pan.x, () => store.pan.y, () => store.upscaleSrc], () => { nextTick(() => { eraseTick.value++; }); });
 const eraseOverlayStyle = computed(() => {
+  void eraseTick.value;
   const m = store.canvasMetrics();
-  void store.zoom; void store.pan.x; void store.pan.y; // re-eval khi zoom/pan đổi
   if (!m || !store.eraseMode) return { display: 'none' };
   return {
     left: (m.vx / m.crW * 100) + '%',
@@ -224,12 +237,11 @@ function onTouchEnd(e) {
             <button v-if="store.editSource" @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
           </div>
           <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
-            <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
-            <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
-              <div v-if="store.upscaleSrc" class="relative max-h-full max-w-full">
-                <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
-                <div v-if="store.regionSelectMode" class="pointer-events-none absolute inset-0">
-                  <div class="absolute cursor-move select-none border-2 border-dashed border-brand-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" style="pointer-events:auto; touch-action:none" :style="regionBoxStyle()" @pointerdown.stop="store.beginRegionDrag($event)" @pointermove="store.regionDragMove($event)" @pointerup="store.endRegionDrag()" @pointerleave="store.endRegionDrag()" title="Kéo để di chuyển vùng chọn"></div>
+            <!-- Chế độ isolate (crop/inpaint/erase): layer active GIỮ ĐÚNG vị trí/scale như stack — không xê dịch -->
+            <div v-if="isolateActive" class="absolute inset-0">
+              <div v-if="store.upscaleSrc" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
+                <div class="absolute left-0 top-0" :style="isolateLayerStyle">
+                  <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" draggable="false" @load="store.onCanvasImgLoad()" />
                 </div>
               </div>
               <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
