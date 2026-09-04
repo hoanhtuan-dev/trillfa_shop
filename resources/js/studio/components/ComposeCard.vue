@@ -151,7 +151,6 @@ async function run() {
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
-    <p class="text-[11px] text-ink-500">Hòa trộn 2–3 ảnh thành 1.</p>
 
     <!-- Chip chế độ -->
     <div class="mt-2.5 flex gap-1.5">
@@ -184,7 +183,7 @@ async function run() {
           <span v-if="i > 1" @click.stop="makeBase(i-1)" class="absolute bottom-6 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink-800/90 text-[9px] text-white" title="Đưa lên làm @image1">⤴</span>
         </template>
         <template v-else>
-          <span class="grid h-6 w-6 place-items-center text-ink-600"><StudioIcon name="image" size="h-5 w-5" v-if="i === 1" /><span v-else>＋</span></span>
+          <span class="grid h-8 w-8 place-items-center rounded-full bg-ink-800/70 text-cream-300/70"><StudioIcon name="camera" size="h-4 w-4" v-if="i === 1" /><span v-else class="text-base">＋</span></span>
           <span class="px-1 text-center text-[9px] font-medium text-cream-300/60">{{ slotRoles[i-1] }}</span>
           <span class="px-1 text-center text-[9px] text-cream-300/40">@image{{ i }}</span>
         </template>
@@ -194,7 +193,6 @@ async function run() {
     <label class="label mt-3">Mô tả ghép</label>
     <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…"></textarea>
     <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-      <span class="text-cream-300/50">Chèn nhanh:</span>
       <button v-for="n in 3" :key="n" @click="insertTag('@image' + n)"
               class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white">@image{{ n }}</button>
     </div>

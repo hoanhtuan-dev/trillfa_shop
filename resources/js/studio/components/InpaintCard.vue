@@ -72,18 +72,18 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <div v-if="store.preview?.media_url" class="mt-2 flex gap-1.5">
       <button @click="store.toggleInpaintMask('rect')"
               :class="store.inpaintMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
-        Chọn vùng
+              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
+        <StudioIcon name="scan" size="h-3.5 w-3.5" /> Chọn vùng
       </button>
       <button @click="store.toggleInpaintMask('brush')"
               :class="store.inpaintMaskMode === 'brush' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
-        Vẽ mask
+              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
+        <StudioIcon name="brush" size="h-3.5 w-3.5" /> Vẽ mask
       </button>
       <button @click="store.toggleInpaintMask('freehand')"
               :class="store.inpaintMaskMode === 'freehand' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
-        Vẽ tự do
+              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
+        <StudioIcon name="spline" size="h-3.5 w-3.5" /> Vẽ tự do
       </button>
       <button v-if="maskActive && store.inpaintMaskMode === 'rect' && (store.inpaintMaskBox.w || 0) >= 0.02"
               @click="store.resetInpaintMaskBox()"
