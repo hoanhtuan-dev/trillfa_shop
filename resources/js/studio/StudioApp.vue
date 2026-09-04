@@ -36,10 +36,8 @@ const canvasZoom = ref(null);
 watch([cvImg, canvasZoom], ([img, zoom]) => { store.setCanvasRefs(img, zoom); });
 // While crop mode is on: re-fit the box when the ratio changes, re-init when the image changes.
 watch(() => store.reframeRatio, () => { if (store.cropMode) store.refitCropBox(); });
-// Khi ảnh hiển thị ĐỔI (chọn ảnh khác / ảnh mới sinh ra / đổi layer) → reset zoom+pan
-// về mặc định để ảnh LUÔN fit trọn khung, hiển thị đầy đủ cả chiều ngang lẫn dọc.
-watch(() => store.upscaleSrc, (src, old) => {
-  if (src && src !== old) { store.zoom = 1; store.pan = { x: 0, y: 0 }; }
+// Khi đổi layer, KHÔNG reset zoom/pan — giữ nguyên khung nhìn của người dùng.
+watch(() => store.upscaleSrc, () => {
   if (store.cropMode) store.initCropBox();
 });
 function onCanvasKey(e) {
@@ -217,7 +215,7 @@ function onRotatePointerDown(l, e) {
 
           </div>
           <!-- right column: layers (top) + floating palette (below, same width) -->
-          <div class="absolute right-3 top-3 z-20 flex w-64 flex-col gap-1.5">
+          <div class="absolute right-3 top-3 z-20 flex w-52 flex-col gap-1.5 lg:w-64">
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1.5 rounded-2xl bg-ink-900/85 p-2 shadow-lg">
               <div class="flex items-center justify-between px-0.5">
                 <p class="text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
@@ -246,7 +244,7 @@ function onRotatePointerDown(l, e) {
               </div>
             </div>
             <p v-else class="rounded-2xl bg-ink-900/50 px-2 py-2.5 text-center text-[10px] text-cream-300/40">Chưa có layer — thêm ảnh nguồn hoặc kết quả.</p>
-            <div v-if="store.activeLayer" class="rounded-2xl bg-ink-900/90 p-2 shadow-lg">
+            <div v-if="store.activeLayer" class="hidden rounded-2xl bg-ink-900/90 p-2 shadow-lg lg:block">
               <div class="mb-1 flex items-center justify-between px-0.5">
                 <p class="text-[10px] font-semibold text-cream-300/60">✋ Transform</p>
                 <button @click="store.resetLayerTransform(store.activeLayer.id)" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Đưa layer về mặc định">Reset all</button>
@@ -287,7 +285,7 @@ function onRotatePointerDown(l, e) {
                 <button @click="store.bringLayerTo(store.activeLayer.id, 'back')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa xuống dưới cùng">⤓ Xuống dưới</button>
               </div>
             </div>
-            <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
+            <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="hidden rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl lg:block">
               <div class="mb-1 text-[10px] font-semibold text-cream-300/60">🎨 Palette</div>
               <div class="grid grid-cols-3 gap-1.5">
                 <button v-for="c in store.palette.slice(0, 8)" :key="c" @click="copyColor(c)" class="h-7 w-full rounded-md border border-ink-700 transition hover:scale-105" :style="{ background: c }" :title="'Nhấn để copy ' + c"></button>
