@@ -126,6 +126,10 @@ export const useStudioStore = defineStore('studio', {
     _inpaintPending: null,       // pointermove chờ flush
     _inpaintPrevBox: null,       // box trước khi bắt đầu vẽ vùng mới (để khôi phục nếu click nhầm)
     _inpaintDrew: false,         // đã kéo thật (>4px) khi vẽ vùng mới?
+    inpaintFreehandPoints: [],    // path lasso đang vẽ [{nx, ny}] — hiển thị đường GIMP
+    _inpaintFreehandActive: false,
+    inpaintFeather: 0,            // feather (px 0-50) — làm mềm mép vùng chọn
+    inpaintFillColor: '#ffffff',  // màu tô cho nút "🎨 Tô" của vùng chọn
     // Canvas mask overlay (dùng chung cho Inpaint brush trên canvas chính)
     brushOverlay: null,
     _brushCanvas: null,
@@ -1088,7 +1092,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintStage = 'send';
       this.inpaintStartTs = Date.now();
       try {
-        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: this.upscaleSrc || src };
+        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: this.upscaleSrc || src, feather: Number(this.inpaintFeather) || 0 };
         // Gửi mask đã LƯU (bấm "Xong") — dù overlay công cụ đã tắt vẫn xử lý đúng vùng.
         if (this.inpaintMaskDone && this._inpaintMaskKind) {
           body.mask_mode = this._inpaintMaskKind;
@@ -1125,6 +1129,10 @@ export const useStudioStore = defineStore('studio', {
         this._inpaintMaskKind = 'brush';
       } else if (this.inpaintMaskMode === 'rect') {
         this._inpaintMaskKind = 'rect';
+      } else if (this.inpaintMaskMode === 'freehand') {
+        if (this._inpaintFreehandActive) { this.freehandStop(); }
+        if (!this.inpaintBrushData) { this.toast('Chưa vẽ vùng chọn — vẽ tự do để khoanh vùng.', 'error'); return; }
+        this._inpaintMaskKind = 'brush'; // freehand tạo mask_data như brush
       } else {
         return;
       }
@@ -1154,6 +1162,40 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
+      if (mode === 'freehand') { this.inpaintFreehandPoints = []; this._initInpaintBrush(); }
+    },
+    // ── Freehand (lasso) select: vẽ tự do tạo vùng kín → mask ──
+    freehandStart(e) {
+      if (this.inpaintMaskMode !== 'freehand') return;
+      e.stopPropagation();
+      const p = this.inpaintMaskPointer(e); if (!p) return;
+      this._inpaintFreehandActive = true;
+      this.inpaintFreehandPoints = [p];
+    },
+    freehandMove(e) {
+      if (!this._inpaintFreehandActive) return;
+      const p = this.inpaintMaskPointer(e); if (!p) return;
+      const pts = this.inpaintFreehandPoints;
+      const last = pts[pts.length - 1];
+      if (last && Math.hypot(p.nx - last.nx, p.ny - last.ny) < 0.004) return;
+      pts.push(p);
+    },
+    freehandStop() {
+      if (!this._inpaintFreehandActive) return;
+      this._inpaintFreehandActive = false;
+      const pts = this.inpaintFreehandPoints;
+      if (pts.length < 3) { this.inpaintFreehandPoints = []; return; }
+      if (!this._inpaintMaskCtx) { this._initInpaintBrush(); }
+      const c = this._inpaintMaskCanvas, ctx = this._inpaintMaskCtx;
+      if (!c || !ctx) { return; }
+      const w = c.width, h = c.height;
+      ctx.beginPath();
+      pts.forEach((pt, i) => { const x = pt.nx * w, y = pt.ny * h; if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); } });
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(220,38,38,0.6)';
+      ctx.fill();
+      this._finalizeInpaintBrush();
+      this.inpaintFreehandPoints = [];
     },
     inpaintMaskPointer(e) {
       const m = this.canvasMetrics();
@@ -1395,6 +1437,82 @@ export const useStudioStore = defineStore('studio', {
       // KHÔNG null canvas: giữ nét để vẽ TIẾP nhiều nét trên cùng mask (finalize chỉ snapshot
       // dữ liệu). Canvas bị xoá khi bật brush mới / thoát chế độ (attachBrushCanvas clearRect).
     },
+    // ── Hành động vùng chọn (Xóa / Tô màu) cho rect + freehand ──
+    _loadImageSrc(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Không tải được ảnh.'));
+        img.src = src;
+      });
+    },
+    // Canvas alpha (trắng=vùng chọn, trong suốt=ngoài) theo kích thước layer, có feather.
+    async _buildSelectionAlpha(w, h) {
+      const sel = document.createElement('canvas'); sel.width = w; sel.height = h;
+      const sctx = sel.getContext('2d');
+      const mode = this.inpaintMaskMode;
+      if (mode === 'rect') {
+        const b = this.inpaintMaskBox;
+        if (!b || b.w < 0.02 || b.h < 0.02) throw new Error('Chưa có vùng chọn.');
+        sctx.fillStyle = '#fff';
+        sctx.fillRect(b.x * w, b.y * h, b.w * w, b.h * h);
+      } else {
+        // freehand/brush → mask PNG (đen=vùng chọn)
+        if (!this.inpaintBrushData) throw new Error('Chưa vẽ vùng chọn.');
+        const mimg = await this._loadImageSrc('data:image/png;base64,' + this.inpaintBrushData);
+        const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+        const tctx = tmp.getContext('2d');
+        tctx.drawImage(mimg, 0, 0, w, h);
+        const id = tctx.getImageData(0, 0, w, h);
+        const d = id.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const a = 255 - d[i]; // mask grayscale: đen(0)=vùng chọn → alpha 255
+          d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; d[i + 3] = a;
+        }
+        sctx.putImageData(id, 0, 0);
+      }
+      const feather = Number(this.inpaintFeather) || 0;
+      if (feather > 0) {
+        const blurred = document.createElement('canvas'); blurred.width = w; blurred.height = h;
+        const bctx = blurred.getContext('2d');
+        bctx.filter = `blur(${feather}px)`;
+        bctx.drawImage(sel, 0, 0);
+        return blurred;
+      }
+      return sel;
+    },
+    async _applySelectionToLayer(action, color) {
+      const l = this.activeLayer;
+      if (!l || !l.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      try {
+        const img = await this._loadImageSrc(l.image);
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const sel = await this._buildSelectionAlpha(w, h);
+        const out = document.createElement('canvas'); out.width = w; out.height = h;
+        const octx = out.getContext('2d');
+        octx.drawImage(img, 0, 0);
+        if (action === 'delete') {
+          octx.globalCompositeOperation = 'destination-out';
+          octx.drawImage(sel, 0, 0);
+        } else {
+          const colorCanvas = document.createElement('canvas'); colorCanvas.width = w; colorCanvas.height = h;
+          const cctx = colorCanvas.getContext('2d');
+          cctx.fillStyle = color || this.inpaintFillColor;
+          cctx.fillRect(0, 0, w, h);
+          cctx.globalCompositeOperation = 'destination-in';
+          cctx.drawImage(sel, 0, 0);
+          octx.drawImage(colorCanvas, 0, 0);
+        }
+        l.image = out.toDataURL('image/png');
+        this.saveLayerLayout();
+        this.toast(action === 'delete' ? 'Đã xóa nội dung vùng chọn.' : 'Đã tô màu vùng chọn.');
+      } catch (e) {
+        this.toast(e.message || 'Không áp dụng được.', 'error');
+      }
+    },
+    deleteSelectedRegion() { this._applySelectionToLayer('delete'); },
+    fillSelectedRegion() { this._applySelectionToLayer('fill'); },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
       // change_face=false (mặc định): giữ nguyên khuôn mặt gốc, chỉ cần pose.

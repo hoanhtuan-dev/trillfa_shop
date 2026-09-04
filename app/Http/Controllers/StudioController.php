@@ -192,6 +192,7 @@ class StudioController extends Controller
             // Ảnh ĐANG HIỂN THỊ trên canvas (upscaleSrc) — mask được vẽ theo ảnh này,
             // nên build mask & base phải dùng ĐÚNG ảnh này (không phải generation.media_url).
             'source_url' => ['nullable', 'string', 'max:2048'],
+            'feather' => ['nullable', 'integer', 'min:0', 'max:50'],
         ]);
 
         $preserveBg = ! empty($data['preserve_background']);
@@ -206,7 +207,7 @@ class StudioController extends Controller
         $maskUrl = null;
         $maskMode = (string) ($data['mask_mode'] ?? '');
         if ($maskMode !== '' && ! empty($data['region']) && $sourceUrl) {
-            $maskUrl = $this->buildMaskImage($sourceUrl, $data['region'], $maskMode, $data['mask_data'] ?? null);
+            $maskUrl = $this->buildMaskImage($sourceUrl, $data['region'], $maskMode, $data['mask_data'] ?? null, (int) ($data['feather'] ?? 0));
         }
 
         $promptInstruction = 'Using the provided image as the exact base, edit it surgically. Change ONLY: '.$request->input('prompt')
@@ -238,7 +239,7 @@ class StudioController extends Controller
      * Build a mask image (WHITE=keep, BLACK=edit) from normalized region coords.
      * Same size as the source image. Supports rect and brush modes.
      */
-    protected function buildMaskImage(string $sourceUrl, array $region, string $maskMode, ?string $brushData): ?string
+    protected function buildMaskImage(string $sourceUrl, array $region, string $maskMode, ?string $brushData, int $feather = 0): ?string
     {
         $file = null;
         foreach ([public_path(ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')))] as $cand) {
@@ -292,7 +293,7 @@ class StudioController extends Controller
         }
 
         // Feather: mép vùng edit chuyển mềm — model tôn trọng biên, ảnh gộp không seam.
-        $this->featherMaskEdges($mask);
+        $this->featherMaskEdges($mask, $feather);
 
         $name = 'studio/mask-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($mask));
@@ -1787,17 +1788,18 @@ RULES:
      * Thực hiện trên bản thu nhỏ (~1/5) rồi nội suy về kích thước gốc — mép đen/trắng
      * chuyển dần qua xám vài px tỉ lệ theo ảnh, nhanh kể cả ảnh lớn.
      */
-    protected function featherMaskEdges(\GdImage &$mask): void
+    protected function featherMaskEdges(\GdImage &$mask, int $feather = 0): void
     {
         $w = imagesx($mask); $h = imagesy($mask);
         if ($w < 32 || $h < 32) return;
-        $tw = max(32, (int) round($w / 5));
-        $th = max(32, (int) round($h / 5));
+        // Feather px → số lần blur + tỉ lệ thu nhỏ (nhiều feather = mép mềm rộng hơn).
+        $passes = $feather > 0 ? max(3, min(8, 3 + intdiv($feather, 12))) : 3;
+        $div = $feather > 30 ? 4 : 5;
+        $tw = max(32, (int) round($w / $div));
+        $th = max(32, (int) round($h / $div));
         $small = imagecreatetruecolor($tw, $th);
         imagecopyresampled($small, $mask, 0, 0, 0, 0, $tw, $th, $w, $h);
-        imagefilter($small, IMG_FILTER_GAUSSIAN_BLUR);
-        imagefilter($small, IMG_FILTER_GAUSSIAN_BLUR);
-        imagefilter($small, IMG_FILTER_GAUSSIAN_BLUR);
+        for ($i = 0; $i < $passes; $i++) { imagefilter($small, IMG_FILTER_GAUSSIAN_BLUR); }
         $tmp = imagecreatetruecolor($w, $h);
         imagecopyresampled($tmp, $small, 0, 0, 0, 0, $w, $h, $tw, $th);
         imagedestroy($mask);

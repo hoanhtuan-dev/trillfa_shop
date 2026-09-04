@@ -80,6 +80,11 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
               class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
         🖌 Vẽ mask
       </button>
+      <button @click="store.toggleInpaintMask('freehand')"
+              :class="store.inpaintMaskMode === 'freehand' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
+        ✏️ Vẽ tự do
+      </button>
       <button v-if="maskActive && store.inpaintMaskMode === 'rect' && (store.inpaintMaskBox.w || 0) >= 0.02"
               @click="store.resetInpaintMaskBox()"
               class="rounded-full bg-amber-600/30 px-2 py-1 text-[10px] font-semibold text-amber-200 hover:bg-amber-600"

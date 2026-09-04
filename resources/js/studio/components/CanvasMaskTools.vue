@@ -46,12 +46,27 @@ const brushCanvasSize = computed(() => {
   return { width: base, height: base };
 });
 
-// Bấm ngoài box (container) → tạo vùng mới; brush → vẽ mask. Chỉ khi ĐANG chỉnh.
+// Bấm ngoài box (container) → tạo vùng mới; brush → vẽ mask; freehand → vẽ tự do. Chỉ khi ĐANG chỉnh.
+function onFhMove(e) { store.freehandMove(e); }
+function onFhUp() { window.removeEventListener('pointermove', onFhMove); window.removeEventListener('pointerup', onFhUp); store.freehandStop(); }
 function onPointerDown(e) {
   if (!editing.value) return;
   e.preventDefault();
+  if (store.inpaintMaskMode === 'freehand') {
+    store.freehandStart(e);
+    window.addEventListener('pointermove', onFhMove);
+    window.addEventListener('pointerup', onFhUp);
+    return;
+  }
   store.inpaintMaskStart(e);
 }
+
+// SVG path freehand (GIMP-style): điểm normalized → pixel trong container
+const freehandPoints = computed(() => {
+  const m = store.canvasMetrics();
+  if (!m) return '';
+  return store.inpaintFreehandPoints.map(p => Math.round(m.vx + p.nx * m.vw) + ',' + Math.round(m.vy + p.ny * m.vh)).join(' ');
+});
 
 // ── Brush: canvas overlay THẬT phủ đúng vùng ảnh hiển thị (nét vẽ hiện ngay, đỏ 60%) ──
 const metricsTick = ref(0);
@@ -108,6 +123,14 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
             class="pointer-events-none absolute z-10 rounded-lg"
             :style="brushOverlayStyle"></canvas>
 
+    <!-- Freehand (lasso): hiển thị đường vẽ đang kéo (GIMP-style) -->
+    <svg v-if="store.inpaintMaskMode === 'freehand' && store.inpaintFreehandPoints.length > 1"
+         class="pointer-events-none absolute inset-0 z-10 h-full w-full">
+      <polyline :points="freehandPoints" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      <polygon v-if="store.inpaintMaskMode === 'freehand' && !store._inpaintFreehandActive && store.inpaintFreehandPoints.length"
+               :points="freehandPoints" fill="rgba(244,63,94,0.12)" stroke="none" />
+    </svg>
+
     <!-- Rect: box + handles (chỉ khi ĐANG chỉnh) -->
     <div v-if="store.inpaintMaskMode === 'rect'" class="pointer-events-none absolute inset-0">
       <template v-if="hasBox">
@@ -160,6 +183,19 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
           <button @click.stop="store.inpaintBrushSize = Math.min(48, (store.inpaintBrushSize||10) + 2)" @pointerdown.stop class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600" title="Cọ to hơn">+</button>
           <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
           <button @click.stop="store.confirmInpaintMask()" @pointerdown.stop class="rounded-full bg-brand-600 px-2.5 py-1 text-white transition-colors hover:bg-brand-700" title="Lưu vùng vẽ và thoát">✅ Xong</button>
+        </template>
+        <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+        <span class="text-[10px] text-cream-300/70">Feather</span>
+        <input type="range" min="0" max="50" step="5" :value="store.inpaintFeather" @input="store.inpaintFeather = Number($event.target.value)" class="h-1.5 w-16 cursor-pointer accent-brand-500" @pointerdown.stop>
+        <span class="min-w-5 text-center text-[11px] text-cream-100">{{ store.inpaintFeather }}</span>
+        <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand'">
+          <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+          <button @click.stop="store.deleteSelectedRegion()" @pointerdown.stop class="rounded-full bg-red-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-red-600" title="Xóa nội dung trong vùng chọn">🧹 Xóa</button>
+          <label class="relative inline-flex h-6 w-6 cursor-pointer overflow-hidden rounded-full ring-1 ring-white/20" title="Chọn màu tô">
+            <span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span>
+            <input type="color" :value="store.inpaintFillColor" @input.stop="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0" @pointerdown.stop>
+          </label>
+          <button @click.stop="store.fillSelectedRegion()" @pointerdown.stop class="rounded-full bg-sky-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-sky-600" title="Tô màu vào vùng chọn">🎨 Tô</button>
         </template>
         <button @click.stop="store.clearInpaintMask()" @pointerdown.stop class="rounded-full bg-ink-700 px-2 py-0.5 text-cream-200 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ mask hiện tại">✕</button>
       </div>
