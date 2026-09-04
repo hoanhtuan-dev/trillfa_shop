@@ -140,6 +140,18 @@ function onCanvasBgUp(e) {
   }
   bgDownPos = null;
 }
+function onTouchStart(e) {
+  if (e.touches.length === 2) store.beginPinch(e.touches[0], e.touches[1]);
+}
+function onTouchMove(e) {
+  if (e.touches.length === 2) {
+    if (e.cancelable) e.preventDefault();
+    store.pinchMove(e.touches[0], e.touches[1]);
+  }
+}
+function onTouchEnd(e) {
+  if (e.touches.length < 2) store.endPinch();
+}
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
@@ -170,8 +182,10 @@ function onCanvasBgUp(e) {
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative h-full overflow-hidden rounded-2xl border border-ink-700" :class="bgClass">
-          <!-- Floating tools (Reframe + Film Look) -->
-          <RegionTools />
+          <!-- Floating tools (Reframe + Film Look) — desktop only -->
+          <div class="hidden lg:block">
+            <RegionTools />
+          </div>
           <!-- Inpaint mask overlay on canvas -->
           <CanvasMaskTools />
           <!-- active image indicator + actions -->
@@ -181,7 +195,7 @@ function onCanvasBgUp(e) {
             <button @click="store.downloadActive()" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-white shadow-brand-500/40 transition-colors hover:bg-brand-500" title="Tải ảnh xuống"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
             <button v-if="store.editSource" @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
           </div>
-          <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd">
+          <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
             <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
               <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full min-w-0 select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
@@ -231,13 +245,40 @@ function onCanvasBgUp(e) {
           </div>
           <!-- right column: layers thumbnails (minimal) + transform/palette -->
           <div class="absolute right-3 top-3 z-20 flex flex-col items-end gap-1.5">
-            <div v-if="store.canvasLayers.length" class="flex flex-col gap-1">
+            <div v-if="store.canvasLayers.length" class="flex flex-col gap-1 lg:hidden">
               <button v-for="l in store.canvasLayers" :key="l.id" @click="store.selectLayer(l)" class="h-6 w-6 shrink-0 overflow-hidden rounded-sm transition" :class="store.activeLayerId === l.id ? 'ring-2 ring-brand-400' : 'opacity-60 hover:opacity-100'" :title="l.name">
                 <img :src="l.image" class="h-6 w-6 object-cover" />
               </button>
               <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-6 w-6 shrink-0 place-items-center rounded-sm text-red-300 hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas">🗑</button>
             </div>
-            <p v-else class="rounded-lg bg-ink-900/50 px-2 py-1.5 text-center text-[10px] text-cream-300/40">Chưa có layer.</p>
+            <div v-if="store.canvasLayers.length" class="hidden w-64 flex-col gap-1.5 rounded-2xl bg-ink-900/85 p-2 shadow-lg lg:flex">
+              <div class="flex items-center justify-between px-0.5">
+                <p class="text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
+                <button @click="store.cleanCanvas()" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">Dọn canvas</button>
+              </div>
+              <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
+                <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40']">
+                  <button @click="store.toggleLayerVisible(l.id)" class="grid h-5 w-5 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700" :title="l.visible ? 'Ẩn layer' : 'Hiện layer'">{{ l.visible ? '👁' : '–' }}</button>
+                  <button @click="store.selectLayer(l)" class="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+                    <img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover">
+                    <span v-if="renamingId !== l.id" class="truncate text-[10px] text-cream-100">{{ l.name }}</span>
+                    <input v-else v-model="renameValue" class="w-full min-w-0 rounded bg-ink-900 px-1 py-0.5 text-[10px] text-cream-100 outline-none ring-1 ring-brand-500" @keyup.enter="commitRename()" @keyup.esc="cancelRename()" @blur="commitRename()" @click.stop>
+                  </button>
+                  <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button @click="store.toggleLayerLock(l.id)" class="grid h-5 w-5 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-amber-300' : 'text-cream-300 hover:bg-ink-700'" :title="l.locked ? 'Mở khóa' : 'Khóa layer'">{{ l.locked ? '🔒' : '🔓' }}</button>
+                    <button @click="store.moveLayer(l.id, 'up')" :disabled="i === 0 || l.locked" class="grid h-5 w-4 place-items-center rounded text-cream-300 hover:bg-ink-700 disabled:opacity-30" title="Lên trên">▲</button>
+                    <button @click="store.moveLayer(l.id, 'down')" :disabled="i === store.canvasLayers.length - 1 || l.locked" class="grid h-5 w-4 place-items-center rounded text-cream-300 hover:bg-ink-700 disabled:opacity-30" title="Xuống dưới">▼</button>
+                    <button v-if="renamingId !== l.id" @click="startRename(l)" :disabled="l.locked" class="grid h-5 w-5 place-items-center rounded text-cream-300 hover:bg-ink-700 disabled:opacity-30" title="Đổi tên">✎</button>
+                    <button @click="store.deleteLayer(l)" :disabled="l.locked" class="grid h-5 w-5 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600 disabled:opacity-30" :title="l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)'">🗑</button>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-1 grid grid-cols-2 gap-1.5 border-t border-ink-700/60 pt-1.5">
+                <button @click="store.exportComposite()" :disabled="!store.visibleLayers.length" class="rounded-lg bg-ink-800 px-2 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị và tải xuống PNG">⬇ Xuất ảnh gộp</button>
+                <button @click="store.flattenToLayer()" :disabled="!store.visibleLayers.length" class="rounded-lg bg-brand-600 px-2 py-1.5 text-[9px] font-semibold text-white hover:bg-brand-500 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị thành 1 layer mới">🧩 Gộp thành layer</button>
+              </div>
+            </div>
+            <p v-if="!store.canvasLayers.length" class="rounded-lg bg-ink-900/50 px-2 py-1.5 text-center text-[10px] text-cream-300/40">Chưa có layer.</p>
             <div v-if="store.activeLayer" class="hidden w-64 rounded-2xl bg-ink-900/90 p-2 shadow-lg lg:block">
               <div class="mb-1 flex items-center justify-between px-0.5">
                 <p class="text-[10px] font-semibold text-cream-300/60">✋ Transform</p>
@@ -277,11 +318,6 @@ function onCanvasBgUp(e) {
                 <button @click="store.duplicateLayer(store.activeLayer.id)" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Nhân đôi layer (Ctrl+D)">📄 Nhân đôi</button>
                 <button @click="store.bringLayerTo(store.activeLayer.id, 'front')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa lên trên cùng">⤒ Lên trên</button>
                 <button @click="store.bringLayerTo(store.activeLayer.id, 'back')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa xuống dưới cùng">⤓ Xuống dưới</button>
-              </div>
-              <div class="mt-1.5 grid grid-cols-3 gap-1.5 border-t border-ink-700/60 pt-1.5">
-                <button @click="store.cleanCanvas()" :disabled="!store.canvasLayers.length" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Dọn canvas — bỏ hết layer">🧹 Dọn</button>
-                <button @click="store.exportComposite()" :disabled="!store.visibleLayers.length" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị và tải xuống PNG">⬇ Xuất</button>
-                <button @click="store.flattenToLayer()" :disabled="!store.visibleLayers.length" class="rounded-lg bg-brand-600 px-1 py-1.5 text-[9px] font-semibold text-white hover:bg-brand-500 disabled:opacity-40" title="Gộp tất cả layer đang hiển thị thành 1 layer mới">🧩 Gộp</button>
               </div>
             </div>
             <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="hidden w-64 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl lg:block">
