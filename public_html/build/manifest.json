@@ -1,10 +1,10 @@
 {
-  "_BaseBadge-DsdVY5pt.js": {
-    "file": "assets/BaseBadge-DsdVY5pt.js",
+  "_BaseBadge-CUrpXzIm.js": {
+    "file": "assets/BaseBadge-CUrpXzIm.js",
     "name": "BaseBadge",
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-CONNTBP3.js"
+      "_ProductCard-B9ME0WgD.js"
     ]
   },
   "_GalleryModal-BtN1UU1x.js": {
@@ -18,8 +18,8 @@
     "file": "assets/ProductCard-B78GTz3D.css",
     "src": "_ProductCard-B78GTz3D.css"
   },
-  "_ProductCard-CONNTBP3.js": {
-    "file": "assets/ProductCard-CONNTBP3.js",
+  "_ProductCard-B9ME0WgD.js": {
+    "file": "assets/ProductCard-B9ME0WgD.js",
     "name": "ProductCard",
     "imports": [
       "_pinia-CJA6HZ2m.js",
@@ -120,7 +120,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-L45TBJIx.css",
+    "file": "assets/app-C-s6FSC6.css",
     "name": "app",
     "names": [
       "app.css"
@@ -135,36 +135,36 @@
     "isEntry": true
   },
   "resources/js/storefront/app.js": {
-    "file": "assets/app-JMMbPDww.js",
+    "file": "assets/app-F_991nh2.js",
     "name": "app",
     "src": "resources/js/storefront/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-CONNTBP3.js",
+      "_ProductCard-B9ME0WgD.js",
       "_SkeletonCard-DY5YvfgY.js",
-      "_BaseBadge-DsdVY5pt.js"
+      "_BaseBadge-CUrpXzIm.js"
     ]
   },
   "resources/js/storefront/product.js": {
-    "file": "assets/product-D2UM2ZlM.js",
+    "file": "assets/product-sR_S6BUD.js",
     "name": "product",
     "src": "resources/js/storefront/product.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-CONNTBP3.js",
-      "_BaseBadge-DsdVY5pt.js"
+      "_ProductCard-B9ME0WgD.js",
+      "_BaseBadge-CUrpXzIm.js"
     ]
   },
   "resources/js/storefront/shop.js": {
-    "file": "assets/shop-D2JKEHmt.js",
+    "file": "assets/shop-BhfFkDN5.js",
     "name": "shop",
     "src": "resources/js/storefront/shop.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-CONNTBP3.js",
+      "_ProductCard-B9ME0WgD.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_SkeletonCard-DY5YvfgY.js"
     ],

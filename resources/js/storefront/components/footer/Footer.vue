@@ -50,9 +50,9 @@ const year = new Date().getFullYear();
                         <h3 class="font-display text-2xl font-semibold text-ink-900">Nhận ưu đãi &amp; xu hướng mới</h3>
                         <p class="mt-2 text-sm text-ink-500">Đăng ký nhận thông tin về bộ sưu tập mới và khuyến mãi độc quyền.</p>
                     </div>
-                    <form class="flex w-full max-w-md items-center gap-3" @submit.prevent="subscribe">
-                        <input v-model="email" type="email" required placeholder="Email của bạn" class="sf-input" />
-                        <button type="submit" class="sf-btn sf-btn-primary shrink-0" :disabled="sending">
+                    <form class="flex w-full max-w-md flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="subscribe">
+                        <input v-model="email" type="email" required placeholder="Email của bạn" class="sf-input flex-1" />
+                        <button type="submit" class="sf-btn sf-btn-primary w-full shrink-0 sm:w-auto" :disabled="sending">
                             {{ sending ? 'Đang gửi…' : 'Đăng ký' }}
                         </button>
                     </form>
