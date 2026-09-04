@@ -128,11 +128,12 @@ class ProductAIService
     {
         $prompt = $this->buildPrompt($input, $imageAnalysis);
 
-        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if ($this->provider !== 'gemini' && $qwenKey) {
-            $result = $this->callQwen($prompt, $qwenKey);
-            if ($result) {
-                return $result;
+        if ($this->provider !== 'gemini') {
+            foreach ($this->qwenKeys() as $key) {
+                $result = $this->callQwen($prompt, $key);
+                if ($result) {
+                    return $result;
+                }
             }
         }
 
@@ -145,6 +146,16 @@ class ProductAIService
         }
 
         return $this->stub($input, $imageAnalysis);
+    }
+
+    protected function qwenKeys(): array
+    {
+        $keys = function_exists('studio_qwen_credentials') ? studio_qwen_credentials('vision') : [];
+        if (empty($keys)) {
+            $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
+        }
+
+        return array_values(array_unique(array_filter($keys)));
     }
 
     protected function buildPrompt(array $input, ?array $imageAnalysis): string
@@ -170,7 +181,7 @@ class ProductAIService
         $refine = $currentShort ? "\nNội dung đã viết (hãy dùng làm nền, giữ ý chính, cải thiện làm giàu hơn): {$currentShort}" : '';
 
         return <<<PROMPT
-Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Tối giản, tinh tế, hấp dẫn, khác biệt.
+Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Viết mô tả sản phẩm CHUẨN NGÀNH, có cấu trúc rõ ràng, không sáo rỗng, dựa trên phân tích ảnh + thông tin người dùng.
 {$img}
 {$refine}
 
@@ -180,12 +191,22 @@ Thông tin người dùng đã nhập:
 - Thương hiệu: {$brand}
 - Ý tưởng/điểm nhấn: {$hint}
 
-Làm giàu & tinh chỉnh nội dung sản phẩm dựa trên các thông tin trên. Chỉ TRẢ VỀ JSON hợp lệ (không markdown):
+QUAN TRỌNG — mô tả chi tiết (key "description") phải là HTML có cấu trúc gồm CÁC MỤC (dùng <h3> mục + <ul><li>/<p>), bao phủ những gì người mua cần biết về một sản phẩm thời trang chuẩn ngành, ví dụ:
+- **Phong cách**: phong cách/đặc tính chính (tối giản, thanh lịch, năng động…)
+- **Loại trang phục / dáng**: (đầm, áo sơ mi, quần…) + dáng/kiểu dáng, form
+- **Chất liệu & chất lượng**: chất liệu chính, cảm giác, độ bền, thoáng mát…
+- **Màu sắc / họa tiết**: từ phân tích ảnh
+- **Thiết kế chi tiết**: cổ tay, cúc, túi, đường may, chi tiết nổi bật
+- **Phù hợp**: dịp/phong cách phối đồ (công sở, dạo phố, dự tiệc, mùa hè…)
+- **Bảo quản & lưu ý**: giặt, ủi, bảo quản, hướng dẫn size
+- Một câu cảm xúc / câu chuyện thương hiệu ngắn, khác biệt.
+
+Chỉ TRẢ VỀ JSON hợp lệ (không markdown, không giải thích):
 {
-  "suggested_name": "tên sản phẩm hấp dẫn (<=80)",
+  "suggested_name": "tên sản phẩm hấp dẫn (<=80 ký tự)",
   "brand": "thương hiệu (giữ nguyên nếu có, nếu không gợi ý)",
-  "short_description": "mô tả ngắn 1-2 câu (<=160)",
-  "description": "<p>mô tả chi tiết <p><ul><li><blockquote>, có <h2>, ~120 từ, nêu chất liệu/màu/phong cách từ phân tích ảnh nếu có</p>",
+  "short_description": "1-2 câu mô tả ngắn, hấp dẫn (<=160 ký tự)",
+  "description": "<h3>Phong cách</h3><p>...</p><h3>Chất liệu</h3><ul><li>...</li></ul>... (đầy đủ các mục trên, ~180-250 từ)",
   "meta_title": "SEO title <=60 ký tự",
   "meta_description": "SEO description 120-160 ký tự",
   "tags": ["tag1","tag2","tag3","tag4"]
@@ -201,7 +222,8 @@ PROMPT;
                 'model' => $this->model,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.7,
-                'max_tokens' => 900,
+                'max_tokens' => 1200,
+                'response_format' => ['type' => 'json_object'],
             ]);
             if (! $resp->ok()) {
                 return null;
@@ -278,14 +300,41 @@ PROMPT;
         $color = $imageAnalysis['colors'] ?? '';
         $fabric = $imageAnalysis['fabric'] ?? '';
 
+        $style = $imageAnalysis['styles'] ?? '';
+        $fabric = $imageAnalysis['fabric'] ?? '';
+        $color = $imageAnalysis['colors'] ?? '';
+        $subject = $imageAnalysis['subject'] ?? '';
+        $feeling = $imageAnalysis['feeling'] ?? '';
+
+        $descFabric = $fabric ?: 'chất liệu cao cấp, thoáng mát và bền bỉ';
+        $descColor = $color ?: 'tông màu trung tính dễ phối đồ';
+        $descStyle = $style ?: 'tối giản, tinh tế, hiện đại';
+        $descGarment = $category ?: 'sản phẩm thời trang/phong cách sống';
+
+        $description = '<h3>Phong cách</h3>'
+            .'<p>'.$base.' mang phong cách '.$descStyle.', tôn dáng và thoải mái — dễ dàng kết hợp trong nhiều hoàn cảnh.</p>'
+            .'<h3>Loại trang phục &amp; dáng</h3>'
+            .'<p>'.$descGarment.' với đường cắt tối giản, form cân đối, phù hợp vóc dáng người Việt.</p>'
+            .'<h3>Chất liệu &amp; chất lượng</h3>'
+            .'<ul><li>'.$descFabric.', tạo cảm giác dễ chịu khi mặc</li><li>Đường may chắc chắn, bền bỉ theo thời gian</li></ul>'
+            .'<h3>Màu sắc &amp; họa tiết</h3>'
+            .'<p>'.$descColor.($subject ? ', phù hợp với ' . $subject : '').'.</p>'
+            .'<h3>Thiết kế chi tiết</h3>'
+            .'<ul><li>Chi tiết tối giản, tinh tế, dễ phối đồ</li><li>Form dáng tôn dáng, thoải mái khi vận động</li></ul>'
+            .'<h3>Phù hợp</h3>'
+            .'<p>Dễ phối cho công sở, dạo phố hoặc những buổi gặp gỡ nhẹ nhàng.</p>'
+            .'<h3>Bảo quản &amp; lưu ý</h3>'
+            .'<ul><li>Giặt nhẹ, tránh nước tẩy mạnh</li><li>Ủi ở nhiệt độ thấp để giữ form</li><li>Đổi trả trong 7 ngày</li></ul>'
+            .'<blockquote>"'.($feeling ?: 'Tối giản không phải là ít, mà là đủ.').' — '.$brand.'"</blockquote>';
+
         return [
             'suggested_name' => $base,
             'brand' => $brand,
-            'short_description' => 'Sản phẩm '.($category ? $category.' ' : '').'được tuyển chọn kỹ lưỡng, thiết kế tối giản tinh tế, chất liệu cao cấp — dễ dàng phối đồ và bền bỉ theo thời gian.',
-            'description' => '<h2>Mô tả sản phẩm</h2><p>'.$base.' '.($category ? 'thuộc bộ sưu tập '.$category.' ' : '').'của Trillfa Fa — thiết kế tối giản, chất liệu cao cấp'.($fabric ? ', '.$fabric : '').', tôn dáng và thoải mái.</p><ul><li>Chất liệu cao cấp, thân thiện môi trường</li><li>Thiết kế tối giản, dễ phối đồ</li><li>Đổi trả trong 7 ngày</li></ul><blockquote>"Tối giản không phải là ít, mà là đủ."</blockquote>',
-            'meta_title' => $base.' | Trillfa Fa',
-            'meta_description' => 'Khám phá '.$base.' '.($category ? 'trong '.$category.' ' : '').'— chất liệu cao cấp, thiết kế tối giản, giao nhanh, đổi trả dễ dàng.',
-            'tags' => array_values(array_filter([$category, $color, $fabric, 'thời trang', 'phong cách', 'trillfa'])),
+            'short_description' => ($category ? $category.' ' : '').$base.' '.($fabric ? $fabric.' ' : '').'— thiết kế '.$descStyle.', '.$descFabric.', dễ phối đồ và bền bỉ.',
+            'description' => $description,
+            'meta_title' => $base.' | '.$brand,
+            'meta_description' => 'Khám phá '.$base.' '.($fabric ? $fabric.' ' : '').'— '.$descStyle.', chất liệu cao cấp, tôn dáng, giao nhanh, đổi trả dễ dàng.',
+            'tags' => array_values(array_filter([$category, $style, $color, $fabric, 'thời trang', 'phong cách', 'trillfa'])),
             'source' => 'stub',
         ];
     }
