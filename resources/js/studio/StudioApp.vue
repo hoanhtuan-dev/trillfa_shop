@@ -249,10 +249,16 @@ function onTouchEnd(e) {
           </div>
           <!-- Erase toolbar (desktop only) -->
           <div v-if="store.eraseMode" class="absolute bottom-16 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900/90 px-3 py-2 shadow-xl backdrop-blur lg:flex">
+            <span class="text-[10px] font-semibold text-cream-200">Cọ</span>
+            <input type="range" min="3" max="150" step="1" :value="store.eraseBrushSize" @input="store.eraseBrushSize = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
+            <span class="w-8 text-right text-[10px] text-cream-200">{{ store.eraseBrushSize }}px</span>
+            <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
             <span class="text-[10px] font-semibold text-cream-200">Feather</span>
-            <input type="range" min="3" max="120" step="1" :value="store.eraseFeather" @input="store.setEraseFeather($event.target.value)" class="h-1.5 w-28 cursor-pointer accent-brand-500">
-            <span class="w-8 text-right text-[10px] text-cream-200">{{ store.eraseFeather }}px</span>
-            <button @click="store.toggleErase()" class="rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-500">✓ Xong</button>
+            <input type="range" min="0" max="60" step="1" :value="store.eraseFeather" @input="store.eraseFeather = Number($event.target.value)" class="h-1.5 w-24 cursor-pointer accent-brand-500">
+            <span class="w-6 text-right text-[10px] text-cream-200">{{ store.eraseFeather }}</span>
+            <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+            <button @click="store.applyEraseNow()" class="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500">🗑 Xóa</button>
+            <button @click="store.cancelErase()" class="rounded-full bg-ink-700 px-3 py-1 text-xs font-semibold text-cream-200 hover:bg-ink-600">✕ Hủy</button>
           </div>
           <!-- Canvas toolbar -->
           <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">

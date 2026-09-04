@@ -190,6 +190,7 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
         <span class="min-w-5 text-center text-[11px] text-cream-100">{{ store.inpaintFeather }}</span>
         <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand'">
           <span class="mx-0.5 h-4 w-px bg-ink-600"></span>
+          <button @click.stop="store.duplicateSelectedRegion()" @pointerdown.stop class="rounded-full bg-emerald-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-emerald-600" title="Nhân đôi vùng chọn thành layer mới">⧉ Nhân đôi</button>
           <button @click.stop="store.deleteSelectedRegion()" @pointerdown.stop class="rounded-full bg-red-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-red-600" title="Xóa nội dung trong vùng chọn">🧹 Xóa</button>
           <label class="relative inline-flex h-6 w-6 cursor-pointer overflow-hidden rounded-full ring-1 ring-white/20" title="Chọn màu tô">
             <span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span>

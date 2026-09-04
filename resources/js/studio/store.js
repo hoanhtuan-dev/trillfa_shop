@@ -53,7 +53,8 @@ export const useStudioStore = defineStore('studio', {
     _pinch: null,
     // Xóa vùng (erase) với feather
     eraseMode: false,
-    eraseFeather: 20,
+    eraseFeather: 15,       // độ mềm mép nét xóa (0-60)
+    eraseBrushSize: 24,     // độ dày cọ xóa (px 3-150)
     _eraseCanvas: null,
     _eraseCtx: null,
     _eraseDrawing: false,
@@ -784,7 +785,7 @@ export const useStudioStore = defineStore('studio', {
       this._eraseCtx.clearRect(0, 0, w, h);
     },
     setEraseFeather(v) { this.eraseFeather = Number(v) || 0; },
-    _eraseRadius() { return Math.max(3, Math.min(120, Number(this.eraseFeather) || 20)); },
+    _eraseRadius() { return Math.max(3, Math.min(150, Number(this.eraseBrushSize) || 24)); },
     _erasePoint(e) {
       const m = this.canvasMetrics();
       if (!m) return { nx: 0.5, ny: 0.5 };
@@ -793,9 +794,11 @@ export const useStudioStore = defineStore('studio', {
     _drawEraseDot(p) {
       const c = this._eraseCtx; if (!c) return;
       const w = this._eraseCanvas.width, h = this._eraseCanvas.height, r = this._eraseRadius();
+      const f = Math.max(0, Math.min(1, (Number(this.eraseFeather) || 0) / 60)); // feather 0-60
+      const hard = Math.max(0.15, 0.9 - f * 0.75); // mép cứng (f=0) → rất mềm (f=1)
       const g = c.createRadialGradient(p.nx * w, p.ny * h, 0, p.nx * w, p.ny * h, r);
       g.addColorStop(0, 'rgba(0,0,0,1)');
-      g.addColorStop(0.55, 'rgba(0,0,0,0.85)');
+      g.addColorStop(hard, 'rgba(0,0,0,0.85)');
       g.addColorStop(1, 'rgba(0,0,0,0)');
       c.fillStyle = g;
       c.beginPath(); c.arc(p.nx * w, p.ny * h, r, 0, Math.PI * 2); c.fill();
@@ -811,7 +814,8 @@ export const useStudioStore = defineStore('studio', {
     endEraseBrush() { this._eraseDrawing = false; this._eraseLast = null; },
     applyErase() {
       const l = this.activeLayer;
-      if (!l || !this._eraseCanvas) return;
+      const ec = this._eraseCanvas;
+      if (!l || !ec) return;
       const img = new Image();
       img.onload = () => {
         const w = img.naturalWidth, h = img.naturalHeight;
@@ -819,15 +823,18 @@ export const useStudioStore = defineStore('studio', {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0);
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.drawImage(this._eraseCanvas, 0, 0, w, h);
+        ctx.drawImage(ec, 0, 0, w, h);
         l.image = canvas.toDataURL('image/png');
-        this._eraseCtx && this._eraseCtx.clearRect(0, 0, this._eraseCanvas.width, this._eraseCanvas.height);
         this.saveLayerLayout();
         this.toast('Đã xóa vùng.');
       };
       img.onerror = () => this.toast('Không xóa được ảnh.', 'error');
       img.src = l.image;
     },
+    // Nút "🗑 Xóa" trên toolbar erase: áp dụng xóa ngay rồi thoát chế độ.
+    applyEraseNow() { this.applyErase(); this.eraseMode = false; },
+    // Nút "✕ Hủy": thoát chế độ erase KHÔNG áp dụng (bỏ nét đã vẽ).
+    cancelErase() { this.eraseMode = false; this.toast('Đã hủy xóa.'); },
     // ── Vẽ vùng chọn (rectangle marquee) ──
     toggleRegionSelect() {
       this.regionSelectMode = !this.regionSelectMode;
@@ -1149,6 +1156,7 @@ export const useStudioStore = defineStore('studio', {
       this._inpaintStopDrag && this._inpaintStopDrag();
       this.inpaintMaskMode = 'none'; // tắt overlay
       this.inpaintErase = false;
+      this.inpaintFreehandPoints = [];
       if (this.inpaintMaskSource === 'canvas') {
         // Vùng chọn trên canvas: chỉ thoát + xoá dữ liệu, không giữ làm mask inpaint.
         this.inpaintMaskDone = false;
@@ -1170,6 +1178,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintBrushData = '';
       this.inpaintErase = false;
       this.inpaintMaskSource = 'inpaint';
+      this.inpaintFreehandPoints = [];
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
     },
     toggleInpaintMask(mode) {
@@ -1230,7 +1239,7 @@ export const useStudioStore = defineStore('studio', {
       ctx.fillStyle = 'rgba(220,38,38,0.6)';
       ctx.fill();
       this._finalizeInpaintBrush();
-      this.inpaintFreehandPoints = [];
+      // Giữ điểm path để đường lasso hiển thị bền bỉ cho đến khi xóa/thoát vùng chọn.
     },
     inpaintMaskPointer(e) {
       const m = this.canvasMetrics();
@@ -1548,6 +1557,28 @@ export const useStudioStore = defineStore('studio', {
     },
     deleteSelectedRegion() { this._applySelectionToLayer('delete'); },
     fillSelectedRegion() { this._applySelectionToLayer('fill'); },
+    // Nhân đôi vùng chọn (rect/freehand) thành 1 layer mới chứa đúng phần được chọn.
+    async duplicateSelectedRegion() {
+      const l = this.activeLayer;
+      if (!l || !l.image) { this.toast('Chọn 1 layer ảnh trước.', 'error'); return; }
+      try {
+        const img = await this._loadImageSrc(l.image);
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const sel = await this._buildSelectionAlpha(w, h);
+        const out = document.createElement('canvas'); out.width = w; out.height = h;
+        const octx = out.getContext('2d');
+        octx.drawImage(img, 0, 0);
+        octx.globalCompositeOperation = 'destination-in';
+        octx.drawImage(sel, 0, 0); // giữ đúng pixel trong vùng chọn, ngoài trong suốt
+        const url = out.toDataURL('image/png');
+        const id = 'dup-' + Date.now();
+        this.pushCanvasLayer(id, 'source', 'Nhân đôi vùng chọn', url);
+        this.setActiveLayer(id);
+        this.toast('Đã nhân đôi vùng chọn thành layer mới.');
+      } catch (e) {
+        this.toast(e.message || 'Không nhân đôi được.', 'error');
+      }
+    },
     async runSwap(opts = {}) {
       const src = this.upscaleSrc; if (!src || this.swapLoading) { this.toast('Chọn ảnh thiết kế để áp dụng.', 'error'); return; }
       // change_face=false (mặc định): giữ nguyên khuôn mặt gốc, chỉ cần pose.
