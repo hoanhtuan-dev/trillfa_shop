@@ -29,8 +29,8 @@ const cls = computed(() => [
     'sf-btn',
     variantClass.value,
     sizeClass.value,
-    block.value ? 'w-full' : '',
-    disabled.value ? 'pointer-events-none' : '',
+    props.block ? 'w-full' : '',
+    props.disabled ? 'pointer-events-none' : '',
 ]);
 </script>
 
