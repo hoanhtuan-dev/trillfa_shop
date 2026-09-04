@@ -62,28 +62,35 @@ class ProductAIService
 
     protected function vision(string $imagePath, string $prompt): ?array
     {
-        // Qwen (multimodal) first.
-        $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
-        if ($qwenKey) {
-            [$b64, $mime] = $this->imageBase64($imagePath);
-            $base = dashscope_base_url($qwenKey).'/compatible-mode/v1';
-            try {
-                $resp = Http::withToken($qwenKey)->timeout(90)->post($base.'/chat/completions', [
-                    'model' => $this->model,
-                    'messages' => [['role' => 'user', 'content' => [
-                        ['type' => 'text', 'text' => $prompt],
-                        ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                    ]]],
-                    'response_format' => ['type' => 'json_object'],
-                ]);
-                if ($resp->ok()) {
-                    $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
-                    if ($json) {
-                        return $json;
+        // Qwen (multimodal) — reuse the Studio's working vision setup so the
+        // same key + model list (qwen3.8-flash …) that /studio uses is used here.
+        [$b64, $mime] = $this->imageBase64($imagePath);
+        $models = function_exists('studio_suggest_qwen_models') ? studio_suggest_qwen_models() : [$this->model];
+        $keys = function_exists('studio_qwen_credentials') ? studio_qwen_credentials('vision') : [];
+        if (empty($keys)) {
+            $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
+        }
+        foreach (array_values(array_unique($keys)) as $key) {
+            foreach ($models as $model) {
+                $base = dashscope_base_url($key).'/compatible-mode/v1';
+                try {
+                    $resp = Http::withToken($key)->timeout(90)->post($base.'/chat/completions', [
+                        'model' => $model,
+                        'messages' => [['role' => 'user', 'content' => [
+                            ['type' => 'text', 'text' => $prompt],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                        ]]],
+                        'response_format' => ['type' => 'json_object'],
+                    ]);
+                    if ($resp->ok()) {
+                        $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
+                        if ($json) {
+                            return $json;
+                        }
                     }
+                } catch (\Throwable $e) {
+                    // try next
                 }
-            } catch (\Throwable $e) {
-                // fall through
             }
         }
 

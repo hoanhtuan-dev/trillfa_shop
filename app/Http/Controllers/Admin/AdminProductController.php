@@ -179,12 +179,14 @@ class AdminProductController extends Controller
     {
         $images = [];
 
-        // Latest generations — media_url is stored as /storage/{path} (browser-
-        // usable directly), so use it unchanged.
+        // Latest generations — media_url is stored as /storage/{path}; expose an
+        // ABSOLUTE url so asset_image() returns it unchanged and the AI image
+        // resolver can locate the file on disk.
         $gens = auth()->user()->generations()->whereNotNull('media_url')->latest()->limit(60)->get();
         foreach ($gens as $g) {
             $media = (string) $g->media_url;
-            $images[] = ['id' => 'gen-'.$g->id, 'url' => $media, 'type' => 'generation', 'label' => $g->prompt];
+            $url = str_starts_with($media, 'http') ? $media : asset($media);
+            $images[] = ['id' => 'gen-'.$g->id, 'url' => $url, 'type' => 'generation', 'label' => $g->prompt];
         }
 
         // Public studio assets (uploaded images).
@@ -273,6 +275,9 @@ class AdminProductController extends Controller
     {
         if ($request->hasFile('image')) {
             $product->update(['image' => $request->file('image')->store('products', 'public')]);
+        } elseif ($request->filled('cover_url')) {
+            // Cover picked from the Studio library (absolute /storage/... URL).
+            $product->update(['image' => $request->input('cover_url')]);
         }
 
         // Preserve existing gallery, drop removed ones, then append freshly uploaded images.

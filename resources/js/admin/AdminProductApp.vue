@@ -29,8 +29,10 @@ const form = reactive({
 });
 
 const cover = ref(null);
+const coverUrl = ref(''); // cover picked from Studio library (absolute URL)
 const galleryUpload = ref([]); // files
 const studioGallery = ref([]); // studio urls (added)
+const pickingFor = ref('gallery'); // 'cover' | 'gallery'
 const variants = ref((product?.variants || []).map((v) => ({ name: v.name, sku: v.sku || '', price: v.price ?? '', compare_price: v.compare_price ?? '', stock: v.stock ?? 0 })));
 const hint = ref('');
 const aiLoading = ref(false);
@@ -43,8 +45,8 @@ const studioImages = ref([]);
 const pickerLoading = ref(false);
 const selImages = ref([]);
 
-// Image the AI should look at: existing cover, or the first Studio image chosen.
-const aiImageUrl = computed(() => product?.image || studioGallery.value[0] || '');
+// Image the AI should look at: cover (existing or Studio-chosen), else first gallery image.
+const aiImageUrl = computed(() => coverUrl.value || product?.image || studioGallery.value[0] || '');
 
 // ---------- AI suggest (vision + iterative enrichment) ----------
 async function aiSuggest() {
@@ -95,7 +97,8 @@ function catName() {
 }
 
 // ---------- Studio picker (multi-select, like SourcePanel) ----------
-async function openPicker() {
+async function openPicker(forMode = 'gallery') {
+    pickingFor.value = forMode;
     pickerOpen.value = true;
     pickerLoading.value = true;
     selImages.value = [];
@@ -115,6 +118,14 @@ function toggleSelImage(img) {
 }
 const isSelImage = (img) => selImages.value.some((x) => x.id === img.id);
 function addSelectedImages() {
+    if (pickingFor.value === 'cover') {
+        if (selImages.value[0]?.url) {
+            coverUrl.value = selImages.value[0].url;
+            cover.value = null;
+        }
+        pickerOpen.value = false;
+        return;
+    }
     let added = 0;
     for (const img of selImages.value) {
         if (img.url && !studioGallery.value.includes(img.url)) {
@@ -126,6 +137,14 @@ function addSelectedImages() {
     pickerOpen.value = false;
 }
 function addStudioImage(img) {
+    if (pickingFor.value === 'cover') {
+        if (img.url) {
+            coverUrl.value = img.url;
+            cover.value = null;
+            pickerOpen.value = false;
+        }
+        return;
+    }
     if (img.url && !studioGallery.value.includes(img.url)) {
         studioGallery.value.push(img.url);
         pickerOpen.value = false;
@@ -232,7 +251,16 @@ function submit() {
         <!-- Media -->
         <div class="card p-6">
           <h2 class="mb-4 font-display text-lg font-semibold text-ink-900">Hình ảnh</h2>
-          <div><label class="label">Ảnh đại diện</label><div class="flex items-center gap-3"><img v-if="product?.image" :src="product.image" class="h-16 w-16 rounded-xl object-cover" /><input type="file" name="image" accept="image/*" @change="onCoverFile" class="text-xs" /></div></div>
+          <div>
+            <label class="label">Ảnh đại diện</label>
+            <div class="flex items-center gap-3">
+              <img v-if="coverUrl || product?.image" :src="coverUrl || product.image" class="h-16 w-16 rounded-xl object-cover" />
+              <input type="file" name="image" accept="image/*" @change="onCoverFile" class="text-xs" />
+              <button type="button" @click="openPicker('cover')" class="btn-ghost !p-1.5 text-xs font-semibold text-brand-700">📚 Chọn từ Studio</button>
+            </div>
+            <input v-if="coverUrl" type="hidden" name="cover_url" :value="coverUrl" />
+            <p v-if="coverUrl" class="mt-1 text-xs text-ink-400">Đang dùng ảnh đại diện từ Thư viện Studio.</p>
+          </div>
           <div class="mt-4">
             <label class="label">Thư viện ảnh (upload)</label>
             <input type="file" name="gallery[]" accept="image/*" multiple @change="onGalleryFiles" class="text-xs" />
@@ -265,10 +293,10 @@ function submit() {
         <div v-if="pickerOpen" class="fixed inset-0 z-[95] flex items-center justify-center p-4">
           <div class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" @click="pickerOpen = false"></div>
           <div class="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3"><h3 class="font-display text-base font-semibold">Chọn ảnh từ Thư viện Studio</h3><button @click="pickerOpen = false" class="btn-ghost !p-1.5">✕</button></div>
+            <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3"><h3 class="font-display text-base font-semibold">{{ pickingFor === 'cover' ? 'Chọn ảnh đại diện' : 'Chọn ảnh cho bộ sưu tập' }}</h3><button @click="pickerOpen = false" class="btn-ghost !p-1.5">✕</button></div>
             <div class="flex items-center justify-between gap-2 border-b border-cream-100 px-4 py-2">
-              <span class="text-xs text-ink-500">Đã chọn {{ selImages.length }} ảnh</span>
-              <button @click="addSelectedImages" :disabled="!selImages.length" class="btn-brand !py-1.5 text-xs" :class="{ '!opacity-50': !selImages.length }">Thêm {{ selImages.length || '' }} vào sản phẩm</button>
+              <span class="text-xs text-ink-500">{{ pickingFor === 'cover' ? 'Chọn 1 ảnh làm đại diện' : 'Đã chọn ' + selImages.length + ' ảnh' }}</span>
+              <button @click="addSelectedImages" :disabled="!selImages.length" class="btn-brand !py-1.5 text-xs" :class="{ '!opacity-50': !selImages.length }">{{ pickingFor === 'cover' ? 'Dùng làm đại diện' : 'Thêm ' + selImages.length + ' vào sản phẩm' }}</button>
             </div>
             <div class="max-h-[64vh] overflow-y-auto p-4">
               <div v-if="pickerLoading" class="grid grid-cols-3 gap-2"><div v-for="i in 9" :key="i" class="aspect-square animate-pulse rounded-lg bg-cream-200"></div></div>
