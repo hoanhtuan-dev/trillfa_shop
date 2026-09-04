@@ -307,7 +307,10 @@ function onTouchEnd(e) {
             <div v-if="store.canvasLayers.length" class="hidden w-64 flex-col gap-1.5 rounded-2xl bg-ink-900/85 p-2 shadow-lg lg:flex">
               <div class="flex items-center justify-between px-0.5">
                 <p class="text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
-                <button @click="store.cleanCanvas()" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">Dọn canvas</button>
+                <div class="flex items-center gap-1.5">
+                  <button @click="store.addBlankLayer()" class="grid h-5 w-5 place-items-center rounded bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Thêm layer vẽ trống"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg></button>
+                  <button @click="store.cleanCanvas()" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">Dọn canvas</button>
+                </div>
               </div>
               <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
                 <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40']">

@@ -63,12 +63,13 @@ function onPointerDown(e) {
 }
 
 // SVG path freehand (GIMP-style): điểm normalized → pixel trong container
-const freehandPoints = computed(() => {
-  void metricsTick.value;
+const pathPixels = (pts) => {
   const m = store.canvasMetrics();
   if (!m) return '';
-  return store.inpaintFreehandPoints.map(p => Math.round(m.vx + p.nx * m.vw) + ',' + Math.round(m.vy + p.ny * m.vh)).join(' ');
-});
+  return pts.map(p => Math.round(m.vx + p.nx * m.vw) + ',' + Math.round(m.vy + p.ny * m.vh)).join(' ');
+};
+const freehandPoints = computed(() => { void metricsTick.value; return pathPixels(store.inpaintFreehandPoints); });
+const freehandPaths = computed(() => { void metricsTick.value; return store.inpaintFreehandPaths.map((pts) => pathPixels(pts)); });
 
 // ── Brush: canvas overlay THẬT phủ đúng vùng ảnh hiển thị (nét vẽ hiện ngay, đỏ 60%) ──
 const metricsTick = ref(0);
@@ -125,12 +126,14 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
             class="pointer-events-none absolute z-10 rounded-lg"
             :style="brushOverlayStyle"></canvas>
 
-    <!-- Freehand (lasso): hiển thị đường vẽ đang kéo (GIMP-style) -->
-    <svg v-if="store.inpaintMaskMode === 'freehand' && store.inpaintFreehandPoints.length > 1"
+    <!-- Freehand (lasso): hiển thị TẤT CẢ nét đã hoàn thành + nét đang kéo (GIMP-style) -->
+    <svg v-if="store.inpaintMaskMode === 'freehand' && (store.inpaintFreehandPaths.length || store.inpaintFreehandPoints.length > 1)"
          class="pointer-events-none absolute inset-0 z-10 h-full w-full">
-      <polyline :points="freehandPoints" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-      <polygon v-if="store.inpaintMaskMode === 'freehand' && !store._inpaintFreehandActive && store.inpaintFreehandPoints.length"
-               :points="freehandPoints" fill="rgba(244,63,94,0.12)" stroke="none" />
+      <template v-for="(path, idx) in freehandPaths" :key="idx">
+        <polyline :points="path" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+        <polygon :points="path" fill="rgba(244,63,94,0.12)" stroke="none" />
+      </template>
+      <polyline v-if="store.inpaintFreehandPoints.length > 1" :points="freehandPoints" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
     </svg>
 
     <!-- Rect: box + handles (chỉ khi ĐANG chỉnh) -->
