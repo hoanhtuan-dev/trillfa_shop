@@ -1,25 +1,25 @@
 {
-  "_GalleryModal-NOXuBadh.js": {
-    "file": "assets/GalleryModal-NOXuBadh.js",
+  "_GalleryModal-Bhg8Xqk6.js": {
+    "file": "assets/GalleryModal-Bhg8Xqk6.js",
     "name": "GalleryModal",
     "imports": [
       "_pinia-CJA6HZ2m.js"
     ]
   },
-  "_ProductCard-8vgc_Snn.js": {
-    "file": "assets/ProductCard-8vgc_Snn.js",
+  "_ProductCard-B78GTz3D.css": {
+    "file": "assets/ProductCard-B78GTz3D.css",
+    "src": "_ProductCard-B78GTz3D.css"
+  },
+  "_ProductCard-BKQtOxP-.js": {
+    "file": "assets/ProductCard-BKQtOxP-.js",
     "name": "ProductCard",
     "imports": [
       "_pinia-CJA6HZ2m.js",
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/ProductCard-D5k1nk1s.css"
+      "assets/ProductCard-B78GTz3D.css"
     ]
-  },
-  "_ProductCard-D5k1nk1s.css": {
-    "file": "assets/ProductCard-D5k1nk1s.css",
-    "src": "_ProductCard-D5k1nk1s.css"
   },
   "_StylistDataManager-BDx2sRrJ.js": {
     "file": "assets/StylistDataManager-BDx2sRrJ.js",
@@ -105,7 +105,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-nH2HoIkN.css",
+    "file": "assets/app-BFeiCJfR.css",
     "name": "app",
     "names": [
       "app.css"
@@ -120,23 +120,23 @@
     "isEntry": true
   },
   "resources/js/storefront/app.js": {
-    "file": "assets/app-DOn0Pbkx.js",
+    "file": "assets/app-CqwsfGZ3.js",
     "name": "app",
     "src": "resources/js/storefront/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-8vgc_Snn.js"
+      "_ProductCard-BKQtOxP-.js"
     ]
   },
   "resources/js/storefront/shop.js": {
-    "file": "assets/shop-DEoMg6DX.js",
+    "file": "assets/shop-BmZtwTuY.js",
     "name": "shop",
     "src": "resources/js/storefront/shop.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_ProductCard-8vgc_Snn.js",
+      "_ProductCard-BKQtOxP-.js",
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
@@ -144,28 +144,28 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-R_YqLHNX.js",
+    "file": "assets/app-Bu39Gf49.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_GalleryModal-NOXuBadh.js",
+      "_GalleryModal-Bhg8Xqk6.js",
       "_StylistDataManager-BDx2sRrJ.js"
     ],
     "css": [
-      "assets/app-CZYdq2b_.css"
+      "assets/app-DOhoSaYo.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-mOVvZ3Kx.js",
+    "file": "assets/library-u3RQUzz6.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
       "_pinia-CJA6HZ2m.js",
-      "_GalleryModal-NOXuBadh.js"
+      "_GalleryModal-Bhg8Xqk6.js"
     ]
   },
   "resources/js/studio/settings.js": {

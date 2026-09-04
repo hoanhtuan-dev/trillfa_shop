@@ -72,7 +72,7 @@ onBeforeUnmount(() => {
                             <img
                                 :src="site.logo"
                                 :alt="site.name"
-                                class="h-10 w-10 rounded-full object-cover shadow-sm ring-2 ring-white/70"
+                                class="h-9 w-auto object-contain"
                                 loading="eager"
                             />
                             <span class="hidden font-display text-2xl font-bold tracking-tight text-ink-900 sm:inline">

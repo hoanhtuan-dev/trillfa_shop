@@ -128,6 +128,18 @@ function onRotatePointerDown(l, e) {
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
 }
+let bgDownPos = null;
+function onCanvasBgDown(e) {
+  store.panStart(e);
+  bgDownPos = { x: e.clientX, y: e.clientY };
+}
+function onCanvasBgUp(e) {
+  store.panEnd();
+  if (bgDownPos && !isolateActive.value && Math.hypot(e.clientX - bgDownPos.x, e.clientY - bgDownPos.y) < 5) {
+    store.deselectAll();
+  }
+  bgDownPos = null;
+}
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
@@ -164,12 +176,12 @@ function onRotatePointerDown(l, e) {
           <CanvasMaskTools />
           <!-- active image indicator + actions -->
           <div v-if="store.upscaleSrc" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
-            <span class="text-[10px] text-cream-300/60">{{ store.editSource ? 'Nguồn:' : 'Kết quả:' }}</span>
-            <span class="max-w-40 truncate font-semibold text-cream-100">{{ store.upscaleName }}</span>
+            <span class="hidden text-[10px] text-cream-300/60 lg:inline">{{ store.editSource ? 'Nguồn:' : 'Kết quả:' }}</span>
+            <span class="hidden max-w-40 truncate font-semibold text-cream-100 lg:inline">{{ store.upscaleName }}</span>
             <button @click="store.downloadActive()" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-white shadow-brand-500/40 transition-colors hover:bg-brand-500" title="Tải ảnh xuống"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
             <button v-if="store.editSource" @click="store.clearSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas">✕</button>
           </div>
-          <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="store.panStart($event)" @pointermove="store.panMove($event)" @pointerup="store.panEnd" @pointerleave="store.panEnd">
+          <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd">
             <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
             <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
               <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full min-w-0 select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
@@ -188,6 +200,9 @@ function onRotatePointerDown(l, e) {
               </div>
               <p v-if="!store.visibleLayers.length" class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
+            <!-- Đường guide khi bắt điểm (snap) -->
+            <div v-if="store.snapX != null" class="pointer-events-none absolute inset-y-0 z-40 w-px bg-brand-400/80" :style="{ left: 'calc(50% + ' + (store.snapX * store.zoom + store.pan.x) + 'px)' }"></div>
+            <div v-if="store.snapY != null" class="pointer-events-none absolute inset-x-0 z-40 h-px bg-brand-400/80" :style="{ top: 'calc(50% + ' + (store.snapY * store.zoom + store.pan.y) + 'px)' }"></div>
             <div v-if="store.cropMode && store.upscaleSrc" class="pointer-events-none absolute inset-0" style="z-index:30">
               <div class="absolute cursor-move select-none" style="pointer-events:auto; touch-action:none" :style="store.cropStyle()" @pointerdown.stop="store.cropStart($event,'move')" @dblclick="store.toggleCrop" title="Kéo để di chuyển · nhấn đúp để hủy">
                 <div class="pointer-events-none absolute inset-0 border-2 border-dashed border-brand-300" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);"></div>
@@ -223,13 +238,13 @@ function onRotatePointerDown(l, e) {
               </div>
               <div class="scrollbar-hide flex max-h-44 flex-col gap-1.5 overflow-y-auto">
                 <div v-for="(l, i) in store.canvasLayers" :key="l.id" class="group relative flex items-center gap-1 rounded-lg border p-1" :class="[store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/20' : 'border-ink-700/60', l.visible ? '' : 'opacity-40']">
-                  <button @click="store.toggleLayerVisible(l.id)" class="grid h-5 w-5 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700" :title="l.visible ? 'Ẩn layer' : 'Hiện layer'">{{ l.visible ? '👁' : '–' }}</button>
+                  <button @click="store.toggleLayerVisible(l.id)" class="hidden h-5 w-5 shrink-0 place-items-center rounded text-cream-200 hover:bg-ink-700 lg:grid" :title="l.visible ? 'Ẩn layer' : 'Hiện layer'">{{ l.visible ? '👁' : '–' }}</button>
                   <button @click="store.selectLayer(l)" class="flex min-w-0 flex-1 items-center gap-1.5 text-left">
                     <img :src="l.image" class="h-7 w-7 shrink-0 rounded bg-ink-900 object-cover">
-                    <span v-if="renamingId !== l.id" class="truncate text-[10px] text-cream-100">{{ l.name }}</span>
+                    <span v-if="renamingId !== l.id" class="hidden truncate text-[10px] text-cream-100 lg:inline">{{ l.name }}</span>
                     <input v-else v-model="renameValue" class="w-full min-w-0 rounded bg-ink-900 px-1 py-0.5 text-[10px] text-cream-100 outline-none ring-1 ring-brand-500" @keyup.enter="commitRename()" @keyup.esc="cancelRename()" @blur="commitRename()" @click.stop>
                   </button>
-                  <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div class="hidden shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 lg:flex">
                     <button @click="store.toggleLayerLock(l.id)" class="grid h-5 w-5 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-amber-300' : 'text-cream-300 hover:bg-ink-700'" :title="l.locked ? 'Mở khóa' : 'Khóa layer'">{{ l.locked ? '🔒' : '🔓' }}</button>
                     <button @click="store.moveLayer(l.id, 'up')" :disabled="i === 0 || l.locked" class="grid h-5 w-4 place-items-center rounded text-cream-300 hover:bg-ink-700 disabled:opacity-30" title="Lên trên">▲</button>
                     <button @click="store.moveLayer(l.id, 'down')" :disabled="i === store.canvasLayers.length - 1 || l.locked" class="grid h-5 w-4 place-items-center rounded text-cream-300 hover:bg-ink-700 disabled:opacity-30" title="Xuống dưới">▼</button>

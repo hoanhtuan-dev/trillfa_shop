@@ -48,6 +48,8 @@ export const useStudioStore = defineStore('studio', {
     canvasBg: 'grid',
     _drag: null,
     _layerDrag: null,
+    snapX: null,
+    snapY: null,
     // concept
     imagePromptEn: '',
     negativePromptEn: '',
@@ -594,7 +596,7 @@ export const useStudioStore = defineStore('studio', {
     },
     goEdit(g) { this.goEditor(g, 2); },
     goVideo(g) { this.goEditor(g, 3); },
-    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { const i = this.canvasLayers.length; const GAP = 44, COLS = 4; const x = (i % COLS) * GAP, y = Math.floor(i / COLS) * GAP; this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false, x, y, scale: 1, rotation: 0, opacity: 1, blend: 'normal' }); this.saveLayerLayout(); } },
+    pushCanvasLayer(id, kind, name, image, genId) { if (!id || !image) return; if (!this.canvasLayers.some(l => l.id === id)) { const i = this.canvasLayers.length; const GAP = 150, COLS = 3; const x = (i % COLS) * GAP, y = Math.floor(i / COLS) * GAP; this.canvasLayers.push({ id, kind, name, image, genId, visible: true, locked: false, x, y, scale: 1, rotation: 0, opacity: 1, blend: 'normal' }); this.saveLayerLayout(); } },
     setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
@@ -713,22 +715,35 @@ export const useStudioStore = defineStore('studio', {
       if (!l) return;
       let nx = d.ox + (e.clientX - d.sx) / (this.zoom || 1);
       let ny = d.oy + (e.clientY - d.sy) / (this.zoom || 1);
-      const SNAP = 8 / (this.zoom || 1); // ≈8px trên màn hình
+      const SNAP = 14 / (this.zoom || 1); // ≈14px trên màn hình — nhạy hơn
+      let sx = null, sy = null;
       // Bắt điểm vào tâm canvas (0,0) và vào các layer khác.
-      if (Math.abs(nx) < SNAP) nx = 0;
-      if (Math.abs(ny) < SNAP) ny = 0;
+      if (Math.abs(nx) < SNAP) { nx = 0; sx = 0; }
+      if (Math.abs(ny) < SNAP) { ny = 0; sy = 0; }
       this.canvasLayers.forEach((o) => {
         if (o.id === d.id || o.visible === false) return;
         const ox = o.x || 0, oy = o.y || 0;
-        if (Math.abs(nx - ox) < SNAP) nx = ox;
-        if (Math.abs(ny - oy) < SNAP) ny = oy;
+        if (Math.abs(nx - ox) < SNAP) { nx = ox; sx = ox; }
+        if (Math.abs(ny - oy) < SNAP) { ny = oy; sy = oy; }
       });
       l.x = nx;
       l.y = ny;
+      this.snapX = sx;
+      this.snapY = sy;
     },
     endLayerDrag() {
       if (!this._layerDrag) return;
       this._layerDrag = null;
+      this.snapX = null;
+      this.snapY = null;
+      this.saveLayerLayout();
+    },
+    // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
+    deselectAll() {
+      this.activeLayerId = '';
+      this.editSource = null;
+      this.previewId = null;
+      this.preview = null;
       this.saveLayerLayout();
     },
     // Gộp tất cả layer đang hiển thị thành 1 ảnh PNG (data URL) theo đúng transform/opacity/blend.

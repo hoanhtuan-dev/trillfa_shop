@@ -65,7 +65,7 @@ const year = new Date().getFullYear();
                     <!-- Brand -->
                     <div>
                         <a href="/" class="flex items-center gap-2.5">
-                            <img :src="site.logo" :alt="site.name" class="h-10 w-10 rounded-full object-cover ring-2 ring-white/10" loading="lazy" />
+                            <img :src="site.logo" :alt="site.name" class="h-9 w-auto object-contain" loading="lazy" />
                             <span class="font-display text-xl font-bold text-cream-50">Trillfa<span class="text-brand-300"> Fa</span></span>
                         </a>
                         <p class="mt-4 text-sm leading-relaxed text-cream-300/70">
