@@ -60,6 +60,9 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M8 12h8"/></svg>
         </button>
       </template>
+      <button @click="store.invertSelection()" class="flex items-center gap-1 rounded-full bg-ink-800 px-2.5 py-1 text-cream-200 transition-colors hover:bg-ink-700" title="Đảo ngược vùng chọn (chọn phần bên ngoài)">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>Đảo
+      </button>
       <button @click="store.floatSelectedRegion()" class="flex items-center gap-1 rounded-full bg-amber-600/30 px-2 py-0.5 text-cream-200 transition-colors hover:bg-amber-600" title="Nâng (cắt) vùng chọn thành layer mới để di chuyển">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>Nâng
       </button>

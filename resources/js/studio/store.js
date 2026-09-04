@@ -1392,7 +1392,8 @@ export const useStudioStore = defineStore('studio', {
         if (!this.inpaintBrushData) { this.toast('Chưa vẽ mask — vẽ vùng cần sửa trước.', 'error'); return; }
         this._inpaintMaskKind = 'brush';
       } else if (this.inpaintMaskMode === 'rect') {
-        this._inpaintMaskKind = 'rect';
+        // Rect đã ĐẢO (có mask_data) → gửi như brush mask, không dùng box nữa.
+        this._inpaintMaskKind = this.inpaintBrushData ? 'brush' : 'rect';
       } else if (this.inpaintMaskMode === 'freehand') {
         if (this._inpaintFreehandActive) { this.freehandStop(); }
         if (!this.inpaintBrushData) { this.toast('Chưa vẽ vùng chọn — vẽ tự do để khoanh vùng.', 'error'); return; }
@@ -1622,6 +1623,54 @@ export const useStudioStore = defineStore('studio', {
         if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
         this.toast('Đã chọn vùng theo màu.');
       } catch (err) { this.toast('Không chọn được vùng.', 'error'); }
+    },
+    // ── Đảo ngược vùng chọn (invert selection) ──
+    async invertSelection() {
+      const mode = this.inpaintMaskMode;
+      if (mode === 'none') { this.toast('Chưa có vùng chọn để đảo.', 'error'); return; }
+      if (mode === 'rect' && !this.inpaintBrushData) {
+        const b = this.inpaintMaskBox;
+        if (!b || b.w < 0.02 || b.h < 0.02) { this.toast('Chưa có vùng chọn.', 'error'); return; }
+        if (!this._inpaintMaskCtx) this._initInpaintBrush();
+        const c = this._inpaintMaskCanvas, ctx = this._inpaintMaskCtx;
+        if (!c || !ctx) return;
+        const w = c.width, h = c.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(220,38,38,0.6)';
+        ctx.fillRect(b.x * w, b.y * h, b.w * w, b.h * h);
+        this._finalizeInpaintBrush();
+        this._inpaintMaskKind = 'brush'; // rect → mask để đảo
+      }
+      if (!this.inpaintBrushData) { this.toast('Chưa có vùng chọn.', 'error'); return; }
+      try {
+        const mimg = await this._loadImageSrc('data:image/png;base64,' + this.inpaintBrushData);
+        const w = mimg.naturalWidth, h = mimg.naturalHeight;
+        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(mimg, 0, 0);
+        const id = ctx.getImageData(0, 0, w, h);
+        const d = id.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const v = 255 - d[i]; // đảo đen↔trắng
+          d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+        }
+        ctx.putImageData(id, 0, 0);
+        this.inpaintBrushData = canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+        // Đồng bộ overlay mask canvas (đỏ) theo mask đã đảo → add/subtract/vẽ tiếp vẫn đúng.
+        const mc = this._inpaintMaskCanvas, mctx = this._inpaintMaskCtx;
+        if (mc && mctx && mc.width === w && mc.height === h) {
+          mctx.globalCompositeOperation = 'source-over';
+          mctx.clearRect(0, 0, w, h);
+          const rd = mctx.createImageData(w, h);
+          for (let i = 0; i < w * h; i++) {
+            const v = d[i * 4]; // 0=vùng chọn, 255=ngoài
+            rd.data[i * 4] = 220; rd.data[i * 4 + 1] = 38; rd.data[i * 4 + 2] = 38;
+            rd.data[i * 4 + 3] = Math.round((255 - v) * (153 / 255)); // đỏ theo độ chọn
+          }
+          mctx.putImageData(rd, 0, 0);
+        }
+        this.toast('Đã đảo ngược vùng chọn.');
+      } catch (err) { this.toast('Không đảo được vùng chọn.', 'error'); }
     },
     inpaintMaskPointer(e) {
       const m = this.canvasMetrics();
@@ -1881,14 +1930,15 @@ export const useStudioStore = defineStore('studio', {
       const sel = document.createElement('canvas'); sel.width = w; sel.height = h;
       const sctx = sel.getContext('2d');
       const mode = this.inpaintMaskMode;
-      if (mode === 'rect') {
+      const data = maskData ?? this.inpaintBrushData;
+      if (mode === 'rect' && !data) {
         const b = this.inpaintMaskBox;
         if (!b || b.w < 0.02 || b.h < 0.02) throw new Error('Chưa có vùng chọn.');
         sctx.fillStyle = '#fff';
         sctx.fillRect(b.x * w, b.y * h, b.w * w, b.h * h);
       } else {
-        // freehand/brush → mask PNG (đen=vùng chọn). Dùng maskData ĐÃ CAPTURE (ổn định, không đổi giữa chừng).
-        const data = maskData ?? this.inpaintBrushData;
+        // freehand/brush/path/magic → mask PNG (đen=vùng chọn); rect đã ĐẢO cũng dùng mask.
+        // Dùng maskData ĐÃ CAPTURE (ổn định, không đổi giữa chừng).
         if (!data) throw new Error('Chưa vẽ vùng chọn.');
         const mimg = await this._loadImageSrc('data:image/png;base64,' + data);
         const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
