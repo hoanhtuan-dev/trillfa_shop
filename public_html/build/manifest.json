@@ -144,7 +144,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Cyq2WTkk.css",
+    "file": "assets/app-e-1hZEOz.css",
     "name": "app",
     "names": [
       "app.css"
@@ -217,7 +217,7 @@
     ]
   },
   "resources/js/storefront/shop.js": {
-    "file": "assets/shop-BlXPo4n8.js",
+    "file": "assets/shop-Dh3b2Hqn.js",
     "name": "shop",
     "src": "resources/js/storefront/shop.js",
     "isEntry": true,
@@ -229,7 +229,7 @@
       "_ProductCard-HPiacwX_.js"
     ],
     "css": [
-      "assets/shop-C3R3LSvQ.css"
+      "assets/shop-BTnFaxj8.css"
     ]
   },
   "resources/js/studio/app.js": {

@@ -84,8 +84,10 @@ class StorefrontBridge
 
         $p = $query->paginate(12, ['*'], 'page', $page);
 
-        return [
-            'categories' => Category::active()->whereNull('parent_id')
+        // Merge the shared base (site/nav/user/contact/categories for the
+        // layout + footer) so the shop page gets the header/menu/footer too.
+        return array_merge($this->base(), [
+            'filter_categories' => Category::active()->whereNull('parent_id')
                 ->with('children', fn ($q) => $q->active())
                 ->orderBy('sort_order')->get()
                 ->map(fn (Category $c) => [
@@ -116,7 +118,7 @@ class StorefrontBridge
             'per_page' => $p->perPage(),
             'current_page' => $p->currentPage(),
             'last_page' => $p->lastPage(),
-        ];
+        ]);
     }
 
     /**

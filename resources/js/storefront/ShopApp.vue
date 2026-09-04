@@ -16,7 +16,7 @@ const slug = boot.slug || '';
 
 // Reactive shop state.
 const products = ref(boot.products || []);
-const categories = ref(boot.categories || []);
+const categories = ref(boot.filter_categories || []);
 const brands = ref(boot.brands || []);
 const total = ref(boot.total || 0);
 const lastPage = ref(boot.last_page || 1);
