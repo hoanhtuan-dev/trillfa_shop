@@ -90,7 +90,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-ByytuYDy.css",
+    "file": "assets/app-nolnVNRh.css",
     "name": "app",
     "names": [
       "app.css"
@@ -105,7 +105,7 @@
     "isEntry": true
   },
   "resources/js/storefront/app.js": {
-    "file": "assets/app-BEC26V-b.js",
+    "file": "assets/app-CKEZLyaT.js",
     "name": "app",
     "src": "resources/js/storefront/app.js",
     "isEntry": true,
@@ -114,7 +114,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/app-DluB_K28.css"
+      "assets/app-ZQLOHD8j.css"
     ]
   },
   "resources/js/studio/app.js": {

@@ -49,17 +49,19 @@ onBeforeUnmount(stop);
                         <!-- gradient overlay -->
                         <div class="absolute inset-0 bg-gradient-to-r from-ink-950/80 via-ink-900/40 to-transparent"></div>
                         <!-- glass content card -->
-                        <div class="sf-container relative z-10 flex h-full items-center">
+                        <div class="sf-container relative z-10 flex h-full items-center pb-6">
                             <div class="w-full max-w-xl min-w-0">
-                                <div class="glass max-w-full !rounded-2xl p-5 sm:p-8">
-                                    <p class="truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-200">{{ slide.subtitle }}</p>
-                                    <h1 class="mt-2 font-display text-3xl font-semibold leading-tight text-white text-balance sm:text-6xl">{{ slide.title }}</h1>
+                                <div class="glass max-w-full !rounded-[2rem] p-6 sm:p-9">
+                                    <p class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-200">
+                                        <span class="h-px w-6 bg-brand-200/70"></span>{{ slide.subtitle }}
+                                    </p>
+                                    <h1 class="mt-3 font-display text-3xl font-semibold leading-tight text-white text-balance sm:text-5xl lg:text-6xl">{{ slide.title }}</h1>
                                     <BaseButton
                                         v-if="slide.button_text"
                                         :href="slide.button_link"
                                         variant="primary"
                                         size="lg"
-                                        class="mt-6 !bg-white !text-ink-900 hover:!bg-brand-50"
+                                        class="mt-6 !bg-white !text-ink-900 shadow-lg hover:!bg-brand-50"
                                     >
                                         {{ slide.button_text }} <Icon name="arrow-right" :size="18" />
                                     </BaseButton>

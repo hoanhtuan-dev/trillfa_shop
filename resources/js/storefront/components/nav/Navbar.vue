@@ -55,8 +55,8 @@ onBeforeUnmount(() => {
             v-if="site.announcement_enabled"
             class="bg-gradient-to-r from-ink-900 via-brand-800 to-ink-900 bg-ink-900 text-cream-50"
         >
-            <div class="sf-container flex h-9 items-center justify-center gap-2 text-xs font-medium">
-                <span class="grid h-5 w-5 place-items-center rounded-full bg-brand-600/30 text-brand-200">
+            <div class="sf-container flex h-9 items-center justify-center gap-2 overflow-hidden text-xs font-medium">
+                <span class="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-600/30 text-brand-200">
                     <Icon name="bolt" :size="14" />
                 </span>
                 <span class="truncate">{{ site.announcement_text }}</span>
@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
                         </a>
 
                         <!-- Wishlist -->
-                        <a href="/yeu-thich" class="sf-btn sf-btn-ghost relative !p-2" aria-label="Yêu thích">
+                        <a href="/yeu-thich" class="sf-btn sf-btn-ghost relative !p-2 transition-colors" aria-label="Yêu thích">
                             <Icon name="heart" :size="22" />
                             <span
                                 v-if="store.wishlistCount > 0"
@@ -153,7 +153,7 @@ onBeforeUnmount(() => {
                         <!-- Cart -->
                         <button
                             @click="store.openCart()"
-                            class="relative inline-flex items-center justify-center rounded-full p-2 text-ink-700 transition hover:bg-cream-200/70 active:scale-95"
+                            class="sf-btn sf-btn-ghost relative !p-2 transition-colors"
                             aria-label="Giỏ hàng"
                         >
                             <Icon name="cart" :size="22" />

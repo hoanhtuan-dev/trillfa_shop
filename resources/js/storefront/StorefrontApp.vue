@@ -23,6 +23,10 @@ import CtaCard from './components/home/CtaCard.vue';
 const store = useStorefrontStore();
 store.ensureBoot();
 
+// Current path for bottom-nav active state.
+const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+const isActive = (p) => (p === '/' ? path === '/' : path.startsWith(p));
+
 // Reactive slices of the boot payload.
 const boot = computed(() => store.boot || {});
 const hero = computed(() => boot.value.hero || { enabled: false, slides: [] });
@@ -141,18 +145,23 @@ const cta = computed(() => boot.value.cta || { enabled: false });
         <!-- Floating contact / mobile bottom nav -->
         <div class="fixed inset-x-0 bottom-0 z-30 border-t border-cream-200 bg-white/80 backdrop-blur-xl md:hidden pb-safe">
             <nav class="grid grid-cols-4">
-                <a href="/" class="flex flex-col items-center gap-1 py-2.5 text-xs text-brand-700">
-                    <Icon name="home" :size="22" /> Home
+                <a href="/" class="relative flex flex-col items-center gap-1 py-2.5 text-xs transition-colors" :class="isActive('/') ? 'text-brand-700' : 'text-ink-500'">
+                    <span :class="isActive('/') ? 'text-brand-600' : ''"><Icon name="home" :size="22" /></span>
+                    Home
+                    <span v-if="isActive('/')" class="absolute top-0 h-0.5 w-7 rounded-full bg-brand-600"></span>
                 </a>
-                <a href="/shop" class="flex flex-col items-center gap-1 py-2.5 text-xs text-ink-500">
-                    <Icon name="search" :size="22" /> Shop
+                <a href="/shop" class="relative flex flex-col items-center gap-1 py-2.5 text-xs transition-colors" :class="isActive('/shop') ? 'text-brand-700' : 'text-ink-500'">
+                    <span :class="isActive('/shop') ? 'text-brand-600' : ''"><Icon name="search" :size="22" /></span>
+                    Shop
+                    <span v-if="isActive('/shop')" class="absolute top-0 h-0.5 w-7 rounded-full bg-brand-600"></span>
                 </a>
-                <a href="/yeu-thich" class="relative flex flex-col items-center gap-1 py-2.5 text-xs text-ink-500">
-                    <Icon name="heart" :size="22" />
+                <a href="/yeu-thich" class="relative flex flex-col items-center gap-1 py-2.5 text-xs transition-colors" :class="isActive('/yeu-thich') ? 'text-brand-700' : 'text-ink-500'">
+                    <span :class="isActive('/yeu-thich') ? 'text-brand-600' : ''"><Icon name="heart" :size="22" /></span>
                     <span v-if="store.wishlistCount" class="absolute right-1 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">{{ store.wishlistCount }}</span>
                     Yêu thích
+                    <span v-if="isActive('/yeu-thich')" class="absolute top-0 h-0.5 w-7 rounded-full bg-brand-600"></span>
                 </a>
-                <button @click="store.openCart()" class="relative flex flex-col items-center gap-1 py-2.5 text-xs text-ink-500">
+                <button @click="store.openCart()" class="relative flex flex-col items-center gap-1 py-2.5 text-xs text-ink-500 transition-colors">
                     <Icon name="cart" :size="22" />
                     <span v-if="store.cartCount" class="absolute right-1 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">{{ store.cartCount }}</span>
                     Giỏ
