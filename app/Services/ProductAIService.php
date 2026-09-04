@@ -150,10 +150,13 @@ class ProductAIService
 
         $img = '';
         if ($imageAnalysis) {
-            $img = "\nDựa trên phân tích ảnh sản phẩm: phong cách={($imageAnalysis['styles'] ?? '')}, "
-                ."màu sắc={($imageAnalysis['colors'] ?? '')}, chất liệu={($imageAnalysis['fabric'] ?? '')}, "
-                ."chủ thể={($imageAnalysis['subject'] ?? '')}, cảm giác={($imageAnalysis['feeling'] ?? '')}, "
-                ."từ khóa=".implode(', ', (array) ($imageAnalysis['keywords'] ?? []));
+            $styles = $imageAnalysis['styles'] ?? '';
+            $colors = $imageAnalysis['colors'] ?? '';
+            $fabric = $imageAnalysis['fabric'] ?? '';
+            $subject = $imageAnalysis['subject'] ?? '';
+            $feeling = $imageAnalysis['feeling'] ?? '';
+            $keywords = implode(', ', (array) ($imageAnalysis['keywords'] ?? []));
+            $img = "\nDựa trên phân tích ảnh sản phẩm: phong cách={$styles}, màu sắc={$colors}, chất liệu={$fabric}, chủ thể={$subject}, cảm giác={$feeling}, từ khóa={$keywords}";
         }
 
         // Làm giàu: nếu đã có short_description thì yêu cầu cải thiện dựa trên đó.

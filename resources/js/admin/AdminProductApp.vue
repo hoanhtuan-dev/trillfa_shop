@@ -35,19 +35,34 @@ const variants = ref((product?.variants || []).map((v) => ({ name: v.name, sku: 
 const hint = ref('');
 const aiLoading = ref(false);
 const aiMsg = ref('');
+const aiState = ref(''); // '' | 'analyzing' | 'suggesting'
+const forceReanalyze = ref(false);
 
 const pickerOpen = ref(false);
 const studioImages = ref([]);
 const pickerLoading = ref(false);
+const selImages = ref([]);
 
-// ---------- AI suggest ----------
+// Image the AI should look at: existing cover, or the first Studio image chosen.
+const aiImageUrl = computed(() => product?.image || studioGallery.value[0] || '');
+
+// ---------- AI suggest (vision + iterative enrichment) ----------
 async function aiSuggest() {
     aiLoading.value = true;
     aiMsg.value = '';
+    aiState.value = aiImageUrl.value ? 'analyzing' : 'suggesting';
     try {
         const data = await apiFetch('/admin/products/ai-suggest', {
             method: 'POST',
-            body: { name: form.name, category: catName(), brand: form.brand, hint: hint.value, short_description: form.short_description },
+            body: {
+                name: form.name,
+                category: catName(),
+                brand: form.brand,
+                hint: hint.value,
+                short_description: form.short_description,
+                image_url: aiImageUrl.value,
+                force: forceReanalyze.value,
+            },
         });
         const r = data.data || {};
         if (r.suggested_name) form.name = r.suggested_name;
@@ -57,11 +72,21 @@ async function aiSuggest() {
         if (r.meta_title) form.meta_title = r.meta_title;
         if (r.meta_description) form.meta_description = r.meta_description;
         if (Array.isArray(r.tags) && r.tags.length) form.tags = r.tags.join(', ');
-        aiMsg.value = data.source === 'stub' ? 'AI chưa cấu hình key — dùng gợi ý mẫu.' : 'Đã sinh gợi ý bằng ' + ai.model;
+
+        if (r.source === 'stub') {
+            aiMsg.value = 'AI chưa cấu hình key — dùng gợi ý mẫu.';
+        } else {
+            const img = data.image_analyzed
+                ? (data.analysis_cached ? ' · ảnh đã phân tích (dùng cache)' : ' · ảnh: ' + (r.description ? 'nhìn ảnh' : ''))
+                : '';
+            aiMsg.value = 'Đã làm giàu bằng ' + ai.model + img;
+        }
+        forceReanalyze.value = false;
     } catch (e) {
         aiMsg.value = e.message;
     } finally {
         aiLoading.value = false;
+        aiState.value = '';
     }
 }
 function catName() {
@@ -69,10 +94,11 @@ function catName() {
     return c?.name || '';
 }
 
-// ---------- Studio picker ----------
+// ---------- Studio picker (multi-select, like SourcePanel) ----------
 async function openPicker() {
     pickerOpen.value = true;
     pickerLoading.value = true;
+    selImages.value = [];
     try {
         const data = await apiFetch('/admin/products/studio-images');
         studioImages.value = data.images || [];
@@ -82,13 +108,28 @@ async function openPicker() {
         pickerLoading.value = false;
     }
 }
-function addStudioImage(img) {
-    if (!img.url) return;
-    if (studioGallery.value.includes(img.url)) return;
-    if (!cover.value && studioGallery.value.length === 0) {
-        // first picked image becomes the cover reference (just a flag for hint)
+function toggleSelImage(img) {
+    const i = selImages.value.findIndex((x) => x.id === img.id);
+    if (i >= 0) selImages.value.splice(i, 1);
+    else selImages.value.push(img);
+}
+const isSelImage = (img) => selImages.value.some((x) => x.id === img.id);
+function addSelectedImages() {
+    let added = 0;
+    for (const img of selImages.value) {
+        if (img.url && !studioGallery.value.includes(img.url)) {
+            studioGallery.value.push(img.url);
+            added++;
+        }
     }
-    studioGallery.value.push(img.url);
+    selImages.value = [];
+    pickerOpen.value = false;
+}
+function addStudioImage(img) {
+    if (img.url && !studioGallery.value.includes(img.url)) {
+        studioGallery.value.push(img.url);
+        pickerOpen.value = false;
+    }
 }
 function removeStudioImage(url) { studioGallery.value = studioGallery.value.filter((u) => u !== url); }
 
@@ -108,17 +149,24 @@ function submit() {
 
 <template>
   <div class="max-w-7xl">
-    <!-- AI helper bar -->
-    <div class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-cream-200 bg-white/80 p-4">
-      <div class="min-w-0 flex-1">
-        <p class="text-sm font-semibold text-ink-900">Gợi ý nội dung &amp; SEO bằng AI</p>
-        <p class="text-xs text-ink-500">Model: {{ ai.model }} ({{ ai.provider }}) — sinh tên, mô tả, meta title/description, tags.</p>
+    <!-- AI helper bar (vision + iterative) -->
+    <div class="mb-5 rounded-2xl border border-cream-200 bg-white/80 p-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-ink-900">Gợi ý nội dung &amp; SEO bằng AI</p>
+          <p class="text-xs text-ink-500">Model {{ ai.model }} ({{ ai.provider }}) — nhìn ảnh, phân tích, làm giàu dần theo nội dung bạn đã nhập.</p>
+        </div>
+        <input v-model="hint" placeholder="Ý tưởng / điểm nhấn…" class="input !py-2 sm:w-72" @keyup.enter="aiSuggest" />
+        <label v-if="aiImageUrl" class="flex items-center gap-2 text-xs text-ink-600"><input type="checkbox" v-model="forceReanalyze" class="h-4 w-4 accent-brand-600" /> Phân tích lại ảnh</label>
+        <button @click="aiSuggest" :disabled="aiLoading" class="btn-brand !py-2.5">
+          {{ aiState === 'analyzing' ? '🔍 Đang phân tích ảnh…' : aiState === 'suggesting' ? '✨ Đang sinh…' : '✨ Gợi ý AI' }}
+        </button>
       </div>
-      <input v-model="hint" placeholder="Ý tưởng / điểm nhấn sản phẩm…" class="input !py-2 sm:w-72" @keyup.enter="aiSuggest" />
-      <button @click="aiSuggest" :disabled="aiLoading" class="btn-brand !py-2.5">
-        {{ aiLoading ? 'Đang gợi ý…' : '✨ Gợi ý AI' }}
-      </button>
-      <p v-if="aiMsg" class="w-full text-xs text-ink-500">{{ aiMsg }}</p>
+      <div v-if="aiImageUrl" class="mt-3 flex items-center gap-3">
+        <img :src="aiImageUrl" class="h-12 w-12 rounded-lg object-cover" />
+        <p class="text-xs text-ink-500">AI sẽ nhìn ảnh này ({{ forceReanalyze ? 'phân tích lại' : 'tái sử dụng phân tích cũ nếu ảnh không đổi' }}).</p>
+      </div>
+      <p v-if="aiMsg" class="mt-2 w-full text-xs text-ink-500">{{ aiMsg }}</p>
     </div>
 
     <form id="admin-product-form" method="POST" :action="action" enctype="multipart/form-data" @submit.prevent="submit" class="grid gap-6 lg:grid-cols-3">
@@ -218,17 +266,21 @@ function submit() {
           <div class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" @click="pickerOpen = false"></div>
           <div class="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div class="flex items-center justify-between border-b border-cream-200 px-4 py-3"><h3 class="font-display text-base font-semibold">Chọn ảnh từ Thư viện Studio</h3><button @click="pickerOpen = false" class="btn-ghost !p-1.5">✕</button></div>
-            <div class="max-h-[70vh] overflow-y-auto p-4">
+            <div class="flex items-center justify-between gap-2 border-b border-cream-100 px-4 py-2">
+              <span class="text-xs text-ink-500">Đã chọn {{ selImages.length }} ảnh</span>
+              <button @click="addSelectedImages" :disabled="!selImages.length" class="btn-brand !py-1.5 text-xs" :class="{ '!opacity-50': !selImages.length }">Thêm {{ selImages.length || '' }} vào sản phẩm</button>
+            </div>
+            <div class="max-h-[64vh] overflow-y-auto p-4">
               <div v-if="pickerLoading" class="grid grid-cols-3 gap-2"><div v-for="i in 9" :key="i" class="aspect-square animate-pulse rounded-lg bg-cream-200"></div></div>
               <div v-else-if="studioImages.length" class="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                <button v-for="img in studioImages" :key="img.id" @click="addStudioImage(img)" class="group relative aspect-square overflow-hidden rounded-lg border transition" :class="studioGallery.includes(img.url) ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200 hover:border-brand-400'">
+                <button v-for="img in studioImages" :key="img.id" @click="toggleSelImage(img)" class="group relative aspect-square overflow-hidden rounded-lg border transition" :class="isSelImage(img) ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200 hover:border-brand-400'">
                   <img :src="img.url" :alt="img.label" class="h-full w-full object-cover" loading="lazy" />
-                  <span class="absolute inset-0 grid place-items-center bg-brand-600/40 text-white opacity-0 transition group-hover:opacity-100">＋</span>
+                  <span class="absolute inset-0 grid place-items-center text-white transition" :class="isSelImage(img) ? 'bg-brand-600/30' : 'bg-black/30 opacity-0 group-hover:opacity-100'">{{ isSelImage(img) ? '✓' : '＋' }}</span>
                 </button>
               </div>
               <div v-else class="py-16 text-center text-sm text-ink-500">Thư viện Studio chưa có ảnh.</div>
             </div>
-            <div class="border-t border-cream-200 px-4 py-3 text-right"><button @click="pickerOpen = false" class="btn-brand !py-2">Xong</button></div>
+            <div class="border-t border-cream-200 px-4 py-3 text-right"><button @click="pickerOpen = false" class="btn-ghost !py-2">Đóng</button><button @click="addSelectedImages" :disabled="!selImages.length" class="btn-brand ml-2 !py-2">Xong</button></div>
           </div>
         </div>
       </Transition>
