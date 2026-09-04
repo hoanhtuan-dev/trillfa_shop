@@ -33,6 +33,12 @@ Route::middleware('web')->group(function () {
     Route::get('/thanh-toan', [StorefrontController::class, 'checkout'])
         ->name('checkout.show')->middleware('auth');
 
+    // Auth (submission posts to the legacy POST /dang-nhap, /dang-ky).
+    Route::get('/dang-nhap', [StorefrontController::class, 'auth'])
+        ->defaults('mode', 'login')->name('login')->middleware('guest');
+    Route::get('/dang-ky', [StorefrontController::class, 'auth'])
+        ->defaults('mode', 'register')->name('register')->middleware('guest');
+
     // Shop listing (all products + per-category).
     Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
     Route::get('/danh-muc/{categorySlug}', [StorefrontController::class, 'shop'])->name('shop.category');

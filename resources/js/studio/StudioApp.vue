@@ -198,7 +198,10 @@ function onTouchEnd(e) {
           <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint): chỉ hiển thị layer active như trước để đo vùng chính xác -->
             <div v-if="isolateActive" class="absolute inset-0 flex items-center justify-center p-4">
-              <img v-if="store.upscaleSrc" ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full min-w-0 select-none object-contain" :style="{ transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
+              <div v-if="store.upscaleSrc" class="relative">
+                <img ref="cvImg" :src="store.upscaleSrc" class="max-h-full max-w-full min-w-0 select-none object-contain" :style="store.eraseMode ? {} : { transform: 'translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')', transformOrigin: 'center' }" draggable="false" @load="store.onCanvasImgLoad()" />
+                <canvas v-if="store.eraseMode" class="absolute inset-0 h-full w-full cursor-crosshair rounded bg-red-500/10" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
+              </div>
               <p v-else class="text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
             </div>
             <!-- Chế độ stack: composite tất cả layer đang hiển thị -->
@@ -234,6 +237,13 @@ function onTouchEnd(e) {
               </div>
             </div>
 
+          </div>
+          <!-- Erase toolbar (desktop only) -->
+          <div v-if="store.eraseMode" class="absolute bottom-16 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900/90 px-3 py-2 shadow-xl backdrop-blur lg:flex">
+            <span class="text-[10px] font-semibold text-cream-200">Feather</span>
+            <input type="range" min="3" max="120" step="1" :value="store.eraseFeather" @input="store.setEraseFeather($event.target.value)" class="h-1.5 w-28 cursor-pointer accent-brand-500">
+            <span class="w-8 text-right text-[10px] text-cream-200">{{ store.eraseFeather }}px</span>
+            <button @click="store.toggleErase()" class="rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-500">✓ Xong</button>
           </div>
           <!-- Canvas toolbar -->
           <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full bg-ink-900/85 px-2 py-1.5 shadow-lg">
@@ -318,6 +328,11 @@ function onTouchEnd(e) {
                 <button @click="store.duplicateLayer(store.activeLayer.id)" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Nhân đôi layer (Ctrl+D)">📄 Nhân đôi</button>
                 <button @click="store.bringLayerTo(store.activeLayer.id, 'front')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa lên trên cùng">⤒ Lên trên</button>
                 <button @click="store.bringLayerTo(store.activeLayer.id, 'back')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa xuống dưới cùng">⤓ Xuống dưới</button>
+              </div>
+              <div class="mt-1.5 grid grid-cols-3 gap-1.5">
+                <button @click="store.toggleFlipX(store.activeLayer.id)" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Lật ngang layer">↔ Lật ngang</button>
+                <button @click="store.toggleFlipY(store.activeLayer.id)" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Lật dọc layer">↕ Lật dọc</button>
+                <button @click="store.toggleErase()" class="rounded-lg px-1 py-1.5 text-[9px] font-semibold" :class="store.eraseMode ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" title="Xóa vùng (feather)">🧽 Xóa vùng</button>
               </div>
             </div>
             <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="hidden w-64 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl lg:block">

@@ -85,6 +85,19 @@ class StorefrontController extends Controller
     }
 
     /**
+     * Auth page (login/register) — renders the Vue auth SPA. Submission posts
+     * natively to the existing AuthController login/register endpoints.
+     */
+    public function auth(string $mode)
+    {
+        seo()->title(($mode === 'register' ? 'Đăng ký' : 'Đăng nhập').' | '.setting('site_name'));
+
+        return view('storefront.auth', [
+            'boot' => array_merge($this->bridge->base(), ['mode' => $mode]),
+        ]);
+    }
+
+    /**
      * Checkout page — renders the Vue checkout SPA (order is created by the
      * existing CheckoutController@store endpoint).
      */

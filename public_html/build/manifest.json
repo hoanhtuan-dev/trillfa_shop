@@ -144,7 +144,7 @@
     "name": "pinia"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DNLWsMNQ.css",
+    "file": "assets/app-Dmf95Pgp.css",
     "name": "app",
     "names": [
       "app.css"
@@ -170,6 +170,16 @@
       "_BaseButton-BKy3q-cQ.js",
       "_ProductCard-CBN1T6OX.js",
       "_BlogCard-Dk-Q-Dp3.js"
+    ]
+  },
+  "resources/js/storefront/auth.js": {
+    "file": "assets/auth-BW8NDOPV.js",
+    "name": "auth",
+    "src": "resources/js/storefront/auth.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-9imU3GMs.js",
+      "_StorefrontLayout-p3AJkv3O.js"
     ]
   },
   "resources/js/storefront/blog-post.js": {
@@ -254,7 +264,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DAEJJQIo.js",
+    "file": "assets/app-C2zU81g-.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -265,7 +275,7 @@
       "_StylistDataManager-C6o-0vCw.js"
     ],
     "css": [
-      "assets/app-CQrN04W3.css"
+      "assets/app-DyxDKeqI.css"
     ]
   },
   "resources/js/studio/library.js": {
