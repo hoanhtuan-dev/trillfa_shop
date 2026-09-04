@@ -1038,7 +1038,14 @@ if (! function_exists('product_ai_temperature')) {
 if (! function_exists('product_ai_max_tokens')) {
     function product_ai_max_tokens(): int
     {
-        return max(128, (int) product_ai_config('max_tokens', 1800));
+        return max(128, (int) product_ai_config('max_tokens', 1200));
+    }
+}
+
+if (! function_exists('product_ai_vision_max_tokens')) {
+    function product_ai_vision_max_tokens(): int
+    {
+        return max(64, (int) product_ai_config('vision_max_tokens', 400));
     }
 }
 

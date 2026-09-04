@@ -32,6 +32,7 @@ class ProductAIService
     protected int $cacheTtl;
     protected float $temperature;
     protected int $maxTokens;
+    protected int $visionMaxTokens;
 
     /** Hard wall-clock deadline for the whole operation (sync request must never 504). */
     private float $deadline = 0.0;
@@ -53,6 +54,7 @@ class ProductAIService
         $this->cacheTtl = product_ai_cache_ttl();
         $this->temperature = product_ai_temperature();
         $this->maxTokens = product_ai_max_tokens();
+        $this->visionMaxTokens = product_ai_vision_max_tokens();
     }
 
     /**
@@ -286,6 +288,16 @@ class ProductAIService
             return null;
         }
 
+        // Cost/latency guard: put the last key that WORKED first, and drop keys
+        // that 429'd (quota) in the last 10 minutes so we don't keep re-probing them.
+        $keyId = fn (string $k) => sha1($k);
+        $goodKey = Cache::get('product_ai_good_key:'.$kind);
+        usort($keys, fn ($a, $b) => ($keyId($a) === $goodKey ? -1 : 0) <=> ($keyId($b) === $goodKey ? -1 : 0));
+        $fresh = array_values(array_filter($keys, fn ($k) => ! Cache::get('product_ai_bad_key:'.$keyId($k))));
+        if (! empty($fresh)) {
+            $keys = $fresh;
+        }
+
         $keyPrefix = fn (string $k) => substr($k, 0, 8).'…';
 
         foreach ($keys as $key) {
@@ -313,7 +325,8 @@ class ProductAIService
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => $content]],
                         'temperature' => $this->temperature,
-                        'max_tokens' => $this->maxTokens,
+                        // Vision output is tiny (just the understanding) → cheaper & faster.
+                        'max_tokens' => $kind === 'vision' ? $this->visionMaxTokens : $this->maxTokens,
                         'response_format' => ['type' => 'json_object'],
                     ]);
                 } catch (\Throwable $e) {
@@ -325,13 +338,14 @@ class ProductAIService
                 $status = $resp->status();
                 $body = (string) $resp->body();
 
-                // 429 = rate/quota limit on this key -> skip to the next key fast.
+                // 429 = rate/quota limit on this key -> remember it and skip to the next key.
                 if ($status === 429 || is_qwen_quota_error($body)) {
+                    Cache::put('product_ai_bad_key:'.$keyId($key), true, 600);
                     $this->record('qwen', '429/quota ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
 
                     continue 2;
                 }
-                // Model not on this host/account -> try the next model.
+                // Model not on this host/account -> try the next model (free).
                 if ($status === 404 || str_contains(strtolower($body), 'model_not_found') || str_contains(strtolower($body), 'model not exist')) {
                     $this->record('qwen', 'model not found ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
 
@@ -340,6 +354,7 @@ class ProductAIService
                 if ($resp->ok()) {
                     $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
                     if ($json) {
+                        Cache::put('product_ai_good_key:'.$kind, $keyId($key), 3600);
                         $this->attempts[] = 'qwen: ok ('.$kind.', '.$model.', key '.$keyPrefix($key).')';
 
                         return $json;
