@@ -27,8 +27,8 @@ const renameValue = ref('');
 function startRename(l) { renamingId.value = l.id; renameValue.value = l.name || ''; }
 function commitRename() { if (!renamingId.value) return; store.renameLayer(renamingId.value, renameValue.value); renamingId.value = null; }
 function cancelRename() { renamingId.value = null; }
-onMounted(async () => { store.load(); store.loadPalette(store.previewId); window.addEventListener('keydown', onCanvasKey); });
-onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); });
+onMounted(async () => { store.load(); store.loadPalette(store.previewId); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); });
 watch(() => store.previewId, (id) => { store.loadPalette(id); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
 const cvImg = ref(null);
@@ -48,6 +48,24 @@ function onCanvasKey(e) {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
   if (e.key === 'Escape') { if (store.inpaintMaskMode !== 'none') { store.inpaintMaskMode = 'none'; store.inpaintBrushData = ''; } else store.toggleCrop(); }
   else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON') && store.inpaintMaskMode === 'none') store.confirmCrop();
+}
+// Phím tắt cho layer (chế độ stack): mũi tên di chuyển, Ctrl/Cmd+D nhân đôi.
+function onLayerKeys(e) {
+  if (store.cropMode || store.inpaintMaskMode !== 'none') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  const l = store.activeLayer;
+  if (!l || l.locked) return;
+  if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); store.duplicateLayer(l.id); return; }
+  const step = e.shiftKey ? 10 : 1;
+  let dx = 0, dy = 0;
+  if (e.key === 'ArrowLeft') dx = -step;
+  else if (e.key === 'ArrowRight') dx = step;
+  else if (e.key === 'ArrowUp') dy = -step;
+  else if (e.key === 'ArrowDown') dy = step;
+  else return;
+  e.preventDefault();
+  store.updateLayerTransform(l.id, { x: (l.x || 0) + dx, y: (l.y || 0) + dy });
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
@@ -163,7 +181,7 @@ function onRotatePointerDown(l, e) {
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
-                  <img :src="l.image" class="relative block max-h-[70vh] max-w-[70vw] select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
+                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] select-none" :class="l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : ''" draggable="false" />
                   <template v-if="l.id === store.activeLayerId && !l.locked">
                     <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
                     <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>
@@ -199,7 +217,7 @@ function onRotatePointerDown(l, e) {
 
           </div>
           <!-- right column: layers (top) + floating palette (below, same width) -->
-          <div class="absolute right-3 top-3 z-20 flex w-56 flex-col gap-1.5">
+          <div class="absolute right-3 top-3 z-20 flex w-64 flex-col gap-1.5">
             <div v-if="store.canvasLayers.length" class="flex flex-col gap-1.5 rounded-2xl bg-ink-900/85 p-2 shadow-lg">
               <div class="flex items-center justify-between px-0.5">
                 <p class="text-[10px] font-semibold text-cream-300/60">Layers ({{ store.canvasLayers.length }})</p>
@@ -231,15 +249,16 @@ function onRotatePointerDown(l, e) {
             <div v-if="store.activeLayer" class="rounded-2xl bg-ink-900/90 p-2 shadow-lg">
               <div class="mb-1 flex items-center justify-between px-0.5">
                 <p class="text-[10px] font-semibold text-cream-300/60">✋ Transform</p>
-                <button @click="store.resetLayerTransform(store.activeLayer.id)" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Đưa layer về mặc định">Reset</button>
+                <button @click="store.resetLayerTransform(store.activeLayer.id)" class="text-[9px] font-semibold text-red-300 hover:text-red-200" title="Đưa layer về mặc định">Reset all</button>
               </div>
               <div class="flex items-center gap-1.5">
-                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Opacity</span>
-                <input type="range" min="0" max="1" step="0.05" :value="store.activeLayer.opacity" @input="store.updateLayerTransform(store.activeLayer.id, { opacity: Number($event.target.value) })" class="h-1.5 flex-1 accent-brand-500">
-                <span class="w-8 shrink-0 text-right text-[9px] text-cream-200">{{ Math.round(store.activeLayer.opacity * 100) }}%</span>
+                <span class="w-14 shrink-0 whitespace-nowrap text-[9px] text-cream-300/60">Opacity</span>
+                <input type="range" min="0" max="1" step="0.05" :value="store.activeLayer.opacity" @input="store.updateLayerTransform(store.activeLayer.id, { opacity: Number($event.target.value) })" class="h-1.5 min-w-0 flex-1 accent-brand-500">
+                <span class="w-9 shrink-0 whitespace-nowrap text-right text-[9px] text-cream-200">{{ Math.round(store.activeLayer.opacity * 100) }}%</span>
+                <button @click="store.updateLayerTransform(store.activeLayer.id, { opacity: 1 })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset opacity">↺</button>
               </div>
               <div class="mt-1 flex items-center gap-1.5">
-                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Blend</span>
+                <span class="w-14 shrink-0 whitespace-nowrap text-[9px] text-cream-300/60">Blend</span>
                 <select :value="store.activeLayer.blend" @change="store.updateLayerTransform(store.activeLayer.id, { blend: $event.target.value })" class="min-w-0 flex-1 rounded bg-ink-800 px-1 py-0.5 text-[10px] text-cream-100">
                   <option value="normal">Normal</option>
                   <option value="multiply">Multiply</option>
@@ -248,16 +267,24 @@ function onRotatePointerDown(l, e) {
                   <option value="darken">Darken</option>
                   <option value="lighten">Lighten</option>
                 </select>
+                <button @click="store.updateLayerTransform(store.activeLayer.id, { blend: 'normal' })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset blend">↺</button>
               </div>
               <div class="mt-1 flex items-center gap-1.5">
-                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Scale</span>
-                <input type="range" min="0.2" max="3" step="0.05" :value="store.activeLayer.scale" @input="store.updateLayerTransform(store.activeLayer.id, { scale: Number($event.target.value) })" class="h-1.5 flex-1 accent-brand-500">
-                <span class="w-8 shrink-0 text-right text-[9px] text-cream-200">{{ Math.round(store.activeLayer.scale * 100) }}%</span>
+                <span class="w-14 shrink-0 whitespace-nowrap text-[9px] text-cream-300/60">Scale</span>
+                <input type="range" min="0.2" max="3" step="0.05" :value="store.activeLayer.scale" @input="store.updateLayerTransform(store.activeLayer.id, { scale: Number($event.target.value) })" class="h-1.5 min-w-0 flex-1 accent-brand-500">
+                <span class="w-9 shrink-0 whitespace-nowrap text-right text-[9px] text-cream-200">{{ Math.round(store.activeLayer.scale * 100) }}%</span>
+                <button @click="store.updateLayerTransform(store.activeLayer.id, { scale: 1 })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset scale">↺</button>
               </div>
               <div class="mt-1 flex items-center gap-1.5">
-                <span class="w-11 shrink-0 text-[9px] text-cream-300/60">Xoay</span>
-                <input type="range" min="-180" max="180" step="1" :value="store.activeLayer.rotation" @input="store.updateLayerTransform(store.activeLayer.id, { rotation: Number($event.target.value) })" class="h-1.5 flex-1 accent-brand-500">
-                <span class="w-8 shrink-0 text-right text-[9px] text-cream-200">{{ store.activeLayer.rotation }}°</span>
+                <span class="w-14 shrink-0 whitespace-nowrap text-[9px] text-cream-300/60">Xoay</span>
+                <input type="range" min="-180" max="180" step="1" :value="store.activeLayer.rotation" @input="store.updateLayerTransform(store.activeLayer.id, { rotation: Number($event.target.value) })" class="h-1.5 min-w-0 flex-1 accent-brand-500">
+                <span class="w-9 shrink-0 whitespace-nowrap text-right text-[9px] text-cream-200">{{ store.activeLayer.rotation }}°</span>
+                <button @click="store.updateLayerTransform(store.activeLayer.id, { rotation: 0 })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset rotation">↺</button>
+              </div>
+              <div class="mt-1.5 grid grid-cols-3 gap-1.5 border-t border-ink-700/60 pt-1.5">
+                <button @click="store.duplicateLayer(store.activeLayer.id)" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Nhân đôi layer (Ctrl+D)">📄 Nhân đôi</button>
+                <button @click="store.bringLayerTo(store.activeLayer.id, 'front')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa lên trên cùng">⤒ Lên trên</button>
+                <button @click="store.bringLayerTo(store.activeLayer.id, 'back')" class="rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa xuống dưới cùng">⤓ Xuống dưới</button>
               </div>
             </div>
             <div v-if="store.palette.length && store.step !== 3 && store.previewId" class="rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">

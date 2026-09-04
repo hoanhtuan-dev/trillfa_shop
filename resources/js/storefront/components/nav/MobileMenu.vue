@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useStorefrontStore } from '../../store.js';
 import Icon from '../ui/Icon.vue';
 import SearchBox from './SearchBox.vue';
@@ -7,6 +7,19 @@ import SearchBox from './SearchBox.vue';
 const store = useStorefrontStore();
 const nav = computed(() => store.boot?.nav || []);
 const user = computed(() => store.user);
+const openKeys = ref([]);
+
+function hasChildren(item) {
+    return Array.isArray(item.children) && item.children.length > 0;
+}
+function toggle(key) {
+    openKeys.value = openKeys.value.includes(key)
+        ? openKeys.value.filter((k) => k !== key)
+        : [...openKeys.value, key];
+}
+function isOpen(key) {
+    return openKeys.value.includes(key);
+}
 </script>
 
 <template>
@@ -27,15 +40,34 @@ const user = computed(() => store.user);
                     </div>
 
                     <div class="flex-1 space-y-1 px-4 pb-6">
-                        <a
-                            v-for="item in nav"
-                            :key="item.label"
-                            :href="item.url"
-                            @click="store.closeMenu()"
-                            class="block rounded-2xl px-4 py-3 text-sm font-medium text-ink-900 transition hover:bg-white"
-                        >
-                            {{ item.label }}
-                        </a>
+                        <div v-for="item in nav" :key="item.label">
+                            <div class="flex items-center">
+                                <a
+                                    :href="item.url"
+                                    @click="store.closeMenu()"
+                                    class="flex-1 rounded-2xl px-4 py-3 text-sm font-medium text-ink-900 transition hover:bg-white"
+                                >{{ item.label }}</a>
+                                <button
+                                    v-if="hasChildren(item)"
+                                    @click="toggle(item.label)"
+                                    class="grid h-9 w-9 place-items-center rounded-full text-ink-500 transition hover:bg-white"
+                                    :aria-label="isOpen(item.label) ? 'Thu gọn' : 'Mở rộng'"
+                                >
+                                    <Icon name="chevron-right" :size="16" :class="isOpen(item.label) ? 'rotate-90' : ''" />
+                                </button>
+                            </div>
+                            <Transition name="acc">
+                                <div v-if="hasChildren(item) && isOpen(item.label)" class="ml-3 border-l border-cream-200 py-1 pl-3">
+                                    <a
+                                        v-for="child in item.children"
+                                        :key="child.label"
+                                        :href="child.url"
+                                        @click="store.closeMenu()"
+                                        class="block rounded-2xl px-3 py-2.5 text-sm text-ink-700 transition hover:bg-white"
+                                    >{{ child.label }}</a>
+                                </div>
+                            </Transition>
+                        </div>
                     </div>
 
                     <div class="border-t border-cream-200 p-4 pb-safe">
@@ -71,5 +103,14 @@ const user = computed(() => store.user);
 .drawer-enter-from > div:last-child,
 .drawer-leave-to > div:last-child {
     transform: translateX(-100%);
+}
+.acc-enter-active,
+.acc-leave-active {
+    transition: all 0.2s ease;
+}
+.acc-enter-from,
+.acc-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
 }
 </style>

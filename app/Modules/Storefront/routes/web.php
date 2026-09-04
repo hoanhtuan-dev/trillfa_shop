@@ -7,14 +7,20 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | Storefront module routes
 |--------------------------------------------------------------------------
-| The public homepage and the JSON feed the SPA can re-request if the static
-| boot payload is missing (e.g. after an SSR cache expires) or for a refresh.
-| Loaded by StorefrontModuleServiceProvider so the feature is self-contained.
+| The public homepage and shop listing (Vue SPA), plus the JSON feeds the SPAs
+| re-request for cache expiry or filter/sort/page updates. Loaded by
+| StorefrontModuleServiceProvider so the feature is self-contained.
 */
 
 Route::middleware('web')->group(function () {
     Route::get('/', [StorefrontController::class, 'home'])->name('home');
 
-    Route::get('/api/storefront/home', [StorefrontController::class, 'feed'])
-        ->name('storefront.feed');
+    // Shop listing (all products + per-category).
+    Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop.index');
+    Route::get('/danh-muc/{categorySlug}', [StorefrontController::class, 'shop'])->name('shop.category');
+
+    // JSON feeds.
+    Route::get('/api/storefront/home', [StorefrontController::class, 'feed'])->name('storefront.feed');
+    Route::get('/api/storefront/shop', [StorefrontController::class, 'shop'])->name('storefront.shop');
+    Route::get('/api/storefront/shop/{categorySlug}', [StorefrontController::class, 'shop'])->name('storefront.shop.category');
 });

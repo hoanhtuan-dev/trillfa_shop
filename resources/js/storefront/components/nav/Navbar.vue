@@ -1,27 +1,19 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStorefrontStore } from '../../store.js';
 import Icon from '../ui/Icon.vue';
 import SearchBox from './SearchBox.vue';
+import MenuNav from './MenuNav.vue';
 
 const store = useStorefrontStore();
 
 const scrolled = ref(false);
 const accountOpen = ref(false);
 const accountRef = ref(null);
-const moreOpen = ref(false);
-const moreRef = ref(null);
 
 const nav = computed(() => store.boot?.nav || []);
 const site = computed(() => store.site);
 const user = computed(() => store.user);
-
-// Keep the top nav to one clean row: show up to 7 primary items, drop the
-// rest into a "Xem thêm" dropdown so the menu never wraps or overflows.
-const MAX_PRIMARY = 7;
-const primaryNav = computed(() => nav.value.slice(0, MAX_PRIMARY));
-const moreNav = computed(() => nav.value.slice(MAX_PRIMARY));
-const hasMore = computed(() => moreNav.value.length > 0);
 
 function onScroll() {
     scrolled.value = window.scrollY > 8;
@@ -30,9 +22,6 @@ function onScroll() {
 function onDocClick(e) {
     if (accountOpen.value && accountRef.value && !accountRef.value.contains(e.target)) {
         accountOpen.value = false;
-    }
-    if (moreOpen.value && moreRef.value && !moreRef.value.contains(e.target)) {
-        moreOpen.value = false;
     }
 }
 
@@ -170,55 +159,8 @@ onBeforeUnmount(() => {
                     <SearchBox id="nav-mobile-search" />
                 </div>
 
-                <!-- Desktop nav (single row, primary + "Xem thêm" dropdown) -->
-                <nav v-if="nav.length" class="hidden h-12 items-center gap-0.5 overflow-hidden lg:flex">
-                    <a
-                        v-for="item in primaryNav"
-                        :key="item.label"
-                        :href="item.url"
-                        class="group relative flex h-full shrink-0 items-center whitespace-nowrap rounded-lg px-3 text-sm font-medium text-ink-700 transition-colors hover:text-brand-700"
-                    >
-                        {{ item.label }}
-                        <div
-                            v-if="item.children && item.children.length"
-                            class="glass-strong absolute left-0 top-full z-50 hidden min-w-52 rounded-2xl p-1.5 group-hover:block"
-                        >
-                            <a
-                                v-for="child in item.children"
-                                :key="child.label"
-                                :href="child.url"
-                                class="block whitespace-nowrap rounded-xl px-3 py-2 text-sm text-ink-700 hover:bg-cream-100"
-                            >{{ child.label }}</a>
-                        </div>
-                    </a>
-
-                    <!-- Overflow into "Xem thêm" dropdown -->
-                    <div v-if="hasMore" ref="moreRef" class="relative">
-                        <button
-                            @click="moreOpen = !moreOpen"
-                            class="flex h-full items-center gap-1 whitespace-nowrap rounded-lg px-3 text-sm font-medium text-ink-700 transition-colors hover:text-brand-700"
-                        >
-                            Xem thêm
-                            <Icon name="chevron-right" :size="14" class="rotate-90" />
-                        </button>
-                        <Transition name="fade">
-                            <div
-                                v-if="moreOpen"
-                                class="glass-strong absolute right-0 top-full z-50 mt-1 w-64 rounded-2xl p-2"
-                            >
-                                <a
-                                    v-for="item in moreNav"
-                                    :key="item.label"
-                                    :href="item.url"
-                                    class="flex items-center justify-between rounded-xl px-3 py-2 text-sm text-ink-700 hover:bg-cream-100"
-                                >
-                                    <span>{{ item.label }}</span>
-                                    <span class="text-xs text-ink-500">›</span>
-                                </a>
-                            </div>
-                        </Transition>
-                    </div>
-                </nav>
+                <!-- Desktop nav (shared, nested menu) -->
+                <MenuNav v-if="nav.length" :items="nav" />
             </div>
         </div>
     </header>

@@ -43,6 +43,82 @@ class StorefrontBridge
         ];
     }
 
+    /**
+     * Shop / category listing payload for the Vue shop SPA.
+     * Reuses the same product serializer so cards look identical to home.
+     */
+    public function shop(?string $categorySlug = null, array $filters = [], int $page = 1): array
+    {
+        $query = Product::active()->with('category', 'variants');
+
+        $category = null;
+        if ($categorySlug) {
+            $category = Category::active()->where('slug', $categorySlug)->first();
+            if ($category) {
+                $ids = collect([$category->id])->merge($category->children->pluck('id'));
+                $query->whereIn('category_id', $ids);
+            }
+        }
+
+        if (! empty($filters['q'])) {
+            $query->search($filters['q']);
+        }
+        if (! empty($filters['brand'])) {
+            $query->where('brand', $filters['brand']);
+        }
+        if (isset($filters['min_price']) && $filters['min_price'] !== '') {
+            $query->where('price', '>=', (float) $filters['min_price']);
+        }
+        if (isset($filters['max_price']) && $filters['max_price'] !== '') {
+            $query->where('price', '<=', (float) $filters['max_price']);
+        }
+
+        $sort = $filters['sort'] ?? 'newest';
+        $query = match ($sort) {
+            'price_asc' => $query->orderBy('price'),
+            'price_desc' => $query->orderByDesc('price'),
+            'popular' => $query->orderByDesc('sales_count'),
+            'rating' => $query->orderByDesc('rating_avg'),
+            default => $query->orderByDesc('featured')->orderByDesc('id'),
+        };
+
+        $p = $query->paginate(12, ['*'], 'page', $page);
+
+        return [
+            'categories' => Category::active()->whereNull('parent_id')
+                ->with('children', fn ($q) => $q->active())
+                ->orderBy('sort_order')->get()
+                ->map(fn (Category $c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'slug' => $c->slug,
+                    'icon' => $c->icon,
+                    'icon_image' => $c->icon_image_url,
+                    'url' => route('shop.category', $c->slug),
+                    'children' => $c->children->map(fn ($ch) => [
+                        'name' => $ch->name,
+                        'slug' => $ch->slug,
+                        'url' => route('shop.category', $ch->slug),
+                    ])->values()->all(),
+                ])->values()->all(),
+            'brands' => Product::active()->whereNotNull('brand')->distinct()->orderBy('brand')->pluck('brand')->values()->all(),
+            'active' => [
+                'category' => $categorySlug,
+                'q' => $filters['q'] ?? '',
+                'brand' => $filters['brand'] ?? '',
+                'min_price' => $filters['min_price'] ?? '',
+                'max_price' => $filters['max_price'] ?? '',
+                'sort' => $sort,
+            ],
+            'category_name' => $category?->name,
+            'products' => $p->getCollection()->map(fn ($product) => $this->product($product))->values()->all(),
+            'total' => $p->total(),
+            'per_page' => $p->perPage(),
+            'current_page' => $p->currentPage(),
+            'last_page' => $p->lastPage(),
+        ];
+    }
+
     // ---------------------------------------------------------------- sections
 
     public function site(): array

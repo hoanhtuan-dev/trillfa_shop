@@ -32,7 +32,6 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuickCheckoutController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RobotsController;
-use App\Http\Controllers\ShopController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StudioController;
 use App\Http\Controllers\StylistDataController;
@@ -46,9 +45,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 Route::get('/robots.txt', [RobotsController::class, 'index'])->name('robots');
 
-// Shop
-Route::get('/shop', [ShopController::class, 'index'])->name('shop.index');
-Route::get('/danh-muc/{categorySlug}', [ShopController::class, 'index'])->name('shop.category');
+// Shop (owned by the Storefront module now — Vue SPA).
 Route::get('/san-pham/{slug}', [ProductController::class, 'show'])->name('product.show');
 
 // Cart

@@ -679,6 +679,26 @@ export const useStudioStore = defineStore('studio', {
       Object.assign(l, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, blend: 'normal' });
       this.saveLayerLayout();
     },
+    // Nhân đôi layer (giữ nguyên transform, tạo id + tên mới).
+    duplicateLayer(id) {
+      const l = this.canvasLayers.find((x) => x.id === id);
+      if (!l) return;
+      const copy = { ...l, id: id + '-copy-' + Date.now(), name: (l.name || 'Layer') + ' (bản sao)' };
+      this.canvasLayers.push(copy);
+      this.setActiveLayer(copy.id);
+      this.saveLayerLayout();
+    },
+    // Đưa layer lên trên cùng ('front') hoặc xuống dưới cùng ('back').
+    bringLayerTo(id, where) {
+      const i = this.canvasLayers.findIndex((x) => x.id === id);
+      if (i < 0) return;
+      const arr = this.canvasLayers.slice();
+      const item = arr.splice(i, 1)[0];
+      if (where === 'front') arr.push(item);
+      else arr.unshift(item);
+      this.canvasLayers = arr;
+      this.saveLayerLayout();
+    },
     // Kéo layer trên canvas để di chuyển (tách khỏi pan/zoom khung nhìn).
     beginLayerDrag(id, e) {
       const l = this.canvasLayers.find((x) => x.id === id);
@@ -703,6 +723,7 @@ export const useStudioStore = defineStore('studio', {
     async compositeVisible() {
       const layers = this.canvasLayers.filter((l) => l.visible !== false && l.image);
       if (!layers.length) throw new Error('Chưa có layer để gộp.');
+      const MAX = 512; // khớp với max-h/max-w hiển thị trên canvas → tỷ lệ gộp khớp với màn hình
       const loaded = await Promise.all(layers.map((l) => new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -712,9 +733,14 @@ export const useStudioStore = defineStore('studio', {
       })));
       const valid = loaded.filter((x) => x.img && x.img.naturalWidth);
       if (!valid.length) throw new Error('Không tải được ảnh layer.');
+      // Dùng đúng kích thước hiển thị thật của mỗi layer (natural bị giới hạn về MAX giống canvas).
+      const items = valid.map(({ layer: l, img }) => {
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        const base = Math.min(1, MAX / nw, MAX / nh);
+        return { l, img, w: nw * base, h: nh * base };
+      });
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      valid.forEach(({ layer: l, img }) => {
-        const w = img.naturalWidth, h = img.naturalHeight;
+      items.forEach(({ l, w, h }) => {
         const s = l.scale || 1;
         const rot = ((l.rotation || 0) * Math.PI) / 180;
         const cos = Math.cos(rot), sin = Math.sin(rot);
@@ -732,8 +758,7 @@ export const useStudioStore = defineStore('studio', {
       const canvas = document.createElement('canvas');
       canvas.width = W; canvas.height = H;
       const ctx = canvas.getContext('2d');
-      valid.forEach(({ layer: l, img }) => {
-        const w = img.naturalWidth, h = img.naturalHeight;
+      items.forEach(({ l, img, w, h }) => {
         ctx.save();
         ctx.translate(-minX + pad, -minY + pad);
         ctx.translate(l.x || 0, l.y || 0);
