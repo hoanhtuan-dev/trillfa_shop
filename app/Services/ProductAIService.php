@@ -71,11 +71,15 @@ class ProductAIService
         if (empty($keys)) {
             $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
         }
+        // Bound attempts so the queued job always finishes well within the
+        // frontend 180s poll window: 2 models × 3 keys × ~12s timeout max.
+        $models = array_slice(array_values($models), 0, 2);
+        $keys = array_slice(array_values(array_unique(array_filter($keys))), 0, 3);
         foreach (array_values(array_unique($keys)) as $key) {
             $base = dashscope_base_url($key).'/compatible-mode/v1';
             foreach ($models as $model) {
                 try {
-                    $resp = Http::withToken($key)->timeout(25)->post($base.'/chat/completions', [
+                    $resp = Http::withToken($key)->timeout(12)->post($base.'/chat/completions', [
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => [
                             ['type' => 'text', 'text' => $prompt],
@@ -110,7 +114,7 @@ class ProductAIService
             $model = function_exists('studio_suggest_gemini_model') ? studio_suggest_gemini_model() : studio_config('qwen_vision_model', 'gemini-2.5-flash');
             $b64 = base64_encode(file_get_contents($imagePath));
             try {
-                $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(30)
+                $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(15)
                     ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                         'contents' => [['parts' => [['text' => $prompt], ['inline_data' => ['mime_type' => 'image/jpeg', 'data' => $b64]]]]],
                     ]);
@@ -276,7 +280,9 @@ PROMPT;
 
     protected function qwenTextModels(): array
     {
-        return function_exists('studio_qwen_text_models') ? studio_qwen_text_models() : [$this->model];
+        $models = function_exists('studio_qwen_text_models') ? studio_qwen_text_models() : [$this->model];
+
+        return array_slice(array_values($models), 0, 2);
     }
 
     protected function qwenPromptKeys(): array
@@ -286,7 +292,7 @@ PROMPT;
             $keys = array_values(array_filter([studio_api_key('qwen'), studio_api_key('dashscope')]));
         }
 
-        return array_values(array_unique(array_filter($keys)));
+        return array_slice(array_values(array_unique(array_filter($keys))), 0, 3);
     }
 
     protected function buildPrompt(array $input, ?array $imageAnalysis): string
@@ -349,7 +355,7 @@ PROMPT;
     {
         $base = dashscope_base_url($key).'/compatible-mode/v1';
         try {
-            $resp = Http::withToken($key)->timeout(25)->post($base.'/chat/completions', [
+            $resp = Http::withToken($key)->timeout(12)->post($base.'/chat/completions', [
                 'model' => $model ?: $this->model,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.7,
@@ -373,7 +379,7 @@ PROMPT;
     {
         $model = studio_config('prompt_model', 'gemini-2.5-flash');
         try {
-            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(30)
+            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(15)
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                     'contents' => [['parts' => [['text' => $prompt]]]],
                 ]);
