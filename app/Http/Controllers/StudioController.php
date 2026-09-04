@@ -34,7 +34,8 @@ class StudioController extends Controller
      */
     public function studioVue()
     {
-        return view('studio.vue');
+        // Không cache trang Studio — tránh SW/HTTP cache giữ HTML cũ (trỏ bundle đã lỗi thời).
+        return response()->view('studio.vue')->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function settingsVue() { return view('studio.settings-vue'); }
@@ -42,7 +43,7 @@ class StudioController extends Controller
     public function index()
     {
         // The Vue studio loads its own data; keep this method minimal.
-        return view('studio.vue');
+        return response()->view('studio.vue')->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function storeProject(Request $request)
