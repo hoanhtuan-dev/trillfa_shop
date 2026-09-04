@@ -3,6 +3,7 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../views';
+@source '../js/storefront';
 
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
@@ -204,3 +205,100 @@ aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .studio-dark .scrollbar-hide, .studio-dark { scroll-behavior: smooth; }
+
+/* ==========================================================================
+   Storefront Vue SPA design system
+   Minimalist · glassmorphic · gradient · everything-is-a-card. Compiled
+   with Tailwind's cascade layers so these composed classes stay overridable
+   by plain utilities used in the .vue components.
+   ========================================================================== */
+.sf-shell {
+    @apply min-h-screen bg-cream-50 text-ink-900 antialiased;
+    background-image:
+        radial-gradient(1100px 560px at 12% -6%, rgba(69, 128, 98, 0.16), transparent 60%),
+        radial-gradient(900px 480px at 100% -4%, rgba(178, 106, 59, 0.10), transparent 55%);
+    background-attachment: fixed;
+}
+
+.sf-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+/* --- Glassmorphism surfaces --- */
+.glass {
+    @apply border border-white/60 bg-white/70 backdrop-blur-xl;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.6) inset,
+        0 8px 30px -12px rgba(11, 18, 16, 0.18);
+}
+
+.glass-strong {
+    @apply border border-white/70 bg-white/85 backdrop-blur-2xl;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.7) inset,
+        0 20px 60px -24px rgba(11, 18, 16, 0.30);
+}
+
+.card-surface {
+    @apply rounded-[1.75rem] border border-cream-200 bg-white/70 backdrop-blur-xl;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.6) inset,
+        0 10px 40px -18px rgba(11, 18, 16, 0.22);
+}
+
+.card-surface-hover {
+    @apply transition-all duration-300 hover:-translate-y-1;
+}
+.card-surface-hover:hover {
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 26px 60px -22px rgba(11, 18, 16, 0.34);
+}
+
+.sf-gradient-text {
+    @apply bg-gradient-to-r from-brand-700 via-brand-500 to-clay-500 bg-clip-text text-transparent;
+}
+
+/* --- Buttons --- */
+.sf-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+}
+.sf-btn-primary {
+    @apply bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-lg shadow-brand-900/20 hover:from-brand-700 hover:to-brand-600 active:scale-[.98];
+}
+.sf-btn-dark {
+    @apply bg-ink-900 text-cream-50 shadow-lg shadow-ink-900/20 hover:bg-ink-800 active:scale-[.98];
+}
+.sf-btn-ghost {
+    @apply text-ink-700 hover:bg-white/70 active:scale-[.98];
+}
+.sf-btn-soft {
+    @apply border border-cream-200 bg-white/70 text-ink-900 backdrop-blur hover:bg-white active:scale-[.98];
+}
+
+/* --- Typography helpers --- */
+.section-kicker {
+    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-600;
+}
+.section-title {
+    @apply font-display text-2xl font-semibold text-ink-900 sm:text-3xl;
+}
+.sf-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
+}
+
+.sf-input {
+    @apply w-full rounded-2xl border border-cream-200 bg-white/70 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-500/70 backdrop-blur focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15;
+}
+
+.sf-scroll-x {
+    @apply flex gap-4 overflow-x-auto pb-2;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+.sf-scroll-x > * { scroll-snap-align: start; }
+
+/* Mobile safe-area bottom inset */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0.75rem); }
+
+/* Hide scrollbar on snap carousels */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

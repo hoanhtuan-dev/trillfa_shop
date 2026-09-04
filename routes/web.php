@@ -26,7 +26,6 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
-use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProductController;
@@ -40,7 +39,8 @@ use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
+// NOTE: the public homepage "/" is now owned by the Storefront module
+// (app/Modules/Storefront/routes/web.php) and rendered by its Vue SPA.
 
 // SEO
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
