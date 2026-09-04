@@ -415,6 +415,28 @@ class StorefrontBridge
         ]);
     }
 
+    public function checkoutPay($order): array
+    {
+        return array_merge($this->base(), ['view' => 'pay', 'order' => $this->orderSummary($order)]);
+    }
+
+    public function checkoutSuccess($order): array
+    {
+        return array_merge($this->base(), ['view' => 'success', 'order' => $this->orderSummary($order)]);
+    }
+
+    protected function orderSummary($order): array
+    {
+        return [
+            'id' => $order->id,
+            'order_number' => $order->order_number,
+            'total' => (float) $order->total,
+            'payment_method' => $order->payment_method,
+            'payment_status' => $order->payment_status,
+            'items_count' => $order->items->count(),
+        ];
+    }
+
     protected function orderCard($o): array
     {
         return [

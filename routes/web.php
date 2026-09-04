@@ -68,9 +68,7 @@ Route::post('/danh-gia/{review}/huu-ich', [ReviewController::class, 'helpful'])-
 // Checkout
 Route::middleware('auth')->group(function () {
     Route::post('/thanh-toan', [CheckoutController::class, 'store'])->name('checkout.store');
-    Route::get('/thanh-toan/{order}/thanh-toan', [CheckoutController::class, 'pay'])->name('checkout.pay');
     Route::post('/thanh-toan/{order}/thanh-toan', [CheckoutController::class, 'confirmPay'])->name('checkout.confirm');
-    Route::get('/thanh-toan/{order}/hoan-tat', [CheckoutController::class, 'success'])->name('checkout.success');
 });
 
 // Quick checkout — guests can order with just name + phone (COD)

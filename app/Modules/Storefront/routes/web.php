@@ -52,6 +52,12 @@ Route::middleware('web')->group(function () {
     Route::get('/dieu-khoan', [StorefrontController::class, 'staticPage'])->defaults('key', 'terms')->name('page.terms');
     Route::get('/trang/{slug}', [StorefrontController::class, 'staticPage'])->name('page.show');
 
+    // Checkout result (pay / success) — auth.
+    Route::get('/thanh-toan/{order}/thanh-toan', [StorefrontController::class, 'checkoutPay'])
+        ->name('checkout.pay')->middleware('auth');
+    Route::get('/thanh-toan/{order}/hoan-tat', [StorefrontController::class, 'checkoutSuccess'])
+        ->name('checkout.success')->middleware('auth');
+
     // Auth (submission posts to the legacy POST /dang-nhap, /dang-ky).
     Route::get('/dang-nhap', [StorefrontController::class, 'auth'])
         ->defaults('mode', 'login')->name('login')->middleware('guest');

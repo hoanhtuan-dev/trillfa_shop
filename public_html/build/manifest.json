@@ -224,6 +224,16 @@
       "_StorefrontLayout-p3AJkv3O.js"
     ]
   },
+  "resources/js/storefront/checkout-result.js": {
+    "file": "assets/checkout-result-BOiuml7A.js",
+    "name": "checkout-result",
+    "src": "resources/js/storefront/checkout-result.js",
+    "isEntry": true,
+    "imports": [
+      "_pinia-9imU3GMs.js",
+      "_StorefrontLayout-p3AJkv3O.js"
+    ]
+  },
   "resources/js/storefront/checkout.js": {
     "file": "assets/checkout-D6i2cU3k.js",
     "name": "checkout",

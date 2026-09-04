@@ -138,6 +138,24 @@ class StorefrontController extends Controller
         return view('storefront.account', ['boot' => $this->bridge->accountPassword()]);
     }
 
+    public function checkoutPay(\App\Models\Order $order)
+    {
+        if ($order->user_id && $order->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        return view('storefront.checkout-result', ['boot' => $this->bridge->checkoutPay($order)]);
+    }
+
+    public function checkoutSuccess(\App\Models\Order $order)
+    {
+        if ($order->user_id && $order->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        return view('storefront.checkout-result', ['boot' => $this->bridge->checkoutSuccess($order)]);
+    }
+
     /**
      * Static content page — renders the Vue static SPA.
      */
