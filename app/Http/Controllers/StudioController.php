@@ -310,6 +310,36 @@ class StudioController extends Controller
      */
     protected function downscaleSource(string $url, int $maxSide = 1600): string
     {
+        // Data URL (base64) → giải mã + lưu thành file rồi downscale.
+        // Tránh nhét base64 khổng lồ vào cột base_image (gây tràn cột DB → 500).
+        if (str_starts_with($url, 'data:')) {
+            $comma = strpos($url, ',');
+            if ($comma !== false) {
+                $raw = base64_decode(substr($url, $comma + 1), true);
+                if ($raw !== false && $raw !== '') {
+                    $img = @imagecreatefromstring($raw);
+                    if ($img) {
+                        $w = imagesx($img); $h = imagesy($img);
+                        $long = max($w, $h);
+                        if ($long > $maxSide) {
+                            $scale = $maxSide / $long;
+                            $nw = (int) max(1, round($w * $scale));
+                            $nh = (int) max(1, round($h * $scale));
+                            $out = imagecreatetruecolor($nw, $nh);
+                            imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                            imagedestroy($img);
+                            $img = $out;
+                        }
+                        $name = 'studio/ds-'.Str::uuid().'.png';
+                        \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($img));
+                        imagedestroy($img);
+                        return '/storage/'.$name;
+                    }
+                }
+            }
+            return $url;
+        }
+
         $file = null;
         foreach ([public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($url, PHP_URL_PATH), '/')))] as $cand) {
             if (is_file($cand)) { $file = $cand; break; }

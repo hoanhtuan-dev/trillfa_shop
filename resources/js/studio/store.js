@@ -161,6 +161,7 @@ export const useStudioStore = defineStore('studio', {
     flashMsg: '',
     flashType: 'info',
     _flashTimer: null,
+    _highlightTimer: null,
     upscalePresets: [],
     lastBatch: [],
     showBatch: false,
@@ -168,6 +169,7 @@ export const useStudioStore = defineStore('studio', {
     activeLayerId: '',
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
     redoStack: [],   // lịch sử làm lại
+    highlightLayerId: '',  // layer mới tạo cần viền nổi bật tạm thời
   }),
   getters: {
     upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
@@ -678,7 +680,7 @@ export const useStudioStore = defineStore('studio', {
       this._positionByImageSize(id, image);
     },
     // Thêm 1 layer TRỐNG (trong suốt) để vẽ — nền tảng cho hiệu ứng sau (brush/vẽ tự do GIMP/PS).
-    async addBlankLayer() {
+    async addBlankLayer(bg = null) {
       let w = 1024, h = 1024;
       const src = this.activeLayer;
       if (src && src.image) {
@@ -688,12 +690,17 @@ export const useStudioStore = defineStore('studio', {
         } catch (e) { /* giữ kích thước mặc định */ }
       }
       const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h; // nền trong suốt mặc định
+      canvas.width = w; canvas.height = h;
+      if (bg) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, w, h);
+      }
       const url = canvas.toDataURL('image/png');
       const id = 'blank-' + Date.now();
       // Thêm TRÙNG KHỚP với layer active (cùng x/y/scale/rotation/blend), không flow ra chỗ khác.
       this.canvasLayers.push({
-        id, kind: 'source', name: 'Layer vẽ', image: url, genId: null,
+        id, kind: 'source', name: bg ? 'Layer màu' : 'Layer trong suốt', image: url, genId: null,
         visible: true, locked: false,
         x: src ? (src.x || 0) : 0, y: src ? (src.y || 0) : 0,
         scale: src ? (src.scale || 1) : 1, rotation: src ? (src.rotation || 0) : 0,
@@ -702,8 +709,12 @@ export const useStudioStore = defineStore('studio', {
         baseW: src ? src.baseW : undefined, baseH: src ? src.baseH : undefined,
       });
       this.saveLayerLayout();
+      // Highlight layer mới (viền nổi bật) rồi tự tắt sau 2.5s hoặc khi người dùng chọn layer khác.
+      this.highlightLayerId = id;
+      clearTimeout(this._highlightTimer);
+      this._highlightTimer = setTimeout(() => { if (this.highlightLayerId === id) this.highlightLayerId = ''; }, 2500);
       this.setActiveLayer(id);
-      this.toast('Đã thêm layer vẽ trống (trùng vị trí layer đang chọn).');
+      this.toast(bg ? 'Đã thêm layer màu (trùng vị trí layer đang chọn).' : 'Đã thêm layer trong suốt (trùng vị trí layer đang chọn).');
     },
     // Tô màu TOÀN BỘ layer đang chọn bằng màu hiện tại (inpaintFillColor).
     async fillActiveLayer() {
@@ -770,7 +781,7 @@ export const useStudioStore = defineStore('studio', {
       img.onerror = () => {};
       img.src = image;
     },
-    setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
+    setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (this.highlightLayerId && this.highlightLayerId !== id) this.highlightLayerId = ''; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
     deleteLayer(item) {
