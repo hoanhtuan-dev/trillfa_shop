@@ -50,7 +50,7 @@ const cta = computed(() => boot.value.cta || { enabled: false });
             <BenefitsStrip :benefits="boot.benefits || []" />
 
             <!-- Categories -->
-            <section v-if="categories.enabled && categories.items.length" class="sf-container py-8">
+            <section v-if="categories.enabled && categories.items.length" v-reveal class="sf-container py-8 sm:py-12">
                 <SectionHeading
                     :kicker="categories.kicker"
                     :title="categories.title"
@@ -61,7 +61,7 @@ const cta = computed(() => boot.value.cta || { enabled: false });
             </section>
 
             <!-- Featured -->
-            <section v-if="featured.enabled && featured.products.length" class="sf-container py-8">
+            <section v-if="featured.enabled && featured.products.length" v-reveal class="sf-container py-8 sm:py-12">
                 <SectionHeading
                     :kicker="featured.kicker"
                     :title="featured.title"
@@ -72,14 +72,14 @@ const cta = computed(() => boot.value.cta || { enabled: false });
             </section>
 
             <!-- Secondary banners -->
-            <section v-if="secondary.enabled && secondary.banners.length" class="sf-container py-8">
+            <section v-if="secondary.enabled && secondary.banners.length" v-reveal class="sf-container py-8 sm:py-12">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <BannerPromoCard v-for="b in secondary.banners.slice(0, 2)" :key="b.id" :banner="b" />
                 </div>
             </section>
 
             <!-- New arrivals -->
-            <section v-if="newArrivals.enabled && newArrivals.products.length" class="sf-container py-8">
+            <section v-if="newArrivals.enabled && newArrivals.products.length" v-reveal class="sf-container py-8 sm:py-12">
                 <SectionHeading
                     :kicker="newArrivals.kicker"
                     :title="newArrivals.title"
@@ -90,7 +90,7 @@ const cta = computed(() => boot.value.cta || { enabled: false });
             </section>
 
             <!-- Sale -->
-            <section v-if="onSale.enabled && onSale.products.length" class="sf-container py-8">
+            <section v-if="onSale.enabled && onSale.products.length" v-reveal class="sf-container py-8 sm:py-12">
                 <div class="card-surface relative overflow-hidden !rounded-[2rem] bg-ink-900 p-6 text-white sm:p-10">
                     <div class="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-brand-600/30 blur-3xl"></div>
                     <div class="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-clay-500/20 blur-3xl"></div>
@@ -105,7 +105,7 @@ const cta = computed(() => boot.value.cta || { enabled: false });
             </section>
 
             <!-- Bestsellers -->
-            <section v-if="bestsellers.enabled && bestsellers.products.length" class="sf-container py-8">
+            <section v-if="bestsellers.enabled && bestsellers.products.length" v-reveal class="sf-container py-8 sm:py-12">
                 <SectionHeading
                     :kicker="bestsellers.kicker"
                     :title="bestsellers.title"
@@ -116,7 +116,7 @@ const cta = computed(() => boot.value.cta || { enabled: false });
             </section>
 
             <!-- Blog -->
-            <section v-if="blog.enabled && blog.posts.length" class="sf-container py-8">
+            <section v-if="blog.enabled && blog.posts.length" v-reveal class="sf-container py-8 sm:py-12">
                 <SectionHeading
                     :kicker="blog.kicker"
                     :title="blog.title"
