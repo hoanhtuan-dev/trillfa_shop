@@ -397,9 +397,10 @@ class AdminProductController extends Controller
 
     protected function syncVariants(Request $request, Product $product): void
     {
-        // The SPA always submits `sync_variants=1` so that removing every row
-        // also clears existing variants (an empty `variants` array is intentional).
-        if (! $request->boolean('sync_variants')) {
+        // The SPA submits `sync_variants=1` so removing every row also clears
+        // existing variants. Legacy form posts (no flag) keep the old behaviour:
+        // only sync when at least one variant row is present.
+        if (! $request->boolean('sync_variants') && ! $request->filled('variants')) {
             return;
         }
 
