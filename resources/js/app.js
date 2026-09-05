@@ -451,6 +451,8 @@ document.addEventListener('alpine:init', () => {
     //  - nút "Lấy từ" → kéo đoạn đầu của Nội dung mở rộng vào Mở đầu.
     Alpine.data('introEditor', () => ({
         lastSynced: '',
+        // 'empty' | 'synced' | 'pending' — chip trạng thái hiển thị dựa vào biến này
+        status: 'empty',
         init() {
             if (this.$refs.hidden && this.$refs.hidden.value) {
                 this.$refs.editor.innerHTML = this.$refs.hidden.value;
@@ -459,7 +461,19 @@ document.addEventListener('alpine:init', () => {
             this.bodyHidden = document.getElementById('about-body-hidden');
             // Body editor init chạy SAU component này trong cùng lượt quét DOM,
             // nên đánh dấu trạng thái đồng bộ sau khi cả hai đã được khởi tạo.
-            setTimeout(() => { this.lastSynced = this.firstParagraphText(); }, 0);
+            setTimeout(() => {
+                this.lastSynced = this.firstParagraphText();
+                this.updateStatus();
+            }, 0);
+        },
+        updateStatus() {
+            if (!this.bodyEl || (this.bodyEl.innerHTML || '').trim() === '') {
+                this.status = 'empty';
+            } else if (this.lastSynced !== '' && this.firstParagraphText() === this.lastSynced) {
+                this.status = 'synced';
+            } else {
+                this.status = 'pending';
+            }
         },
         exec(cmd, val = null) {
             this.$refs.editor.focus();
@@ -497,6 +511,7 @@ document.addEventListener('alpine:init', () => {
                 }
                 this.lastSynced = this.plainText(html);
             }
+            this.updateStatus();
         },
         syncToBody() {
             const html = this.$refs.editor.innerHTML;
@@ -511,6 +526,8 @@ document.addEventListener('alpine:init', () => {
             this.bodyEl.innerHTML = next;
             this.bodyHidden.value = next;
             this.lastSynced = this.plainText(html);
+            this.updateStatus();
+            this.notify('Đã đồng bộ “Mở đầu” vào đoạn đầu của “Nội dung mở rộng”.');
         },
         pullFromBody() {
             const first = this.firstParagraphText();
@@ -518,6 +535,15 @@ document.addEventListener('alpine:init', () => {
                 this.$refs.editor.innerHTML = first;
                 this.$refs.hidden.value = first;
                 this.lastSynced = first;
+                this.updateStatus();
+                this.notify('Đã kéo đoạn mở đầu từ “Nội dung mở rộng” vào “Mở đầu”.');
+            }
+        },
+        notify(message) {
+            try {
+                Alpine.store('toast').show(message, 'success');
+            } catch (e) {
+                window.alert(message);
             }
         },
     }));

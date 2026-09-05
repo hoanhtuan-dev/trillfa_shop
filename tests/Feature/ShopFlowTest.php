@@ -3,13 +3,25 @@
 namespace Tests\Feature;
 
 use App\Mail\OrderConfirmation;
+use App\Models\Banner;
+use App\Models\Category;
 use App\Models\Coupon;
+use App\Models\CustomPage;
+use App\Models\Generation;
+use App\Models\MenuItem;
+use App\Models\Order;
+use App\Models\PaymentMethod;
+use App\Models\Post;
+use App\Models\Preset;
 use App\Models\Product;
-use App\Models\ShippingMethod;
+use App\Models\StudioOutfitSetting;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ShopFlowTest extends TestCase
@@ -38,7 +50,7 @@ class ShopFlowTest extends TestCase
 
         $product = Product::first();
         $this->get('/san-pham/'.$product->slug)->assertOk();
-        $post = \App\Models\Post::published()->first();
+        $post = Post::published()->first();
         $this->get('/blog/'.$post->slug)->assertOk();
     }
 
@@ -97,7 +109,7 @@ class ShopFlowTest extends TestCase
         ]);
 
         $response->assertSessionHasNoErrors();
-        $response->assertSessionHasNoErrors(); 
+        $response->assertSessionHasNoErrors();
         $this->assertDatabaseCount('orders', 5); // 4 seeded + 1 new
     }
 
@@ -134,13 +146,14 @@ class ShopFlowTest extends TestCase
         $this->get('/admin/products/'.$product->id.'/edit')->assertOk();
         $this->get('/admin/categories')->assertOk();
         $this->get('/admin/orders')->assertOk();
-        $this->get('/admin/orders/'.\App\Models\Order::first()->id)->assertOk();
-        $this->get('/admin/users')->assertOk();
+        $this->get('/admin/orders/'.Order::first()->id)->assertOk();
+        // Quản lý tài khoản chỉ dành cho Super Admin — admin thường bị chặn.
+        $this->get('/admin/users')->assertForbidden();
         $this->get('/admin/coupons')->assertOk();
         $this->get('/admin/reviews')->assertOk();
         $this->get('/admin/posts')->assertOk();
         $this->get('/admin/posts/create')->assertOk();
-        $post = \App\Models\Post::first();
+        $post = Post::first();
         $this->get('/admin/posts/'.$post->id.'/edit')->assertOk();
         $this->get('/admin/banners')->assertOk();
         $this->get('/admin/settings')->assertOk();
@@ -209,10 +222,13 @@ class ShopFlowTest extends TestCase
             ->assertSee('rel="canonical"', false);
     }
 
-    public function test_admin_can_create_update_and_delete_user(): void
+    public function test_super_admin_can_create_update_and_delete_user(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
-        $this->actingAs($admin);
+        $superAdmin = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $this->assertNotNull($superAdmin, 'Super admin chưa được seed.');
+        $this->assertTrue($superAdmin->isSuperAdmin());
+        $this->assertTrue($superAdmin->isAdmin());
+        $this->actingAs($superAdmin);
 
         $this->post('/admin/users', [
             'name' => 'Khách Mới',
@@ -239,18 +255,19 @@ class ShopFlowTest extends TestCase
         $this->assertSame('Khách Đã Sửa', $user->fresh()->name);
         $this->assertSame('admin', $user->fresh()->role);
 
-        $this->delete('/admin/users/'.$admin->id)->assertSessionHas('error');
+        // Super Admin không thể tự xóa chính mình.
+        $this->delete('/admin/users/'.$superAdmin->id)->assertSessionHas('error');
 
         $other = User::where('email', 'khach1@trillfa.com')->first();
         $this->delete('/admin/users/'.$other->id)->assertSessionHas('success');
         $this->assertNull(User::find($other->id));
     }
 
-    public function test_admin_can_reset_user_password(): void
+    public function test_super_admin_can_reset_user_password(): void
     {
-        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $superAdmin = User::where('email', 'tuan.ho.designer@gmail.com')->first();
         $customer = User::where('email', 'customer@trillfa.com')->first();
-        $this->actingAs($admin);
+        $this->actingAs($superAdmin);
 
         $this->post('/admin/users/'.$customer->id.'/password', [
             'password' => 'newpassword123',
@@ -258,13 +275,61 @@ class ShopFlowTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $this->assertTrue(Hash::check('newpassword123', $customer->fresh()->password));
+
+        // Super Admin không thể tự đặt lại mật khẩu của chính mình qua đây.
+        $this->post('/admin/users/'.$superAdmin->id.'/password', [
+            'password' => 'different456',
+            'password_confirmation' => 'different456',
+        ])->assertSessionHas('error');
+        $this->assertFalse(Hash::check('different456', $superAdmin->fresh()->password));
+    }
+
+    public function test_regular_admin_cannot_manage_users(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Truy cập trang quản lý tài khoản → 403.
+        $this->get('/admin/users')->assertForbidden();
+
+        // Tạo tài khoản → 403 (UserPolicy::create).
+        $this->post('/admin/users', [
+            'name' => 'Hacker',
+            'email' => 'hacker@trillfa.com',
+            'role' => 'customer',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertForbidden();
+        $this->assertNull(User::where('email', 'hacker@trillfa.com')->first());
+
+        // Sửa tài khoản → 403 (UserPolicy::update / resetPassword).
+        $this->put('/admin/users/'.$customer->id, [
+            'name' => $customer->name,
+            'email' => $customer->email,
+            'role' => 'admin',
+            'password' => '',
+            'password_confirmation' => '',
+            'is_active' => '1',
+        ])->assertForbidden();
+        $this->assertSame('customer', $customer->fresh()->role);
+
+        $this->post('/admin/users/'.$customer->id.'/password', [
+            'password' => 'hacked123',
+            'password_confirmation' => 'hacked123',
+        ])->assertForbidden();
+
+        // Khóa / xóa tài khoản → 403 (UserPolicy::update / delete).
+        $this->post('/admin/users/'.$customer->id.'/toggle')->assertForbidden();
+        $this->delete('/admin/users/'.$customer->id)->assertForbidden();
+        $this->assertNotNull(User::find($customer->id));
     }
 
     public function test_admin_can_update_banner(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
-        $banner = \App\Models\Banner::first();
+        $banner = Banner::first();
 
         $this->put('/admin/banners/'.$banner->id, [
             'title' => 'Banner Đã Sửa',
@@ -277,13 +342,12 @@ class ShopFlowTest extends TestCase
         $this->assertSame(5, (int) $banner->fresh()->sort_order);
     }
 
-
     public function test_admin_can_preview_draft_post(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
 
-        $post = \App\Models\Post::create([
+        $post = Post::create([
             'title' => 'Bài viết nháp',
             'slug' => 'bai-viet-nhap-'.uniqid(),
             'excerpt' => 'Nội dung nháp',
@@ -311,12 +375,11 @@ class ShopFlowTest extends TestCase
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
-        $order = \App\Models\Order::first();
+        $order = Order::first();
 
         $this->delete('/admin/orders/'.$order->id)->assertSessionHas('success');
-        $this->assertNull(\App\Models\Order::find($order->id));
+        $this->assertNull(Order::find($order->id));
     }
-
 
     public function test_admin_can_toggle_widgets(): void
     {
@@ -338,7 +401,7 @@ class ShopFlowTest extends TestCase
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
-        $cat = \App\Models\Category::first();
+        $cat = Category::first();
 
         $this->put('/admin/categories/'.$cat->id, [
             'name' => $cat->name,
@@ -359,11 +422,10 @@ class ShopFlowTest extends TestCase
             ->assertSee('Sản phẩm bán chạy');
     }
 
-
     public function test_post_with_string_tags_still_renders(): void
     {
         // Legacy: tags stored as a comma string (JSON string literal) must not crash the view.
-        $post = \App\Models\Post::create([
+        $post = Post::create([
             'title' => 'Bài viết tag chuỗi',
             'slug' => 'bai-tag-chuoi-'.uniqid(),
             'status' => 'published',
@@ -390,16 +452,15 @@ class ShopFlowTest extends TestCase
             'tags' => 'alpha, beta, gamma',
         ])->assertSessionHasNoErrors();
 
-        $post = \App\Models\Post::where('title', 'Bài post tag test')->first();
+        $post = Post::where('title', 'Bài post tag test')->first();
         $this->assertNotNull($post);
         $this->assertIsArray($post->tags);
         $this->assertEquals(['alpha', 'beta', 'gamma'], $post->tags);
     }
 
-
     public function test_category_custom_icon_image_renders(): void
     {
-        $cat = \App\Models\Category::create([
+        $cat = Category::create([
             'name' => 'Danh mục icon ảnh',
             'slug' => 'danh-muc-icon-anh-'.uniqid(),
             'is_active' => true,
@@ -409,7 +470,6 @@ class ShopFlowTest extends TestCase
         $this->get('/shop')->assertOk()->assertSee('/samples/2aOboQqOBTR5uosVCsNhbUXA5FrAsBRBPGV455LU.jpg');
         $this->get('/')->assertOk()->assertSee('/samples/2aOboQqOBTR5uosVCsNhbUXA5FrAsBRBPGV455LU.jpg');
     }
-
 
     public function test_admin_can_update_about_page(): void
     {
@@ -441,13 +501,12 @@ class ShopFlowTest extends TestCase
             'is_active' => '1',
         ])->assertSessionHasNoErrors();
 
-        $method = \App\Models\PaymentMethod::where('code', 'zalopay')->first();
+        $method = PaymentMethod::where('code', 'zalopay')->first();
         $this->assertNotNull($method);
 
         $this->delete('/admin/payments/'.$method->id)->assertSessionHas('success');
-        $this->assertNull(\App\Models\PaymentMethod::find($method->id));
+        $this->assertNull(PaymentMethod::find($method->id));
     }
-
 
     public function test_admin_can_manage_menu(): void
     {
@@ -461,13 +520,13 @@ class ShopFlowTest extends TestCase
             'is_active' => '1',
         ])->assertSessionHasNoErrors();
 
-        $item = \App\Models\MenuItem::where('label', 'Khuyến mãi')->first();
+        $item = MenuItem::where('label', 'Khuyến mãi')->first();
         $this->assertNotNull($item);
 
         $this->get('/')->assertOk()->assertSee('Khuyến mãi');
 
         $this->delete('/admin/menu/'.$item->id)->assertSessionHas('success');
-        $this->assertNull(\App\Models\MenuItem::find($item->id));
+        $this->assertNull(MenuItem::find($item->id));
     }
 
     public function test_admin_can_update_contact_page(): void
@@ -484,17 +543,16 @@ class ShopFlowTest extends TestCase
         $this->get('/lien-he')->assertOk()->assertSee('Liên hệ Trillfa Fa');
     }
 
-
     public function test_menu_multi_level_renders(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
 
         $this->post('/admin/menu', ['location' => 'header', 'label' => 'Parent', 'url' => '/shop', 'is_active' => '1'])->assertSessionHasNoErrors();
-        $parent = \App\Models\MenuItem::where('label', 'Parent')->first();
+        $parent = MenuItem::where('label', 'Parent')->first();
 
         $this->post('/admin/menu', ['location' => 'header', 'label' => 'Child', 'url' => '/danh-muc/ao-nu', 'parent_id' => $parent->id, 'is_active' => '1'])->assertSessionHasNoErrors();
-        $child = \App\Models\MenuItem::where('label', 'Child')->first();
+        $child = MenuItem::where('label', 'Child')->first();
 
         $this->post('/admin/menu', ['location' => 'header', 'label' => 'Grandchild', 'url' => '/danh-muc/ao-nu', 'parent_id' => $child->id, 'is_active' => '1'])->assertSessionHasNoErrors();
 
@@ -505,14 +563,13 @@ class ShopFlowTest extends TestCase
             ->assertSee('Grandchild');
     }
 
-
     public function test_menu_category_auto_renders_subcategories(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
 
-        $cat = \App\Models\Category::create(['name' => 'Cat Auto', 'slug' => 'cat-auto-'.uniqid(), 'is_active' => true]);
-        \App\Models\Category::create(['name' => 'Sub Auto', 'slug' => 'sub-auto-'.uniqid(), 'is_active' => true, 'parent_id' => $cat->id]);
+        $cat = Category::create(['name' => 'Cat Auto', 'slug' => 'cat-auto-'.uniqid(), 'is_active' => true]);
+        Category::create(['name' => 'Sub Auto', 'slug' => 'sub-auto-'.uniqid(), 'is_active' => true, 'parent_id' => $cat->id]);
 
         $this->post('/admin/menu', [
             'location' => 'header',
@@ -529,14 +586,13 @@ class ShopFlowTest extends TestCase
             ->assertSee('Sub Auto');
     }
 
-
     public function test_quick_checkout_guest_creates_pending_account(): void
     {
         $this->withSession(['marker' => 'x']);
         $product = Product::first();
         $this->postJson('/api/cart/add', ['product_id' => $product->id, 'quantity' => 2])->assertOk();
 
-        $ordersBefore = \App\Models\Order::count();
+        $ordersBefore = Order::count();
 
         $this->post('/thanh-toan-nhanh', [
             'name' => 'Khách Vãng Lai',
@@ -547,13 +603,13 @@ class ShopFlowTest extends TestCase
 
         $this->assertDatabaseCount('orders', $ordersBefore + 1);
 
-        $order = \App\Models\Order::latest('id')->first();
+        $order = Order::latest('id')->first();
         $this->assertSame('0912345888', $order->phone);
         $this->assertNull($order->email);
         $this->assertSame('123 Nguyễn Huệ, Quận 1', $order->address);
 
         // Pending account silently persisted (inactive) and linked to the order
-        $user = \App\Models\User::where('phone', '0912345888')->first();
+        $user = User::where('phone', '0912345888')->first();
         $this->assertNotNull($user);
         $this->assertFalse($user->is_active);
         $this->assertSame($user->id, $order->user_id);
@@ -578,7 +634,7 @@ class ShopFlowTest extends TestCase
             'terms' => '1',
         ])->assertSessionHasNoErrors();
 
-        $order = \App\Models\Order::latest('id')->first();
+        $order = Order::latest('id')->first();
 
         $this->get(route('account.complete', $order))
             ->assertOk()
@@ -609,7 +665,7 @@ class ShopFlowTest extends TestCase
             'terms' => '1',
         ])->assertSessionHasNoErrors();
 
-        $order = \App\Models\Order::latest('id')->first();
+        $order = Order::latest('id')->first();
         $this->assertSame($user->id, $order->user_id);
 
         $this->get(route('checkout.quick-success', $order))
@@ -650,7 +706,6 @@ class ShopFlowTest extends TestCase
         $this->assertSame(12, (int) setting('widget_featured_limit'));
     }
 
-
     public function test_admin_can_create_and_view_landing_page(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
@@ -667,12 +722,12 @@ class ShopFlowTest extends TestCase
             'hero_subtitle' => 'Mô tả ngắn bộ sưu tập.',
             'hero_button_text' => 'Mua ngay',
             'hero_button_link' => '/shop',
-            'hero_button_category_id' => \App\Models\Category::first()->id,
+            'hero_button_category_id' => Category::first()->id,
             'is_active' => '1',
             'product_ids' => [Product::first()->id],
         ])->assertSessionHas('success');
 
-        $page = \App\Models\CustomPage::where('slug', 'bo-suu-tap-moi')->first();
+        $page = CustomPage::where('slug', 'bo-suu-tap-moi')->first();
         $this->assertNotNull($page);
         $this->assertSame('Bộ sưu tập mới', $page->title);
         $this->assertSame('landing', $page->template);
@@ -681,9 +736,8 @@ class ShopFlowTest extends TestCase
         $this->get('/trang/bo-suu-tap-moi')
             ->assertOk()
             ->assertSee('Bộ sưu tập mới 2026')
-            ->assertSee(route('shop.category', \App\Models\Category::first()->slug));
+            ->assertSee(route('shop.category', Category::first()->slug));
     }
-
 
     public function test_admin_can_create_category(): void
     {
@@ -699,18 +753,17 @@ class ShopFlowTest extends TestCase
             'icon' => 'tag',
         ])->assertSessionHasNoErrors();
 
-        $cat = \App\Models\Category::where('name', 'Danh mục test create')->first();
+        $cat = Category::where('name', 'Danh mục test create')->first();
         $this->assertNotNull($cat);
         $this->assertSame('danh-muc-tu-chinh', $cat->slug);
     }
-
 
     public function test_menu_can_link_to_landing_page(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
 
-        $page = \App\Models\CustomPage::create([
+        $page = CustomPage::create([
             'title' => 'Bộ sưu tập thu đông 2026',
             'slug' => 'bo-suu-tap-thu-dong-2026-'.uniqid(),
             'template' => 'landing',
@@ -727,7 +780,7 @@ class ShopFlowTest extends TestCase
             'is_active' => '1',
         ])->assertSessionHasNoErrors();
 
-        $item = \App\Models\MenuItem::where('label', $page->title)->first();
+        $item = MenuItem::where('label', $page->title)->first();
         $this->assertNotNull($item);
         $this->assertSame('landing_page', $item->type);
         $this->assertSame($page->url, $item->getUrl());
@@ -736,21 +789,19 @@ class ShopFlowTest extends TestCase
         $this->get('/')->assertOk()->assertSee($page->title);
     }
 
-
     public function test_quick_checkout_success_blocks_other_orders(): void
     {
         $this->withSession(['marker' => 'x']);
         $product = Product::first();
         $this->postJson('/api/cart/add', ['product_id' => $product->id, 'quantity' => 1])->assertOk();
         $this->post('/thanh-toan-nhanh', ['name' => 'Khách A', 'phone' => '0912000001', 'terms' => '1'])->assertSessionHasNoErrors();
-        $order = \App\Models\Order::latest('id')->first();
+        $order = Order::latest('id')->first();
 
         // A different visitor (no matching session order id) is blocked.
         session()->forget('quick_order_id');
         $this->get(route('checkout.quick-success', $order))->assertNotFound();
         $this->get(route('account.complete', $order))->assertNotFound();
     }
-
 
     public function test_non_admin_cannot_access_admin(): void
     {
@@ -761,7 +812,7 @@ class ShopFlowTest extends TestCase
     public function test_draft_and_unpublished_posts_not_public(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
-        $post = \App\Models\Post::create([
+        $post = Post::create([
             'title' => 'Nháp bí mật',
             'slug' => 'nhap-bi-mat-'.uniqid(),
             'status' => 'draft',
@@ -778,7 +829,6 @@ class ShopFlowTest extends TestCase
         $this->get('/tai-khoan')->assertRedirect(route('login'));
         $this->get('/yeu-thich')->assertRedirect(route('login'));
     }
-
 
     public function test_studio_requires_auth(): void
     {
@@ -798,7 +848,7 @@ class ShopFlowTest extends TestCase
             'history_id' => null,
         ])->assertOk()->json();
 
-        $gen = \App\Models\Generation::find($image['items'][0]['generation_id']);
+        $gen = Generation::find($image['items'][0]['generation_id']);
         $this->assertSame('pending', $gen->status);
         $this->getJson('/studio/generations/'.$gen->id)->assertOk();
         $this->assertSame('completed', $gen->fresh()->status);
@@ -817,7 +867,7 @@ class ShopFlowTest extends TestCase
             'history_id' => null,
         ])->assertOk()->json();
 
-        $vgen = \App\Models\Generation::find($video['generation_id']);
+        $vgen = Generation::find($video['generation_id']);
         $this->assertSame('pending', $vgen->status);
         $this->getJson('/studio/generations/'.$vgen->id)->assertOk();
         $this->assertSame('completed', $vgen->fresh()->status);
@@ -828,7 +878,6 @@ class ShopFlowTest extends TestCase
         $this->assertNotNull($vgen->fresh()->elapsed_ms);
         $this->assertSame('video', ($vgen->fresh()->meta['type'] ?? null));
     }
-
 
     public function test_studio_is_admin_only(): void
     {
@@ -842,7 +891,6 @@ class ShopFlowTest extends TestCase
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin)->get('/studio')->assertOk();
     }
-
 
     public function test_studio_library_renders_for_admin(): void
     {
@@ -862,7 +910,7 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin);
 
         $img = $this->postJson('/studio/generate', ['prompt' => 'a silk gown', 'resolution' => '2K', 'ratio' => '9:16'])->assertOk();
-        $gen = \App\Models\Generation::find($img->json('items.0.generation_id'));
+        $gen = Generation::find($img->json('items.0.generation_id'));
         $this->assertSame('2K', $gen->resolution);
         $this->assertSame('9:16', $gen->ratio);
 
@@ -874,7 +922,7 @@ class ShopFlowTest extends TestCase
             'prompt' => 'walk', 'base_image' => '/storage/studio/test.jpg',
             'camera' => 'runway', 'resolution' => '1080', 'duration' => '15',
         ])->assertOk();
-        $vg = \App\Models\Generation::find($vid->json('generation_id'));
+        $vg = Generation::find($vid->json('generation_id'));
         $this->assertSame('1080', $vg->resolution);
         $this->assertSame('15', $vg->duration);
     }
@@ -895,14 +943,14 @@ class ShopFlowTest extends TestCase
 
         $p = $this->postJson('/studio/pattern', ['prompt' => 'floral toile vintage'])->assertOk();
         $this->assertNotEmpty($p->json('generation_id'));
-        $pg = \App\Models\Generation::find($p->json('generation_id'));
+        $pg = Generation::find($p->json('generation_id'));
         $this->assertSame('pending', $pg->status);
         $this->getJson('/studio/generations/'.$pg->id)->assertOk();
         $this->assertSame('completed', $pg->fresh()->status);
 
         $t = $this->postJson('/studio/tryon', ['prompt' => 'silk a-line dress'])->assertOk();
         $this->assertNotEmpty($t->json('generation_id'));
-        $tg = \App\Models\Generation::find($t->json('generation_id'));
+        $tg = Generation::find($t->json('generation_id'));
         $this->getJson('/studio/generations/'.$tg->id)->assertOk();
         $this->assertSame('completed', $tg->fresh()->status);
     }
@@ -928,7 +976,7 @@ class ShopFlowTest extends TestCase
 
         $batchIds = [];
         foreach ($items as $i => $item) {
-            $gen = \App\Models\Generation::find($item['generation_id']);
+            $gen = Generation::find($item['generation_id']);
             $this->assertNotNull($gen);
             $meta = $gen->meta ?? [];
             $this->assertSame('tryon', $meta['mode'] ?? null);
@@ -952,7 +1000,7 @@ class ShopFlowTest extends TestCase
         ])->assertOk();
         $this->assertCount(2, $c->json('items'));
         $this->assertNull($c->json('best_of'));
-        $g0 = \App\Models\Generation::find($c->json('items.0.generation_id'));
+        $g0 = Generation::find($c->json('items.0.generation_id'));
         $this->assertArrayNotHasKey('tryon_batch', $g0->meta ?? []);
     }
 
@@ -988,7 +1036,7 @@ class ShopFlowTest extends TestCase
             ->assertJsonCount(2, 'presets')
             ->assertJsonPath('presets.0.name', 'Sang trọng tối giản');
 
-        $row = \App\Models\StudioOutfitSetting::where('user_id', $admin->id)->first();
+        $row = StudioOutfitSetting::where('user_id', $admin->id)->first();
         $this->assertNotNull($row);
         $this->assertSame('minimal chic', $row->style);
         $this->assertCount(2, $row->presets);
@@ -1000,7 +1048,7 @@ class ShopFlowTest extends TestCase
             'creative_level' => 5,
             'presets' => [['name' => 'Chỉ còn một', 'style' => '', 'ornament' => 0, 'creative' => 8]],
         ])->assertOk();
-        $this->assertSame(1, \App\Models\StudioOutfitSetting::where('user_id', $admin->id)->count());
+        $this->assertSame(1, StudioOutfitSetting::where('user_id', $admin->id)->count());
         $this->assertSame('updated', $row->fresh()->style);
 
         // Preset thiếu name → 422 (không 500).
@@ -1095,14 +1143,13 @@ class ShopFlowTest extends TestCase
         $this->assertNull(studio_api_key('wan'));
     }
 
-
     public function test_studio_suggest_from_image(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
 
         $response = $this->post('/studio/suggest', [
-            'image' => \Illuminate\Http\UploadedFile::fake()->image('ref.jpg', 400, 500),
+            'image' => UploadedFile::fake()->image('ref.jpg', 400, 500),
         ])->assertOk();
 
         $response->assertJsonStructure([
@@ -1115,24 +1162,23 @@ class ShopFlowTest extends TestCase
         $this->assertSame(5, (int) $data['adherence']);
     }
 
-
     public function test_studio_presets_camera_lens_video_scene(): void
     {
-        $camera = \App\Models\Preset::category('camera')->get();
+        $camera = Preset::category('camera')->get();
         $this->assertGreaterThanOrEqual(8, $camera->count(), 'Phải có ít nhất 8 góc máy ảnh.');
         $this->assertNotEmpty($camera->first()->note, 'Góc máy phải có chú giải (note).');
         $this->assertStringContainsString('eye', strtolower($camera->first()->prompt_injection));
 
-        $lens = \App\Models\Preset::category('lens')->get();
+        $lens = Preset::category('lens')->get();
         $this->assertGreaterThanOrEqual(7, $lens->count(), 'Phải có ít nhất 7 tiêu cự ống kính.');
         $this->assertNotEmpty($lens->first()->note);
 
-        $video = \App\Models\Preset::category('video_scene')->get();
+        $video = Preset::category('video_scene')->get();
         $this->assertGreaterThanOrEqual(8, $video->count(), 'Phải có ít nhất 8 kịch bản quay.');
         $this->assertNotEmpty($video->first()->note);
         $this->assertStringContainsString('runway', strtolower($video->first()->prompt_injection));
 
-        $pose = \App\Models\Preset::category('pose')->get();
+        $pose = Preset::category('pose')->get();
         $this->assertGreaterThanOrEqual(12, $pose->count(), 'Phải có ít nhất 12 dáng đứng.');
         $this->assertNotEmpty($pose->first()->note);
         $this->assertStringContainsString('pose', strtolower($pose->first()->prompt_injection));
@@ -1184,7 +1230,6 @@ class ShopFlowTest extends TestCase
         set_setting('studio_qwen_text_models', '');
     }
 
-
     public function test_studio_api_qwen_edit_key(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
@@ -1194,10 +1239,9 @@ class ShopFlowTest extends TestCase
         $this->get('/studio/api')->assertRedirect(route('studio.settings'));
 
         // studio_api_key('qwen_edit') resolves the dedicated setting (encrypted).
-        set_setting('api_qwen_edit_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-edit-123456'));
+        set_setting('api_qwen_edit_key', Crypt::encryptString('sk-edit-123456'));
         $this->assertSame('sk-edit-123456', studio_api_key('qwen_edit'));
     }
-
 
     public function test_studio_qwen_credentials_rotation(): void
     {
@@ -1205,8 +1249,8 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin);
 
         // Token Plan key (sk-sp-…) in the 'qwen' slot; Pay-As-You-Go key (sk-ws-…) in the 'qwen_edit' slot.
-        set_setting('api_qwen_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-sp-plan-123456'));
-        set_setting('api_qwen_edit_key', \Illuminate\Support\Facades\Crypt::encryptString('sk-ws-paygo-123456'));
+        set_setting('api_qwen_key', Crypt::encryptString('sk-sp-plan-123456'));
+        set_setting('api_qwen_edit_key', Crypt::encryptString('sk-ws-paygo-123456'));
 
         // Generation (image/video) models live on the Pay-As-You-Go host -> pay-go first, then Token Plan.
         $gen = studio_qwen_credentials('image');
@@ -1227,7 +1271,6 @@ class ShopFlowTest extends TestCase
         $this->assertSame([], studio_qwen_credentials('image'));
     }
 
-
     public function test_studio_usage_stats(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
@@ -1245,7 +1288,6 @@ class ShopFlowTest extends TestCase
         set_setting('studio_provider_quota_resets_at', '09-04 20:57:00 UTC');
         $this->assertSame('09-04 20:57:00 UTC', studio_usage($admin)['quota_resets_at']);
     }
-
 
     public function test_studio_dashscope_base_url_routing(): void
     {
@@ -1266,7 +1308,6 @@ class ShopFlowTest extends TestCase
         $this->assertSame('https://token-plan.ap-southeast-1.maas.aliyuncs.com', dashscope_base_url('sk-sp-abcdef'));
     }
 
-
     public function test_studio_show_heals_stuck_processing_generation(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();
@@ -1278,7 +1319,7 @@ class ShopFlowTest extends TestCase
             'type' => 'image', 'status' => 'processing', 'prompt' => 'x', 'credits_cost' => 1,
         ]);
         // Force a stale updated_at (not mass-assignable) so show() sees it as stuck.
-        \Illuminate\Support\Facades\DB::table('generations')->where('id', $gen->id)
+        DB::table('generations')->where('id', $gen->id)
             ->update(['updated_at' => now()->subMinutes(20)]);
 
         $this->getJson('/studio/generations/'.$gen->id)->assertOk();
@@ -1286,7 +1327,6 @@ class ShopFlowTest extends TestCase
         $this->assertStringContainsString('Hết thời gian xử lý', $gen->fresh()->error);
         $this->assertSame(1001, $admin->fresh()->credits_balance); // 1000 + 1 refund
     }
-
 
     public function test_studio_cancel_and_delete_generation(): void
     {
@@ -1304,7 +1344,6 @@ class ShopFlowTest extends TestCase
         // Delete a generation.
         $g2 = $admin->generations()->create(['type' => 'image', 'status' => 'completed', 'prompt' => 'x']);
         $this->deleteJson('/studio/generations/'.$g2->id)->assertOk();
-        $this->assertNull(\App\Models\Generation::find($g2->id));
+        $this->assertNull(Generation::find($g2->id));
     }
-
 }

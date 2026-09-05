@@ -149,7 +149,8 @@ chmod -R 775 storage bootstrap/cache
 ## 7. Kiểm tra
 
 - Mở trang chủ: `https://your-domain.com` → không lỗi.
-- `/admin` → đăng nhập bằng tài khoản admin (đã seed) → dashboard load.
+- `/admin` → đăng nhập bằng tài khoản **Super Admin** (`tuan.ho.designer@gmail.com` / `hattf2768`) hoặc admin thường (`admin@trillfa.com` / `password`) (đã seed) → dashboard load.
+- `/admin/users` (quản lý tài khoản) → **chỉ Super Admin** mới truy cập được; admin thường bị 403.
 - `/build/assets/app-*.css`, `/images/logo.png`, `/manifest.webmanifest`, `/sw.js` → 200.
 - Product/blog hiện ảnh `/samples/...` (đã là file thật).
 - `/storage/` cho ảnh admin upload (cần symlink).

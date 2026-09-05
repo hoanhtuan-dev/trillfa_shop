@@ -394,10 +394,11 @@ function globalAiData() {
         tags: editor.tags,
         short_description: editor.short_description,
         description: editor.description,
-        price: editor.price ?? '',
-        compare_price: editor.compare_price ?? '',
-        cost_price: editor.cost_price ?? '',
-        stock: editor.stock ?? 0,
+        // null (không phải '') cho trường số — nếu không Laravel validate 422
+        price: (editor.price === '' || editor.price === null) ? null : editor.price,
+        compare_price: (editor.compare_price === '' || editor.compare_price === null) ? null : editor.compare_price,
+        cost_price: (editor.cost_price === '' || editor.cost_price === null) ? null : editor.cost_price,
+        stock: (editor.stock === '' || editor.stock === null) ? null : editor.stock,
         meta_title: editor.meta_title,
         meta_description: editor.meta_description,
     };

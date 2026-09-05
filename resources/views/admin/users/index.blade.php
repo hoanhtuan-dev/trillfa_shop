@@ -11,6 +11,11 @@
     ])->values();
 @endphp
 
+<div class="mb-5 flex items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+    <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
+    <p>Khu vực quản lý tài khoản — <strong>chỉ Super Admin</strong> mới có quyền tạo, sửa, xóa và đặt lại mật khẩu. Admin thường không truy cập được mục này.</p>
+</div>
+
 <div class="grid gap-6 lg:grid-cols-[1fr_380px]" x-data="userForm({{ Js::from($userItems) }}, '{{ route('admin.users.store') }}')">
     <!-- List -->
     <div class="card overflow-hidden">
@@ -45,7 +50,7 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-5 py-3"><span class="badge {{ $user->isAdmin() ? 'bg-brand-600 text-white' : 'bg-cream-100 text-ink-500' }}">{{ $user->isAdmin() ? 'Admin' : 'Khách' }}</span></td>
+                            <td class="px-5 py-3"><span class="badge {{ $user->isSuperAdmin() ? 'bg-violet-600 text-white' : ($user->isAdmin() ? 'bg-brand-600 text-white' : 'bg-cream-100 text-ink-500') }}">{{ $user->roleLabel() }}</span></td>
                             <td class="px-5 py-3 text-ink-500">{{ $user->phone ?? '—' }}</td>
                             <td class="px-5 py-3 text-ink-500">{{ $user->orders()->count() }}</td>
                             <td class="px-5 py-3">
@@ -55,10 +60,15 @@
                             </td>
                             <td class="px-5 py-3">
                                 <div class="flex justify-end gap-1">
-                                    <button @click="edit({{ $user->id }})" class="btn-ghost !p-2" title="Sửa"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
-                                    <button @click="openReset({{ $user->id }})" class="btn-ghost !p-2" title="Đặt lại mật khẩu"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg></button>
+                                    @if($user->id === auth()->id())
+                                        <span class="btn-ghost cursor-not-allowed !p-2 opacity-40" title="Không thể tự sửa tài khoản của mình"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></span>
+                                        <span class="btn-ghost cursor-not-allowed !p-2 opacity-40" title="Không thể tự đặt lại mật khẩu của mình"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg></span>
+                                    @else
+                                        <button @click="edit({{ $user->id }})" class="btn-ghost !p-2" title="Sửa"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></button>
+                                        <button @click="openReset({{ $user->id }})" class="btn-ghost !p-2" title="Đặt lại mật khẩu"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg></button>
+                                    @endif
                                     <form method="POST" action="{{ route('admin.users.destroy', $user) }}" onsubmit="return confirm('Xóa người dùng này?')">@csrf @method('DELETE')
-                                        <button type="submit" class="btn-ghost !p-2 text-red-500" title="Xóa" {{ $user->isAdmin() ? 'disabled' : '' }}><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166"/></svg></button>
+                                        <button type="submit" class="btn-ghost !p-2 text-red-500" title="Xóa" {{ ($user->isAdmin() || $user->id === auth()->id()) ? 'disabled' : '' }}><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166"/></svg></button>
                                     </form>
                                 </div>
                             </td>
@@ -93,7 +103,8 @@
                     <label class="label">Vai trò</label>
                     <select name="role" x-model="form.role" class="input">
                         <option value="customer">Khách hàng</option>
-                        <option value="admin">Quản trị</option>
+                        <option value="admin">Quản trị (Admin)</option>
+                        <option value="super_admin">Super Admin</option>
                     </select>
                 </div>
             </div>

@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use App\Models\Category;
 use App\Models\Setting;
+use App\Models\User;
+use App\Policies\UserPolicy;
 use App\Support\Seo;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -12,11 +15,14 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(Seo::class, fn () => new Seo());
+        $this->app->singleton(Seo::class, fn () => new Seo);
     }
 
     public function boot(): void
     {
+        // Phân quyền quản lý tài khoản: chỉ Super Admin mới có quyền (chuẩn Laravel Policy).
+        Gate::policy(User::class, UserPolicy::class);
+
         // Shared data for every view.
         View::composer('*', function ($view) {
             if (str_starts_with($view->name(), 'errors.')) {

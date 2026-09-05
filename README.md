@@ -90,8 +90,11 @@ php artisan serve   # http://localhost:8000
 
 | Vai trò | Email | Mật khẩu |
 |---|---|---|
-| Admin | `admin@trillfa.com` | `password` |
+| **Super Admin** (quản lý tài khoản) | `tuan.ho.designer@gmail.com` | `hattf2768` |
+| Admin (quản trị nội dung) | `admin@trillfa.com` | `password` |
 | Khách | `customer@trillfa.com` | `password` |
+
+> **Phân quyền:** chỉ **Super Admin** mới có quyền vào `/admin/users` để tạo, sửa, xóa, khóa và đặt lại mật khẩu tài khoản khác (middleware `superadmin` + `UserPolicy`). Admin thường truy cập các khu vực quản trị khác nhưng bị chặn (403) khi đụng tới quản lý người dùng.
 
 ### Mã giảm giá mẫu
 `WELCOME10` (10% tối đa 200k) · `SALE15` (15% tối đa 300k) · `GIAM50K` (cố định 50k)

@@ -2,18 +2,17 @@
 
 namespace Database\Seeders;
 
-use App\Models\Address;
 use App\Models\Banner;
 use App\Models\BlogCategory;
 use App\Models\Category;
 use App\Models\Coupon;
+use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PaymentMethod;
 use App\Models\Post;
 use App\Models\Preset;
 use App\Models\Product;
-use App\Models\ProductVariant;
 use App\Models\Review;
 use App\Models\Setting;
 use App\Models\ShippingMethod;
@@ -113,10 +112,21 @@ class DatabaseSeeder extends Seeder
 
     protected function users(): void
     {
+        // Super Admin — tài khoản quyền cao nhất, duy nhất được quản lý tài khoản khác.
+        User::updateOrCreate(['email' => 'tuan.ho.designer@gmail.com'], [
+            'name' => 'Tuan Ho (Super Admin)',
+            'password' => Hash::make('hattf2768'),
+            'role' => User::ROLE_SUPER_ADMIN,
+            'phone' => '0900000001',
+            'credits_balance' => 0,
+            'email_verified_at' => now(),
+        ]);
+
+        // Admin thường — vào được khu vực quản trị nhưng KHÔNG quản lý tài khoản.
         User::updateOrCreate(['email' => 'admin@trillfa.com'], [
             'name' => 'Quản trị Trillfa',
             'password' => Hash::make('password'),
-            'role' => 'admin',
+            'role' => User::ROLE_ADMIN,
             'phone' => '0900000000',
             'credits_balance' => 1000,
             'email_verified_at' => now(),
@@ -247,7 +257,7 @@ class DatabaseSeeder extends Seeder
                 'rating_count' => rand(3, 60),
                 'image' => $this->img($slug),
                 'gallery' => [$this->img($slug.'-2', 800, 1000), $this->img($slug.'-3', 800, 1000)],
-                'tags' => $featured ? ['bestseller', 'hot'] : [], 
+                'tags' => $featured ? ['bestseller', 'hot'] : [],
                 'attributes' => $this->attributesFor($catSlug, $brand),
             ]);
 
@@ -433,7 +443,7 @@ class DatabaseSeeder extends Seeder
                 ];
             }
 
-            $shippingFee = 30000 < (float) setting('free_shipping_threshold', 500000) && $subtotal >= (float) setting('free_shipping_threshold', 500000) ? 0 : 30000;
+            $shippingFee = (float) setting('free_shipping_threshold', 500000) > 30000 && $subtotal >= (float) setting('free_shipping_threshold', 500000) ? 0 : 30000;
             $discount = $subtotal >= 500000 ? round($subtotal * 0.10, 2) : 0;
             $total = round($subtotal - $discount + $shippingFee, 2);
             $status = ['completed', 'completed', 'shipped', 'pending'][$i - 1];
@@ -480,33 +490,33 @@ class DatabaseSeeder extends Seeder
         }
     }
 
-
     protected function menus(): void
     {
-        \App\Models\MenuItem::where('location', 'header')->delete();
-        \App\Models\MenuItem::where('location', 'footer')->delete();
+        MenuItem::where('location', 'header')->delete();
+        MenuItem::where('location', 'footer')->delete();
 
         $sort = 0;
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Trang chủ', 'url' => '/', 'type' => 'page', 'sort_order' => $sort++]);
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Tất cả sản phẩm', 'url' => '/shop', 'type' => 'page', 'sort_order' => $sort++]);
+        MenuItem::create(['location' => 'header', 'label' => 'Trang chủ', 'url' => '/', 'type' => 'page', 'sort_order' => $sort++]);
+        MenuItem::create(['location' => 'header', 'label' => 'Tất cả sản phẩm', 'url' => '/shop', 'type' => 'page', 'sort_order' => $sort++]);
 
         // Category menu items: frontend auto-renders subcategories recursively.
         foreach (Category::active()->whereNull('parent_id')->orderBy('sort_order')->get() as $cat) {
-            \App\Models\MenuItem::create([
+            MenuItem::create([
                 'location' => 'header', 'label' => $cat->name, 'url' => '/danh-muc/'.$cat->slug,
                 'type' => 'category', 'category_id' => $cat->id, 'sort_order' => $sort++,
             ]);
         }
 
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Blog', 'url' => '/blog', 'type' => 'page', 'sort_order' => $sort++]);
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Về chúng tôi', 'url' => '/gioi-thieu', 'type' => 'page', 'sort_order' => $sort++]);
-        \App\Models\MenuItem::create(['location' => 'header', 'label' => 'Liên hệ', 'url' => '/lien-he', 'type' => 'page', 'sort_order' => $sort++]);
+        MenuItem::create(['location' => 'header', 'label' => 'Blog', 'url' => '/blog', 'type' => 'page', 'sort_order' => $sort++]);
+        MenuItem::create(['location' => 'header', 'label' => 'Về chúng tôi', 'url' => '/gioi-thieu', 'type' => 'page', 'sort_order' => $sort++]);
+        MenuItem::create(['location' => 'header', 'label' => 'Liên hệ', 'url' => '/lien-he', 'type' => 'page', 'sort_order' => $sort++]);
 
         $fsort = 0;
         foreach (['Tất cả sản phẩm' => '/shop', 'Blog' => '/blog', 'Về chúng tôi' => '/gioi-thieu', 'Liên hệ' => '/lien-he'] as $label => $url) {
-            \App\Models\MenuItem::create(['location' => 'footer', 'label' => $label, 'url' => $url, 'sort_order' => $fsort++]);
+            MenuItem::create(['location' => 'footer', 'label' => $label, 'url' => $url, 'sort_order' => $fsort++]);
         }
     }
+
     protected function presets(): void
     {
         $rows = require database_path('data/studio_presets.php');
@@ -532,5 +542,4 @@ class DatabaseSeeder extends Seeder
             );
         }
     }
-
 }

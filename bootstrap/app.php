@@ -17,6 +17,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
+            'superadmin' => \App\Http\Middleware\EnsureUserIsSuperAdmin::class,
             'nostore' => \App\Http\Middleware\NoStoreCache::class,
         ]);
         // Apply no-store to ALL web responses so the browser never caches any auth/redirect

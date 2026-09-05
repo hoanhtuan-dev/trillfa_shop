@@ -156,7 +156,17 @@ class AdminProductController extends Controller
      */
     public function aiSuggest(Request $request)
     {
-        $data = $request->validate([
+        // Form Vue có thể gửi chuỗi rỗng ("") cho các trường số khi chưa nhập —
+        // chuẩn hoá thành null TRƯỚC khi validate, nếu không Laravel trả 422
+        // ('' không thoả nullable|numeric) khiến mọi lần gợi ý/tinh chỉnh AI lỗi.
+        $input = $request->all();
+        foreach (['price', 'compare_price', 'cost_price', 'stock'] as $f) {
+            if (array_key_exists($f, $input) && ($input[$f] === '' || $input[$f] === null)) {
+                $input[$f] = null;
+            }
+        }
+
+        $data = validator($input, [
             'target' => ['nullable', 'string', 'in:all,name,names,description,seo'],
             'prompt' => ['nullable', 'string', 'max:2000'],
             'name' => ['nullable', 'string', 'max:255'],
@@ -165,7 +175,7 @@ class AdminProductController extends Controller
             'tags' => ['nullable', 'string', 'max:500'],
             'hint' => ['nullable', 'string', 'max:1000'],
             'short_description' => ['nullable', 'string', 'max:500'],
-            'description' => ['nullable', 'string', 'max:20000'],
+            'description' => ['nullable', 'string', 'max:50000'],
             'price' => ['nullable', 'numeric', 'min:0'],
             'compare_price' => ['nullable', 'numeric', 'min:0'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
@@ -176,7 +186,7 @@ class AdminProductController extends Controller
             'image_base64' => ['nullable', 'string'],
             'image_mime' => ['nullable', 'string', 'max:80'],
             'force' => ['nullable', 'boolean'],
-        ]);
+        ])->validate();
 
         $imagePath = null;
         if (! empty($data['image_url'])) {

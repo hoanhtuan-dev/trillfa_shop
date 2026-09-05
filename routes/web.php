@@ -253,12 +253,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/orders/{order}', [AdminOrderController::class, 'updateStatus'])->name('orders.update');
     Route::delete('/orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
 
-    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
-    Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
-    Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
-    Route::post('/users/{user}/password', [AdminUserController::class, 'updatePassword'])->name('users.password');
-    Route::post('/users/{user}/toggle', [AdminUserController::class, 'toggleActive'])->name('users.toggle');
-    Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+    // Quản lý tài khoản — CHỈ dành cho Super Admin (middleware + UserPolicy).
+    Route::middleware('superadmin')->group(function () {
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
+        Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
+        Route::post('/users/{user}/password', [AdminUserController::class, 'updatePassword'])->name('users.password');
+        Route::post('/users/{user}/toggle', [AdminUserController::class, 'toggleActive'])->name('users.toggle');
+        Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+    });
 
     Route::get('/coupons', [AdminCouponController::class, 'index'])->name('coupons.index');
     Route::post('/coupons', [AdminCouponController::class, 'store'])->name('coupons.store');

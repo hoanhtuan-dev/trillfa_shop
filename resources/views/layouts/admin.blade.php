@@ -72,6 +72,9 @@
                 ];
             @endphp
             @foreach($menu as $group => $items)
+                @if($group === 'Khách hàng' && !auth()->user()->isSuperAdmin())
+                    @continue
+                @endif
                 <div>
                     <p class="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">{{ $group }}</p>
                     <ul class="space-y-1">
@@ -95,6 +98,7 @@
                     <p class="truncate text-sm font-medium">{{ auth()->user()->name }}</p>
                     <p class="truncate text-xs text-white/50">{{ auth()->user()->email }}</p>
                 </div>
+                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold {{ auth()->user()->isSuperAdmin() ? 'bg-violet-500 text-white' : 'bg-white/10 text-white/70' }}">{{ auth()->user()->isSuperAdmin() ? 'Super Admin' : 'Admin' }}</span>
             </div>
             <form method="POST" action="{{ route('logout') }}" class="mt-3">
                 @csrf
