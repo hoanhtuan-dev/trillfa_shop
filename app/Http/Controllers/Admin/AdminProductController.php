@@ -303,7 +303,10 @@ class AdminProductController extends Controller
             'meta_description' => $product->meta_description,
             'tags' => (array) $product->tags,
             'image' => $product->image_url,
-            'gallery' => $product->gallery_urls,
+            'gallery' => collect((array) $product->gallery)->map(fn ($p) => [
+                'value' => $p,
+                'url' => asset_image($p),
+            ])->values()->all(),
             'variants' => $product->variants->map(fn ($v) => [
                 'name' => $v->name,
                 'sku' => $v->sku,
@@ -361,29 +364,66 @@ class AdminProductController extends Controller
 
     protected function saveImages(Request $request, Product $product, bool $replace = false): void
     {
-        if ($request->hasFile('image')) {
+        // Cover
+        if ($request->boolean('remove_image')) {
+            $product->update(['image' => null]);
+        } elseif ($request->hasFile('image')) {
             $product->update(['image' => $request->file('image')->store('products', 'public')]);
         } elseif ($request->filled('cover_url')) {
             // Cover picked from the Studio library (absolute /storage/... URL).
             $product->update(['image' => $request->input('cover_url')]);
         }
 
-        // Preserve existing gallery, drop removed ones, then append freshly uploaded images.
+        // Store freshly uploaded gallery files, keyed by submission index.
+        $uploadPaths = [];
+        if ($request->hasFile('gallery')) {
+            foreach ($request->file('gallery') as $i => $file) {
+                if ($file->isValid()) {
+                    $uploadPaths[$i] = $file->store('products', 'public');
+                }
+            }
+        }
+
+        // SPA path: `gallery_managed=1` + `gallery_order[]` is the authoritative
+        // FINAL order (existing paths / studio urls / `__upload__{i}` placeholders),
+        // which lets the user drag-to-reorder and remove images freely.
+        if ($request->boolean('gallery_managed')) {
+            $gallery = [];
+            foreach ((array) $request->input('gallery_order', []) as $token) {
+                $token = (string) $token;
+                if ($token === '') {
+                    continue;
+                }
+                if (str_starts_with($token, '__upload__')) {
+                    $i = (int) substr($token, strlen('__upload__'));
+                    if (isset($uploadPaths[$i])) {
+                        $gallery[] = $uploadPaths[$i];
+                    }
+                } else {
+                    $gallery[] = $token;
+                }
+            }
+            // Safety net: never drop an upload the client forgot to reference.
+            foreach ($uploadPaths as $p) {
+                if (! in_array($p, $gallery, true)) {
+                    $gallery[] = $p;
+                }
+            }
+
+            $product->update(['gallery' => array_values(array_unique(array_filter($gallery)))]);
+
+            return;
+        }
+
+        // Legacy fallback (no gallery_managed): preserve + append.
         $gallery = array_values(array_filter((array) $product->gallery));
         $removed = array_values(array_filter((array) $request->input('gallery_remove', [])));
         if ($removed) {
             $gallery = array_values(array_diff($gallery, $removed));
         }
-
-        if ($request->hasFile('gallery')) {
-            foreach ($request->file('gallery') as $file) {
-                if ($file->isValid()) {
-                    $gallery[] = $file->store('products', 'public');
-                }
-            }
+        foreach ($uploadPaths as $p) {
+            $gallery[] = $p;
         }
-
-        // Merge Studio/library images (absolute URLs selected in the Vue form).
         foreach (array_values(array_filter((array) $request->input('studio_gallery', []))) as $path) {
             if (is_string($path) && $path !== '' && ! in_array($path, $gallery, true)) {
                 $gallery[] = $path;

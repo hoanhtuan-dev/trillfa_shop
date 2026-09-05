@@ -280,6 +280,25 @@ class CreativeDirectionService
     }
 
     /**
+     * Map the "Mức độ trang trí" (ornamentation) slider (0-10) to an explicit instruction,
+     * including an explicit "avoid" clause, so the edit model does NOT default to heavy
+     * patterns / rhinestones / sequins. 0 = ultra-minimal, 10 = maximal couture.
+     */
+    public function embellishmentDescriptor(int $level): string
+    {
+        $level = $this->clamp($level, 0, 10);
+
+        return match (true) {
+            $level <= 0 => 'ultra-minimal and clean: no patterns, no rhinestones, no sequins, no beads, no embroidery — plain solid fabric only',
+            $level <= 2 => 'minimal and understated: at most one delicate tonal trim; avoid heavy patterns, rhinestones and sequins',
+            $level <= 4 => 'refined and tasteful: light, intentional detailing; a subtle pattern or single embellishment only where it supports the design; avoid clutter',
+            $level <= 6 => 'balanced: decorative details allowed but tasteful; coherent pattern and restrained embellishment',
+            $level <= 8 => 'rich: pronounced pattern, embroidery or embellishment as a focal point',
+            default => 'maximal couture: lavish ornamentation, intricate patterns, rhinestones, sequins, beads and embroidery as the hero feature',
+        };
+    }
+
+    /**
      * Enrich a raw user prompt into a production-ready image generation prompt.
      * Applies: prefix, suffix, texture descriptor, creativity directive, and negative prompt.
      * All values come from studio_config defaults (settable in Settings).

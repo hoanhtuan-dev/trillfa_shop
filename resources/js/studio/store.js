@@ -365,13 +365,13 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi thay khuôn mặt.', 'error'); return null; }
     },
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend)
-    async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '') {
+    async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '', ornamentLevel = 3) {
       if (!Array.isArray(images) || images.length < 2 || !(prompt || '').trim()) { this.toast('Chọn ít nhất 2 ảnh + nhập mô tả.', 'error'); return null; }
       this.composeStage = 'send';
       this.composeError = '';
       this.composeStartTs = Date.now();
       try {
-        const d = await this.api('/studio/compose', { images, prompt, variants: Number(variants) || 1, mode, creative_level: Number(creativeLevel) || 6, style: style || '' });
+        const d = await this.api('/studio/compose', { images, prompt, variants: Number(variants) || 1, mode, creative_level: Number(creativeLevel) || 6, style: style || '', ornament_level: Number(ornamentLevel) ?? 3 });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: it.credits_cost ?? 1, created_at: 'Vừa ghép ảnh' }));
         const ids = items.map(it => it.generation_id).filter(Boolean);

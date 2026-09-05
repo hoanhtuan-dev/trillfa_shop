@@ -546,6 +546,7 @@ class StudioController extends Controller
             'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap,outfit'],
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'style' => ['nullable', 'string', 'max:400'],
+            'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
 
         $imgs = array_values(array_slice($data['images'], 0, 3));
@@ -557,6 +558,7 @@ class StudioController extends Controller
         $isOutfit = ($data['mode'] ?? '') === 'outfit';
         $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
         $style = trim((string) ($data['style'] ?? ''));
+        $ornamentLevel = (int) ($data['ornament_level'] ?? 3);
 
         if ($isTryon) {
             // Thử đồ ảo (chiến lược): @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
@@ -576,17 +578,19 @@ class StudioController extends Controller
             if ($faceDesc) { $finalPrompt .= ' Face description (from reference photo): '.$faceDesc; }
         } elseif ($isOutfit) {
             // Ghép Trang Phục: @image1 + @image2 = 2 trang phục nguồn, @image3 = bối cảnh (tuỳ chọn).
-            $finalPrompt = 'Fashion design: hybridize the two garments in @image1 and @image2 into one new cohesive outfit. '
-                .'Fuse the most distinctive design features of both — silhouette, fabric, texture, print, color story, neckline, sleeves, tailoring, embellishments and construction details — into original, wearable, high-fashion variations. '
-                .'Follow professional fashion-design standards: balanced proportions, intentional color story, realistic fabric drape, correct garment construction, clean editorial presentation.';
+            $direction = app(\App\Services\CreativeDirectionService::class);
+            $finalPrompt = 'Fashion design: create a new, original outfit by hybridizing the two garments in @image1 and @image2. '
+                .'Take the single most distinctive design element from each garment (silhouette, neckline, sleeve, fabric, color or cut) and combine them into one balanced, wearable design. '
+                .'Do not simply overlay or stack the two garments on top of each other.';
             if ($style !== '') {
-                $finalPrompt .= ' Target style: '.$style.'.';
+                $finalPrompt .= ' The dominant creative direction is this style: "'.$style.'" — make it clearly visible in silhouette, fabric, color palette and detailing.';
             }
+            $finalPrompt .= ' Embellishment: '.$direction->embellishmentDescriptor($ornamentLevel).'.';
             if (count($refs) > 1) {
-                $finalPrompt .= ' Set the outfit into the background of @image3.';
+                $finalPrompt .= ' Place the finished outfit on a model standing in the background of @image3.';
             }
             $finalPrompt .= ' '.$userPrompt;
-            $finalPrompt .= '. '.app(\App\Services\CreativeDirectionService::class)->creativityDirective($creativeLevel);
+            $finalPrompt .= '. '.$direction->creativityDirective($creativeLevel);
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
                 .'The FIRST image is the main base (keep its subject and overall layout). '
@@ -621,6 +625,7 @@ class StudioController extends Controller
                 'mode' => $data['mode'] ?? null,
                 'creative_level' => $creativeLevel,
                 'style' => $style,
+                'ornament_level' => $ornamentLevel,
             ], $cost)->getData(true);
         }
 
@@ -1196,6 +1201,7 @@ RULES:
                 'mode' => $data['mode'] ?? null,
                 'creative_level' => $data['creative_level'] ?? null,
                 'style' => $data['style'] ?? null,
+                'ornament_level' => $data['ornament_level'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 
