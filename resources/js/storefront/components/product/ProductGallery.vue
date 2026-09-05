@@ -10,6 +10,10 @@ import Icon from '../ui/Icon.vue';
  *  - Touch: chạm một lần để phóng tại điểm chạm, chạm lại để thu về.
  *  - Bàn phím: Enter / Space bật–tắt zoom tại tâm khung.
  *  - Tôn trọng prefers-reduced-motion (bỏ transition).
+ *
+ * Chuyển ảnh KHÔNG bị chớp: không remount <img> qua :key, giữ tỉ lệ khung
+ * cũ cho đến khi ảnh mới load, và crossfade lớp ảnh cũ ↔ ảnh mới khi ảnh
+ * mới sẵn sàng — khung không bao giờ trống/trắng giữa chừng.
  */
 
 const props = defineProps({
@@ -26,30 +30,37 @@ const imgRatio = ref(null);       // tỉ lệ tự nhiên của ảnh đang hi�
 const finePointer = ref(true);   // mouse/trackpad (hover) vs touch (tap)
 const reducedMotion = ref(false);
 
+// Crossfade giữa ảnh cũ ↔ ảnh mới khi bấm thumbnail
+const fadedSrc = ref(null);      // ảnh cũ (lớp trên cùng) đang fade-out
+const newReady = ref(true);      // ảnh đang hiển thị đã load xong chưa
+
 onMounted(() => {
     finePointer.value = !(window.matchMedia?.('(pointer: coarse)')?.matches ?? false);
     reducedMotion.value = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
 });
 
-// Đổi ảnh (bấm thumbnail) → về trạng thái zoom ban đầu, ảnh fit trong khung.
-watch(() => props.src, () => {
-    zoomed.value = false;
+// Đổi ảnh (bấm thumbnail): ảnh cũ được giữ nguyên ở lớp trên cùng (không xoá,
+// không chớp trắng), ảnh mới load phía dưới rồi crossfade khi sẵn sàng.
+watch(() => props.src, (newSrc, oldSrc) => {
+    if (!oldSrc || newSrc === oldSrc) return;
+    fadedSrc.value = oldSrc;
+    newReady.value = false;
+    zoomed.value = false;                 // về trạng thái fit
     origin.value = { x: 50, y: 50 };
-    imgRatio.value = null; // chờ ảnh mới load để đo lại tỉ lệ
+    // Cố tình KHÔNG reset imgRatio ở đây: giữ tỉ lệ khung cũ để tránh nhảy
+    // layout; onLoad() cập nhật lại khi ảnh mới đọc xong kích thước.
 });
 
-// Khung ôm khít theo tỉ lệ tự nhiên của ảnh: ảnh luôn "fit" trọn vẹn trong
-// khung (object-contain), không bị cắt, không phải nền thừa. Khi chưa biết
-// tỉ lệ (đang tải) tạm dùng 4/5.
 function onLoad(e) {
     const el = e.currentTarget;
     if (el && el.naturalWidth && el.naturalHeight) {
         imgRatio.value = el.naturalWidth / el.naturalHeight;
     }
+    newReady.value = true; // bắt đầu crossfade sang ảnh mới
 }
 
 function onError() {
-    imgRatio.value = null;
+    newReady.value = true; // không kẹt ở trạng thái ẩn
 }
 
 // Vị trí con trỏ dạng % so với khung ảnh (bị chặn trong [0, 100]).
@@ -108,10 +119,11 @@ function onKeydown(e) {
 const imgStyle = computed(() => ({
     transform: zoomed.value ? `scale(${ZOOM})` : 'scale(1)',
     transformOrigin: `${origin.value.x}% ${origin.value.y}%`,
+    opacity: newReady.value ? 1 : 0,
     transition: reducedMotion.value
         ? 'none'
-        : 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform-origin 0.16s ease-out',
-    willChange: 'transform',
+        : 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform-origin 0.16s ease-out, opacity 0.3s ease',
+    willChange: 'transform, opacity',
 }));
 
 // Khung theo tỉ lệ ảnh; chặn nhẹ để ảnh siêu dài không phá bố cục trang
@@ -139,8 +151,9 @@ const hintText = computed(() => (finePointer.value ? 'Di chuột để phóng to
         @click="onClick"
         @keydown="onKeydown"
     >
+        <!-- Ảnh chính: giữ nguyên phần tử khi đổi src (không remount → không
+             chớp trắng); ẩn bằng opacity cho tới khi ảnh mới load xong -->
         <img
-            :key="src"
             :src="src"
             :alt="alt"
             data-zoom-img
@@ -150,6 +163,20 @@ const hintText = computed(() => (finePointer.value ? 'Di chuột để phóng to
             @load="onLoad"
             @error="onError"
         />
+
+        <!-- Lớp ảnh cũ crossfade: phủ trên cùng, tự fade-out khi ảnh mới sẵn sàng -->
+        <Transition name="gal-fade">
+            <img
+                v-if="fadedSrc && !newReady"
+                :key="fadedSrc"
+                :src="fadedSrc"
+                data-zoom-fade
+                alt=""
+                aria-hidden="true"
+                draggable="false"
+                class="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
+            />
+        </Transition>
 
         <!-- Gợi ý zoom (ẩn nhẹ khi đang phóng) -->
         <span
@@ -168,5 +195,21 @@ const hintText = computed(() => (finePointer.value ? 'Di chuột để phóng to
 .zoom-backdrop {
     background:
         radial-gradient(130% 100% at 30% 18%, #faf9f6 0%, #f3f0e9 52%, #e9e4d8 100%);
+}
+
+/* Crossfade mượt giữa ảnh cũ và ảnh mới khi bấm thumbnail */
+.gal-fade-enter-active,
+.gal-fade-leave-active {
+    transition: opacity 0.3s ease;
+}
+.gal-fade-enter-from,
+.gal-fade-leave-to {
+    opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+    .gal-fade-enter-active,
+    .gal-fade-leave-active {
+        transition: none !important;
+    }
 }
 </style>

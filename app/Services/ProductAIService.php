@@ -110,7 +110,9 @@ class ProductAIService
         // HARDCODE generous timeouts (like StyleSuggestService::timeout(90)) instead
         // of reading product_ai_timeout/total_budget from DB/config — those were being
         // overridden to low values on some hosts, causing "network/timeout" mid-generation.
-        $this->timeout = 90;
+        // Mỗi lần gọi HTTP tối đa 30 giây — nếu provider không trả lời, chuyển sang
+        // provider dự phòng (gemini/deepseek) thay vì treo cả 90 giây rồi 504.
+        $this->timeout = 30;
         $this->totalBudget = 90;
         $this->maxModels = product_ai_max_models();
         $this->maxKeys = product_ai_max_keys();
@@ -287,7 +289,7 @@ class ProductAIService
         $this->startBudget();
 
         $target = (string) ($input['target'] ?? 'all');
-        if (! in_array($target, ['all', 'name', 'names', 'description', 'seo'], true)) {
+        if (! in_array($target, ['all', 'name', 'names', 'description', 'desc_variants', 'seo'], true)) {
             $target = 'all';
         }
         $input['target'] = $target;
@@ -354,6 +356,7 @@ class ProductAIService
             'name' => max(96, (int) product_ai_config('refine_name_tokens', 350)),
             'seo' => max(128, (int) product_ai_config('refine_seo_tokens', 650)),
             'description' => max(256, (int) product_ai_config('refine_desc_tokens', 1400)),
+            'desc_variants' => max(512, (int) product_ai_config('refine_desc_variants_tokens', 2000)),
             default => $this->maxTokens,
         };
     }
@@ -681,6 +684,7 @@ class ProductAIService
             'name' => '"suggested_name": "1 tên sản phẩm hấp dẫn <=80 ký tự"',
             'description' => '"short_description": "1-2 câu <=160 ký tự", "description": "HTML mô tả chi tiết: 4-5 mục <h3> (Phong cách / Chất liệu / Màu sắc / Phù hợp / Bảo quản) + <p>/<ul><li>, tổng ~120-150 từ"',
             'seo' => '"meta_title": "SEO <=60 ký tự", "meta_description": "SEO 120-160 ký tự", "tags": ["3-4 tag"]',
+            'desc_variants' => '"variants": [{"label": "2-3 từ mô tả phong cách", "short_description": "1-2 câu <=160 ký tự", "description": "HTML mô tả chi tiết giống schema trên"}] (2-3 phương án khác biệt rõ rệt: VD một bản nhấn phong cách, một bản nhấn chất liệu, một bản nhấn công dụng)',
             default => '"suggested_name": "...", "short_description": "...", "description": "HTML...", "meta_title": "...", "meta_description": "...", "tags": ["..."]',
         };
 
@@ -961,6 +965,20 @@ PROMPT;
                 'meta_title' => trim((string) ($input['meta_title'] ?? '')) ?: mb_substr($name, 0, 55).' | '.$brand,
                 'meta_description' => trim((string) ($input['meta_description'] ?? '')) ?: 'Khám phá '.$name.' — chất liệu cao cấp, tôn dáng, giao nhanh, đổi trả dễ dàng.',
                 'tags' => $this->normalizeTags($input['tags'] ?? ''),
+            ],
+            'desc_variants' => [
+                'variants' => [
+                    [
+                        'label' => 'Phong cách & cảm hứng',
+                        'short_description' => trim((string) ($input['short_description'] ?? '')) ?: $name.' — '.$brand.', thiết kế tối giản, tôn dáng.',
+                        'description' => trim((string) ($input['description'] ?? '')) ?: $this->stubDescription($name, $input, $imageAnalysis),
+                    ],
+                    [
+                        'label' => 'Chất liệu & bảo quản',
+                        'short_description' => $name.' với chất liệu cao cấp, bền bỉ, thoáng mát.',
+                        'description' => '<h3>Chất liệu</h3><p>'.($imageAnalysis['fabric'] ?? 'Chất liệu cao cấp, thoáng mát').'</p><h3>Bảo quản</h3><ul><li>Giặt nhẹ, tránh nước tẩy mạnh</li><li>Ủi ở nhiệt độ thấp</li><li>Đổi trả trong 7 ngày</li></ul>',
+                    ],
+                ],
             ],
             default => [
                 'suggested_name' => $name,

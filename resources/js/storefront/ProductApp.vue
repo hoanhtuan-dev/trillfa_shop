@@ -65,9 +65,21 @@ const remainingForFree = computed(() => {
     return Math.max(0, freeShipThreshold.value - store.cart.subtotal);
 });
 
+// Preload toàn bộ ảnh gallery ngay khi mở trang: bấm thumbnail chuyển ảnh
+// lấy từ cache, không phải chờ tải → không bị chớp trắng giữa chừng.
+function preloadImages(urls) {
+    urls.forEach((u) => {
+        if (u && typeof u === 'string') {
+            const img = new Image();
+            img.src = u;
+        }
+    });
+}
+
 onMounted(() => {
     store.fetchCart();
     useRecentlyViewed().add(product);
+    preloadImages(images.value);
 });
 </script>
 

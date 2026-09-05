@@ -170,10 +170,12 @@ const forceReanalyze = ref(false);
 
 // ---------- AI tinh chỉnh theo mục tiêu (Tên / Mô tả / SEO) ----------
 const aiPrompts = reactive({ name: '', desc: '', seo: '' });
-const aiBusy = reactive({ all: false, name: false, names: false, description: false, seo: false });
+const aiBusy = reactive({ all: false, name: false, names: false, description: false, desc_variants: false, seo: false });
 const aiMsgs = reactive({ name: '', desc: '', seo: '' });
 const aiNameOptions = ref([]);
 const aiNameSel = ref(-1);
+const aiDescVariants = ref([]);
+const aiDescVariantSel = ref(-1);
 
 // Chip nhanh — Tên sản phẩm
 const NAME_CHIPS = [
@@ -184,10 +186,11 @@ const NAME_CHIPS = [
 ];
 // Chip nhanh — Mô tả
 const DESC_CHIPS = [
-    { label: 'Mô tả hấp dẫn', prompt: 'Viết lại mô tả ngắn và mô tả chi tiết thật hấp dẫn, giàu cảm xúc, đúng giọng văn thương hiệu (hồ sơ bên trên).' },
-    { label: 'Mô tả ngắn ≤ 160 ký tự', prompt: 'Chỉ viết MÔ TẢ NGẮN: tối đa 160 ký tự, súc tích, kích thích mua hàng.' },
-    { label: 'Mô tả chi tiết chuẩn SEO', prompt: 'Viết MÔ TẢ CHI TIẾT (HTML) chuẩn SEO: cấu trúc h3 rõ ràng, từ khóa tự nhiên, khoảng 120–150 từ, đúng giọng thương hiệu.' },
-    { label: 'Chất liệu & bảo quản', prompt: 'Bổ sung vào mô tả chi tiết các mục: chất liệu, kích thước/quy cách, cách bảo quản.' },
+    { target: 'description', label: 'Mô tả hấp dẫn', prompt: 'Viết lại mô tả ngắn và mô tả chi tiết thật hấp dẫn, giàu cảm xúc, đúng giọng văn thương hiệu (hồ sơ bên trên).' },
+    { target: 'description', label: 'Mô tả ngắn ≤ 160 ký tự', prompt: 'Chỉ viết MÔ TẢ NGẮN: tối đa 160 ký tự, súc tích, kích thích mua hàng.' },
+    { target: 'description', label: 'Mô tả chi tiết chuẩn SEO', prompt: 'Viết MÔ TẢ CHI TIẾT (HTML) chuẩn SEO: cấu trúc h3 rõ ràng, từ khóa tự nhiên, khoảng 120–150 từ, đúng giọng thương hiệu.' },
+    { target: 'description', label: 'Chất liệu & bảo quản', prompt: 'Bổ sung vào mô tả chi tiết các mục: chất liệu, kích thước/quy cách, cách bảo quản.' },
+    { target: 'desc_variants', label: '✦ Làm giàu nội dung (đa phong cách)', prompt: 'Tạo 2-3 phương án mô tả KHÁC BIỆT: 1 bản nhấn phong cách & cảm hứng, 1 bản nhấn chất liệu & công dụng, 1 bản tổng hợp. Mỗi phương án gồm mô tả ngắn (≤160 ký tự) + mô tả chi tiết HTML. Viết đúng giọng thương hiệu.' },
 ];
 // Chip nhanh — SEO
 const SEO_CHIPS = [
@@ -255,6 +258,8 @@ function resetEditor() {
     aiPrompts.seo = '';
     aiNameOptions.value = [];
     aiNameSel.value = -1;
+    aiDescVariants.value = [];
+    aiDescVariantSel.value = -1;
     Object.keys(aiBusy).forEach((k) => { aiBusy[k] = false; });
     aiMsgs.name = '';
     aiMsgs.desc = '';
@@ -406,27 +411,29 @@ function globalAiData() {
 
 /** Tinh chỉnh AI theo mục tiêu: name | names | description | seo */
 async function aiRefine(target, prompt) {
-    const key = target;
+    const key = target; // khoá busy riêng cho từng target (chạy song song được)
+    // Thông báo hiển thị theo CARD: names → card Tên, desc_variants → card Mô tả.
+    const msgKey = { names: 'name', desc_variants: 'desc' }[target] || target;
     aiBusy[key] = true;
-    aiMsgs[key] = '';
+    aiMsgs[msgKey] = '';
     try {
         const res = await apiFetch('/admin/products/ai-suggest', {
             method: 'POST',
             body: { target, prompt, ...globalAiData() },
         });
         if (!res || res.status !== 'done' || !res.data) {
-            aiMsgs[key] = 'AI không trả kết quả — thử lại sau.';
+            aiMsgs[msgKey] = 'AI không trả kết quả — thử lại sau.';
             return null;
         }
         const d = res.data;
         if (d.source === 'stub') {
-            aiMsgs[key] = 'Dùng gợi ý offline' + (d.reason ? ' — ' + d.reason : '') + '.';
+            aiMsgs[msgKey] = 'Dùng gợi ý offline' + (d.reason ? ' — ' + d.reason : '') + '.';
         } else {
-            aiMsgs[key] = 'Đã tinh chỉnh bằng ' + (d.model || ai.model) + '.';
+            aiMsgs[msgKey] = 'Đã tinh chỉnh bằng ' + (d.model || ai.model) + '.';
         }
         return d;
     } catch (e) {
-        aiMsgs[key] = e.message || 'AI đang bận/quá lâu — thử lại sau.';
+        aiMsgs[msgKey] = e.message || 'AI đang bận/quá lâu — thử lại sau.';
         return null;
     } finally {
         aiBusy[key] = false;
@@ -467,6 +474,38 @@ function applyNameOption() {
     aiNameOptions.value = [];
     aiNameSel.value = -1;
     toast('Đã áp dụng tên sản phẩm.');
+}
+
+/** Chip "Làm giàu nội dung (đa phong cách)" → hiện 2-3 phương án để chọn. */
+async function runDescVariants(prompt) {
+    const d = await aiRefine('desc_variants', prompt);
+    if (!d) return;
+    const variants = Array.isArray(d.variants) ? d.variants.filter((v) => v && v.description) : [];
+    if (variants.length) {
+        aiDescVariants.value = variants.slice(0, 3);
+        aiDescVariantSel.value = -1;
+        toast('AI tạo ' + variants.length + ' phương án mô tả — chọn 1 để áp dụng.');
+    } else {
+        aiMsgs.desc = 'AI không tạo được phương án nào — thử lại với prompt khác.';
+    }
+}
+
+function applyDescVariant() {
+    const idx = aiDescVariantSel.value;
+    const v = aiDescVariants.value[idx];
+    if (!v) return;
+    if (v.short_description) editor.short_description = String(v.short_description).trim();
+    if (v.description) editor.description = String(v.description).trim();
+    aiDescVariants.value = [];
+    aiDescVariantSel.value = -1;
+    toast('Đã áp dụng phương án mô tả: ' + (v.label || ('#' + (idx + 1))));
+}
+
+/** Bỏ thẻ HTML để hiển thị bản xem trước ngắn gọn (dùng cho panel chọn phương án). */
+function stripHtml(html) {
+    const d = document.createElement('div');
+    d.innerHTML = String(html || '');
+    return (d.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 // ---------- Studio picker ----------
@@ -1005,8 +1044,8 @@ onMounted(() => {
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
                     </span>
                     <input v-model="aiPrompts.desc" placeholder="Tinh chỉnh AI: VD — viết mô tả hấp dẫn hơn, thêm công dụng…" class="min-w-0 flex-1 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-xs text-ink-900 placeholder:text-ink-400 transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/10" @keyup.enter="refineTarget('description')" />
-                    <button type="button" @click="refineTarget('description')" :disabled="aiBusy.description" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
-                      <span v-if="aiBusy.description" class="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                    <button type="button" @click="refineTarget('description')" :disabled="aiBusy.description || aiBusy.desc_variants" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+                      <span v-if="aiBusy.description || aiBusy.desc_variants" class="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
                       <template v-else>✨ Tinh chỉnh mô tả</template>
                     </button>
                   </div>
@@ -1015,15 +1054,47 @@ onMounted(() => {
                       v-for="chip in DESC_CHIPS"
                       :key="chip.label"
                       type="button"
-                      @click="aiPrompts.desc = chip.prompt; refineTarget('description')"
-                      :disabled="aiBusy.description"
-                      class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 transition hover:border-brand-500 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      @click="aiPrompts.desc = chip.prompt; chip.target === 'desc_variants' ? runDescVariants(chip.prompt) : refineTarget('description')"
+                      :disabled="aiBusy.description || aiBusy.desc_variants"
+                      class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+                      :class="chip.target === 'desc_variants' ? 'border-brand-600 bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:border-brand-700' : 'border-brand-300 bg-white text-brand-800 hover:border-brand-500 hover:bg-brand-100'"
                     >
-                      <svg class="h-3 w-3 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z"/></svg>
+                      <svg v-if="chip.target === 'desc_variants'" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+                      <svg v-else class="h-3 w-3 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z"/></svg>
                       {{ chip.label }}
                     </button>
                   </div>
+                  <p v-if="aiBusy.desc_variants" class="mt-2 text-[11px] font-medium text-brand-700">AI đang tạo nhiều phương án mô tả (kết hợp: hấp dẫn + chuẩn SEO + chất liệu)…</p>
                   <p v-if="aiMsgs.desc" class="mt-2 text-[11px] text-ink-600">{{ aiMsgs.desc }}</p>
+
+                  <!-- Panel chọn phương án mô tả (từ chip "Làm giàu nội dung") -->
+                  <div v-if="aiDescVariants.length" class="mt-2.5 rounded-xl border border-brand-200 bg-white p-2.5">
+                    <p class="mb-2 text-[11px] font-semibold text-ink-700">
+                      AI tạo {{ aiDescVariants.length }} phương án mô tả — xem trước &amp; chọn 1 để áp dụng (gồm cả mô tả ngắn + mô tả chi tiết):
+                    </p>
+                    <div class="space-y-2">
+                      <button
+                        v-for="(v, i) in aiDescVariants"
+                        :key="i"
+                        type="button"
+                        @click="aiDescVariantSel = i"
+                        class="block w-full rounded-xl border p-3 text-left transition"
+                        :class="aiDescVariantSel === i ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20' : 'border-cream-200 hover:border-brand-300 hover:bg-cream-50'"
+                      >
+                        <div class="flex items-center gap-2">
+                          <span class="grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] leading-none" :class="aiDescVariantSel === i ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300 text-transparent'">✓</span>
+                          <span class="text-xs font-semibold text-ink-900">{{ v.label || ('Phương án ' + (i + 1)) }}</span>
+                          <span class="ml-auto shrink-0 text-[10px] text-ink-400">{{ stripHtml(v.description).length }} ký tự</span>
+                        </div>
+                        <p v-if="v.short_description" class="mt-1.5 text-[11px] font-medium text-brand-700">{{ v.short_description }}</p>
+                        <p class="mt-1 line-clamp-3 text-[11px] leading-relaxed text-ink-500">{{ stripHtml(v.description).slice(0, 300) }}…</p>
+                      </button>
+                    </div>
+                    <div class="mt-2.5 flex items-center justify-end gap-2">
+                      <button type="button" @click="aiDescVariants = []; aiDescVariantSel = -1" class="rounded-lg px-2.5 py-1 text-[11px] font-medium text-ink-500 transition hover:bg-cream-100">Bỏ qua</button>
+                      <button type="button" @click="applyDescVariant" :disabled="aiDescVariantSel < 0" class="rounded-lg bg-ink-900 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-40">Áp dụng phương án</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>

@@ -167,7 +167,7 @@ class AdminProductController extends Controller
         }
 
         $data = validator($input, [
-            'target' => ['nullable', 'string', 'in:all,name,names,description,seo'],
+            'target' => ['nullable', 'string', 'in:all,name,names,description,desc_variants,seo'],
             'prompt' => ['nullable', 'string', 'max:2000'],
             'name' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
@@ -400,7 +400,16 @@ class AdminProductController extends Controller
 
     protected function validated(Request $request): array
     {
-        return $request->validate([
+        // Chuẩn hoá: Laravel nullable|numeric không chấp nhận chuỗi rỗng "".
+        // Form Vue gửi "" khi chưa nhập → convert sang null trước validate.
+        $input = $request->all();
+        foreach (['compare_price', 'cost_price', 'stock'] as $f) {
+            if (array_key_exists($f, $input) && ($input[$f] === '' || $input[$f] === null)) {
+                $input[$f] = null;
+            }
+        }
+
+        return validator($input, [
             'category_id' => ['nullable', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:100'],
@@ -417,7 +426,7 @@ class AdminProductController extends Controller
             'gallery.*' => ['nullable', 'image', 'max:4096'],
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],
-        ]);
+        ])->validate();
     }
 
     protected function fillData(array $data): array

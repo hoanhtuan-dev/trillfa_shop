@@ -118,6 +118,7 @@ return [
         'refine_name_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_NAME_TOKENS', 350),
         'refine_seo_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_SEO_TOKENS', 650),
         'refine_desc_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_DESC_TOKENS', 1400),
+        'refine_desc_variants_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_DESC_VARIANTS_TOKENS', 2000),
 
         // Cache kết quả tinh chỉnh (giây) — gọi lại chip cùng dữ liệu → tức thì
         'refine_cache_ttl' => (int) env('STUDIO_PRODUCT_AI_REFINE_CACHE_TTL', 600),
