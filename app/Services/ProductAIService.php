@@ -46,8 +46,11 @@ class ProductAIService
     public function __construct()
     {
         $this->providers = product_ai_providers();
-        $this->timeout = product_ai_timeout();
-        $this->totalBudget = product_ai_total_budget();
+        // HARDCODE generous timeouts (like StyleSuggestService::timeout(90)) instead
+        // of reading product_ai_timeout/total_budget from DB/config — those were being
+        // overridden to low values on some hosts, causing "network/timeout" mid-generation.
+        $this->timeout = 90;
+        $this->totalBudget = 90;
         $this->maxModels = product_ai_max_models();
         $this->maxKeys = product_ai_max_keys();
         $this->downscaleMax = product_ai_downscale_max();
