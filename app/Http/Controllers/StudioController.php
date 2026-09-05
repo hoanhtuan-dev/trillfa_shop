@@ -544,6 +544,8 @@ class StudioController extends Controller
             'layout' => ['nullable', 'string', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
             'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap,outfit'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'style' => ['nullable', 'string', 'max:400'],
         ]);
 
         $imgs = array_values(array_slice($data['images'], 0, 3));
@@ -553,6 +555,8 @@ class StudioController extends Controller
         $isTryon = ($data['mode'] ?? '') === 'tryon';
         $isFaceSwap = ($data['mode'] ?? '') === 'faceswap';
         $isOutfit = ($data['mode'] ?? '') === 'outfit';
+        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
+        $style = trim((string) ($data['style'] ?? ''));
 
         if ($isTryon) {
             // Thử đồ ảo (chiến lược): @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
@@ -575,10 +579,14 @@ class StudioController extends Controller
             $finalPrompt = 'Fashion design: hybridize the two garments in @image1 and @image2 into one new cohesive outfit. '
                 .'Fuse the most distinctive design features of both — silhouette, fabric, texture, print, color story, neckline, sleeves, tailoring, embellishments and construction details — into original, wearable, high-fashion variations. '
                 .'Follow professional fashion-design standards: balanced proportions, intentional color story, realistic fabric drape, correct garment construction, clean editorial presentation.';
+            if ($style !== '') {
+                $finalPrompt .= ' Target style: '.$style.'.';
+            }
             if (count($refs) > 1) {
                 $finalPrompt .= ' Set the outfit into the background of @image3.';
             }
             $finalPrompt .= ' '.$userPrompt;
+            $finalPrompt .= '. '.app(\App\Services\CreativeDirectionService::class)->creativityDirective($creativeLevel);
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
                 .'The FIRST image is the main base (keep its subject and overall layout). '
@@ -611,6 +619,8 @@ class StudioController extends Controller
                 'face_ref' => $faceRef,
                 'user_prompt' => $userPrompt,
                 'mode' => $data['mode'] ?? null,
+                'creative_level' => $creativeLevel,
+                'style' => $style,
             ], $cost)->getData(true);
         }
 
@@ -1184,6 +1194,8 @@ RULES:
                 'face_ref' => $data['face_ref'] ?? null,
                 'user_prompt' => $data['user_prompt'] ?? null,
                 'mode' => $data['mode'] ?? null,
+                'creative_level' => $data['creative_level'] ?? null,
+                'style' => $data['style'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 

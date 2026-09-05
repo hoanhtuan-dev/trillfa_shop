@@ -1,4 +1,4 @@
 import { createApp } from 'vue';
-import AdminProductApp from './AdminProductApp.vue';
+import AdminProductsApp from './AdminProductsApp.vue';
 
-createApp(AdminProductApp).mount('#admin-product-root');
+createApp(AdminProductsApp).mount('#admin-products-root');

@@ -8,6 +8,8 @@ const store = useStudioStore();
 
 const prompt = ref('');
 const variants = ref(1);
+const creativeLevel = ref(6);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
+const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
 const busy = ref(false);
 const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
 const open = ref(false);
@@ -158,7 +160,7 @@ async function run() {
     finalPrompt += '. Pose detail: ' + selected.value[1].skeleton;
   }
   busy.value = true;
-  const items = await store.compose(urls, finalPrompt, variants.value, mode.value);
+  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, creativeLevel.value, style.value);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
@@ -217,6 +219,18 @@ async function run() {
       <button v-for="n in 3" :key="n" @click="insertTag('@image' + n)"
               class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white">@image{{ n }}</button>
     </div>
+
+    <!-- Phong cách + mức sáng tạo (chỉ cho chế độ Ghép Trang Phục) -->
+    <div v-if="mode === 'outfit'" class="mt-3">
+      <label class="label">Phong cách</label>
+      <input v-model="style" type="text" maxlength="200" class="input !text-xs" placeholder="VD: tối giản hiện đại, công sở thanh lịch, streetwear, boho, cổ điển…">
+    </div>
+    <div v-if="mode === 'outfit'" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+      <span class="shrink-0 font-medium text-cream-200">Sáng tạo</span>
+      <input type="range" min="1" max="10" v-model.number="creativeLevel" class="h-2 w-full cursor-pointer accent-brand-500">
+      <span class="shrink-0 font-semibold text-cream-50">{{ creativeLevel }}</span><span class="shrink-0 text-cream-300/60">/10</span>
+    </div>
+    <p v-if="mode === 'outfit'" class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Thấp = bám sát 2 trang phục gốc · Cao = tự do lai tạo, editorial.</p>
 
     <div class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
       <span class="mr-1">Số biến thể:</span>

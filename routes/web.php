@@ -227,11 +227,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/widgets', [AdminWidgetController::class, 'update'])->name('widgets.update');
 
     Route::get('/products', [AdminProductController::class, 'index'])->name('products.index');
+    Route::get('/products/data', [AdminProductController::class, 'data'])->name('products.data');
     Route::post('/products/ai-suggest', [AdminProductController::class, 'aiSuggest'])->name('products.ai-suggest');
     Route::get('/products/ai-suggest/poll', [AdminProductController::class, 'aiSuggestPoll'])->name('products.ai-suggest.poll');
     Route::get('/products/studio-images', [AdminProductController::class, 'studioImages'])->name('products.studio-images');
     Route::get('/products/create', [AdminProductController::class, 'create'])->name('products.create');
     Route::post('/products', [AdminProductController::class, 'store'])->name('products.store');
+    Route::get('/products/{product}/payload', [AdminProductController::class, 'payload'])->name('products.payload');
     Route::get('/products/{product}/edit', [AdminProductController::class, 'edit'])->name('products.edit');
     Route::put('/products/{product}', [AdminProductController::class, 'update'])->name('products.update');
     Route::delete('/products/{product}', [AdminProductController::class, 'destroy'])->name('products.destroy');
