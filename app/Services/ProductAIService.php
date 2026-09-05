@@ -33,6 +33,7 @@ class ProductAIService
     protected float $temperature;
     protected int $maxTokens;
     protected int $visionMaxTokens;
+    protected int $refineCacheTtl;
 
     /** Hard wall-clock deadline for the whole operation (sync request must never 504). */
     private float $deadline = 0.0;
@@ -118,6 +119,9 @@ class ProductAIService
         $this->temperature = product_ai_temperature();
         $this->maxTokens = product_ai_max_tokens();
         $this->visionMaxTokens = product_ai_vision_max_tokens();
+        // Cache ngắn (giây) cho các lần "tinh chỉnh" TRÙNG (cùng target + prompt +
+        // cùng toàn bộ dữ liệu) → bấm lại chip/refresh trả về tức thì, không gọi model.
+        $this->refineCacheTtl = max(0, (int) product_ai_config('refine_cache_ttl', 600));
     }
 
     /**
@@ -252,7 +256,9 @@ class ProductAIService
         $this->startBudget();
 
         $prompt = $this->buildPrompt($input, $imageAnalysis);
-        $result = $this->attempt('text', $prompt);
+        // Truyền maxTokens tường minh: với Gemini ép responseMimeType=application/json
+        // (đầu ra đúng JSON → dừng sớm, không trả dài dòng → nhanh hơn, đỡ tốn token).
+        $result = $this->attempt('text', $prompt, null, $this->maxTokens);
 
         if (is_array($result)) {
             $result['source'] = 'ai';
@@ -286,8 +292,27 @@ class ProductAIService
         }
         $input['target'] = $target;
 
+        // Cache kết quả theo (target + prompt + TOÀN BỘ dữ liệu + hồ sơ thương hiệu):
+        // bấm lại đúng chip/prompt với dữ liệu không đổi → trả về tức thì, không gọi model.
+        $cacheKey = 'product_ai:refine:'.md5(json_encode([
+            't' => $target,
+            'p' => $input['prompt'] ?? '',
+            'd' => $input,
+            'b' => $this->brandContext(),
+            'i' => $imageAnalysis,
+        ]));
+        if ($this->refineCacheTtl > 0) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        }
+
         $prompt = $this->buildRefinePrompt($input, $imageAnalysis, $target);
-        $result = $this->attempt('text', $prompt);
+        // Ngân sách token theo hạng mục — đầu ra NGẮN cần ít token → model trả xong
+        // sớm hơn nhiều (gõ 5 cái tên không cần 700 token như viết cả trang HTML).
+        $tokens = $this->refineTokens($target);
+        $result = $this->attempt('text', $prompt, null, $tokens);
 
         if (is_array($result)) {
             $result['source'] = 'ai';
@@ -303,10 +328,34 @@ class ProductAIService
                 )), 0, 8);
             }
 
+            if ($this->refineCacheTtl > 0) {
+                Cache::put($cacheKey, $result, $this->refineCacheTtl);
+            }
+
             return $result;
         }
 
-        return $this->stubRefine($input, $imageAnalysis, $target);
+        $stub = $this->stubRefine($input, $imageAnalysis, $target);
+        if ($this->refineCacheTtl > 0) {
+            Cache::put($cacheKey, $stub, $this->refineCacheTtl);
+        }
+
+        return $stub;
+    }
+
+    /**
+     * Ngân sách token output theo mục tiêu tinh chỉnh (config DB → env → default).
+     * Càng ít token càng nhanh; ngưỡng dưới đủ để JSON không bị cắt giữa chừng.
+     */
+    protected function refineTokens(string $target): int
+    {
+        return match ($target) {
+            'names' => max(96, (int) product_ai_config('refine_names_tokens', 500)),
+            'name' => max(96, (int) product_ai_config('refine_name_tokens', 350)),
+            'seo' => max(128, (int) product_ai_config('refine_seo_tokens', 650)),
+            'description' => max(256, (int) product_ai_config('refine_desc_tokens', 1400)),
+            default => $this->maxTokens,
+        };
     }
 
     /**
@@ -608,11 +657,13 @@ class ProductAIService
         $brand = trim((string) ($input['brand'] ?? ''));
         $tags = trim((string) ($input['tags'] ?? ''));
         $short = trim((string) ($input['short_description'] ?? ''));
-        $description = trim((string) ($input['description'] ?? ''));
+        // Cắt bớt trường dài (mô tả có thể lên tới hàng chục nghìn ký tự) để prompt
+        // ngắn → model prefill nhanh hơn nhiều; vẫn giữ đủ ý chính.
+        $description = $this->clampText((string) ($input['description'] ?? ''), 2000);
         $price = (string) ($input['price'] ?? '');
         $metaTitle = trim((string) ($input['meta_title'] ?? ''));
         $metaDesc = trim((string) ($input['meta_description'] ?? ''));
-        $userPrompt = trim((string) ($input['prompt'] ?? ''));
+        $userPrompt = $this->clampText((string) ($input['prompt'] ?? ''), 800);
 
         $img = '';
         if ($imageAnalysis) {
@@ -641,7 +692,7 @@ class ProductAIService
 Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam.{$img}
 
 === HỒ SƠ THƯƠNG HIỆU (lấy từ trang "/admin/pages/about" của cửa hàng — ĐỌC KỸ và luôn viết đúng giọng văn, giá trị này) ===
-{$this->brandContext()}
+{$this->clampText($this->brandContext(), 1200)}
 === HẾT HỒ SƠ THƯƠNG HIỆU ===
 
 === DỮ LIỆU SẢN PHẨM HIỆN TẠI (toàn cục — giữ nguyên những gì không cần đổi) ===
@@ -672,7 +723,7 @@ PROMPT;
         $hint = $input['hint'] ?? '';
         $currentShort = $input['short_description'] ?? '';
         $currentTags = $input['tags'] ?? '';
-        $currentDesc = $input['description'] ?? '';
+        $currentDesc = $this->clampText((string) ($input['description'] ?? ''), 2000);
         $currentPrice = $input['price'] ?? '';
         $currentMetaTitle = $input['meta_title'] ?? '';
         $currentMetaDesc = $input['meta_description'] ?? '';
@@ -695,7 +746,7 @@ PROMPT;
             ? 'HÃY NHÌN ẢNH SẢN PHẨM ĐÍNH KÈM và dựa trên đó'
             : 'dựa trên phân tích ảnh + thông tin người dùng';
 
-        $brandBlock = "\n=== HỒ SƠ THƯƠNG HIỆU (lấy từ trang \"/admin/pages/about\" của cửa hàng — ĐỌC KỸ, viết đúng giọng văn & giá trị) ===\n".$this->brandContext()."\n=== HẾT HỒ SƠ THƯƠNG HIỆU ===";
+        $brandBlock = "\n=== HỒ SƠ THƯƠNG HIỆU (lấy từ trang \"/admin/pages/about\" của cửa hàng — ĐỌC KỸ, viết đúng giọng văn & giá trị) ===\n".$this->clampText($this->brandContext(), 1200)."\n=== HẾT HỒ SƠ THƯƠNG HIỆU ===";
 
         return <<<PROMPT
 Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Viết NGẮN GỌN nhưng hấp dẫn, {$basis}.
@@ -724,6 +775,18 @@ PROMPT;
     }
 
     // ------------------------------------------------------------- helpers
+
+    /**
+     * Cắt ngắn văn bản về tối đa $max ký tự — giữ nguyên nếu đã ngắn hơn.
+     * Dùng để giảm kích thước prompt đầu vào (prefill nhanh hơn), đặc biệt
+     * cho mô tả chi tiết có thể hàng chục nghìn ký tự.
+     */
+    protected function clampText(?string $s, int $max): string
+    {
+        $s = trim((string) $s);
+
+        return mb_strlen($s) <= $max ? $s : mb_substr($s, 0, $max).'…';
+    }
 
     protected function parseJson(string $text): ?array
     {

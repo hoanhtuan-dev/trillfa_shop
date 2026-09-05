@@ -112,6 +112,15 @@ return [
         'temperature' => (float) env('STUDIO_PRODUCT_AI_TEMPERATURE', 0.7),
         'max_tokens' => (int) env('STUDIO_PRODUCT_AI_MAX_TOKENS', 700), // output vừa phải để host token-plan/paygo trả về kịp (không timeout)
         'vision_max_tokens' => (int) env('STUDIO_PRODUCT_AI_VISION_MAX_TOKENS', 400), // VISION (chỉ hiểu ảnh — rẻ & nhanh)
+
+        // Ngân sách token theo hạng mục tinh chỉnh — càng ít càng nhanh
+        'refine_names_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_NAMES_TOKENS', 500),
+        'refine_name_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_NAME_TOKENS', 350),
+        'refine_seo_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_SEO_TOKENS', 650),
+        'refine_desc_tokens' => (int) env('STUDIO_PRODUCT_AI_REFINE_DESC_TOKENS', 1400),
+
+        // Cache kết quả tinh chỉnh (giây) — gọi lại chip cùng dữ liệu → tức thì
+        'refine_cache_ttl' => (int) env('STUDIO_PRODUCT_AI_REFINE_CACHE_TTL', 600),
     ],
 
     /*
