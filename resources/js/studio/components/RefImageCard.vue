@@ -35,18 +35,17 @@ const selectedModel = computed(() => {
 // Cho phép tạo ngay cả khi chưa nhập mô tả — backend tự dựng prompt "create a fresh variation".
 const canSubmit = computed(() => !!img.value && !busy.value);
 
-// ── Chip nhanh: thiết lập sẵn mô tả + độ giống — bấm để điền, bấm lại để bỏ. ──
+// ── Nền Studio: 8 màu nền studio thông dụng trong chụp ảnh thời trang. Bấm để điền
+// mô tả + độ giống; bấm lại để bỏ. Mỗi chip có 1 swatch màu đại diện cho nền.
 const presets = [
-  { id: 'bg-white',  label: 'Nền trắng studio',  similarity: 85, prompt: 'keep the product unchanged; replace the background with a clean pure-white seamless studio backdrop, even soft lighting, no harsh shadows' },
-  { id: 'bg-dark',   label: 'Nền studio tối',    similarity: 80, prompt: 'keep the product unchanged; replace the background with a dark charcoal studio backdrop with a soft rim light and subtle gradient' },
-  { id: 'outdoor',   label: 'Ngoài trời nắng',    similarity: 65, prompt: 'keep the product unchanged; place it in an outdoor sunny scene with natural soft daylight, slight lens flare, editorial fashion vibe' },
-  { id: 'catalog',   label: 'Lookbook catalog',  similarity: 75, prompt: 'keep the product unchanged; minimal clean catalog look, soft diffuse top lighting, light gray seamless background, centered framing, faint drop shadow' },
-  { id: 'editorial', label: 'Editorial cao cấp', similarity: 60, prompt: 'keep the product unchanged; high-fashion editorial mood, dramatic side light, rich contrast, magazine-grade styling, deep tones' },
-  { id: 'dslr',      label: 'Đậm chất DSLR',      similarity: 78, prompt: 'keep the product unchanged; professional DSLR product photo, razor-sharp focus, shallow depth of field, softbox studio lighting, 50mm look' },
-  { id: 'angle45',   label: 'Góc chếch 45°',     similarity: 55, prompt: 'keep the product unchanged; render from a 45-degree three-quarter side angle, same lighting and styling, slightly different camera height' },
-  { id: 'detail',    label: 'Cận cảnh chi tiết', similarity: 50, prompt: 'keep the product unchanged; extreme close-up macro of the fabric texture, stitching and material, sharp studio macro lighting' },
-  { id: 'vivid',     label: 'Màu sống động',     similarity: 82, prompt: 'keep the product unchanged; increase color vibrance and saturation slightly, punchy high-contrast look, crisp sharp detail' },
-  { id: 'flatlay',   label: 'Flat-lay',          similarity: 58, prompt: 'keep the product unchanged; top-down flat-lay composition on a clean neutral surface, soft natural shadow, catalog styling' },
+  { id: 'studio-white',  label: 'Trắng thuần',  color: '#ffffff', similarity: 82, prompt: 'keep the subject unchanged; replace the background with a pure-white seamless studio backdrop, even soft diffused lighting, no harsh shadows, clean editorial fashion look' },
+  { id: 'studio-lgray',  label: 'Xám nhạt',     color: '#e8e8e8', similarity: 80, prompt: 'keep the subject unchanged; replace the background with a light neutral gray seamless studio backdrop, soft top-down diffused lighting, subtle gradient' },
+  { id: 'studio-mgray',  label: 'Xám trung',    color: '#9a9a9a', similarity: 78, prompt: 'keep the subject unchanged; replace the background with an 18% medium gray seamless studio backdrop, professional softbox lighting, balanced contrast' },
+  { id: 'studio-storm',  label: 'Xám đậm',      color: '#4a4a4a', similarity: 76, prompt: 'keep the subject unchanged; replace the background with a dark storm-gray studio backdrop with a soft rim light and subtle gradient, dramatic fashion mood' },
+  { id: 'studio-black',  label: 'Đen tuyền',    color: '#0a0a0a', similarity: 75, prompt: 'keep the subject unchanged; replace the background with a jet-black seamless studio backdrop, deep shadow, single soft key light, high-contrast editorial mood' },
+  { id: 'studio-cream',  label: 'Kem',          color: '#f2e7d5', similarity: 80, prompt: 'keep the subject unchanged; replace the background with a warm cream/beige seamless studio backdrop, soft warm diffuse lighting, clean catalog look' },
+  { id: 'studio-blue',   label: 'Xanh phấn',   color: '#c9d8e0', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a soft powder-blue seamless studio backdrop, cool soft lighting, calm editorial mood' },
+  { id: 'studio-blush',  label: 'Hồng phấn',   color: '#ead3d5', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a dusty blush-pink seamless studio backdrop, soft warm diffuse lighting, fashion lookbook mood' },
 ];
 const activePreset = ref(null);
 function applyPreset(p) {
@@ -77,7 +76,6 @@ async function runRefgen() {
       <StudioIcon name="image" /> Ảnh mới từ ảnh mẫu
       <span class="rounded-full bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">i2i</span>
     </h2>
-    <p class="mt-1 text-[11px] leading-relaxed text-cream-300/60">Dùng <b class="text-cream-100">{{ selectedModel?.model || 'qwen-image-3.0-pro' }}</b> để tạo bức ảnh <b class="text-cream-100">mới</b> giống ảnh tham chiếu — không sửa trên ảnh gốc (khác "Sửa ảnh").</p>
 
     <!-- Ảnh tham chiếu -->
     <div v-if="img" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
@@ -89,13 +87,17 @@ async function runRefgen() {
     </div>
     <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trong <b>Outputs</b> để làm ảnh tham chiếu.</div>
 
-    <!-- Chip nhanh -->
-    <p class="label mt-4">Chip nhanh</p>
-    <div class="flex flex-wrap gap-1.5">
+    <!-- Nền Studio -->
+    <div class="mt-4 flex items-center justify-between">
+      <p class="label">Nền Studio</p>
+      <span class="text-[9px] font-medium text-cream-300/40">{{ presets.length }} nền</span>
+    </div>
+    <div class="mt-1 grid grid-cols-2 gap-1.5">
       <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
-              class="rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors"
-              :class="activePreset === p.id ? 'border-brand-400 bg-brand-600 text-white' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400 hover:bg-brand-600/20'">
-        {{ p.label }}
+              class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+              :class="activePreset === p.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+        <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }" :title="'Mã màu ' + p.color"></span>
+        <span class="truncate">{{ p.label }}</span>
       </button>
     </div>
 

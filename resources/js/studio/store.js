@@ -359,6 +359,10 @@ export const useStudioStore = defineStore('studio', {
         if (items.length) this.setBatch(items.map(it => it.generation_id));
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
         this.processQueue();
+        // Poll từng kết quả chưa hoàn tất để khi backend xong → tự "in" vào canvas (pushCanvasLayer)
+        // + liệt kê vào Layers panel (setActiveLayer), giống cơ chế Inpaint/Swap. Mặc định
+        // processQueue chỉ refresh /studio/latest nên kết quả pending sẽ kẹt ở Output mà không lên canvas.
+        items.forEach((it) => { if (it.generation_id && it.status !== 'completed') this.pollGeneration(it.generation_id); });
         return items;
       } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh từ ảnh mẫu.', 'error'); return null; }
     },
