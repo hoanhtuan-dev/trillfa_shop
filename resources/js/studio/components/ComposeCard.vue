@@ -263,12 +263,29 @@ function deletePreset(p) {
     </div>
     <p v-if="mode === 'outfit'" class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Thấp = bám sát 2 trang phục gốc · Cao = tự do lai tạo, editorial.</p>
 
+    <!-- Preset phong cách (lưu nhanh) -->
+    <div v-if="mode === 'outfit'" class="mt-3">
+      <label class="label">Preset phong cách</label>
+      <div class="mt-1 flex flex-wrap gap-1.5">
+        <button v-for="p in stylePresets" :key="p.name" @click="applyPreset(p)" class="group inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-[10px] font-medium text-cream-200 transition hover:border-brand-400">
+          {{ p.name }}
+          <span @click.stop="deletePreset(p)" class="grid h-4 w-4 place-items-center rounded-full text-cream-400 hover:bg-red-600 hover:text-white" title="Xóa preset">×</span>
+        </button>
+        <span v-if="!stylePresets.length" class="text-[10px] text-cream-300/50">Chưa có preset — lưu phong cách + trang trí + sáng tạo hiện tại để tái dùng cho cả bộ sưu tập.</span>
+      </div>
+      <div class="mt-1.5 flex gap-1.5">
+        <input v-model="presetName" type="text" maxlength="60" class="input !py-1.5 !text-xs" placeholder="Tên preset (VD: Bộ sưu tập Xuân)">
+        <button @click="savePreset" class="btn-ghost btn-sm shrink-0 whitespace-nowrap">Lưu</button>
+      </div>
+    </div>
+
     <div class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
       <span class="mr-1">Số biến thể:</span>
       <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
               :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="h-7 w-7 rounded-full font-semibold transition-colors">{{ n }}</button>
     </div>
+    <p v-if="mode === 'outfit' && variants > 1" class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Biến thể đi theo trục khác nhau để không trùng lặp: Classic · Modern · Bold · Fluid.</p>
 
     <!-- Xem trước / chỉnh tay prompt -->
     <button @click="togglePreview" type="button" class="btn-outline mt-3 w-full whitespace-nowrap">
@@ -283,6 +300,10 @@ function deletePreset(p) {
       <p class="mt-1 text-[10px] leading-relaxed" :class="previewDirty ? 'text-amber-300' : 'text-cream-300/50'">
         <span v-if="previewDirty">✓ Sẽ gửi bản prompt đã chỉnh này.</span>
         <span v-else>Chưa chỉnh sửa — hệ thống tự dựng prompt từ các tùy chọn. Đổi tùy chọn/ảnh xong bấm "Làm mới".</span>
+      </p>
+      <p v-if="previewAxes.length > 1 && mode === 'outfit'" class="mt-1 text-[10px] leading-relaxed text-brand-200/80">
+        Biến thể theo trục ({{ variants }} biến thể): mỗi biến thể thêm 1 chỉ thị phom dáng/tâm trạng riêng.<br>
+        <span class="text-cream-300/60">1·Classic · 2·Modern · 3·Bold · 4·Fluid — nếu bạn chỉnh tay prompt trên, trục sẽ tắt.</span>
       </p>
     </div>
 
