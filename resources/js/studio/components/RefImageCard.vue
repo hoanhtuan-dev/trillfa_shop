@@ -54,8 +54,57 @@ function applyPreset(p) {
     return;
   }
   activePreset.value = p.id;
+  activeAngle.value = null;             // nhóm góc chụp và nền studio loại trừ nhau
   prompt.value = p.prompt;
   similarity.value = p.similarity;
+}
+
+// ── Góc chụp: 4 hướng camera cơ bản. Mỗi chip có icon SVG camera xoay theo hướng đó.
+// Bấm để điền prompt góc; bấm lại để bỏ. Nhóm này độc lập (loại trừ) với Nền Studio.
+const anglePresets = [
+  {
+    id: 'angle-front',
+    label: 'Chính diện',
+    similarity: 70,
+    prompt: 'keep the subject, garment and styling unchanged; shoot from a straight-on front view, eye-level camera, symmetrical framing, flat even studio lighting',
+    // camera nhìn thẳng: body + lens giữa + chấm nhỏ trên (flash/viewfinder phía trước)
+    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><circle cx="17" cy="10" r="0.6"/>',
+  },
+  {
+    id: 'angle-back',
+    label: 'Mặt sau',
+    similarity: 65,
+    prompt: 'keep the subject, garment and styling unchanged; shoot from directly behind the subject (back view), eye-level camera, same lighting, full back of garment visible',
+    // camera quay về phía sau: body + lens có 2 nét chéo qua (X) → "back side"
+    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M10 11l4 4"/><path d="M14 11l-4 4"/>',
+  },
+  {
+    id: 'angle-left45',
+    label: 'Nghiêng 45° trái',
+    similarity: 62,
+    prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-left angle, camera slightly to the left and slightly above eye level, same lighting and framing',
+    // camera xoay chéo trái: body + lens + dấu mũi tên chéo sang trái
+    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M6 6l4 4"/><path d="M6 10h4V6"/>',
+  },
+  {
+    id: 'angle-right45',
+    label: 'Nghiêng 45° phải',
+    similarity: 62,
+    prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-right angle, camera slightly to the right and slightly above eye level, same lighting and framing',
+    // camera xoay chéo phải: body + lens + dấu mũi tên chéo sang phải
+    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M18 6l-4 4"/><path d="M18 10h-4V6"/>',
+  },
+];
+const activeAngle = ref(null);
+function applyAngle(a) {
+  if (activeAngle.value === a.id) {
+    activeAngle.value = null;
+    return;
+  }
+  activeAngle.value = a.id;
+  activePreset.value = null;            // nhóm góc chụp và nền studio loại trừ nhau
+  prompt.value = a.prompt;
+  similarity.value = a.similarity;
 }
 
 async function runRefgen() {
@@ -98,6 +147,20 @@ async function runRefgen() {
               :class="activePreset === p.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
         <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }" :title="'Mã màu ' + p.color"></span>
         <span class="truncate">{{ p.label }}</span>
+      </button>
+    </div>
+
+    <!-- Góc chụp -->
+    <div class="mt-4 flex items-center justify-between">
+      <p class="label">Góc chụp</p>
+      <span class="text-[9px] font-medium text-cream-300/40">{{ anglePresets.length }} góc</span>
+    </div>
+    <div class="mt-1 grid grid-cols-2 gap-1.5">
+      <button v-for="a in anglePresets" :key="a.id" @click="applyAngle(a)"
+              class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+              :class="activeAngle === a.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+        <svg class="h-4 w-4 shrink-0 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="a.svg"></svg>
+        <span class="truncate">{{ a.label }}</span>
       </button>
     </div>
 
