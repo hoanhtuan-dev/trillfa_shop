@@ -103,7 +103,7 @@ return [
         'deepseek_model' => env('STUDIO_PRODUCT_AI_DEEPSEEK_MODEL', 'deepseek-chat'),
         'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 90), // 1 call đa phương thức (giống "Gợi ý từ ảnh") cần ~30-90s
         'total_budget_seconds' => (int) env('STUDIO_PRODUCT_AI_TOTAL_BUDGET', 90), // trần tổng cho một lần bấm AI
-        'max_models' => (int) env('STUDIO_PRODUCT_AI_MAX_MODELS', 2),
+        'max_models' => (int) env('STUDIO_PRODUCT_AI_MAX_MODELS', 1), // chỉ qwen3.8-flash — giảm thời gian, không thử model dự phòng
         'max_keys' => (int) env('STUDIO_PRODUCT_AI_MAX_KEYS', 3),
         'downscale_max' => (int) env('STUDIO_PRODUCT_AI_DOWNSCALE_MAX', 640),
         'cache_ttl_hours' => (int) env('STUDIO_PRODUCT_AI_CACHE_TTL_HOURS', 720), // 30 ngày

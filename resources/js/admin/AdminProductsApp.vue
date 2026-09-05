@@ -177,7 +177,7 @@ const pickingFor = ref('gallery');
 const submitting = ref(false);
 
 const editorTitle = computed(() => (editor.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'));
-const aiImageUrl = computed(() => coverUrl.value || existingCover.value || (gallery.value[0]?.url || ''));
+const aiImageUrl = computed(() => coverFilePreview.value || coverUrl.value || existingCover.value || (gallery.value[0]?.url || ''));
 const coverPreview = computed(() => (removeCover.value ? '' : (coverFilePreview.value || coverUrl.value || existingCover.value || '')));
 const aiProvidersLabel = computed(() => {
     const names = { qwen: 'Qwen', gemini: 'Gemini', deepseek: 'DeepSeek' };
@@ -293,22 +293,40 @@ function catName() {
     return c?.name || '';
 }
 
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1] || '');
+        r.onerror = reject;
+        r.readAsDataURL(file);
+    });
+}
+
 async function aiSuggest() {
     aiLoading.value = true;
     aiMsg.value = '';
     aiState.value = aiImageUrl.value ? 'analyzing' : 'suggesting';
     try {
+        const body = {
+            name: editor.name,
+            category: catName(),
+            brand: editor.brand,
+            hint: hint.value,
+            short_description: editor.short_description,
+            force: forceReanalyze.value,
+        };
+        // Ảnh vừa upload (chưa lưu lên server) → gửi base64 để AI đọc được ngay,
+        // thay vì để trống làm AI sinh mô tả lệch với ảnh.
+        if (coverFile.value) {
+            body.image_base64 = await fileToBase64(coverFile.value);
+            body.image_mime = coverFile.value.type || 'image/jpeg';
+        } else {
+            body.image_url = aiImageUrl.value;
+        }
+
         const res = await apiFetch('/admin/products/ai-suggest', {
             method: 'POST',
-            body: {
-                name: editor.name,
-                category: catName(),
-                brand: editor.brand,
-                hint: hint.value,
-                short_description: editor.short_description,
-                image_url: aiImageUrl.value,
-                force: forceReanalyze.value,
-            },
+            body,
         });
         if (!res || res.status !== 'done' || !res.data) {
             aiMsg.value = 'AI không trả kết quả — thử lại sau.';
@@ -706,7 +724,7 @@ onMounted(() => {
                 </span>
                 <div class="min-w-0 flex-1">
                   <p class="text-sm font-semibold text-ink-900">Gợi ý nội dung &amp; SEO bằng AI</p>
-                  <p class="text-xs text-ink-500">Chuỗi model: {{ aiProvidersLabel }} — nhìn ảnh rồi tự viết mô tả &amp; SEO.</p>
+                  <p class="text-xs text-ink-500">Model chính: <span class="font-semibold text-ink-700">qwen3.8-flash</span> (đa phương thức — đọc ảnh + text). Chỉ đổi khi không khả dụng: {{ aiProvidersLabel }}.</p>
                 </div>
                 <input v-model="hint" placeholder="Ý tưởng / điểm nhấn…" class="w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-none sm:w-56" @keyup.enter="aiSuggest" />
                 <label v-if="aiImageUrl" class="flex shrink-0 items-center gap-1.5 text-xs text-ink-600"><input type="checkbox" v-model="forceReanalyze" class="h-3.5 w-3.5 accent-brand-600" /> Phân tích lại ảnh</label>

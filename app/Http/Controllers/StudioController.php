@@ -717,14 +717,19 @@ class StudioController extends Controller
         $ornamentLevel = (int) ($data['ornament_level'] ?? 0);
 
         if ($isTryon) {
-            // Thử đồ ảo (chiến lược): @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
-            $finalPrompt = 'Virtual try-on: put the garment in @image1 onto the model pose in @image2, '
-                .'keeping the pose, body proportions, skin tone and lighting of @image2. '
-                .'Make the garment fit naturally with correct drape, texture and shadows.';
+            // Thử đồ ảo: @image1 = trang phục (base/source), @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
+            // Chất lượng cao: khóa nguyên vẹn trang phục + tái tạo chính xác tư thế + tỷ lệ người mẫu
+            // + câu tránh lỗi (cùng kỹ thuật đang dùng cho "Thay Đổi Người Mẫu").
+            $finalPrompt = 'Virtual try-on: dress the model in the EXACT garment and every accessory shown in @image1 — identical colors, prints, patterns, fabric, silhouette, length and details. '
+                .'Do NOT redesign, replace, or omit any garment or accessory. '
+                .'Reproduce the EXACT body pose, stance, arm/leg placement, facing direction and posture from the pose reference in @image2 — do NOT copy the garment or the person from the pose image; keep the model\'s face, hairstyle and skin tone natural and consistent with @image2. '
+                .'Render a vertically-balanced FULL BODY from head to toe (not cropped), with natural elongated fashion-model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat or stubby. '
+                .'The model should occupy about 75-80% of the frame height with headroom above and footroom below.';
             if (count($refs) > 1) {
-                $finalPrompt .= ' Place the result into the background of @image3.';
+                $finalPrompt .= ' Place the result into the background shown in @image3, keeping the person and garment fully lit and clearly visible.';
             }
-            $finalPrompt .= ' '.$userPrompt;
+            $finalPrompt .= ' Avoid: cropped body, wrong pose, deformed hands, extra garments or accessories not in @image1, wrong colors, blurry, low quality. '
+                .'Photorealistic, full body, studio quality, high fashion, consistent lighting. '.$userPrompt;
         } elseif ($isFaceSwap) {
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
             // Prompt kiểm soát tại Settings → Studio → "Prompt thay khuôn mặt".
@@ -751,15 +756,17 @@ class StudioController extends Controller
             $finalPrompt .= '. '.$direction->creativityDirective($creativeLevel);
         } else {
             $finalPrompt = 'Compose these images into a single cohesive, realistic image. '
-                .'The FIRST image is the main base (keep its subject and overall layout). '
+                .'Keep @image1 as the main base (keep its subject and overall layout). '
                 .'Blend the other '.count($refs).' reference image(s) naturally into the scene. '.$userPrompt;
         }
 
-        // Định danh @image1/@image2/@image3 → mô tả chuẩn cho model hiểu đúng từng ảnh.
+        // Định danh @image1/@image2/@image3 theo ĐÚNG thứ tự ảnh gửi tới model edit.
+        // content = [refs..., source] → @image2 là ảnh ĐẦU, @image3 là ảnh THỨ HAI, @image1 (base) là ảnh CUỐI.
+        $total = count($imgs);
         $tagMap = [
-            '@image1' => 'the FIRST image',
-            '@image2' => 'the SECOND image',
-            '@image3' => 'the THIRD image',
+            '@image1' => 'the '.($total >= 3 ? 'THIRD' : 'SECOND').' image',
+            '@image2' => 'the FIRST image',
+            '@image3' => 'the SECOND image',
         ];
         $finalPrompt = strtr($finalPrompt, $tagMap);
 

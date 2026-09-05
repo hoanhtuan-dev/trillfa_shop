@@ -962,23 +962,25 @@ if (! function_exists('product_ai_deepseek_model')) {
 }
 
 if (! function_exists('product_ai_qwen_text_models')) {
+    /**
+     * Dùng DUY NHẤT qwen3.8-flash cho mọi tác vụ TEXT — đây là model đa phương thức
+     * (đọc được ảnh + text) và nhanh nhất. Chỉ model khác (pay-go) được thử khi key
+     * không có qwen3.8-flash (xử lý riêng ở attemptQwen).
+     */
     function product_ai_qwen_text_models(): array
     {
-        $custom = array_values(array_filter(array_map('trim', explode(',', (string) product_ai_config('qwen_text_models', '')))));
-
-        return $custom ?: array_values(studio_qwen_text_models());
+        return ['qwen3.8-flash'];
     }
 }
 
 if (! function_exists('product_ai_qwen_vision_models')) {
+    /**
+     * Dùng DUY NHẤT qwen3.8-flash cho VISION — multimodal, đọc ảnh trực tiếp.
+     * Không còn thử qwen-vl-* (chậm) nữa.
+     */
     function product_ai_qwen_vision_models(): array
     {
-        $custom = array_values(array_filter(
-            array_map('trim', explode(',', (string) product_ai_config('qwen_vision_models', ''))),
-            fn ($m) => $m !== '' && is_qwen_vision_capable($m)
-        ));
-
-        return $custom ?: array_values(studio_suggest_qwen_models());
+        return ['qwen3.8-flash'];
     }
 }
 

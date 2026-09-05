@@ -154,12 +154,17 @@ class AdminProductController extends Controller
             'hint' => ['nullable', 'string', 'max:1000'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'image_url' => ['nullable', 'string', 'max:2048'],
+            'image_base64' => ['nullable', 'string'],
+            'image_mime' => ['nullable', 'string', 'max:80'],
             'force' => ['nullable', 'boolean'],
         ]);
 
         $imagePath = null;
         if (! empty($data['image_url'])) {
             $imagePath = $this->resolveImagePath($data['image_url']);
+        } elseif (! empty($data['image_base64'])) {
+            // Ảnh vừa upload ở form (chưa lưu) → giải mã base64 ra file tạm để AI đọc được.
+            $imagePath = $this->storeBase64Image($data['image_base64'], (string) ($data['image_mime'] ?? 'image/jpeg'));
         }
 
         // Run INLINE (synchronous) with a hard total budget inside ProductAIService:
@@ -188,7 +193,39 @@ class AdminProductController extends Controller
                 'status' => 'error',
                 'error' => 'AI gặp lỗi kỹ thuật — vui lòng thử lại. ('.$e->getMessage().')',
             ], 500);
+        } finally {
+            // Dọn file tạm sinh từ base64 (không phải file gốc trong storage).
+            if (! empty($data['image_base64']) && $imagePath && is_file($imagePath)) {
+                @unlink($imagePath);
+            }
         }
+    }
+
+    /**
+     * Giải mã ảnh base64 (do Vue gửi từ file vừa chọn) ra một file tạm để vision đọc.
+     */
+    protected function storeBase64Image(string $base64, string $mime): ?string
+    {
+        $bin = base64_decode($base64, true);
+        if ($bin === false || $bin === '') {
+            return null;
+        }
+
+        $ext = match (true) {
+            str_contains($mime, 'png') => 'png',
+            str_contains($mime, 'webp') => 'webp',
+            str_contains($mime, 'gif') => 'gif',
+            default => 'jpg',
+        };
+
+        $tmp = tempnam(sys_get_temp_dir(), 'pai');
+        $path = $tmp.'.'.$ext;
+        @unlink($tmp);
+        if (file_put_contents($path, $bin) === false) {
+            return null;
+        }
+
+        return $path;
     }
 
     public function aiSuggestPoll(Request $request)
