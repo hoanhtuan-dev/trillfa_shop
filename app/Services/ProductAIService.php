@@ -511,12 +511,23 @@ class ProductAIService
                         'response_format' => ['type' => 'json_object'],
                     ]);
                 } catch (\Throwable $e) {
-                    // A network/timeout is NOT a permanent key failure — it usually
-                    // just means this model is slow for this kind of output. Try the
-                    // next model on the SAME key (a faster model may fit the budget)
-                    // and NEVER poison the key, otherwise the working vision key
-                    // would be dropped by a slow text attempt.
+                    // Network/timeout chưa chắc là lỗi vĩnh viễn của key — có thể chỉ là
+                    // model này chậm ở lượt này, nên vẫn thử model kế tiếp cùng key.
+                    // NHƯNG nếu cùng một key (cùng kind) timeout LIÊN TIẾP (host treo /
+                    // key chết), đánh dấu bad TẠM THỜI để các request sau bỏ qua ngay,
+                    // khỏi đốt ~30s chờ mỗi lần. Cache tách theo kind nên key text chậm
+                    // không ảnh hưởng vision.
                     $this->record('qwen', 'network/timeout ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
+
+                    $timeoutCountKey = 'product_ai_timeouts:'.$kind.':'.$keyId($key);
+                    $timeouts = (int) Cache::get($timeoutCountKey, 0) + 1;
+                    Cache::put($timeoutCountKey, $timeouts, 300);
+                    if ($timeouts >= 2) {
+                        Cache::put('product_ai_bad_key:'.$kind.':'.$keyId($key), true, 300);
+                        $this->record('qwen', 'key tạm bỏ qua sau '.$timeouts.' timeouts ('.$kind.', key '.$keyPrefix($key).')');
+
+                        continue 2; // bỏ qua key này ngay, sang key kế tiếp
+                    }
 
                     continue;
                 }
@@ -549,6 +560,7 @@ class ProductAIService
                     if ($json) {
                         Cache::put('product_ai_good_key:'.$kind, $keyId($key), 3600);
                         Cache::forget('product_ai_bad_key:'.$kind.':'.$keyId($key));
+                        Cache::forget('product_ai_timeouts:'.$kind.':'.$keyId($key));
                         $this->attempts[] = 'qwen: ok ('.$kind.', '.$model.', key '.$keyPrefix($key).')';
 
                         return $json;
@@ -556,6 +568,17 @@ class ProductAIService
                     $this->record('qwen', 'empty/invalid JSON ('.$kind.', '.$model.')');
 
                     return null;
+                }
+
+                // 401/403 = key KHÔNG hợp lệ/hết hạn (vd key Token-Plan sk-sp-… bị thu hồi).
+                // Đây là lỗi CỦA RIÊNG KEY NÀY, không phải lỗi provider → đánh dấu key hỏng
+                // và thử key kế tiếp (pay-go chẳng hạn). TRƯỚC ĐÂY return null ngay khiến
+                // cả provider chết theo: tinh chỉnh hỏng dù vẫn còn key chạy được.
+                if ($status === 401 || $status === 403) {
+                    Cache::put('product_ai_bad_key:'.$kind.':'.$keyId($key), true, 600);
+                    $this->record('qwen', 'HTTP '.$status.' invalid key ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
+
+                    continue 2;
                 }
 
                 $this->record('qwen', 'HTTP '.$status.' ('.$kind.', '.$model.', key '.$keyPrefix($key).'): '.substr($body, 0, 120));
