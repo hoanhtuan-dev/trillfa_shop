@@ -48,14 +48,28 @@ const presets = [
   { id: 'studio-blush',  label: 'Hồng phấn',   color: '#ead3d5', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a dusty blush-pink seamless studio backdrop, soft warm diffuse lighting, fashion lookbook mood' },
 ];
 const activePreset = ref(null);
+// Tách prompt hiện tại thành mảng segment theo dấu chấm phẩy — giữ cả text do user tự gõ.
+// Mỗi chip thêm 1 segment; "bấm lại" sẽ gỡ segment đó ra. Nhiều chip có thể cùng active.
+function segmentList() {
+  return String(prompt.value || '').split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean);
+}
+function setSegments(list) {
+  // Ghép lại — loại segment rỗng + trùng lặp để prompt luôn sạch.
+  const seen = new Set();
+  const uniq = list.filter((s) => s && !seen.has(s) && seen.add(s));
+  prompt.value = uniq.join('; ');
+}
 function applyPreset(p) {
+  const list = segmentList();
   if (activePreset.value === p.id) {
-    activePreset.value = null;          // bấm lại → bỏ chọn (không xoá mô tả để user giữ lại)
+    // Bấm lại → gỡ segment nền studio này khỏi prompt (text/góc chụp khác còn nguyên).
+    setSegments(list.filter((s) => s !== p.prompt));
+    activePreset.value = null;
     return;
   }
+  if (!list.includes(p.prompt)) list.push(p.prompt); // chưa có → nối (không ghi đè)
+  setSegments(list);
   activePreset.value = p.id;
-  activeAngle.value = null;             // nhóm góc chụp và nền studio loại trừ nhau
-  prompt.value = p.prompt;
   similarity.value = p.similarity;
 }
 
@@ -97,13 +111,16 @@ const anglePresets = [
 ];
 const activeAngle = ref(null);
 function applyAngle(a) {
+  const list = segmentList();
   if (activeAngle.value === a.id) {
+    // Bấm lại → gỡ segment góc chụp này khỏi prompt (text/nền studio khác còn nguyên).
+    setSegments(list.filter((s) => s !== a.prompt));
     activeAngle.value = null;
     return;
   }
+  if (!list.includes(a.prompt)) list.push(a.prompt); // chưa có → nối (không ghi đè)
+  setSegments(list);
   activeAngle.value = a.id;
-  activePreset.value = null;            // nhóm góc chụp và nền studio loại trừ nhau
-  prompt.value = a.prompt;
   similarity.value = a.similarity;
 }
 
