@@ -13,7 +13,76 @@ use Illuminate\Support\Str;
 
 class AdminProductController extends Controller
 {
+    /**
+     * Single-page product manager: list + create/edit live in ONE Vue SPA.
+     * index / create / edit all render the same minimal view; the only
+     * difference is the boot `mode` (list | create | edit) + optional product.
+     */
     public function index(Request $request)
+    {
+        return $this->renderSpa($request, new Product(), 'list');
+    }
+
+    public function create(Request $request)
+    {
+        return $this->renderSpa($request, new Product(), 'create');
+    }
+
+    public function edit(Request $request, Product $product)
+    {
+        $product->load('variants');
+
+        return $this->renderSpa($request, $product, 'edit');
+    }
+
+    /**
+     * JSON feed for the SPA list (search / filter / paginate without reload).
+     */
+    public function data(Request $request)
+    {
+        return response()->json($this->listPayload($request));
+    }
+
+    /**
+     * JSON payload of a single product for the inline editor.
+     */
+    public function payload(Product $product)
+    {
+        $product->load('variants');
+
+        return response()->json($this->productPayload($product));
+    }
+
+    protected function renderSpa(Request $request, Product $product, string $mode)
+    {
+        $categories = Category::active()->orderBy('sort_order')->with('children')->get();
+
+        $boot = [
+            'mode' => $mode,
+            'product' => $product->exists ? $this->productPayload($product) : null,
+            'categories' => $categories->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'slug' => $c->slug,
+                'children' => $c->children->map(fn ($ch) => ['id' => $ch->id, 'name' => $ch->name])->values()->all(),
+            ])->values()->all(),
+            'ai' => [
+                'model' => (string) studio_config('qwen_prompt_model', 'qwen3.8-flash'),
+                'provider' => (string) studio_config('prompt_provider', 'qwen'),
+                'enabled' => true,
+            ],
+            'filters' => [
+                'q' => (string) $request->input('q'),
+                'category_id' => (string) $request->input('category_id'),
+                'status' => (string) $request->input('status'),
+            ],
+            'products' => $this->listPayload($request),
+        ];
+
+        return view('admin.products.index', compact('boot'));
+    }
+
+    protected function listPayload(Request $request): array
     {
         $query = Product::with('category', 'variants')->latest();
 
@@ -27,15 +96,35 @@ class AdminProductController extends Controller
             $query->where('is_active', $request->input('status') === 'active');
         }
 
-        $products = $query->paginate(15)->withQueryString();
-        $categories = Category::active()->get();
+        $products = $query->paginate(15);
 
-        return view('admin.products.index', compact('products', 'categories'));
+        return [
+            'data' => collect($products->items())->map(fn (Product $p) => $this->rowPayload($p))->values()->all(),
+            'current_page' => $products->currentPage(),
+            'last_page' => $products->lastPage(),
+            'per_page' => $products->perPage(),
+            'total' => $products->total(),
+            'from' => $products->firstItem(),
+            'to' => $products->lastItem(),
+        ];
     }
 
-    public function create()
+    protected function rowPayload(Product $p): array
     {
-        return $this->renderVue(new Product());
+        return [
+            'id' => $p->id,
+            'name' => $p->name,
+            'slug' => $p->slug,
+            'sku' => $p->sku,
+            'category' => $p->category?->name,
+            'image' => $p->image_url,
+            'price' => (float) $p->min_price,
+            'compare_price' => $p->in_sale ? (float) $p->compare_price : null,
+            'stock' => (int) $p->total_stock,
+            'variant_count' => $p->variants->count(),
+            'featured' => (bool) $p->featured,
+            'is_active' => (bool) $p->is_active,
+        ];
     }
 
     public function store(Request $request)
@@ -46,71 +135,7 @@ class AdminProductController extends Controller
         $this->saveImages($request, $product);
         $this->syncVariants($request, $product);
 
-        return redirect()->route('admin.products.index')->with('success', 'Đã tạo sản phẩm.');
-    }
-
-    public function edit(Product $product)
-    {
-        $product->load('variants');
-
-        return $this->renderVue($product);
-    }
-
-    /**
-     * Render the Vue product create/edit SPA (card-based, Studio + AI).
-     */
-    protected function renderVue(Product $product)
-    {
-        $categories = Category::active()->orderBy('sort_order')->with('children')->get();
-
-        return view('admin.products.vue', [
-            'boot' => [
-                'product' => $product->exists ? $this->productPayload($product) : null,
-                'categories' => $categories->map(fn ($c) => [
-                    'id' => $c->id,
-                    'name' => $c->name,
-                    'slug' => $c->slug,
-                    'children' => $c->children->map(fn ($ch) => ['id' => $ch->id, 'name' => $ch->name])->values()->all(),
-                ])->values()->all(),
-                'ai' => [
-                    'model' => (string) studio_config('qwen_prompt_model', 'qwen3.8-flash'),
-                    'provider' => (string) studio_config('prompt_provider', 'qwen'),
-                    'enabled' => true,
-                ],
-            ],
-        ]);
-    }
-
-    protected function productPayload(Product $product): array
-    {
-        return [
-            'id' => $product->id,
-            'name' => $product->name,
-            'slug' => $product->slug,
-            'sku' => $product->sku,
-            'brand' => $product->brand,
-            'category_id' => $product->category_id,
-            'short_description' => $product->short_description,
-            'description' => $product->description,
-            'price' => (float) $product->price,
-            'compare_price' => $product->compare_price !== null ? (float) $product->compare_price : null,
-            'cost_price' => $product->cost_price !== null ? (float) $product->cost_price : null,
-            'stock' => (int) $product->stock,
-            'featured' => (bool) $product->featured,
-            'is_active' => (bool) $product->is_active,
-            'meta_title' => $product->meta_title,
-            'meta_description' => $product->meta_description,
-            'tags' => (array) $product->tags,
-            'image' => $product->image_url,
-            'gallery' => $product->gallery_urls,
-            'variants' => $product->variants->map(fn ($v) => [
-                'name' => $v->name,
-                'sku' => $v->sku,
-                'price' => (float) $v->price,
-                'compare_price' => $v->compare_price !== null ? (float) $v->compare_price : null,
-                'stock' => (int) $v->stock,
-            ])->values()->all(),
-        ];
+        return $this->savedResponse($request, 'Đã tạo sản phẩm.');
     }
 
     /**
@@ -225,21 +250,70 @@ class AdminProductController extends Controller
         $this->saveImages($request, $product, true);
         $this->syncVariants($request, $product);
 
-        return redirect()->route('admin.products.index')->with('success', 'Đã cập nhật sản phẩm.');
+        return $this->savedResponse($request, 'Đã cập nhật sản phẩm.');
     }
 
-    public function destroy(Product $product)
+    public function destroy(Request $request, Product $product)
     {
         $product->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'ok', 'message' => 'Đã xóa sản phẩm.']);
+        }
 
         return redirect()->route('admin.products.index')->with('success', 'Đã xóa sản phẩm.');
     }
 
-    public function toggleActive(Product $product)
+    public function toggleActive(Request $request, Product $product)
     {
         $product->update(['is_active' => ! $product->is_active]);
 
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'ok', 'is_active' => (bool) $product->is_active]);
+        }
+
         return back()->with('success', 'Đã cập nhật trạng thái.');
+    }
+
+    protected function savedResponse(Request $request, string $message)
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'ok', 'message' => $message]);
+        }
+
+        return redirect()->route('admin.products.index')->with('success', $message);
+    }
+
+    protected function productPayload(Product $product): array
+    {
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'slug' => $product->slug,
+            'sku' => $product->sku,
+            'brand' => $product->brand,
+            'category_id' => $product->category_id,
+            'short_description' => $product->short_description,
+            'description' => $product->description,
+            'price' => (float) $product->price,
+            'compare_price' => $product->compare_price !== null ? (float) $product->compare_price : null,
+            'cost_price' => $product->cost_price !== null ? (float) $product->cost_price : null,
+            'stock' => (int) $product->stock,
+            'featured' => (bool) $product->featured,
+            'is_active' => (bool) $product->is_active,
+            'meta_title' => $product->meta_title,
+            'meta_description' => $product->meta_description,
+            'tags' => (array) $product->tags,
+            'image' => $product->image_url,
+            'gallery' => $product->gallery_urls,
+            'variants' => $product->variants->map(fn ($v) => [
+                'name' => $v->name,
+                'sku' => $v->sku,
+                'price' => (float) $v->price,
+                'compare_price' => $v->compare_price !== null ? (float) $v->compare_price : null,
+                'stock' => (int) $v->stock,
+            ])->values()->all(),
+        ];
     }
 
     protected function validated(Request $request): array
@@ -325,8 +399,9 @@ class AdminProductController extends Controller
 
     protected function syncVariants(Request $request, Product $product): void
     {
-        // Skip if no variants submitted.
-        if (! $request->filled('variants')) {
+        // The SPA always submits `sync_variants=1` so that removing every row
+        // also clears existing variants (an empty `variants` array is intentional).
+        if (! $request->boolean('sync_variants')) {
             return;
         }
 
