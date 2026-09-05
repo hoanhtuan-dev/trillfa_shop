@@ -65,10 +65,21 @@ class ImageAIService
             // A requested model that is itself edit-capable (e.g. qwen-image-3.0-pro picked in the
             // "Sửa ảnh" card) wins over the configured Qwen Edit model; anything else (text/vision
             // models, unknown ids) keeps the configured edit model so editing never breaks.
+            $configuredEdit = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
             $editModel = ($modelOverride && $this->isImageEditCapableModel($modelOverride))
                 ? $modelOverride
-                : null;
+                : $configuredEdit;
+            $triedModels = [$editModel];
             $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, null, $maskImage, $refImages);
+            // Model được chọn (vd qwen-image-3.0-pro) thất bại ở MỌI key (hết hạn mức, 403/404…) →
+            // tự fallback sang model Qwen Edit cấu hình — đúng cơ chế "tự chuyển sang model kế tiếp"
+            // của Tạo ảnh 2D. Hạn mức DashScope tính THEO MODEL nên model edit chuyên dụng
+            // (qwen-image-edit…) thường vẫn còn hạn mức khi model sinh ảnh đã hết.
+            if (! $edited && $editModel !== $configuredEdit && $this->isImageEditCapableModel($configuredEdit)) {
+                logger()->info('Inpaint: selected edit model failed, falling back to configured Qwen Edit model', ['from' => $editModel, 'to' => $configuredEdit]);
+                $triedModels[] = $configuredEdit;
+                $edited = $this->editImage($prompt, $baseImage, $configuredEdit, $faceRef, null, $maskImage, $refImages);
+            }
             if ($edited) {
                 // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
                 // về ĐÚNG kích thước ảnh nguồn để kết quả khớp khung hình ban đầu.
@@ -87,10 +98,14 @@ class ImageAIService
             // Inpaint must NOT silently fall through to text2image — that produces a brand-new image
             // instead of editing the source. Surface the real error so the user can fix the edit model.
             logger()->warning('Inpaint failed: edit model returned no result (no text2image fallback)', [
-                'model' => $editModel ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit'),
+                'models_tried' => $triedModels,
                 'err' => $this->dashscopeError,
             ]);
-            throw new \RuntimeException($this->dashscopeError ?: 'Không thể chỉnh sửa ảnh (model edit không trả kết quả). Kiểm tra model “Qwen Edit” trong Cài đặt và khoá “Qwen Edit” trong Quản lý API.');
+            $msg = $this->dashscopeError ?: 'Không thể chỉnh sửa ảnh (model edit không trả kết quả). Kiểm tra model “Qwen Edit” trong Cài đặt và khoá “Qwen Edit” trong Quản lý API.';
+            if (count($triedModels) > 1 || ($triedModels[0] ?? '') !== $configuredEdit) {
+                $msg .= ' (Đã thử: '.implode(' → ', $triedModels).')';
+            }
+            throw new \RuntimeException($msg);
         }
 
         // Unified, priority-driven model list: the requested (override) model first, then the default
@@ -638,8 +653,9 @@ class ImageAIService
         }
 
         // Edit (Inpaint) prioritises the Pay-As-You-Go credential (edit models usually live on the pay-go
-        // host), then falls back to Token Plan — via studio_qwen_credentials('edit').
-        $keys = studio_qwen_credentials('edit');
+        // host), then falls back to Token Plan — via studio_qwen_credentials('edit'). Pass the model so
+        // keys scoped to this exact model id also qualify.
+        $keys = studio_qwen_credentials('edit', $model);
 
         $last = null;
         foreach ($keys as $key) {
@@ -729,7 +745,14 @@ class ImageAIService
             if ($status === 401) {
                 continue; // invalid key -> try the next one
             }
-            break; // 429/… are host/model-level -> don't hammer other keys
+            // Hết hạn mức / bị throttle trên key NÀY (429, Throttling.AllocationQuota, FreeTierOnly):
+            // quota là theo TÀI KHOẢN — key khác (tài khoản khác) trong chuỗi có thể còn hạn mức,
+            // giống cơ chế tạo ảnh 2D vẫn thử lần lượt mọi key. Chỉ dừng khi KHÔNG phải lỗi quota.
+            if ($status === 429 || is_qwen_quota_error($last)) {
+                logger()->warning('Edit quota/rate-limit on key, trying next key', ['model' => $model, 'status' => $status, 'key_prefix' => substr($key, 0, 8), 'err' => $last]);
+                continue;
+            }
+            break; // lỗi host/model-level khác -> không đập các key còn lại
         }
 
         // Qwen Edit failed across all keys — try Gemini edit as fallback (multi-provider chain).
@@ -739,7 +762,10 @@ class ImageAIService
         if (str_contains($lowErr, 'arrearage') || str_contains($lowErr, 'overdue')) {
             $last = $this->dashscopeError = 'Tài khoản QwenCloud hết hạn thanh toán (Arrearage) — nạp tiền/thanh toán công nợ tại https://home.qwencloud.com rồi thử lại.';
         } elseif (str_contains($lowErr, 'quota') || str_contains($lowErr, 'throttling')) {
-            $last = $this->dashscopeError = 'Hạn mức tài khoản QwenCloud đã hết (Throttling/Quota). Vào https://home.qwencloud.com gia hạn hạn mức rồi thử lại.';
+            $last = $this->dashscopeError = 'Hạn mức tài khoản QwenCloud đã hết (Throttling/Quota) cho model “'.$model.'”. '
+                .'Vào https://home.qwencloud.com gia hạn hạn mức rồi thử lại. '
+                .'Lưu ý: hạn mức tính THEO MODEL — nếu đang dùng model sinh ảnh (vd qwen-image-3.0-pro) để chỉnh sửa, '
+                .'hãy chọn model edit chuyên dụng khác trong card Sửa ảnh (vd qwen-image-edit, qwen-image-edit-plus).';
         }
         if ($maskImage && ($geminiKey = studio_api_key('gemini'))) {
             logger()->info('Edit: Qwen failed, falling back to Gemini edit');

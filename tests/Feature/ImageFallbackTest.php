@@ -12,11 +12,51 @@ class ImageFallbackTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Real PNG files created for edit tests (imageDataUri/storeRemoteImage read the filesystem). */
+    private array $tempFiles = [];
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed();
         Storage::fake('public');
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tempFiles as $abs) {
+            if (is_file($abs)) {
+                @unlink($abs);
+            }
+        }
+        $this->tempFiles = [];
+        parent::tearDown();
+    }
+
+    /** Create a real 64x64 PNG under storage/app/public; returns [relative, absolute] paths. */
+    private function makeRealPng(string $name): array
+    {
+        $rel = 'studio/'.$name;
+        $abs = storage_path('app/public/'.$rel);
+        if (! is_dir(dirname($abs))) {
+            mkdir(dirname($abs), 0777, true);
+        }
+        $im = imagecreatetruecolor(64, 64);
+        imagepng($im, $abs);
+        imagedestroy($im);
+        $this->tempFiles[] = $abs;
+
+        return [$rel, $abs];
+    }
+
+    /** Fake DashScope edit success whose "remote" result image is a local file:// URL. */
+    private function editSuccessResponse(string $absFile): \GuzzleHttp\Promise\PromiseInterface
+    {
+        return Http::response([
+            'output' => ['choices' => [['message' => ['content' => [
+                ['image' => 'file://'.$absFile],
+            ]]]]],
+        ], 200);
     }
 
     public function test_qwen_key_failure_falls_back_to_gemini(): void
@@ -127,49 +167,123 @@ class ImageFallbackTest extends TestCase
         config(['studio.image_provider' => 'qwen']);
         config(['studio.qwen_key' => 'sk-ws-test-paygo']);
 
-        // Ảnh nguồn + ảnh "kết quả từ provider" phải tồn tại trên đĩa (imageDataUri /
-        // storeRemoteImage đọc qua filesystem thật, không qua Http fake).
-        $srcRel = 'studio/edit-src-'.uniqid().'.png';
-        $srcAbs = storage_path('app/public/'.$srcRel);
-        $outAbs = storage_path('app/public/studio/edit-out-'.uniqid().'.png');
-        foreach ([$srcAbs, $outAbs] as $abs) {
-            if (! is_dir(dirname($abs))) {
-                mkdir(dirname($abs), 0777, true);
+        [$srcRel] = $this->makeRealPng('edit-src-'.uniqid().'.png');
+        [, $outAbs] = $this->makeRealPng('edit-out-'.uniqid().'.png');
+
+        Http::fake([
+            'dashscope-intl.aliyuncs.com*' => $this->editSuccessResponse($outAbs),
+        ]);
+
+        $service = app(ImageAIService::class);
+        $url = $service->generate(
+            'change the dress color to red',
+            '/storage/'.$srcRel,
+            null, null, null, null,
+            'qwen', 'qwen-image-3.0-pro',
+        );
+
+        $this->assertIsString($url);
+        $this->assertSame('qwen-image-3.0-pro', $service->lastModel());
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'multimodal-generation/generation')
+                && $request['model'] === 'qwen-image-3.0-pro';
+        });
+    }
+
+    public function test_edit_fails_over_to_next_key_on_quota_error(): void
+    {
+        // Key 1 hết hạn mức (429 AllocationQuota) → phải thử key kế tiếp (tài khoản khác)
+        // thay vì dừng ở key đầu như trước đây (tạo ảnh 2D vốn đã thử cả chuỗi key).
+        config(['studio.image_provider' => 'qwen']);
+        config(['studio.qwen_key' => 'sk-ws-key-one']);
+        config(['studio.qwen_edit_key' => 'sk-ws-key-two']);
+
+        [$srcRel] = $this->makeRealPng('failover-src-'.uniqid().'.png');
+        [, $outAbs] = $this->makeRealPng('failover-out-'.uniqid().'.png');
+
+        Http::fake(function ($request) use ($outAbs) {
+            $auth = (string) ($request->header('Authorization')[0] ?? '');
+            if (str_contains($auth, 'sk-ws-key-one')) {
+                return Http::response(['code' => 'Throttling.AllocationQuota', 'message' => 'Allocation quota exhausted'], 429);
             }
-            $im = imagecreatetruecolor(64, 64);
-            imagepng($im, $abs);
-            imagedestroy($im);
-        }
+
+            return $this->editSuccessResponse($outAbs);
+        });
+
+        $service = app(ImageAIService::class);
+        $url = $service->generate(
+            'edit the dress',
+            '/storage/'.$srcRel,
+            null, null, null, null,
+            'qwen', 'qwen-image-3.0-pro',
+        );
+
+        $this->assertIsString($url);
+        $this->assertSame('qwen-image-3.0-pro', $service->lastModel());
+        // Cả 2 key đều được gọi: key 1 (429) rồi key 2 (thành công).
+        Http::assertSentCount(2);
+        Http::assertSent(function ($request) {
+            return str_contains((string) ($request->header('Authorization')[0] ?? ''), 'sk-ws-key-two')
+                && $request['model'] === 'qwen-image-3.0-pro';
+        });
+    }
+
+    public function test_inpaint_falls_back_to_configured_edit_model_on_quota(): void
+    {
+        // Model được chọn (qwen-image-3.0-pro) hết hạn mức ở MỌI key → tự fallback sang
+        // model Qwen Edit cấu hình (qwen-image-edit) — hạn mức DashScope tính theo model.
+        config(['studio.image_provider' => 'qwen']);
+        config(['studio.qwen_key' => 'sk-ws-test-paygo']);
+
+        [$srcRel] = $this->makeRealPng('fallback-src-'.uniqid().'.png');
+        [, $outAbs] = $this->makeRealPng('fallback-out-'.uniqid().'.png');
+
+        Http::fake(function ($request) use ($outAbs) {
+            if (($request->data()['model'] ?? '') === 'qwen-image-3.0-pro') {
+                return Http::response(['code' => 'Throttling.AllocationQuota', 'message' => 'quota exhausted'], 429);
+            }
+
+            return $this->editSuccessResponse($outAbs);
+        });
+
+        $service = app(ImageAIService::class);
+        $url = $service->generate(
+            'change the color',
+            '/storage/'.$srcRel,
+            null, null, null, null,
+            'qwen', 'qwen-image-3.0-pro',
+        );
+
+        $this->assertIsString($url);
+        // Kết quả do model edit cấu hình tạo ra, không phải model đã hết hạn mức.
+        $this->assertSame('qwen-image-edit', $service->lastModel());
+    }
+
+    public function test_inpaint_error_lists_all_tried_models_when_quota_exhausted(): void
+    {
+        // Mọi model/key đều hết hạn mức → lỗi phải nêu rõ chuỗi model đã thử để dễ chẩn đoán.
+        config(['studio.image_provider' => 'qwen']);
+        config(['studio.qwen_key' => 'sk-ws-test-paygo']);
+
+        [$srcRel] = $this->makeRealPng('allfail-src-'.uniqid().'.png');
+
+        Http::fake([
+            'dashscope-intl.aliyuncs.com*' => Http::response(['code' => 'Throttling.AllocationQuota', 'message' => 'quota exhausted'], 429),
+        ]);
+
+        $service = app(ImageAIService::class);
 
         try {
-            Http::fake([
-                'dashscope-intl.aliyuncs.com*' => Http::response([
-                    'output' => ['choices' => [['message' => ['content' => [
-                        ['image' => 'file://'.$outAbs],
-                    ]]]]],
-                ], 200),
-            ]);
-
-            $service = app(ImageAIService::class);
-            $url = $service->generate(
-                'change the dress color to red',
+            $service->generate(
+                'edit something',
                 '/storage/'.$srcRel,
                 null, null, null, null,
                 'qwen', 'qwen-image-3.0-pro',
             );
-
-            $this->assertIsString($url);
-            $this->assertSame('qwen-image-3.0-pro', $service->lastModel());
-            Http::assertSent(function ($request) {
-                return str_contains($request->url(), 'multimodal-generation/generation')
-                    && $request['model'] === 'qwen-image-3.0-pro';
-            });
-        } finally {
-            foreach ([$srcAbs, $outAbs] as $abs) {
-                if (is_file($abs)) {
-                    @unlink($abs);
-                }
-            }
+            $this->fail('Expected RuntimeException for exhausted quota.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Hạn mức', $e->getMessage());
+            $this->assertStringContainsString('Đã thử: qwen-image-3.0-pro → qwen-image-edit', $e->getMessage());
         }
     }
 }
