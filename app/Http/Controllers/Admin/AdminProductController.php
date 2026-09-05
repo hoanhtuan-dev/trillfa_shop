@@ -166,7 +166,7 @@ class AdminProductController extends Controller
         // qwen3.8-flash works fast, and the bounded attempts + per-call timeout +
         // wall-clock deadline guarantee a result well under the gateway 504 limit.
         // This removes the fragile queue-worker + poll dependency on shared hosting.
-        @set_time_limit(90);
+        @set_time_limit(120);
 
         try {
             /** @var \App\Services\ProductAIService $service */

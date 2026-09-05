@@ -834,9 +834,15 @@ function is_qwen_vision_capable(?string $model): bool
     }
     $m = strtolower(trim($model));
 
+    // Chỉ nhận model Qwen (qwen-… / qvq-… / qwq-…). Chặn mọi tên model của provider
+    // khác (gemini-…, gpt-…, deepseek-…, flux-…, wan-…, kling-…, veo-…) — nếu admin
+    // lỡ nhập sai vào danh sách Qwen, nó sẽ không bị gửi sang host Qwen gây "model not found".
+    if (! str_starts_with($m, 'qwen') && ! str_starts_with($m, 'qvq') && ! str_starts_with($m, 'qwq')) {
+        return false;
+    }
+
     if (preg_match('/(^|[\-_.])(image|img)(edit)?([\-_.]|$)/', $m)
         || str_contains($m, 'wanx')
-        || str_contains($m, 'deepseek')
         || str_contains($m, 'videogen')
         || str_contains($m, 'taichu')
         || str_contains($m, 'embedding')

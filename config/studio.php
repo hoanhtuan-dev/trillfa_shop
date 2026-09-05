@@ -108,7 +108,7 @@ return [
         'downscale_max' => (int) env('STUDIO_PRODUCT_AI_DOWNSCALE_MAX', 640),
         'cache_ttl_hours' => (int) env('STUDIO_PRODUCT_AI_CACHE_TTL_HOURS', 720), // 30 ngày
         'temperature' => (float) env('STUDIO_PRODUCT_AI_TEMPERATURE', 0.7),
-        'max_tokens' => (int) env('STUDIO_PRODUCT_AI_MAX_TOKENS', 1200), // TEXT (content + SEO)
+        'max_tokens' => (int) env('STUDIO_PRODUCT_AI_MAX_TOKENS', 700), // output vừa phải để host token-plan/paygo trả về kịp (không timeout)
         'vision_max_tokens' => (int) env('STUDIO_PRODUCT_AI_VISION_MAX_TOKENS', 400), // VISION (chỉ hiểu ảnh — rẻ & nhanh)
     ],
 

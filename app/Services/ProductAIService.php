@@ -341,7 +341,6 @@ class ProductAIService
                     $resp = Http::withToken($key)->timeout($this->remainingTimeout())->post($base.'/chat/completions', [
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => $content]],
-                        'temperature' => $this->temperature,
                         'max_tokens' => $maxTokens ?? ($kind === 'vision' ? $this->visionMaxTokens : $this->maxTokens),
                         'response_format' => ['type' => 'json_object'],
                     ]);
@@ -517,35 +516,21 @@ class ProductAIService
             : 'dựa trên phân tích ảnh + thông tin người dùng';
 
         return <<<PROMPT
-Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Viết mô tả sản phẩm CHUẨN NGÀNH, có cấu trúc rõ ràng, không sáo rỗng, {$basis}.
+Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Viết NGẮN GỌN nhưng hấp dẫn, {$basis}.
 {$img}
 {$refine}
 
-Thông tin người dùng đã nhập:
-- Tên gợi ý: {$name}
-- Danh mục: {$category}
-- Thương hiệu: {$brand}
-- Ý tưởng/điểm nhấn: {$hint}
+Thông tin người dùng: Tên={$name} · Danh mục={$category} · Thương hiệu={$brand} · Ý tưởng={$hint}
 
-QUAN TRỌNG — mô tả chi tiết (key "description") phải là HTML có cấu trúc gồm CÁC MỤC (dùng <h3> mục + <ul><li>/<p>), bao phủ những gì người mua cần biết về một sản phẩm thời trang chuẩn ngành, ví dụ:
-- **Phong cách**: phong cách/đặc tính chính (tối giản, thanh lịch, năng động…)
-- **Loại trang phục / dáng**: (đầm, áo sơ mi, quần…) + dáng/kiểu dáng, form
-- **Chất liệu & chất lượng**: chất liệu chính, cảm giác, độ bền, thoáng mát…
-- **Màu sắc / họa tiết**: từ phân tích ảnh
-- **Thiết kế chi tiết**: cổ tay, cúc, túi, đường may, chi tiết nổi bật
-- **Phù hợp**: dịp/phong cách phối đồ (công sở, dạo phố, dự tiệc, mùa hè…)
-- **Bảo quản & lưu ý**: giặt, ủi, bảo quản, hướng dẫn size
-- Một câu cảm xúc / câu chuyện thương hiệu ngắn, khác biệt.
-
-Chỉ TRẢ VỀ JSON hợp lệ (không markdown, không giải thích):
+Trả về JSON hợp lệ DUY NHẤT (không markdown, không giải thích):
 {
-  "suggested_name": "tên sản phẩm hấp dẫn (<=80 ký tự)",
-  "brand": "thương hiệu (giữ nguyên nếu có, nếu không gợi ý)",
-  "short_description": "1-2 câu mô tả ngắn, hấp dẫn (<=160 ký tự)",
-  "description": "<h3>Phong cách</h3><p>...</p><h3>Chất liệu</h3><ul><li>...</li></ul>... (đầy đủ các mục trên, ~180-250 từ)",
-  "meta_title": "SEO title <=60 ký tự",
-  "meta_description": "SEO description 120-160 ký tự",
-  "tags": ["tag1","tag2","tag3","tag4"]
+  "suggested_name": "tên hấp dẫn <=80 ký tự",
+  "brand": "thương hiệu",
+  "short_description": "1-2 câu <=160 ký tự",
+  "description": "HTML ngắn: 4-5 mục <h3> (Phong cách / Chất liệu / Màu sắc / Phù hợp / Bảo quản) + <p>/<ul><li>, tổng ~120-150 từ",
+  "meta_title": "SEO <=60 ký tự",
+  "meta_description": "SEO 120-160 ký tự",
+  "tags": ["3-4 tag"]
 }
 PROMPT;
     }
