@@ -956,6 +956,63 @@ class ShopFlowTest extends TestCase
         $this->assertArrayNotHasKey('tryon_batch', $g0->meta ?? []);
     }
 
+    public function test_studio_outfit_settings_save_and_reload(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Chưa có dữ liệu → GET trả mặc định (không 500).
+        $this->getJson('/studio/outfit-settings')->assertOk()
+            ->assertJson(['style' => '', 'ornament_level' => 0, 'creative_level' => 8, 'presets' => []]);
+
+        // Lưu cài đặt + preset → ok:true, phản hồi đúng payload.
+        $this->postJson('/studio/outfit-settings', [
+            'style' => 'minimal chic',
+            'ornament_level' => 2,
+            'creative_level' => 7,
+            'presets' => [
+                ['name' => 'Sang trọng tối giản', 'style' => 'minimal', 'ornament' => 1, 'creative' => 8],
+                ['name' => 'Bold', 'style' => 'bold', 'ornament' => 9, 'creative' => 6],
+            ],
+        ])->assertOk()->assertJsonPath('ok', true)
+            ->assertJsonPath('style', 'minimal chic')
+            ->assertJsonPath('ornament_level', 2)
+            ->assertJsonPath('creative_level', 7)
+            ->assertJsonCount(2, 'presets');
+
+        // Reload → đọc lại đúng những gì đã lưu (upsert theo user).
+        $this->getJson('/studio/outfit-settings')->assertOk()
+            ->assertJsonPath('style', 'minimal chic')
+            ->assertJsonPath('ornament_level', 2)
+            ->assertJsonPath('creative_level', 7)
+            ->assertJsonCount(2, 'presets')
+            ->assertJsonPath('presets.0.name', 'Sang trọng tối giản');
+
+        $row = \App\Models\StudioOutfitSetting::where('user_id', $admin->id)->first();
+        $this->assertNotNull($row);
+        $this->assertSame('minimal chic', $row->style);
+        $this->assertCount(2, $row->presets);
+
+        // Cập nhật lần 2 → vẫn chỉ 1 dòng (unique user_id), presets thay thế.
+        $this->postJson('/studio/outfit-settings', [
+            'style' => 'updated',
+            'ornament_level' => 4,
+            'creative_level' => 5,
+            'presets' => [['name' => 'Chỉ còn một', 'style' => '', 'ornament' => 0, 'creative' => 8]],
+        ])->assertOk();
+        $this->assertSame(1, \App\Models\StudioOutfitSetting::where('user_id', $admin->id)->count());
+        $this->assertSame('updated', $row->fresh()->style);
+
+        // Preset thiếu name → 422 (không 500).
+        $this->postJson('/studio/outfit-settings', [
+            'style' => 'x', 'presets' => [['style' => 'no-name']],
+        ])->assertStatus(422);
+
+        // Studio chỉ dành cho team admin — user thường bị chặn (403), không nhìn thấy cài đặt.
+        $customer = User::where('email', 'customer@trillfa.com')->first();
+        $this->actingAs($customer)->getJson('/studio/outfit-settings')->assertForbidden();
+    }
+
     public function test_studio_preset_manager_and_references(): void
     {
         $customer = User::where('email', 'customer@trillfa.com')->first();

@@ -682,17 +682,26 @@ class StudioController extends Controller
     /**
      * GET /studio/outfit-settings — cài đặt Ghép Trang Phục của người dùng hiện tại
      * (phong cách + mức trang trí + mức sáng tạo + danh sách preset). Chưa có → trả mặc định.
+     * Hỏng bảng dữ liệu (chưa migrate) → trả thông báo rõ ràng thay vì 500 mù.
      */
     public function outfitSettings()
     {
-        $s = \App\Models\StudioOutfitSetting::where('user_id', auth()->id())->first();
+        try {
+            $s = \App\Models\StudioOutfitSetting::where('user_id', auth()->id())->first();
 
-        return response()->json([
-            'style' => $s->style ?? '',
-            'ornament_level' => $s->ornament_level ?? 0,
-            'creative_level' => $s->creative_level ?? 8,
-            'presets' => $s->presets ?? [],
-        ]);
+            return response()->json([
+                'style' => $s->style ?? '',
+                'ornament_level' => $s->ornament_level ?? 0,
+                'creative_level' => $s->creative_level ?? 8,
+                'presets' => $s->presets ?? [],
+            ]);
+        } catch (\Throwable $e) {
+            logger()->error('outfitSettings failed', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'message' => 'Không đọc được cài đặt Ghép Trang Phục (bảng dữ liệu chưa được tạo?). Chạy lệnh: php artisan migrate --force',
+            ], 500);
+        }
     }
 
     /**
@@ -720,15 +729,23 @@ class StudioController extends Controller
             ];
         }, $data['presets'] ?? []));
 
-        $s = \App\Models\StudioOutfitSetting::updateOrCreate(
-            ['user_id' => auth()->id()],
-            [
-                'style' => trim((string) ($data['style'] ?? '')),
-                'ornament_level' => (int) ($data['ornament_level'] ?? 0),
-                'creative_level' => (int) ($data['creative_level'] ?? 8),
-                'presets' => $presets,
-            ],
-        );
+        try {
+            $s = \App\Models\StudioOutfitSetting::updateOrCreate(
+                ['user_id' => auth()->id()],
+                [
+                    'style' => trim((string) ($data['style'] ?? '')),
+                    'ornament_level' => (int) ($data['ornament_level'] ?? 0),
+                    'creative_level' => (int) ($data['creative_level'] ?? 8),
+                    'presets' => $presets,
+                ],
+            );
+        } catch (\Throwable $e) {
+            logger()->error('saveOutfitSettings failed', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'message' => 'Không lưu được cài đặt Ghép Trang Phục (bảng dữ liệu chưa được tạo?). Chạy lệnh: php artisan migrate --force',
+            ], 500);
+        }
 
         return response()->json([
             'ok' => true,

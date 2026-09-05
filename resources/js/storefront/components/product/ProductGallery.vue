@@ -22,6 +22,7 @@ const ZOOM = 2.2;
 const frame = ref(null);
 const zoomed = ref(false);
 const origin = ref({ x: 50, y: 50 });
+const imgRatio = ref(null);       // tỉ lệ tự nhiên của ảnh đang hiển thị
 const finePointer = ref(true);   // mouse/trackpad (hover) vs touch (tap)
 const reducedMotion = ref(false);
 
@@ -34,7 +35,22 @@ onMounted(() => {
 watch(() => props.src, () => {
     zoomed.value = false;
     origin.value = { x: 50, y: 50 };
+    imgRatio.value = null; // chờ ảnh mới load để đo lại tỉ lệ
 });
+
+// Khung ôm khít theo tỉ lệ tự nhiên của ảnh: ảnh luôn "fit" trọn vẹn trong
+// khung (object-contain), không bị cắt, không phải nền thừa. Khi chưa biết
+// tỉ lệ (đang tải) tạm dùng 4/5.
+function onLoad(e) {
+    const el = e.currentTarget;
+    if (el && el.naturalWidth && el.naturalHeight) {
+        imgRatio.value = el.naturalWidth / el.naturalHeight;
+    }
+}
+
+function onError() {
+    imgRatio.value = null;
+}
 
 // Vị trí con trỏ dạng % so với khung ảnh (bị chặn trong [0, 100]).
 function position(e) {
@@ -98,9 +114,11 @@ const imgStyle = computed(() => ({
     willChange: 'transform',
 }));
 
+// Khung theo tỉ lệ ảnh; chặn nhẹ để ảnh siêu dài không phá bố cục trang
+// (khi bị chặn, object-contain vẫn đảm bảo toàn bộ ảnh hiển thị).
 const frameStyle = computed(() => ({
-    aspectRatio: '4 / 5',
-    maxHeight: 'min(72vh, 44rem)',
+    aspectRatio: imgRatio.value && imgRatio.value > 0 ? String(imgRatio.value) : '4 / 5',
+    maxHeight: 'min(92vh, 60rem)',
 }));
 
 const hintText = computed(() => (finePointer.value ? 'Di chuột để phóng to' : 'Chạm để phóng to'));
@@ -129,6 +147,8 @@ const hintText = computed(() => (finePointer.value ? 'Di chuột để phóng to
             class="h-full w-full object-contain"
             draggable="false"
             :style="imgStyle"
+            @load="onLoad"
+            @error="onError"
         />
 
         <!-- Gợi ý zoom (ẩn nhẹ khi đang phóng) -->
