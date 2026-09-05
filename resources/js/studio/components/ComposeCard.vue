@@ -12,6 +12,10 @@ const creativeLevel = ref(6);   // mức độ sáng tạo (1–10) — dùng ch
 const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
 const ornamentLevel = ref(3);   // mức độ trang trí (0–10; 0 = tối giản, 10 = cầu kỳ) — dùng cho chế độ Ghép Trang Phục
 const busy = ref(false);
+const previewOpen = ref(false);
+const previewPrompt = ref('');
+const previewLoading = ref(false);
+const previewDirty = ref(false);
 const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
 const open = ref(false);
 const uploading = ref(false);
@@ -161,10 +165,40 @@ async function run() {
     finalPrompt += '. Pose detail: ' + selected.value[1].skeleton;
   }
   busy.value = true;
-  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, creativeLevel.value, style.value, ornamentLevel.value);
+  const override = previewDirty.value ? previewPrompt.value : '';
+  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, creativeLevel.value, style.value, ornamentLevel.value, override);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
+
+// ── Xem trước / chỉnh tay prompt ──
+function togglePreview() {
+  previewOpen.value = !previewOpen.value;
+  if (previewOpen.value) loadPreview();
+}
+
+async function loadPreview() {
+  if (selectedCount.value < 2) { store.toast('Chọn ít nhất 2 ảnh để xem trước prompt.', 'error'); return; }
+  previewLoading.value = true;
+  try {
+    const urls = selectedImgs.value.map(g => g.url).filter(Boolean);
+    const res = await fetch('/studio/compose/preview', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ images: urls, prompt: prompt.value, mode: mode.value, creative_level: creativeLevel.value, style: style.value, ornament_level: ornamentLevel.value }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.message || 'Không tải được bản xem trước prompt.');
+    previewPrompt.value = d.prompt || '';
+    previewDirty.value = false;
+  } catch (e) {
+    store.toast(e.message || 'Lỗi tải bản xem trước prompt.', 'error');
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
+function onPreviewEdit() { previewDirty.value = true; }
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
@@ -245,6 +279,22 @@ async function run() {
       <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
               :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="h-7 w-7 rounded-full font-semibold transition-colors">{{ n }}</button>
+    </div>
+
+    <!-- Xem trước / chỉnh tay prompt -->
+    <button @click="togglePreview" type="button" class="btn-outline mt-3 w-full whitespace-nowrap">
+      {{ previewOpen ? 'Ẩn xem trước prompt' : '👁 Xem trước prompt' }}
+    </button>
+    <div v-if="previewOpen" class="mt-2 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3">
+      <div class="mb-1.5 flex items-center justify-between gap-2">
+        <span class="text-[11px] font-semibold text-brand-200">Prompt sẽ gửi cho AI (chỉnh được)</span>
+        <button @click="loadPreview" :disabled="previewLoading" class="btn-ghost btn-sm shrink-0">{{ previewLoading ? 'Đang tải…' : 'Làm mới' }}</button>
+      </div>
+      <textarea v-model="previewPrompt" @input="onPreviewEdit" rows="6" class="input w-full !text-[11px] leading-relaxed" placeholder="Bấm Làm mới để lấy prompt hiện tại…"></textarea>
+      <p class="mt-1 text-[10px] leading-relaxed" :class="previewDirty ? 'text-amber-300' : 'text-cream-300/50'">
+        <span v-if="previewDirty">✓ Sẽ gửi bản prompt đã chỉnh này.</span>
+        <span v-else>Chưa chỉnh sửa — hệ thống tự dựng prompt từ các tùy chọn. Đổi tùy chọn/ảnh xong bấm "Làm mới".</span>
+      </p>
     </div>
 
     <button @click="run" :disabled="busy || selectedCount < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">

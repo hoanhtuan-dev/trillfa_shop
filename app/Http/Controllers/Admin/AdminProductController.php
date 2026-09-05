@@ -65,9 +65,15 @@ class AdminProductController extends Controller
                 'children' => $c->children->map(fn ($ch) => ['id' => $ch->id, 'name' => $ch->name])->values()->all(),
             ])->values()->all(),
             'ai' => [
-                'model' => (string) studio_config('qwen_prompt_model', 'qwen3.8-flash'),
-                'provider' => (string) studio_config('prompt_provider', 'qwen'),
-                'enabled' => true,
+                'enabled' => product_ai_enabled(),
+                'providers' => product_ai_providers(),
+                'provider' => product_ai_providers()[0] ?? 'qwen',
+                'model' => product_ai_qwen_text_models()[0] ?? 'qwen3.8-flash',
+                'gemini_model' => product_ai_gemini_text_model(),
+                'deepseek_model' => product_ai_deepseek_model(),
+                // True when at least one provider has a usable API key — the UI uses
+                // this to explain why it fell back to offline suggestions.
+                'has_keys' => (bool) (studio_api_key('qwen') || studio_api_key('dashscope') || studio_api_key('gemini') || studio_api_key('deepseek')),
             ],
             'filters' => [
                 'q' => (string) $request->input('q'),

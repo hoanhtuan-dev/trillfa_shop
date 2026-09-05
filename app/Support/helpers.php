@@ -925,25 +925,33 @@ if (! function_exists('product_ai_enabled')) {
 
 if (! function_exists('product_ai_providers')) {
     /**
-     * Thứ tự provider được thử (Qwen trước mặc định). Luôn đảm bảo có cả qwen + gemini
-     * trong danh sách hợp lệ; Qwen được đặt đầu nếu admin bỏ sót thứ tự.
+     * Thứ tự provider được thử (Qwen trước, rồi Gemini, rồi DeepSeek). DeepSeek chỉ
+     * làm TEXT (không vision) nên luôn được đặt sau cùng làm phương án rẻ/đáng tin cậy.
+     * Luôn đảm bảo danh sách hợp lệ đủ cả ba provider.
      */
     function product_ai_providers(): array
     {
-        $raw = array_values(array_filter(array_map('trim', explode(',', strtolower((string) product_ai_config('provider_order', 'qwen,gemini'))))));
+        $raw = array_values(array_filter(array_map('trim', explode(',', strtolower((string) product_ai_config('provider_order', 'qwen,gemini,deepseek'))))));
         $valid = [];
         foreach ($raw as $p) {
-            if (in_array($p, ['qwen', 'gemini'], true) && ! in_array($p, $valid, true)) {
+            if (in_array($p, ['qwen', 'gemini', 'deepseek'], true) && ! in_array($p, $valid, true)) {
                 $valid[] = $p;
             }
         }
-        foreach (['qwen', 'gemini'] as $p) {
+        foreach (['qwen', 'gemini', 'deepseek'] as $p) {
             if (! in_array($p, $valid, true)) {
                 $valid[] = $p;
             }
         }
 
         return $valid;
+    }
+}
+
+if (! function_exists('product_ai_deepseek_model')) {
+    function product_ai_deepseek_model(): string
+    {
+        return trim((string) product_ai_config('deepseek_model', config('studio.deepseek_model', 'deepseek-chat')));
     }
 }
 

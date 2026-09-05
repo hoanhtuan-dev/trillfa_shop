@@ -253,9 +253,19 @@ class ProductAIService
             if ($this->timedOut()) {
                 return null;
             }
-            $result = $provider === 'qwen'
-                ? $this->attemptQwen($kind, $prompt, $imagePath)
-                : $this->attemptGemini($kind, $prompt, $imagePath);
+
+            // DeepSeek is TEXT-ONLY: skip it for the vision stage (image analysis)
+            // instead of wasting budget probing a model that can't see images.
+            if ($provider === 'deepseek' && $imagePath !== null) {
+                continue;
+            }
+
+            $result = match ($provider) {
+                'qwen' => $this->attemptQwen($kind, $prompt, $imagePath),
+                'gemini' => $this->attemptGemini($kind, $prompt, $imagePath),
+                'deepseek' => $this->attemptDeepseek($kind, $prompt),
+                default => null,
+            };
 
             if (is_array($result)) {
                 return $result;
@@ -382,6 +392,52 @@ class ProductAIService
 
                 return null; // other error -> stop trying this provider
             }
+        }
+
+        return null;
+    }
+
+    protected function attemptDeepseek(string $kind, string $prompt): ?array
+    {
+        $key = studio_api_key('deepseek');
+        if (! $key) {
+            $this->record('deepseek', 'no deepseek key configured');
+
+            return null;
+        }
+
+        if ($this->timedOut()) {
+            $this->record('deepseek', 'budget exhausted ('.$kind.')');
+
+            return null;
+        }
+
+        $model = product_ai_deepseek_model();
+
+        try {
+            $resp = Http::withToken($key)->timeout($this->remainingTimeout())
+                ->post(deepseek_base_url($key).'/chat/completions', [
+                    'model' => $model,
+                    'messages' => [['role' => 'user', 'content' => $prompt]],
+                    'temperature' => $this->temperature,
+                    'max_tokens' => $this->maxTokens,
+                    'response_format' => ['type' => 'json_object'],
+                    'stream' => false,
+                ]);
+
+            if ($resp->ok()) {
+                $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
+                if ($json) {
+                    $this->attempts[] = 'deepseek: ok ('.$kind.', '.$model.')';
+
+                    return $json;
+                }
+                $this->record('deepseek', 'empty/invalid JSON ('.$kind.', '.$model.')');
+            } else {
+                $this->record('deepseek', 'HTTP '.$resp->status().' ('.$kind.', '.$model.'): '.substr((string) $resp->body(), 0, 120));
+            }
+        } catch (\Throwable $e) {
+            $this->record('deepseek', 'network/timeout ('.$kind.', '.$model.')');
         }
 
         return null;

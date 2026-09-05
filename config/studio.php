@@ -93,13 +93,14 @@ return [
     */
     'product_ai' => [
         'enabled' => (bool) env('STUDIO_PRODUCT_AI_ENABLED', true),
-        'provider_order' => env('STUDIO_PRODUCT_AI_PROVIDER_ORDER', 'qwen,gemini'), // qwen trước
+        'provider_order' => env('STUDIO_PRODUCT_AI_PROVIDER_ORDER', 'qwen,gemini,deepseek'), // qwen trước, deepseek cuối (text)
         'qwen_text_models' => env('STUDIO_PRODUCT_AI_QWEN_TEXT_MODELS', ''), // '' = theo studio_qwen_text_models
         'qwen_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_VISION_MODELS', ''), // '' = theo studio_suggest_qwen_models
         'qwen_paygo_text_models' => env('STUDIO_PRODUCT_AI_QWEN_PAYGO_TEXT_MODELS', ''), // '' = qwen-plus,turbo (dashscope-intl)
         'qwen_paygo_vision_models' => env('STUDIO_PRODUCT_AI_QWEN_PAYGO_VISION_MODELS', ''), // '' = qwen-vl-max,plus
         'gemini_text_model' => env('STUDIO_PRODUCT_AI_GEMINI_TEXT_MODEL', 'gemini-2.5-flash'),
         'gemini_vision_model' => env('STUDIO_PRODUCT_AI_GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
+        'deepseek_model' => env('STUDIO_PRODUCT_AI_DEEPSEEK_MODEL', 'deepseek-chat'),
         'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 30), // đủ cho call text ~15s (không cắt ngang như 12s cũ)
         'total_budget_seconds' => (int) env('STUDIO_PRODUCT_AI_TOTAL_BUDGET', 25), // trần tổng cho một lần bấm AI
         'max_models' => (int) env('STUDIO_PRODUCT_AI_MAX_MODELS', 2),

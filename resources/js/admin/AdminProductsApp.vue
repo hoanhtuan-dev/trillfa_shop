@@ -179,6 +179,11 @@ const submitting = ref(false);
 const editorTitle = computed(() => (editor.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'));
 const aiImageUrl = computed(() => coverUrl.value || existingCover.value || (gallery.value[0]?.url || ''));
 const coverPreview = computed(() => (removeCover.value ? '' : (coverFilePreview.value || coverUrl.value || existingCover.value || '')));
+const aiProvidersLabel = computed(() => {
+    const names = { qwen: 'Qwen', gemini: 'Gemini', deepseek: 'DeepSeek' };
+    return (ai.providers || []).map((p) => names[p] || p).join(' → ');
+});
+const aiApplied = ref([]);
 
 const sections = [
     { id: 'info', label: 'Thông tin' },
@@ -272,13 +277,14 @@ function closeEditor() {
 // ---------- AI suggest ----------
 function applyResult(r) {
     const d = r?.data || r || {};
-    if (d.suggested_name) editor.name = d.suggested_name;
-    if (d.brand) editor.brand = d.brand;
-    if (d.short_description) editor.short_description = d.short_description;
-    if (d.description) editor.description = d.description;
-    if (d.meta_title) editor.meta_title = d.meta_title;
-    if (d.meta_description) editor.meta_description = d.meta_description;
-    if (Array.isArray(d.tags) && d.tags.length) editor.tags = d.tags.join(', ');
+    aiApplied.value = [];
+    if (d.suggested_name) { editor.name = d.suggested_name; aiApplied.value.push('Tên'); }
+    if (d.brand) { editor.brand = d.brand; aiApplied.value.push('Thương hiệu'); }
+    if (d.short_description) { editor.short_description = d.short_description; aiApplied.value.push('Mô tả ngắn'); }
+    if (d.description) { editor.description = d.description; aiApplied.value.push('Mô tả chi tiết'); }
+    if (d.meta_title) { editor.meta_title = d.meta_title; aiApplied.value.push('Meta title'); }
+    if (d.meta_description) { editor.meta_description = d.meta_description; aiApplied.value.push('Meta description'); }
+    if (Array.isArray(d.tags) && d.tags.length) { editor.tags = d.tags.join(', '); aiApplied.value.push('Thẻ'); }
     return d;
 }
 
@@ -312,7 +318,7 @@ async function aiSuggest() {
         if (d.source === 'stub') {
             aiMsg.value = 'Dùng gợi ý offline' + (d.reason ? ' — ' + d.reason : '') + '.';
         } else {
-            aiMsg.value = 'Đã làm giàu bằng ' + (d.model || ai.model) + (d.image_analyzed ? ' · nhìn ảnh' : '');
+            aiMsg.value = 'Đã sinh nội dung bằng ' + (d.model || ai.model) + (d.image_analyzed ? ' · đã nhìn ảnh' : '') + (aiApplied.value.length ? ' · điền: ' + aiApplied.value.join(', ') : '');
         }
         forceReanalyze.value = false;
     } catch (e) {
@@ -700,7 +706,7 @@ onMounted(() => {
                 </span>
                 <div class="min-w-0 flex-1">
                   <p class="text-sm font-semibold text-ink-900">Gợi ý nội dung &amp; SEO bằng AI</p>
-                  <p class="text-xs text-ink-500">Model {{ ai.model }} ({{ ai.provider }}) — nhìn ảnh và làm giàu nội dung theo thông tin đã nhập.</p>
+                  <p class="text-xs text-ink-500">Chuỗi model: {{ aiProvidersLabel }} — nhìn ảnh rồi tự viết mô tả &amp; SEO.</p>
                 </div>
                 <input v-model="hint" placeholder="Ý tưởng / điểm nhấn…" class="w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-none sm:w-56" @keyup.enter="aiSuggest" />
                 <label v-if="aiImageUrl" class="flex shrink-0 items-center gap-1.5 text-xs text-ink-600"><input type="checkbox" v-model="forceReanalyze" class="h-3.5 w-3.5 accent-brand-600" /> Phân tích lại ảnh</label>
