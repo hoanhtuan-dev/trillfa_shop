@@ -34,6 +34,7 @@ class ProductAIService
     protected int $maxTokens;
     protected int $visionMaxTokens;
     protected int $refineCacheTtl;
+    protected int $refineStubCacheTtl;
 
     /** Hard wall-clock deadline for the whole operation (sync request must never 504). */
     private float $deadline = 0.0;
@@ -124,6 +125,8 @@ class ProductAIService
         // Cache ngắn (giây) cho các lần "tinh chỉnh" TRÙNG (cùng target + prompt +
         // cùng toàn bộ dữ liệu) → bấm lại chip/refresh trả về tức thì, không gọi model.
         $this->refineCacheTtl = max(0, (int) product_ai_config('refine_cache_ttl', 600));
+        // TTL cache cho kết quả THẤT BẠI (stub) — rất ngắn để sớm thử lại model.
+        $this->refineStubCacheTtl = max(0, (int) product_ai_config('refine_stub_cache_ttl', 20));
     }
 
     /**
@@ -338,8 +341,12 @@ class ProductAIService
         }
 
         $stub = $this->stubRefine($input, $imageAnalysis, $target);
-        if ($this->refineCacheTtl > 0) {
-            Cache::put($cacheKey, $stub, $this->refineCacheTtl);
+        // Kết quả THẤT BẠI chỉ cache rất ngắn (chống spam-click trong vài giây) —
+        // KHÔNG cache 10 phút như kết quả thật. Nếu không, sau khi quota/rate-limit
+        // hồi lại, mọi lần tinh chỉnh vẫn trả stub cũ → "sinh thì được mà tinh
+        // chỉnh thì không".
+        if ($this->refineStubCacheTtl > 0) {
+            Cache::put($cacheKey, $stub, $this->refineStubCacheTtl);
         }
 
         return $stub;
@@ -355,7 +362,7 @@ class ProductAIService
             'names' => max(96, (int) product_ai_config('refine_names_tokens', 500)),
             'name' => max(96, (int) product_ai_config('refine_name_tokens', 350)),
             'seo' => max(128, (int) product_ai_config('refine_seo_tokens', 650)),
-            'description' => max(256, (int) product_ai_config('refine_desc_tokens', 1400)),
+            'description' => max(256, (int) product_ai_config('refine_desc_tokens', 1500)),
             'desc_variants' => max(512, (int) product_ai_config('refine_desc_variants_tokens', 2000)),
             default => $this->maxTokens,
         };
@@ -518,9 +525,16 @@ class ProductAIService
                 $body = (string) $resp->body();
 
                 // 429 = rate/quota limit on this key -> remember it and skip to the next key.
+                // RateQuota (giới hạn tần suất) chỉ TẠM THỜI, hồi sau vài chục giây →
+                // backoff ngắn 45s; AllocationQuota (hết hạn mức thật) → backoff dài 600s.
+                // (Trước đây mọi 429 đều bị "cấm" 10 phút khiến tinh chỉnh chết lâu
+                // hơn nhiều so với generate chỉ vì studio chạy song song dính rate limit.)
                 if ($status === 429 || is_qwen_quota_error($body)) {
-                    Cache::put('product_ai_bad_key:'.$kind.':'.$keyId($key), true, 600);
-                    $this->record('qwen', '429/quota ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
+                    $lower = strtolower($body);
+                    $isRateLimit = str_contains($lower, 'ratelimit') || str_contains($lower, 'rate limit')
+                        || str_contains($lower, 'rate_limit') || str_contains($lower, 'ratequota');
+                    Cache::put('product_ai_bad_key:'.$kind.':'.$keyId($key), true, $isRateLimit ? 45 : 600);
+                    $this->record('qwen', ($isRateLimit ? '429 rate-limit' : '429/quota').' ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
 
                     continue 2;
                 }
@@ -829,8 +843,95 @@ PROMPT;
             return '"'.$inner.'"';
         }, $text);
         $json = json_decode((string) $repaired, true);
+        if (is_array($json)) {
+            return $json;
+        }
 
-        return is_array($json) ? $json : null;
+        // Output bị CẮT giữa chừng vì chạm max_tokens (rất hay gặp ở tinh chỉnh
+        // token thấp): đóng chuỗi/ngoặc còn thiếu, chặt bỏ mảnh cuối dang dở.
+        // Cứu được phần lớn kết quả thay vì fallback stub + tốn lượt gọi lại.
+        return $this->repairTruncatedJson($text);
+    }
+
+    /**
+     * Khôi phục JSON bị cắt cụt: đóng chuỗi/ngoặc đang mở, bỏ mảnh cuối chưa
+     * hoàn chỉnh (key thiếu value, value dở dang), tối đa vài bước lùi.
+     */
+    protected function repairTruncatedJson(string $text): ?array
+    {
+        $candidate = trim($text);
+
+        for ($round = 0; $round < 6; $round++) {
+            $closed = $this->closeUnterminatedJson($candidate);
+            if ($closed !== null) {
+                $decoded = json_decode($closed, true);
+                if (is_array($decoded) && $decoded !== []) {
+                    return $decoded;
+                }
+            }
+
+            // Lùi về dấu phẩy cấu trúc gần nhất rồi thử lại.
+            $pos = strrpos($candidate, ',');
+            if ($pos === false || $pos < 1) {
+                return null;
+            }
+            $candidate = rtrim(substr($candidate, 0, $pos));
+        }
+
+        return null;
+    }
+
+    /** Đóng mọi chuỗi/ngoặc còn mở; trả về chuỗi JSON "đủ hình" hoặc null nếu rỗng. */
+    protected function closeUnterminatedJson(string $text): ?string
+    {
+        $stack = [];
+        $inStr = false;
+        $esc = false;
+
+        for ($i = 0, $n = strlen($text); $i < $n; $i++) {
+            $c = $text[$i];
+            if ($inStr) {
+                if ($esc) {
+                    $esc = false;
+                } elseif ($c === '\\') {
+                    $esc = true;
+                } elseif ($c === '"') {
+                    $inStr = false;
+                }
+
+                continue;
+            }
+            if ($c === '"') {
+                $inStr = true;
+            } elseif ($c === '{') {
+                $stack[] = '}';
+            } elseif ($c === '[') {
+                $stack[] = ']';
+            } elseif ($c === '}' || $c === ']') {
+                array_pop($stack);
+            }
+        }
+
+        if ($inStr) {
+            if ($esc) {
+                $text = substr($text, 0, -1); // bỏ escape dang dở
+            }
+            $text .= '"';
+        }
+
+        $text = rtrim($text);
+        if ($text === '' || $text === '{' || $text === '[') {
+            return null;
+        }
+        // Key vừa gõ xong nhưng chưa có value → gán chuỗi rỗng để JSON hợp lệ.
+        if (str_ends_with($text, ':')) {
+            $text .= '""';
+        }
+        while (str_ends_with($text = rtrim($text), ',')) {
+            $text = rtrim(substr($text, 0, -1));
+        }
+
+        return $text.implode('', array_reverse($stack));
     }
 
     protected function imageCacheKey(string $imagePath): string

@@ -445,8 +445,10 @@ async function refineTarget(target) {
     const prompt = (target === 'name' ? aiPrompts.name : target === 'description' ? aiPrompts.desc : aiPrompts.seo).trim();
     const d = await aiRefine(target, prompt || 'Hãy cải thiện nội dung ' + target + ' cho hấp dẫn và đúng giọng thương hiệu.');
     if (!d) return;
-    const applied = applyResult(d);
-    if (applied.length) toast('AI đã điền ' + targetLabel(target) + ': ' + applied.join(', '));
+    applyResult(d);
+    // applyResult trả về object dữ liệu (không có .length) — danh sách trường
+    // đã điền nằm trong aiApplied.
+    if (aiApplied.value.length) toast('AI đã điền ' + targetLabel(target) + ': ' + aiApplied.value.join(', '));
 }
 
 function targetLabel(t) {

@@ -208,7 +208,10 @@ class AdminProductController extends Controller
             $target = $data['target'] ?? null;
 
             // Tinh chỉnh theo mục tiêu: luôn kèm dữ liệu toàn cục + hồ sơ thương hiệu.
-            if (in_array($target, ['name', 'names', 'description', 'seo'], true)) {
+            // (desc_variants PHẢI ở đây — nếu rơi xuống nhánh generate() bên dưới,
+            // kết quả trả về schema đầy đủ không có key "variants" → UI báo
+            // "AI không tạo được phương án nào".)
+            if (in_array($target, ['name', 'names', 'description', 'desc_variants', 'seo'], true)) {
                 $imageAnalysis = null;
                 if ($imagePath && is_file($imagePath)) {
                     $imageAnalysis = $service->analyzeImage($imagePath, (bool) ($data['force'] ?? false));
