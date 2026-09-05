@@ -559,13 +559,20 @@ class StudioController extends Controller
         $base = $this->downscaleSource((string) ($data['images'][0] ?? ''), 1600);
         $cost = (int) studio_config('image_credits', 1);
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
+        $isOutfit = ($data['mode'] ?? '') === 'outfit';
 
         logger()->info('Compose mode', ['mode' => $data['mode'] ?? '', 'is_faceswap' => $parts['is_faceswap'], 'face_ref' => (bool) $parts['face_ref'], 'images' => count($data['images'])]);
 
         $items = [];
         for ($i = 0; $i < $variants; $i++) {
+            $variantPrompt = $finalPrompt;
+            // Biến thể theo trục (chỉ Ghép Trang Phục + prompt hệ thống + nhiều biến thể):
+            // mỗi biến thể nhận một hướng phom dáng / tâm trạng khác nhau để kết quả không trùng lặp.
+            if ($isOutfit && $override === '' && $variants > 1) {
+                $variantPrompt .= ' '.$this->outfitVariationDirective($i);
+            }
             $items[] = $this->queueGeneration('image', [
-                'prompt' => $finalPrompt,
+                'prompt' => $variantPrompt,
                 'base_image' => $base,
                 'edit' => true,
                 'ref_images' => $parts['remaining_refs'],
@@ -594,6 +601,7 @@ class StudioController extends Controller
             'images' => ['required', 'array', 'min:2', 'max:3'],
             'images.*' => ['string', 'max:2048'],
             'prompt' => ['required', 'string', 'max:4000'],
+            'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
             'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap,outfit'],
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'style' => ['nullable', 'string', 'max:400'],
@@ -602,7 +610,32 @@ class StudioController extends Controller
 
         $parts = $this->assembleComposePrompt($data);
 
-        return response()->json(['prompt' => $parts['prompt']]);
+        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
+        $isOutfit = ($data['mode'] ?? '') === 'outfit';
+        $axes = [];
+        if ($isOutfit && $variants > 1) {
+            for ($i = 0; $i < $variants; $i++) {
+                $axes[] = $this->outfitVariationDirective($i);
+            }
+        }
+
+        return response()->json(['prompt' => $parts['prompt'], 'axes' => $axes]);
+    }
+
+    /**
+     * Chỉ thị biến thể theo trục cho Ghép Trang Phục — mỗi biến thể một hướng
+     * phom dáng / tâm trạng riêng. Không đụng tới mức trang trí người dùng đã chọn
+     * (nên vẫn tôn trọng "Trang trí = 0"). Mỗi chỉ thị tách bạch, dễ đọc.
+     */
+    private function outfitVariationDirective(int $i): string
+    {
+        return match ($i % 4) {
+            0 => 'Variation A — classic tailored: clean structured silhouette, balanced proportions, timeless elegance.',
+            1 => 'Variation B — modern relaxed: softer drape, relaxed contemporary proportions, effortless chic.',
+            2 => 'Variation C — bold structured: sharp tailoring, architectural volume, high-impact editorial stance.',
+            3 => 'Variation D — soft fluid: draped flowing lines, graceful movement, romantic fluidity.',
+            default => '',
+        };
     }
 
     /**

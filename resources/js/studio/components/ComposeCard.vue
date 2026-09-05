@@ -16,6 +16,9 @@ const previewOpen = ref(false);
 const previewPrompt = ref('');
 const previewLoading = ref(false);
 const previewDirty = ref(false);
+const previewAxes = ref([]);
+const stylePresets = ref([]);   // preset phong cách (lưu localStorage)
+const presetName = ref('');
 const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
 const open = ref(false);
 const selected = ref([null, null, null]); // 3 slot cố định: image object hoặc null
@@ -110,6 +113,7 @@ function insertTag(tag) {
 
 onMounted(() => {
   timer = setInterval(() => { now.value = Date.now(); }, 1000);
+  loadPresets();
 });
 onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 
@@ -143,11 +147,12 @@ async function loadPreview() {
     const res = await fetch('/studio/compose/preview', {
       method: 'POST',
       headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ images: urls, prompt: prompt.value, mode: mode.value, creative_level: creativeLevel.value, style: style.value, ornament_level: ornamentLevel.value }),
+      body: JSON.stringify({ images: urls, prompt: prompt.value, mode: mode.value, creative_level: creativeLevel.value, style: style.value, ornament_level: ornamentLevel.value, variants: variants.value }),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d.message || 'Không tải được bản xem trước prompt.');
     previewPrompt.value = d.prompt || '';
+    previewAxes.value = Array.isArray(d.axes) ? d.axes : [];
     previewDirty.value = false;
   } catch (e) {
     store.toast(e.message || 'Lỗi tải bản xem trước prompt.', 'error');
@@ -157,6 +162,32 @@ async function loadPreview() {
 }
 
 function onPreviewEdit() { previewDirty.value = true; }
+
+// ── Preset phong cách (lưu localStorage) ──
+const PRESET_KEY = 'trillfa.studio.outfit.presets';
+function loadPresets() {
+  try { stylePresets.value = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); } catch (e) { stylePresets.value = []; }
+}
+function savePreset() {
+  const name = presetName.value.trim();
+  if (!name) { store.toast('Nhập tên preset.', 'error'); return; }
+  const p = { name, style: style.value, ornament: Number(ornamentLevel.value) ?? 3, creative: Number(creativeLevel.value) ?? 6 };
+  const i = stylePresets.value.findIndex((x) => x.name === name);
+  if (i >= 0) stylePresets.value[i] = p; else stylePresets.value.push(p);
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(stylePresets.value)); } catch (e) {}
+  presetName.value = '';
+  store.toast('Đã lưu preset "' + name + '".');
+}
+function applyPreset(p) {
+  style.value = p.style || '';
+  ornamentLevel.value = Number(p.ornament) ?? 3;
+  creativeLevel.value = Number(p.creative) ?? 6;
+  store.toast('Đã áp preset "' + p.name + '".');
+}
+function deletePreset(p) {
+  stylePresets.value = stylePresets.value.filter((x) => x.name !== p.name);
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(stylePresets.value)); } catch (e) {}
+}
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
