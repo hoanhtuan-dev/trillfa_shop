@@ -648,7 +648,9 @@ class StudioController extends Controller
             if ($style !== '') {
                 $finalPrompt .= ' The dominant creative direction is this style: "'.$style.'" — make it clearly visible in silhouette, fabric, color palette and detailing.';
             }
-            $finalPrompt .= ' Embellishment: '.$direction->embellishmentDescriptor($ornamentLevel).'.';
+            if ($ornamentLevel >= 1) {
+                $finalPrompt .= ' Embellishment: '.$direction->embellishmentDescriptor($ornamentLevel).'.';
+            }
             if (count($refs) > 1) {
                 $finalPrompt .= ' Place the finished outfit on a model standing in the background of @image3.';
             }

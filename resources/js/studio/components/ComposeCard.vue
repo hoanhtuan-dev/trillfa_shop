@@ -92,7 +92,7 @@ const slotRoles = computed(() => mode.value === 'tryon'
       : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
 const promptPlaceholder = computed(() => mode.value === 'outfit'
-  ? 'VD: lai tạo trang phục từ phom dáng của @image1 và họa tiết, màu sắc của @image2…'
+  ? 'VD: lai tạo trang phục từ phom dáng của @image1 và màu sắc của @image2…'
   : mode.value === 'tryon'
     ? 'VD: mặc @image1 lên người mẫu theo dáng @image2…'
     : mode.value === 'faceswap'
@@ -111,7 +111,7 @@ function setFaceSwap() {
 }
 function setOutfit() {
   mode.value = 'outfit';
-  prompt.value = 'lai tạo trang phục mới từ @image1 và @image2: hòa trộn các đặc điểm nổi bật của cả hai (phom dáng, chất liệu, họa tiết, màu sắc, chi tiết) thành biến thể thời trang mới, đúng chuẩn thiết kế thời trang chuyên nghiệp';
+  prompt.value = 'lai tạo trang phục mới từ @image1 và @image2: hòa trộn các đặc điểm nổi bật của cả hai (phom dáng, chất liệu, màu sắc, chi tiết) thành biến thể thời trang mới, đúng chuẩn thiết kế thời trang chuyên nghiệp';
   store.toast('Ghép Trang Phục: @image1 + @image2 = trang phục, @image3 = bối cảnh (tùy chọn).');
 }
 function setCompose() {

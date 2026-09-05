@@ -158,7 +158,7 @@
     "name": "useApi"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BQi9CcXO.css",
+    "file": "assets/app-CcEYjOnE.css",
     "name": "app",
     "names": [
       "app.css"
@@ -167,7 +167,7 @@
     "isEntry": true
   },
   "resources/js/admin/admin-product.js": {
-    "file": "assets/admin-product-DY_KovkC.js",
+    "file": "assets/admin-product-Ceg-Uq8V.js",
     "name": "admin-product",
     "src": "resources/js/admin/admin-product.js",
     "isEntry": true,
@@ -177,7 +177,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/admin-product-Y6Veg2-Y.css"
+      "assets/admin-product-CKpXYJWa.css"
     ]
   },
   "resources/js/app.js": {
@@ -330,7 +330,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-BFe3oPj5.js",
+    "file": "assets/app-CEjYCKl7.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,

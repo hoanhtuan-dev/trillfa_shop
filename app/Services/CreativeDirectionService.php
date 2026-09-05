@@ -289,7 +289,7 @@ class CreativeDirectionService
         $level = $this->clamp($level, 0, 10);
 
         return match (true) {
-            $level <= 0 => 'ultra-minimal and clean: no patterns, no rhinestones, no sequins, no beads, no embroidery — plain solid fabric only',
+            $level <= 0 => 'plain solid fabric, clean minimal design',
             $level <= 2 => 'minimal and understated: at most one delicate tonal trim; avoid heavy patterns, rhinestones and sequins',
             $level <= 4 => 'refined and tasteful: light, intentional detailing; a subtle pattern or single embellishment only where it supports the design; avoid clutter',
             $level <= 6 => 'balanced: decorative details allowed but tasteful; coherent pattern and restrained embellishment',
