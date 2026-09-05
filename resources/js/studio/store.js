@@ -330,10 +330,13 @@ export const useStudioStore = defineStore('studio', {
     // process=true (mặc định) chạy processQueue ngay sau khi tạo. Render đa góc truyền process=false
     // để tạo TẤT CẢ góc trước rồi gọi processQueue MỘT lần — tránh nhiều processQueue chạy song song,
     // cùng "nhặt" các generation đang chờ và xử lý lặp/đè nhau (gây tốn quota + lỗi "chỉ ra 1 ảnh").
-    async reimagine(image, prompt, similarity = 70, variants = 1, process = true) {
+    // model=null dùng Qwen Edit cấu hình; truyền {provider,model} để tôn trọng model đang chọn trên card.
+    async reimagine(image, prompt, similarity = 70, variants = 1, process = true, model = null) {
       if (!image || !(prompt || '').trim()) { this.toast('Chọn ảnh + nhập mô tả.', 'error'); return null; }
       try {
-        const d = await this.api('/studio/reimagine', { image, prompt, similarity: Number(similarity) || 70, variants: Number(variants) || 1 });
+        const payload = { image, prompt, similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
+        if (model && model.provider && model.model) { payload.provider = model.provider; payload.model = model.model; }
+        const d = await this.api('/studio/reimagine', payload);
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa tạo lại ảnh' }));
         if (items.length) this.setBatch(items.map(it => it.generation_id));
@@ -1613,7 +1616,10 @@ export const useStudioStore = defineStore('studio', {
     statusLabel(s) { return { pending: 'Đang chờ', processing: 'Đang xử lý', completed: 'Hoàn tất', failed: 'Lỗi', cancelled: 'Đã hủy' }[s] || s || ''; },
     // Lazy worker poll: theo dõi một generation qua /studio/generations/{id} (backend tự xử lý
     // job đang pending và tự "heal" job kẹt). Single-flight: không bao giờ gửi 2 request song song.
-    pollGeneration(id) {
+    // opts.select=false (Render đa góc): chỉ cập nhật trạng thái trong this.generations, KHÔNG
+    // tự select/đẩy layer canvas — để 4 góc không chèn 4 layer vào canvas đè lên nhau.
+    pollGeneration(id, opts = {}) {
+      const autoSelect = opts.select !== false;
       if (this._pollTimers[id]) return;
       const tick = async () => {
         try {
@@ -1628,7 +1634,7 @@ export const useStudioStore = defineStore('studio', {
             const isCompose = this.composeGenIds.length && this.composeGenIds.includes(Number(id));
             if (g.status === 'completed' && g.media_url) {
               if (isInpaint) { this.inpaintStage = 'done'; this.toast('✅ Đã sửa xong ảnh.'); }
-              this.select({ id: g.id, media_url: g.media_url, type: 'image', status: 'completed' });
+              if (autoSelect) this.select({ id: g.id, media_url: g.media_url, type: 'image', status: 'completed' });
             } else if (g.status === 'failed') {
               if (isInpaint) { this.inpaintStage = 'error'; this.inpaintError = g.error || 'Sửa ảnh thất bại.'; this.toast(this.inpaintError, 'error'); }
             } else {

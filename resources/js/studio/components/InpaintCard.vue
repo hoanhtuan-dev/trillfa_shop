@@ -15,34 +15,84 @@ function submitInpaint() {
 
 // ── Render đa góc: 4 slot tương ứng 4 góc chụp, người dùng bật/tắt + chỉnh prompt từng góc ──
 const mvOpen = ref(false);
-const mvBusy = ref(false);
+const mvBusy = ref(false);          // đang gửi các góc (tạo generation)
 const mvViews = ref([
-  { id: 'front', icon: 'pose', label: 'Chính diện', enabled: true, prompt: 'full-body front view, facing straight ahead' },
-  { id: 'back', icon: 'arrowRight', label: 'Mặt sau', enabled: true, prompt: 'full-body back view' },
-  { id: 'side', icon: 'columns', label: 'Nghiêng 45°', enabled: true, prompt: '45-degree side view, three-quarter angle' },
-  { id: 'detail', icon: 'search', label: 'Cận cảnh chi tiết', enabled: true, prompt: 'close-up detail of the fabric texture and stitching' },
+  { id: 'front', icon: 'pose', label: 'Chính diện', enabled: true, prompt: 'full-body front view, facing straight ahead', genId: null },
+  { id: 'back', icon: 'arrowRight', label: 'Mặt sau', enabled: true, prompt: 'full-body back view', genId: null },
+  { id: 'side', icon: 'columns', label: 'Nghiêng 45°', enabled: true, prompt: '45-degree side view, three-quarter angle', genId: null },
+  { id: 'detail', icon: 'search', label: 'Cận cảnh chi tiết', enabled: true, prompt: 'close-up detail of the fabric texture and stitching', genId: null },
 ]);
 const mvCount = computed(() => mvViews.value.filter(v => v.enabled).length);
 const srcImg = computed(() => store.upscaleSrc || store.preview?.media_url || '');
 
+// Model chỉnh sửa đang chọn trên card Sửa ảnh (null = mặc định Qwen Edit cấu hình).
+function selectedEditModel() {
+  if (!store.inpaintModel) return null;
+  const m = store.inpaintModels.find(o => o.provider + ':' + o.model === store.inpaintModel);
+  return m ? { provider: m.provider, model: m.model } : null;
+}
+// Prompt nguyên vẹn cho 1 góc (giữ chi tiết sản phẩm, chỉ đổi góc máy chụp).
+const mvPrompt = (v) => 'render this fashion product at a new camera angle — ' + v.prompt
+  + '. Keep the product, color, material, proportions and every detail exactly unchanged, no detail loss, crisp sharp, professional studio lighting';
+
+// Trạng thái từng góc — lấy trực tiếp từ store.generations (phản ứng qua pollGeneration).
+function viewStatus(v) {
+  if (v.busy) return 'sending';
+  if (!v.genId) return v.enabled ? 'idle' : 'off';
+  const g = store.generations.find(g => g.id === Number(v.genId));
+  return g?.status || 'pending';
+}
+const mvStatusLabel = (s) => ({ off: 'Tắt', idle: 'Chờ render', sending: 'Đang gửi', pending: 'Đang chờ', processing: 'Đang render', completed: 'Xong', failed: 'Lỗi' }[s] || s || '');
+const mvStatusClass = (s) => ({
+  off: 'bg-ink-700 text-cream-300/50', idle: 'bg-ink-700 text-cream-200',
+  sending: 'bg-amber-600/30 text-amber-200', pending: 'bg-amber-600/30 text-amber-200',
+  processing: 'bg-blue-600/30 text-blue-200', completed: 'bg-emerald-600/30 text-emerald-200',
+  failed: 'bg-red-600/30 text-red-200',
+}[s] || 'bg-ink-700 text-cream-300/50');
+
+const mvTotal = computed(() => mvViews.value.filter(v => v.enabled).length);
+const mvDone = computed(() => mvViews.value.filter(v => v.enabled && viewStatus(v) === 'completed').length);
+const mvFailed = computed(() => mvViews.value.filter(v => v.enabled && viewStatus(v) === 'failed').length);
+const mvRunning = computed(() => mvBusy.value || mvViews.value.some(v => v.enabled && ['sending','pending','processing'].includes(viewStatus(v))));
+
+// Render TẤT CẢ góc đang bật: tạo hết trước (process=false) rồi xử lý MỘT lần — tránh nhiều
+// processQueue song song cùng xử lý lặp 1 generation (tốn quota, chỉ ra 1 ảnh rồi lỗi).
+// Gom genId vào 1 batch → thanh biến thể hiện cả 4 góc; poll từng góc để cập nhật tiến độ.
 async function runMultiView() {
   const img = srcImg.value;
   if (!img) { store.toast('Chọn một ảnh để render đa góc.', 'error'); return; }
   const enabled = mvViews.value.filter(v => v.enabled);
   if (!enabled.length) { store.toast('Chọn ít nhất 1 góc chụp.', 'error'); return; }
   mvBusy.value = true;
-  // Tạo TẤT CẢ góc trước (process=false) rồi xử lý MỘT lần ở cuối — nếu mỗi reimagine tự gọi
-  // processQueue thì nhiều request /studio/process chạy song song, cùng nhặt các generation đang
-  // chờ và xử lý lặp/đè nhau → tốn quota, chỉ ra được 1 ảnh rồi báo lỗi.
+  enabled.forEach(v => { v.genId = null; });
+  const model = selectedEditModel();
+  const ids = [];
   for (const v of enabled) {
-    await store.reimagine(img,
-      'render this fashion product at a new camera angle — ' + v.prompt + '. Keep the product, color, material, proportions and every detail exactly unchanged, no detail loss, crisp sharp, professional studio lighting',
-      85, 1, false);
+    const items = await store.reimagine(img, mvPrompt(v), 85, 1, false, model);
+    if (items && items.length) { v.genId = items[0].generation_id; ids.push(items[0].generation_id); }
   }
-  await store.processQueue();
+  if (ids.length) store.setBatch(ids);      // gom thành 1 batch — thanh biến thể hiển thị cả 4 góc
+  await store.processQueue();               // xử lý tuần tự 1 lần (không chồng lặp)
+  ids.forEach(id => store.pollGeneration(id, { select: false }));  // cập nhật tiến độ từng góc
   mvBusy.value = false;
-  mvOpen.value = false;
-  store.toast('Đã render ' + enabled.length + ' góc chụp.');
+  store.toast('Đã gửi ' + ids.length + ' góc — đang render…');
+}
+
+// Render lại 1 góc (thường cho góc LỖI sau khi quota/key phục hồi): tạo + xử lý + poll riêng.
+async function renderOneView(v) {
+  const img = srcImg.value;
+  if (!img) { store.toast('Chọn một ảnh để render.', 'error'); return; }
+  if (!(v.prompt || '').trim()) { store.toast('Nhập mô tả góc chụp.', 'error'); return; }
+  v.busy = true; v.genId = null;
+  const model = selectedEditModel();
+  const items = await store.reimagine(img, mvPrompt(v), 85, 1, true, model);
+  if (items && items.length) {
+    v.genId = items[0].generation_id;
+    // giữ/ghép vào batch hiện có nếu có
+    if (!store.lastBatch.includes(items[0].generation_id)) store.setBatch([...store.lastBatch, items[0].generation_id]);
+    store.pollGeneration(v.genId, { select: false });
+  }
+  v.busy = false;
 }
 
 const now = ref(Date.now());
@@ -155,16 +205,28 @@ const defaultEditLabel = computed(() => {
               <StudioIcon v-if="v.enabled" name="check" size="h-3 w-3" />
             </button>
             <span class="flex items-center gap-1.5 font-semibold text-cream-100"><StudioIcon :name="v.icon" size="h-4 w-4" /> {{ v.label }}</span>
+            <span class="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold" :class="mvStatusClass(viewStatus(v))">{{ mvStatusLabel(viewStatus(v)) }}</span>
             <span class="ml-auto text-[10px] text-cream-300/60">Slot {{ i + 1 }}</span>
           </div>
           <input v-if="v.enabled" v-model="v.prompt" class="input mt-2 !py-1.5 !text-xs" placeholder="Mô tả góc chụp…">
+          <!-- Nút render lại riêng góc lỗi (sau khi quota/key phục hồi) -->
+          <button v-if="v.enabled && viewStatus(v) === 'failed'"
+                  @click="renderOneView(v)"
+                  class="mt-1.5 flex items-center gap-1 rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600 hover:text-white">
+            <StudioIcon name="refresh" size="h-3 w-3" /> Render lại góc này
+          </button>
         </div>
       </div>
 
-      <div class="mt-4 flex items-center justify-between">
-        <span class="text-xs text-cream-300/70">Đã chọn: <b class="text-brand-300">{{ mvCount }}/4 góc</b></span>
+      <div class="mt-4 flex items-center justify-between gap-3">
+        <span class="text-xs text-cream-300/70">
+          Đã chọn: <b class="text-brand-300">{{ mvCount }}/4 góc</b>
+          <span v-if="mvTotal && (mvDone || mvFailed) && !mvRunning" class="ml-1">
+            · <span class="text-emerald-300">{{ mvDone }} xong</span><span v-if="mvFailed" class="text-red-300"> · {{ mvFailed }} lỗi</span>
+          </span>
+        </span>
         <button @click="runMultiView" :disabled="mvBusy || !mvCount" class="btn-brand whitespace-nowrap">
-          {{ mvBusy ? 'Đang render…' : 'Render ' + mvCount + ' góc' }}
+          {{ mvBusy ? 'Đang gửi…' : 'Render ' + mvCount + ' góc' }}
         </button>
       </div>
     </BaseModal>

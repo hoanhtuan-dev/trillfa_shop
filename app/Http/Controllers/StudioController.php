@@ -425,6 +425,10 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'similarity' => ['nullable', 'integer', 'min:0', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
+            // Render đa góc / tôn trọng model đang chọn trên card Sửa ảnh: chỉ chấp nhận model
+            // edit-capable — queueGeneration sẽ tự ép về Qwen Edit cấu hình nếu model không hợp lệ.
+            'provider' => ['nullable', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:120'],
         ]);
 
         $sim = (int) ($data['similarity'] ?? 70);
@@ -435,6 +439,8 @@ class StudioController extends Controller
 
         $cost = (int) studio_config('image_credits', 1);
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
+        $model = trim((string) ($data['model'] ?? ''));
+        $provider = trim((string) ($data['provider'] ?? ''));
 
         $items = [];
         for ($i = 0; $i < $variants; $i++) {
@@ -442,6 +448,9 @@ class StudioController extends Controller
                 'prompt' => $finalPrompt,
                 'base_image' => $this->downscaleSource((string) $data['image'], 1600),
                 'edit' => true,
+                // Chỉ forward khi có giá trị — rỗng ⇒ queueGeneration dùng Qwen Edit mặc định.
+                'provider' => $provider !== '' ? $provider : null,
+                'model' => $model !== '' ? $model : null,
             ], $cost)->getData(true);
         }
 
