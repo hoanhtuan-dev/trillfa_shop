@@ -563,9 +563,10 @@ class StudioController extends Controller
         $cost = (int) studio_config('image_credits', 1);
         $mode = (string) ($data['mode'] ?? '');
         $isTryon = $mode === 'tryon';
-        // Thử đồ ảo: best_of = số bản candidates (2-6, mặc định theo config); biến thể thường khác.
+        // Thử đồ ảo: best_of = số bản candidates (2-6, mặc định theo config); nếu chỉ gửi variants
+        // (UI cũ) thì tôn trọng variants; biến thể cho chế độ thường giữ nguyên.
         $variants = $isTryon
-            ? max(1, min(6, (int) ($data['best_of'] ?? studio_config('tryon_best_of', 3))))
+            ? max(1, min(6, (int) ($data['best_of'] ?? $data['variants'] ?? studio_config('tryon_best_of', 3))))
             : max(1, min(4, (int) ($data['variants'] ?? 1)));
         $tryonScore = $isTryon && ($data['tryon_score'] ?? studio_config('tryon_score', true));
         $isOutfit = $mode === 'outfit';
@@ -582,11 +583,11 @@ class StudioController extends Controller
             if ($isOutfit && $override === '' && $variants > 1) {
                 $variantPrompt .= ' '.$this->outfitVariationDirective($i);
             }
-            // Thử đồ ảo best-of-N: mỗi candidate một dạng diễn đạt khác để tăng độ đa dạng
+            // Thử đồ ảo best-of-N: mỗi candidate một trọng tâm diễn đạt khác để tăng độ đa dạng
             // (model edit không deterministic — cùng prompt vẫn ra bản khác, nhưng variant giúp
-            // tránh trường hợp model "mắc kẹt" ở một kiểu lỗi chung).
+            // tránh trường hợp model "mắc kẹt" ở một kiểu lỗi chung). KHÔNG gợi ý thay đổi thiết kế.
             if ($isTryon && $variants > 1 && $override === '') {
-                $variantPrompt .= ' '.$this->outfitVariationDirective($i);
+                $variantPrompt .= ' '.$this->tryonVariationDirective($i);
             }
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $variantPrompt,
@@ -657,6 +658,23 @@ class StudioController extends Controller
             1 => 'Variation B — modern relaxed: softer drape, relaxed contemporary proportions, effortless chic.',
             2 => 'Variation C — bold structured: sharp tailoring, architectural volume, high-impact editorial stance.',
             3 => 'Variation D — soft fluid: draped flowing lines, graceful movement, romantic fluidity.',
+            default => '',
+        };
+    }
+
+    /**
+     * Chỉ thị biến thể cho Thử đồ ảo best-of-N: mỗi candidate nhấn một trọng tâm khác nhau
+     * (giữ đồ / đúng dáng / chân thực / bố cục) để model không "mắc kẹt" ở một kiểu lỗi chung —
+     * NHƯNG tuyệt đối KHÔNG gợi ý thay đổi thiết kế trang phục. Không dùng @imageN (đã đi qua
+     * tagMap) — chỉ nói chung chung bằng từ mô tả.
+     */
+    private function tryonVariationDirective(int $i): string
+    {
+        return match ($i % 4) {
+            0 => ' Emphasis: reproduce the garment EXACTLY — identical colors, prints, fabric, silhouette and length; then match the pose.',
+            1 => ' Emphasis: copy the outfit details 100% faithfully while accurately reproducing the body stance and proportions.',
+            2 => ' Emphasis: photorealistic natural blend — sharp face, coherent lighting, seamless garment fit, exact pose.',
+            3 => ' Emphasis: balanced fashion composition — clean full-body framing, natural pose, flawless garment rendering.',
             default => '',
         };
     }

@@ -9,6 +9,7 @@ import SectionHeading from './components/ui/SectionHeading.vue';
 import BaseButton from './components/ui/BaseButton.vue';
 import BaseBadge from './components/ui/BaseBadge.vue';
 import Icon from './components/ui/Icon.vue';
+import ProductGallery from './components/product/ProductGallery.vue';
 
 const store = useStorefrontStore();
 store.ensureBoot();
@@ -88,7 +89,7 @@ onMounted(() => {
                 <!-- Gallery -->
                 <div>
                     <div class="card-surface relative overflow-hidden rounded-[2rem]">
-                        <img :src="images[activeImg] || product.image" :alt="product.name" class="aspect-[4/5] w-full object-cover" />
+                        <ProductGallery :src="images[activeImg] || product.image" :alt="product.name" />
                         <BaseBadge v-if="onSale" variant="clay" class="absolute left-4 top-4">-{{ discount }}%</BaseBadge>
                         <button @click="toggleWishlist" class="glass-strong absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full text-ink-900 transition hover:scale-110" :class="store.wishlistHas(product.id) ? 'text-clay-500' : ''" aria-label="Yêu thích">
                             <Icon name="heart" :size="18" :fill="true" :stroke-width="0" />
