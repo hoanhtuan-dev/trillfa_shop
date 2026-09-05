@@ -8,6 +8,7 @@ import UpscaleCard from './components/UpscaleCard.vue';
 // [SWAP TẠM ẨN] import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
 import ComposeCard from './components/ComposeCard.vue';
+import RefImageCard from './components/RefImageCard.vue';
 import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import ContextToolbar from './components/ContextToolbar.vue';
@@ -98,7 +99,7 @@ function onHistoryKeys(e) {
   else if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); store.redo(); }
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
+const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, InpaintCard, RefImageCard, UpscaleCard] : [DirectorCard]); // [SWAP TẠM ẨN: bỏ SwapCard]
 
 // ── Layer editor (composite + transform) ──
 const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode);

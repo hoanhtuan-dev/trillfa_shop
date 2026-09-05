@@ -75,4 +75,51 @@ class StudioReimagineTest extends TestCase
         $this->assertSame('qwen-image-3.0-pro', $res->json('items.0.model'));
         $this->assertSame('qwen', $res->json('items.0.provider'));
     }
+
+    /**
+     * RefGen (card "Ảnh mới từ ảnh mẫu" — i2i KHÔNG phải edit): tạo generation pending,
+     * tôn trọng model sinh ảnh người dùng chọn (qwen-image-3.0-pro), mode='refgen' trong meta.
+     */
+    public function test_refgen_creates_pending_generation_with_mode(): void
+    {
+        $res = $this->postJson('/studio/refgen', [
+            'image' => $this->sourceUrl(),
+            'prompt' => 'đổi sang nền studio tối',
+            'similarity' => 70,
+            'variants' => 1,
+            'provider' => 'qwen',
+            'model' => 'qwen-image-3.0-pro',
+        ]);
+        $res->assertStatus(200);
+        $this->assertNotEmpty($res->json('items'));
+        $id = $res->json('items.0.generation_id');
+        $this->assertNotEmpty($id);
+        $this->assertSame('qwen-image-3.0-pro', $res->json('items.0.model'));
+        $this->assertSame('qwen', $res->json('items.0.provider'));
+
+        $gen = Generation::find($id);
+        $this->assertNotNull($gen);
+        $this->assertSame('pending', $gen->status);
+        $this->assertSame('refgen', $gen->meta['mode'] ?? null);
+        $this->assertNotNull($gen->base_image);
+    }
+
+    public function test_refgen_requires_image(): void
+    {
+        $this->postJson('/studio/refgen', ['prompt' => 'mô tả', 'similarity' => 70])->assertStatus(422);
+    }
+
+    public function test_refgen_creates_one_generation_per_variant(): void
+    {
+        $res = $this->postJson('/studio/refgen', [
+            'image' => $this->sourceUrl(),
+            'prompt' => 'giữ phong cách',
+            'similarity' => 60,
+            'variants' => 3,
+            'provider' => 'qwen',
+            'model' => 'qwen-image-3.0-pro',
+        ]);
+        $res->assertStatus(200);
+        $this->assertCount(3, $res->json('items'));
+    }
 }

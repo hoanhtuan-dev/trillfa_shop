@@ -345,6 +345,23 @@ export const useStudioStore = defineStore('studio', {
         return items;
       } catch (e) { this.toast(e.message || 'Lỗi tạo lại ảnh.', 'error'); return null; }
     },
+    // i2i — Tạo ẢNH MỚI từ ảnh tham chiếu (card "Tạo ảnh mới từ ảnh mẫu", mode='refgen').
+    // KHÁC reimagine/edit: dùng model SINH ẢNH (mặc định qwen-image-3.0-pro) + ảnh tham chiếu
+    // làm base → tạo bức ảnh mới giống mẫu theo % tương đồng, không sửa trên ảnh gốc.
+    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null) {
+      if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
+      try {
+        const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
+        if (model && model.provider && model.model) { payload.provider = model.provider; payload.model = model.model; }
+        const d = await this.api('/studio/refgen', payload);
+        const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
+        items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa tạo ảnh mới' }));
+        if (items.length) this.setBatch(items.map(it => it.generation_id));
+        if (d.credits_left != null) this.creditsLeft = d.credits_left;
+        this.processQueue();
+        return items;
+      } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh từ ảnh mẫu.', 'error'); return null; }
+    },
     // Xóa nền AI: giữ chủ thể (vùng chọn hiện tại nếu có), xóa nền bằng model edit.
     async removeBackground() {
       const l = this.activeLayer;

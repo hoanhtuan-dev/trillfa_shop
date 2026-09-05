@@ -55,9 +55,20 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = []): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = [], ?string $mode = null): string
     {
         $dashscopeKey = studio_api_key('dashscope');
+
+        // Tạo ẢNH MỚI từ ảnh tham chiếu (i2i — mode='refgen', card "Tạo ảnh mới từ ảnh mẫu"):
+        // KHÔNG phải edit — model sinh ảnh (vd qwen-image-3.0-pro) nhận ảnh tham chiếu + prompt
+        // và tạo một bức ảnh HOÀN TOÀN MỚI giống ảnh mẫu (không ép về kích thước nguồn, không mask).
+        if ($mode === 'refgen' && $baseImage) {
+            $refUrl = $this->generateFromReference($prompt, $baseImage, $providerOverride, $modelOverride);
+            if ($refUrl) {
+                return $refUrl;
+            }
+            throw new \RuntimeException($this->dashscopeError ?: 'Không tạo được ảnh mới từ ảnh tham chiếu.');
+        }
 
         // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
         // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
@@ -780,6 +791,67 @@ class ImageAIService
         }
 
         logger()->warning('Edit model ultimately failed', ['model' => $model, 'err' => $last]);
+
+        return null;
+    }
+
+    /**
+     * Tạo ẢNH MỚI từ ảnh tham chiếu (i2i — card "Tạo ảnh mới từ ảnh mẫu", mode='refgen').
+     * Khác edit: KHÔNG ép kích thước ảnh nguồn, KHÔNG mask/composite — model sinh ảnh
+     * (vd qwen-image-3.0-pro) nhận ảnh tham chiếu + prompt và tạo một bức ảnh mới giống mẫu.
+     * Ưu tiên đúng model người dùng chọn (qwen-image-3.0-pro), fallback theo candidates image.
+     */
+    protected function generateFromReference(string $prompt, string $imageUrl, ?string $providerOverride = null, ?string $modelOverride = null): ?string
+    {
+        $source = $this->imageDataUri($imageUrl);
+        if (! $source) {
+            logger()->warning('RefGen: cannot read source image', ['url' => $imageUrl]);
+
+            return null;
+        }
+
+        $candidates = collect(studio_model_candidates('image'))->values();
+        if ($providerOverride && $modelOverride) {
+            $candidates = collect([['provider' => $providerOverride, 'model' => $modelOverride]])
+                ->merge($candidates)
+                ->unique(fn ($c) => ($c['provider'] ?? '').':'.($c['model'] ?? ''))
+                ->values();
+        }
+
+        $last = null;
+        foreach ($candidates as $c) {
+            $provider = (string) ($c['provider'] ?? '');
+            $model = (string) ($c['model'] ?? '');
+            if (! in_array($provider, ['qwen', 'wan', 'dashscope'], true)) {
+                continue; // nhánh i2i chỉ hỗ trợ DashScope-family (qwen-image-3.0-pro…)
+            }
+
+            foreach (studio_candidate_key($c, 'image') as $key) {
+                $base = dashscope_base_url($key).'/api/v1';
+                logger()->info('RefGen attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base]);
+
+                $url = $this->postMultimodalEdit($model, $base, $key, [['image' => $source], ['text' => $prompt]]);
+                if ($url) {
+                    $this->lastProvider = $provider;
+                    $this->lastModel = $model;
+                    logger()->info('RefGen succeeded', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+
+                    return $this->storeRemoteImage($url);
+                }
+
+                $last = $this->dashscopeError;
+                $status = $this->dashscopeStatus;
+                if ($status === 429 || is_qwen_quota_error($last)) {
+                    continue; // quota/throttle → thử key kế tiếp
+                }
+                if ($status === 401) {
+                    continue; // key lỗi → thử key kế tiếp
+                }
+                break; // 404/403/khác → không đập các key còn lại
+            }
+        }
+
+        $this->dashscopeError = $this->dashscopeError ?: ($last ?: 'Không tạo được ảnh mới từ ảnh tham chiếu.');
 
         return null;
     }

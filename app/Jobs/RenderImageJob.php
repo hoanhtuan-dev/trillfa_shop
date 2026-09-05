@@ -53,6 +53,8 @@ class RenderImageJob implements ShouldQueue
                 $generation->model,
                 $generation->meta['negative_prompt'] ?? null,
                 $refImages,
+                // mode='refgen' (card "Tạo ảnh mới từ ảnh mẫu"): i2i qua model sinh ảnh, KHÔNG edit.
+                $generation->meta['mode'] ?? null,
             );
 
             // DEEP REDESIGN (region): AI đã sửa trên CROP — paste lại vào ẢNH GỐC đúng vị trí

@@ -545,6 +545,56 @@ class StudioController extends Controller
     }
 
     /**
+     * Tạo ẢNH MỚI từ ảnh tham chiếu (i2i / "Tạo ảnh mới từ ảnh mẫu") — KHÔNG phải edit.
+     * Dùng model sinh ảnh (mặc định qwen-image-3.0-pro) nhận ảnh tham chiếu làm base và tạo
+     * một bức ảnh hoàn toàn mới giống với ảnh mẫu: giữ chủ thể/phong cách/bố cục theo % tương đồng.
+     * queueGeneration(edit=false, mode='refgen') → RenderImageJob → ImageAIService::generate(mode='refgen').
+     */
+    public function refgen(Request $request)
+    {
+        $data = $request->validate([
+            'image' => ['required', 'string', 'max:2048'],
+            'prompt' => ['nullable', 'string', 'max:4000'],
+            'similarity' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
+            // Model sinh ảnh do người dùng chọn (vd qwen-image-3.0-pro) — mặc định theo Cài đặt.
+            'provider' => ['nullable', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $similarity = (int) ($data['similarity'] ?? 70);
+        $userPrompt = trim((string) ($data['prompt'] ?? ''));
+        $finalPrompt = 'Create a brand-new image based on the provided reference image. '
+            .'Keep about '.$similarity.'% similarity to the reference: preserve the same subject, style, '
+            .'color palette, composition and proportions, but produce a fresh, original rendering — '
+            .'not an edit of the reference. '
+            .($userPrompt !== '' ? 'Additionally: '.$userPrompt.' ' : '')
+            .'High quality, photorealistic, sharp details, professional studio lighting, no text, no watermark.';
+
+        $cost = (int) studio_config('image_credits', 1);
+        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
+        $provider = trim((string) ($data['provider'] ?? ''));
+        $model = trim((string) ($data['model'] ?? ''));
+
+        $items = [];
+        for ($i = 0; $i < $variants; $i++) {
+            $items[] = $this->queueGeneration('image', [
+                'prompt' => $finalPrompt,
+                'base_image' => $this->downscaleSource((string) $data['image'], 1600),
+                'edit' => false,       // KHÔNG ép model Qwen Edit — giữ model sinh ảnh đã chọn.
+                'mode' => 'refgen',    // RenderImageJob → generate(mode='refgen') → nhánh i2i.
+                'provider' => $provider !== '' ? $provider : null,
+                'model' => $model !== '' ? $model : null,
+            ], $cost)->getData(true);
+        }
+
+        return response()->json([
+            'items' => $items,
+            'credits_left' => auth()->user()->fresh()->credits_balance,
+        ]);
+    }
+
+    /**
      * i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).
      * Ảnh đầu = base (giữ chủ thể/bố cục); các ảnh sau = ref images để hòa trộn vào cảnh.
      */

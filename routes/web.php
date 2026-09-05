@@ -125,6 +125,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::delete('/assets/{asset}', [StudioController::class, 'assetDestroy'])->name('assets.destroy');
     Route::post('/generations/{generation}/inpaint', [StudioController::class, 'inpaint'])->name('inpaint');
     Route::post('/reimagine', [StudioController::class, 'reimagine'])->name('reimagine');
+    Route::post('/refgen', [StudioController::class, 'refgen'])->name('refgen');
     Route::post('/compose', [StudioController::class, 'compose'])->name('compose');
     Route::post('/compose/preview', [StudioController::class, 'composePreview'])->name('compose.preview');
     Route::get('/outfit-settings', [StudioController::class, 'outfitSettings'])->name('outfit-settings');
