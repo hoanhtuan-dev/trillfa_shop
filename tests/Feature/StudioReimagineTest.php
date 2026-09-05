@@ -122,4 +122,18 @@ class StudioReimagineTest extends TestCase
         $res->assertStatus(200);
         $this->assertCount(3, $res->json('items'));
     }
+
+    public function test_refgen_accepts_blank_prompt(): void
+    {
+        $res = $this->postJson('/studio/refgen', [
+            'image' => $this->sourceUrl(),
+            'prompt' => '',
+            'similarity' => 70,
+            'variants' => 1,
+            'provider' => 'qwen',
+            'model' => 'qwen-image-3.0-pro',
+        ]);
+        $res->assertStatus(200);
+        $this->assertNotEmpty($res->json('items.0.generation_id'));
+    }
 }

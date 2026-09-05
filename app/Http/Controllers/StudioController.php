@@ -553,7 +553,7 @@ class StudioController extends Controller
     public function refgen(Request $request)
     {
         $data = $request->validate([
-            'image' => ['required', 'string', 'max:2048'],
+            'image' => ['required', 'string', 'max:8000000'],
             'prompt' => ['nullable', 'string', 'max:4000'],
             'similarity' => ['nullable', 'integer', 'min:0', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
@@ -568,7 +568,7 @@ class StudioController extends Controller
             .'Keep about '.$similarity.'% similarity to the reference: preserve the same subject, style, '
             .'color palette, composition and proportions, but produce a fresh, original rendering — '
             .'not an edit of the reference. '
-            .($userPrompt !== '' ? 'Additionally: '.$userPrompt.' ' : '')
+            .($userPrompt !== '' ? 'Additionally: '.$userPrompt.' ' : 'Produce a clean, refined variation of the reference itself. ')
             .'High quality, photorealistic, sharp details, professional studio lighting, no text, no watermark.';
 
         $cost = (int) studio_config('image_credits', 1);
@@ -580,6 +580,7 @@ class StudioController extends Controller
         for ($i = 0; $i < $variants; $i++) {
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $finalPrompt,
+                // downscaleSource tự xử lý cả data:URL (canvas flattened) → lưu file + trả /storage/ URL ngắn.
                 'base_image' => $this->downscaleSource((string) $data['image'], 1600),
                 'edit' => false,       // KHÔNG ép model Qwen Edit — giữ model sinh ảnh đã chọn.
                 'mode' => 'refgen',    // RenderImageJob → generate(mode='refgen') → nhánh i2i.
