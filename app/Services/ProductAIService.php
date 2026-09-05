@@ -111,10 +111,11 @@ class ProductAIService
         // HARDCODE generous timeouts (like StyleSuggestService::timeout(90)) instead
         // of reading product_ai_timeout/total_budget from DB/config — those were being
         // overridden to low values on some hosts, causing "network/timeout" mid-generation.
-        // Mỗi lần gọi HTTP tối đa 30 giây — nếu provider không trả lời, chuyển sang
-        // provider dự phòng (gemini/deepseek) thay vì treo cả 90 giây rồi 504.
+        // Trần mặc định mỗi lần gọi HTTP là 30 giây — nếu provider không trả lời, chuyển
+        // sang provider dự phòng (gemini/deepseek) thay vì treo rồi 504. Riêng đầu ra DÀI
+        // (desc_variants ~4000 token) được nới trần theo hàm callTimeout() ở trên.
         $this->timeout = 30;
-        $this->totalBudget = 90;
+        $this->totalBudget = 110;
         $this->maxModels = product_ai_max_models();
         $this->maxKeys = product_ai_max_keys();
         $this->downscaleMax = product_ai_downscale_max();
@@ -148,12 +149,28 @@ class ProductAIService
         return $this->deadline > 0.0 && microtime(true) >= $this->deadline;
     }
 
-    /** Remaining seconds for the next HTTP call, clamped to the per-call timeout. */
-    private function remainingTimeout(): int
+    /** Remaining seconds for the next HTTP call, clamped to a per-call cap that
+     *  scales with the requested output size (output dài cần thời gian sinh lâu hơn —
+     *  không được cắt giữa chừng desc_variants ~4000 token ở giây 30). */
+    private function remainingTimeout(?int $maxTokens = null): int
     {
         $left = (int) floor($this->deadline - microtime(true));
 
-        return max(1, min($this->timeout, $left));
+        return max(1, min($this->callTimeout($maxTokens), $left));
+    }
+
+    private function callTimeout(?int $maxTokens): int
+    {
+        if ($maxTokens === null) {
+            return $this->timeout;
+        }
+
+        return match (true) {
+            $maxTokens >= 3000 => 100,
+            $maxTokens >= 1500 => 60,
+            $maxTokens >= 800 => 45,
+            default => $this->timeout,
+        };
     }
 
     private function record(string $provider, string $detail): void
@@ -363,7 +380,7 @@ class ProductAIService
             'name' => max(96, (int) product_ai_config('refine_name_tokens', 350)),
             'seo' => max(128, (int) product_ai_config('refine_seo_tokens', 650)),
             'description' => max(256, (int) product_ai_config('refine_desc_tokens', 1500)),
-            'desc_variants' => max(512, (int) product_ai_config('refine_desc_variants_tokens', 2000)),
+            'desc_variants' => max(512, (int) product_ai_config('refine_desc_variants_tokens', 4000)),
             default => $this->maxTokens,
         };
     }
@@ -503,11 +520,13 @@ class ProductAIService
                     ]
                     : $prompt;
 
+                $effMaxTokens = $maxTokens ?? ($kind === 'vision' ? $this->visionMaxTokens : $this->maxTokens);
+
                 try {
-                    $resp = Http::withToken($key)->timeout($this->remainingTimeout())->post($base.'/chat/completions', [
+                    $resp = Http::withToken($key)->timeout($this->remainingTimeout($effMaxTokens))->post($base.'/chat/completions', [
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => $content]],
-                        'max_tokens' => $maxTokens ?? ($kind === 'vision' ? $this->visionMaxTokens : $this->maxTokens),
+                        'max_tokens' => $effMaxTokens,
                         'response_format' => ['type' => 'json_object'],
                     ]);
                 } catch (\Throwable $e) {
@@ -606,14 +625,15 @@ class ProductAIService
         }
 
         $model = product_ai_deepseek_model();
+        $effMaxTokens = $maxTokens ?? $this->maxTokens;
 
         try {
-            $resp = Http::withToken($key)->timeout($this->remainingTimeout())
+            $resp = Http::withToken($key)->timeout($this->remainingTimeout($effMaxTokens))
                 ->post(deepseek_base_url($key).'/chat/completions', [
                     'model' => $model,
                     'messages' => [['role' => 'user', 'content' => $prompt]],
                     'temperature' => $this->temperature,
-                    'max_tokens' => $maxTokens ?? $this->maxTokens,
+                    'max_tokens' => $effMaxTokens,
                     'response_format' => ['type' => 'json_object'],
                     'stream' => false,
                 ]);
@@ -663,7 +683,7 @@ class ProductAIService
         if ($maxTokens !== null) {
             $body['generationConfig'] = ['responseMimeType' => 'application/json', 'maxOutputTokens' => $maxTokens];
         }
-        $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($this->remainingTimeout())
+        $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($this->remainingTimeout($maxTokens))
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', $body);
             if ($resp->ok()) {
                 $json = $this->parseJson((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
@@ -719,9 +739,9 @@ class ProductAIService
         $schema = match ($target) {
             'names' => '"names": ["5 tên sản phẩm, mỗi tên <=80 ký tự, phù hợp giọng thương hiệu"]',
             'name' => '"suggested_name": "1 tên sản phẩm hấp dẫn <=80 ký tự"',
-            'description' => '"short_description": "1-2 câu <=160 ký tự", "description": "HTML mô tả chi tiết: 4-5 mục <h3> (Phong cách / Chất liệu / Màu sắc / Phù hợp / Bảo quản) + <p>/<ul><li>, tổng ~120-150 từ"',
+            'description' => '"short_description": "2-3 câu <=240 ký tự", "description": "HTML mô tả chi tiết: 4-5 mục <h3> (Phong cách / Chất liệu / Màu sắc / Phù hợp / Bảo quản) + <p>/<ul><li>, tổng ~120-150 từ"',
             'seo' => '"meta_title": "SEO <=60 ký tự", "meta_description": "SEO 120-160 ký tự", "tags": ["3-4 tag"]',
-            'desc_variants' => '"variants": [{"label": "2-3 từ mô tả phong cách", "short_description": "1-2 câu <=160 ký tự", "description": "HTML mô tả chi tiết giống schema trên"}] (2-3 phương án khác biệt rõ rệt: VD một bản nhấn phong cách, một bản nhấn chất liệu, một bản nhấn công dụng)',
+            'desc_variants' => '"variants": [{"label": "2-3 từ mô tả phong cách", "short_description": "2-3 câu <=240 ký tự", "description": "HTML mô tả chi tiết CHUYÊN SÂU: 7-8 mục <h3> (Câu chuyện & cảm hứng / Phong cách & dáng / Chất liệu & hoàn thiện / Màu sắc & họa tiết / Gợi ý phối đồ / Phù hợp với ai / Bảo quản) + <p>/<ul><li>, tổng ~250-300 từ"}] (2-3 phương án khác biệt rõ rệt: VD một bản nhấn phong cách, một bản nhấn chất liệu, một bản nhấn công dụng)',
             default => '"suggested_name": "...", "short_description": "...", "description": "HTML...", "meta_title": "...", "meta_description": "...", "tags": ["..."]',
         };
 
@@ -806,7 +826,7 @@ Trả về JSON hợp lệ DUY NHẤT (không markdown, không giải thích):
 {
   "suggested_name": "tên hấp dẫn <=80 ký tự",
   "brand": "thương hiệu",
-  "short_description": "1-2 câu <=160 ký tự",
+  "short_description": "2-3 câu <=240 ký tự",
   "description": "HTML ngắn: 4-5 mục <h3> (Phong cách / Chất liệu / Màu sắc / Phù hợp / Bảo quản) + <p>/<ul><li>, tổng ~120-150 từ",
   "meta_title": "SEO <=60 ký tự",
   "meta_description": "SEO 120-160 ký tự",

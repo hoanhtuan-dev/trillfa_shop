@@ -187,10 +187,10 @@ const NAME_CHIPS = [
 // Chip nhanh — Mô tả
 const DESC_CHIPS = [
     { target: 'description', label: 'Mô tả hấp dẫn', prompt: 'Viết lại mô tả ngắn và mô tả chi tiết thật hấp dẫn, giàu cảm xúc, đúng giọng văn thương hiệu (hồ sơ bên trên).' },
-    { target: 'description', label: 'Mô tả ngắn ≤ 160 ký tự', prompt: 'Chỉ viết MÔ TẢ NGẮN: tối đa 160 ký tự, súc tích, kích thích mua hàng.' },
+    { target: 'description', label: 'Mô tả ngắn ≤ 240 ký tự', prompt: 'Chỉ viết MÔ TẢ NGẮN: tối đa 240 ký tự (2-3 câu), súc tích, kích thích mua hàng.' },
     { target: 'description', label: 'Mô tả chi tiết chuẩn SEO', prompt: 'Viết MÔ TẢ CHI TIẾT (HTML) chuẩn SEO: cấu trúc h3 rõ ràng, từ khóa tự nhiên, khoảng 120–150 từ, đúng giọng thương hiệu.' },
     { target: 'description', label: 'Chất liệu & bảo quản', prompt: 'Bổ sung vào mô tả chi tiết các mục: chất liệu, kích thước/quy cách, cách bảo quản.' },
-    { target: 'desc_variants', label: '✦ Làm giàu nội dung (đa phong cách)', prompt: 'Tạo 2-3 phương án mô tả KHÁC BIỆT: 1 bản nhấn phong cách & cảm hứng, 1 bản nhấn chất liệu & công dụng, 1 bản tổng hợp. Mỗi phương án gồm mô tả ngắn (≤160 ký tự) + mô tả chi tiết HTML. Viết đúng giọng thương hiệu.' },
+    { target: 'desc_variants', label: '✦ Làm giàu nội dung (đa phong cách)', prompt: 'Tạo 2-3 phương án mô tả KHÁC BIỆT và CHUYÊN SÂU: 1 bản nhấn phong cách & cảm hứng, 1 bản nhấn chất liệu & công dụng, 1 bản tổng hợp. Mỗi phương án gồm mô tả ngắn (≤240 ký tự) + mô tả chi tiết HTML dài ~250-300 từ với 7-8 mục h3 (câu chuyện, phong cách, chất liệu, màu sắc, phối đồ, phù hợp, bảo quản…). Viết đúng giọng thương hiệu, giàu thông tin.' },
 ];
 // Chip nhanh — SEO
 const SEO_CHIPS = [
@@ -211,10 +211,6 @@ const submitting = ref(false);
 const editorTitle = computed(() => (editor.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'));
 const aiImageUrl = computed(() => coverFilePreview.value || coverUrl.value || existingCover.value || (gallery.value[0]?.url || ''));
 const coverPreview = computed(() => (removeCover.value ? '' : (coverFilePreview.value || coverUrl.value || existingCover.value || '')));
-const aiProvidersLabel = computed(() => {
-    const names = { qwen: 'Qwen', gemini: 'Gemini', deepseek: 'DeepSeek' };
-    return (ai.providers || []).map((p) => names[p] || p).join(' → ');
-});
 const aiApplied = ref([]);
 
 const sections = [
@@ -377,13 +373,16 @@ async function aiSuggest() {
         }
         const d = applyResult(res);
         if (d.source === 'stub') {
-            aiMsg.value = 'Dùng gợi ý offline' + (d.reason ? ' — ' + d.reason : '') + '.';
+            // Không lộ chuỗi lỗi kỹ thuật gốc — chỉ hiện thông báo bình thường.
+            console.warn('[ProductAI] stub fallback:', d.reason, d.attempts);
+            aiMsg.value = 'AI chưa phản hồi kịp — đã dùng gợi ý dự phòng. Hãy thử lại sau ít phút.';
         } else {
             aiMsg.value = 'Đã sinh nội dung bằng ' + (d.model || ai.model) + (d.image_analyzed ? ' · đã nhìn ảnh' : '') + (aiApplied.value.length ? ' · điền: ' + aiApplied.value.join(', ') : '');
         }
         forceReanalyze.value = false;
     } catch (e) {
-        aiMsg.value = e.message || 'AI đang bận/quá lâu — thử lại sau.';
+        console.warn('[ProductAI] suggest error:', e);
+        aiMsg.value = 'AI đang bận hoặc phản hồi quá lâu — vui lòng thử lại sau.';
     } finally {
         aiLoading.value = false;
         aiState.value = '';
@@ -427,13 +426,16 @@ async function aiRefine(target, prompt) {
         }
         const d = res.data;
         if (d.source === 'stub') {
-            aiMsgs[msgKey] = 'Dùng gợi ý offline' + (d.reason ? ' — ' + d.reason : '') + '.';
+            // Không lộ chuỗi lỗi kỹ thuật gốc — chỉ hiện thông báo bình thường.
+            console.warn('[ProductAI] stub fallback:', d.reason, d.attempts);
+            aiMsgs[msgKey] = 'AI chưa phản hồi kịp — đã dùng gợi ý dự phòng. Hãy thử lại sau ít phút.';
         } else {
             aiMsgs[msgKey] = 'Đã tinh chỉnh bằng ' + (d.model || ai.model) + '.';
         }
         return d;
     } catch (e) {
-        aiMsgs[msgKey] = e.message || 'AI đang bận/quá lâu — thử lại sau.';
+        console.warn('[ProductAI] refine error:', e);
+        aiMsgs[msgKey] = 'AI đang bận hoặc phản hồi quá lâu — vui lòng thử lại sau.';
         return null;
     } finally {
         aiBusy[key] = false;
@@ -898,7 +900,6 @@ onMounted(() => {
                 <div class="min-w-0 flex-1">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-200">Trí tuệ sáng tạo</p>
                   <h2 class="font-display text-lg font-semibold">Trợ lý nội dung &amp; SEO</h2>
-                  <p class="text-xs text-white/70">Model chính <span class="font-semibold text-white">qwen3.8-flash</span> (đọc ảnh + text) · mọi gợi ý/tinh chỉnh đều hiểu giọng văn &amp; giá trị thương hiệu của bạn. Dự phòng: {{ aiProvidersLabel }}.</p>
                 </div>
                 <div class="flex w-full flex-col gap-2.5 sm:w-auto sm:min-w-[320px]">
                   <div class="relative">
@@ -934,11 +935,7 @@ onMounted(() => {
               </div>
 
               <div class="relative mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-                <span class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white ring-1 ring-white/20">
-                  <svg class="h-3.5 w-3.5 shrink-0 text-brand-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
-                  <span class="truncate"><span class="font-semibold text-brand-100">Hồ sơ thương hiệu đã nạp:</span> “{{ ai.brand_preview }}…“</span>
-                </span>
-                <a href="/admin/pages/about" target="_blank" class="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20">Chỉnh sửa tại Trang Giới thiệu <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg></a>
+                <a href="/admin/pages/about" target="_blank" class="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20">Chỉnh sửa hồ sơ thương hiệu tại Trang Giới thiệu <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg></a>
               </div>
             </section>
 
@@ -1072,7 +1069,7 @@ onMounted(() => {
                       {{ chip.label }}
                     </button>
                   </div>
-                  <p v-if="aiBusy.desc_variants" class="mt-2 text-[11px] font-medium text-brand-700">AI đang tạo nhiều phương án mô tả (kết hợp: hấp dẫn + chuẩn SEO + chất liệu)…</p>
+                  <p v-if="aiBusy.desc_variants" class="mt-2 text-[11px] font-medium text-brand-700">AI đang tạo 2-3 phương án mô tả chuyên sâu (dài &amp; chi tiết) — có thể mất 30-60 giây…</p>
                   <p v-if="aiMsgs.desc" class="mt-2 text-[11px] text-ink-600">{{ aiMsgs.desc }}</p>
 
                   <!-- Panel chọn phương án mô tả (từ chip "Làm giàu nội dung") -->
@@ -1095,7 +1092,7 @@ onMounted(() => {
                           <span class="ml-auto shrink-0 text-[10px] text-ink-400">{{ stripHtml(v.description).length }} ký tự</span>
                         </div>
                         <p v-if="v.short_description" class="mt-1.5 text-[11px] font-medium text-brand-700">{{ v.short_description }}</p>
-                        <p class="mt-1 line-clamp-3 text-[11px] leading-relaxed text-ink-500">{{ stripHtml(v.description).slice(0, 300) }}…</p>
+                        <p class="mt-1 line-clamp-5 text-[11px] leading-relaxed text-ink-500">{{ stripHtml(v.description).slice(0, 500) }}…</p>
                       </button>
                     </div>
                     <div class="mt-2.5 flex items-center justify-end gap-2">

@@ -74,9 +74,6 @@ class AdminProductController extends Controller
                 // True when at least one provider has a usable API key — the UI uses
                 // this to explain why it fell back to offline suggestions.
                 'has_keys' => (bool) (studio_api_key('qwen') || studio_api_key('dashscope') || studio_api_key('gemini') || studio_api_key('deepseek')),
-                // Hồ sơ thương hiệu (nội dung trang /admin/pages/about) — AI luôn
-                // đưa vào suy luận; chỉ hiển thị preview ngắn ở UI.
-                'brand_preview' => mb_substr(app(\App\Services\ProductAIService::class)->brandContext(), 0, 96),
             ],
             'filters' => [
                 'q' => (string) $request->input('q'),
@@ -197,10 +194,10 @@ class AdminProductController extends Controller
         }
 
         // Run INLINE (synchronous) with a hard total budget inside ProductAIService:
-        // qwen3.8-flash works fast, and the bounded attempts + per-call timeout +
-        // wall-clock deadline guarantee a result well under the gateway 504 limit.
-        // This removes the fragile queue-worker + poll dependency on shared hosting.
-        @set_time_limit(120);
+        // bounded attempts + per-call timeout (scaled by output size) + wall-clock
+        // deadline guarantee a result well under the gateway 504 limit. Đầu ra dài
+        // (desc_variants ~4000 token) cần thêm thời gian nên trần PHP nới lên 150s.
+        @set_time_limit(150);
 
         try {
             /** @var \App\Services\ProductAIService $service */
@@ -230,9 +227,10 @@ class AdminProductController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
+            // Không lộ lỗi kỹ thuật gốc ra UI — chỉ hiện thông báo bình thường.
             return response()->json([
                 'status' => 'error',
-                'error' => 'AI gặp lỗi kỹ thuật — vui lòng thử lại. ('.$e->getMessage().')',
+                'error' => 'AI gặp lỗi kỹ thuật — vui lòng thử lại sau ít phút.',
             ], 500);
         } finally {
             // Dọn file tạm sinh từ base64 (không phải file gốc trong storage).
