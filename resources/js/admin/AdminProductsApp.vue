@@ -690,7 +690,13 @@ async function submit() {
     try {
         const fd = buildFormData();
         const url = editor.id ? '/admin/products/' + editor.id : '/admin/products';
-        const method = editor.id ? 'PUT' : 'POST';
+        // PHP chỉ parse multipart/form-data cho request POST thật. Nếu gửi PUT
+        // thật với FormData, server nhận body rỗng ($_POST không được điền) →
+        // validate thiếu name/price → 422. Dùng POST + _method=PUT (method
+        // spoofing, Laravel bật sẵn trong Request::capture()) — đúng chuẩn
+        // các form Blade khác trong admin.
+        const method = 'POST';
+        if (editor.id) fd.append('_method', 'PUT');
         const res = await fetch(url, {
             method,
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken() },
