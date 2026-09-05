@@ -327,7 +327,10 @@ export const useStudioStore = defineStore('studio', {
       finally { this.generating = false; }
     },
     // i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation)
-    async reimagine(image, prompt, similarity = 70, variants = 1) {
+    // process=true (mặc định) chạy processQueue ngay sau khi tạo. Render đa góc truyền process=false
+    // để tạo TẤT CẢ góc trước rồi gọi processQueue MỘT lần — tránh nhiều processQueue chạy song song,
+    // cùng "nhặt" các generation đang chờ và xử lý lặp/đè nhau (gây tốn quota + lỗi "chỉ ra 1 ảnh").
+    async reimagine(image, prompt, similarity = 70, variants = 1, process = true) {
       if (!image || !(prompt || '').trim()) { this.toast('Chọn ảnh + nhập mô tả.', 'error'); return null; }
       try {
         const d = await this.api('/studio/reimagine', { image, prompt, similarity: Number(similarity) || 70, variants: Number(variants) || 1 });
@@ -335,7 +338,7 @@ export const useStudioStore = defineStore('studio', {
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa tạo lại ảnh' }));
         if (items.length) this.setBatch(items.map(it => it.generation_id));
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
-        this.processQueue();
+        if (process) this.processQueue();
         return items;
       } catch (e) { this.toast(e.message || 'Lỗi tạo lại ảnh.', 'error'); return null; }
     },

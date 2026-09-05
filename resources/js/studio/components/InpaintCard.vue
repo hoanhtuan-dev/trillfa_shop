@@ -31,11 +31,15 @@ async function runMultiView() {
   const enabled = mvViews.value.filter(v => v.enabled);
   if (!enabled.length) { store.toast('Chọn ít nhất 1 góc chụp.', 'error'); return; }
   mvBusy.value = true;
+  // Tạo TẤT CẢ góc trước (process=false) rồi xử lý MỘT lần ở cuối — nếu mỗi reimagine tự gọi
+  // processQueue thì nhiều request /studio/process chạy song song, cùng nhặt các generation đang
+  // chờ và xử lý lặp/đè nhau → tốn quota, chỉ ra được 1 ảnh rồi báo lỗi.
   for (const v of enabled) {
     await store.reimagine(img,
       'render this fashion product at a new camera angle — ' + v.prompt + '. Keep the product, color, material, proportions and every detail exactly unchanged, no detail loss, crisp sharp, professional studio lighting',
-      85, 1);
+      85, 1, false);
   }
+  await store.processQueue();
   mvBusy.value = false;
   mvOpen.value = false;
   store.toast('Đã render ' + enabled.length + ' góc chụp.');
