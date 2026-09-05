@@ -84,18 +84,6 @@ class ProductAIService
         return max(1, min($this->timeout, $left));
     }
 
-    /**
-     * Kind-aware HTTP timeout. VISION produces a short JSON (max_tokens ~400) and is
-     * fast, so it gets a hard cap — otherwise a slow/hanging vision call could eat the
-     * whole wall-clock budget and leave nothing for the (much longer) TEXT generation.
-     */
-    private function callTimeout(string $kind): int
-    {
-        $left = $this->remainingTimeout();
-
-        return $kind === 'vision' ? max(1, min($left, 25)) : $left;
-    }
-
     private function record(string $provider, string $detail): void
     {
         $this->attempts[] = $provider.': '.$detail;
@@ -215,34 +203,30 @@ class ProductAIService
     }
 
     /**
-     * TWO fast steps (total well under the gateway timeout):
-     *  1) LIGHT vision — understand the image (short output, cached by image hash).
-     *  2) FAST text — qwen3.8-flash writes the full structured content + SEO from
-     *     (form fields + understanding). This is the reliable, user-confirmed path.
-     * Vision failure never blocks content: it degrades to GD offline analysis and
-     * the TEXT step still produces a real AI result.
+     * SINGLE multimodal call — the model sees the image AND writes the full
+     * content + SEO in ONE shot (exactly like the Studio "Gợi ý từ ảnh" card,
+     * which the user confirmed works). No fragile vision→text two-step, no
+     * separate image-analysis round-trip: one image + one long prompt = one answer.
      */
     public function generateFromImage(array $input, string $imagePath, bool $force = false): array
     {
         $this->startBudget();
 
-        $key = $this->imageCacheKey($imagePath);
-        $understanding = $force ? null : Cache::get('product_ai_img:'.$key);
-        $cached = is_array($understanding);
+        $result = $this->attempt('vision', $this->buildPrompt($input, null, true), $imagePath, $this->maxTokens);
 
-        if (! $cached) {
-            $understanding = $this->attempt('vision', $this->buildVisionPrompt(), $imagePath);
-            if (is_array($understanding)) {
-                Cache::put('product_ai_img:'.$key, $understanding, $this->cacheTtl);
-            } else {
-                // Offline GD analysis is NOT cached, so the model is retried later.
-                $understanding = $this->offlineAnalysis($imagePath);
-            }
+        if (is_array($result)) {
+            $result['source'] = 'ai';
+            $result['reason'] = 'ok';
+            $result['image_analyzed'] = true;
+            $result['analysis_cached'] = false;
+            $result['attempts'] = $this->attempts;
+
+            return $result;
         }
 
-        $out = $this->generate($input, is_array($understanding) ? $understanding : null);
+        // Degrade to the TEXT path (offline GD analysis feeds the stub if needed).
+        $out = $this->generate($input, $this->offlineAnalysis($imagePath));
         $out['image_analyzed'] = true;
-        $out['analysis_cached'] = $cached;
 
         return $out;
     }
@@ -253,7 +237,7 @@ class ProductAIService
      * Try each provider in the configured order (qwen first). Returns a parsed
      * JSON result array, or null when no provider succeeded (caller falls back).
      */
-    protected function attempt(string $kind, string $prompt, ?string $imagePath = null): ?array
+    protected function attempt(string $kind, string $prompt, ?string $imagePath = null, ?int $maxTokens = null): ?array
     {
         if (! product_ai_enabled()) {
             $this->record('system', 'AI Sản phẩm đang bị tắt trong cài đặt (product_ai_enabled=0)');
@@ -273,9 +257,9 @@ class ProductAIService
             }
 
             $result = match ($provider) {
-                'qwen' => $this->attemptQwen($kind, $prompt, $imagePath),
-                'gemini' => $this->attemptGemini($kind, $prompt, $imagePath),
-                'deepseek' => $this->attemptDeepseek($kind, $prompt),
+                'qwen' => $this->attemptQwen($kind, $prompt, $imagePath, $maxTokens),
+                'gemini' => $this->attemptGemini($kind, $prompt, $imagePath, $maxTokens),
+                'deepseek' => $this->attemptDeepseek($kind, $prompt, $maxTokens),
                 default => null,
             };
 
@@ -287,7 +271,7 @@ class ProductAIService
         return null;
     }
 
-    protected function attemptQwen(string $kind, string $prompt, ?string $imagePath): ?array
+    protected function attemptQwen(string $kind, string $prompt, ?string $imagePath, ?int $maxTokens = null): ?array
     {
         $models = array_slice(array_values(
             $kind === 'vision' ? product_ai_qwen_vision_models() : product_ai_qwen_text_models()
@@ -354,12 +338,11 @@ class ProductAIService
                     : $prompt;
 
                 try {
-                    $resp = Http::withToken($key)->timeout($this->callTimeout($kind))->post($base.'/chat/completions', [
+                    $resp = Http::withToken($key)->timeout($this->remainingTimeout())->post($base.'/chat/completions', [
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => $content]],
                         'temperature' => $this->temperature,
-                        // Vision output is tiny (just the understanding) → cheaper & faster.
-                        'max_tokens' => $kind === 'vision' ? $this->visionMaxTokens : $this->maxTokens,
+                        'max_tokens' => $maxTokens ?? ($kind === 'vision' ? $this->visionMaxTokens : $this->maxTokens),
                         'response_format' => ['type' => 'json_object'],
                     ]);
                 } catch (\Throwable $e) {
@@ -412,7 +395,7 @@ class ProductAIService
         return null;
     }
 
-    protected function attemptDeepseek(string $kind, string $prompt): ?array
+    protected function attemptDeepseek(string $kind, string $prompt, ?int $maxTokens = null): ?array
     {
         $key = studio_api_key('deepseek');
         if (! $key) {
@@ -430,12 +413,12 @@ class ProductAIService
         $model = product_ai_deepseek_model();
 
         try {
-            $resp = Http::withToken($key)->timeout($this->callTimeout($kind))
+            $resp = Http::withToken($key)->timeout($this->remainingTimeout())
                 ->post(deepseek_base_url($key).'/chat/completions', [
                     'model' => $model,
                     'messages' => [['role' => 'user', 'content' => $prompt]],
                     'temperature' => $this->temperature,
-                    'max_tokens' => $this->maxTokens,
+                    'max_tokens' => $maxTokens ?? $this->maxTokens,
                     'response_format' => ['type' => 'json_object'],
                     'stream' => false,
                 ]);
@@ -458,7 +441,7 @@ class ProductAIService
         return null;
     }
 
-    protected function attemptGemini(string $kind, string $prompt, ?string $imagePath): ?array
+    protected function attemptGemini(string $kind, string $prompt, ?string $imagePath, ?int $maxTokens = null): ?array
     {
         $key = studio_api_key('gemini');
         if (! $key) {
@@ -481,10 +464,12 @@ class ProductAIService
         }
 
         try {
-            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($this->callTimeout($kind))
-                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
-                    'contents' => [['parts' => $parts]],
-                ]);
+            $body = ['contents' => [['parts' => $parts]]];
+        if ($maxTokens !== null) {
+            $body['generationConfig'] = ['responseMimeType' => 'application/json', 'maxOutputTokens' => $maxTokens];
+        }
+        $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($this->remainingTimeout())
+                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', $body);
             if ($resp->ok()) {
                 $json = $this->parseJson((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
                 if ($json) {
@@ -505,7 +490,7 @@ class ProductAIService
 
     // ------------------------------------------------------------- prompts
 
-    protected function buildPrompt(array $input, ?array $imageAnalysis): string
+    protected function buildPrompt(array $input, ?array $imageAnalysis, bool $imageAttached = false): string
     {
         $name = ($input['name'] ?? '') ?: 'sản phẩm thời trang/phong cách sống';
         $category = $input['category'] ?? '';
@@ -527,8 +512,12 @@ class ProductAIService
         // Làm giàu: nếu đã có short_description thì yêu cầu cải thiện dựa trên đó.
         $refine = $currentShort ? "\nNội dung đã viết (hãy dùng làm nền, giữ ý chính, cải thiện làm giàu hơn): {$currentShort}" : '';
 
+        $basis = $imageAttached
+            ? 'HÃY NHÌN ẢNH SẢN PHẨM ĐÍNH KÈM và dựa trên đó'
+            : 'dựa trên phân tích ảnh + thông tin người dùng';
+
         return <<<PROMPT
-Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Viết mô tả sản phẩm CHUẨN NGÀNH, có cấu trúc rõ ràng, không sáo rỗng, dựa trên phân tích ảnh + thông tin người dùng.
+Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Viết mô tả sản phẩm CHUẨN NGÀNH, có cấu trúc rõ ràng, không sáo rỗng, {$basis}.
 {$img}
 {$refine}
 
