@@ -541,6 +541,7 @@ class StudioController extends Controller
             'images' => ['required', 'array', 'min:2', 'max:3'],
             'images.*' => ['string', 'max:2048'],
             'prompt' => ['required', 'string', 'max:4000'],
+            'final_prompt' => ['nullable', 'string', 'max:4000'],
             'layout' => ['nullable', 'string', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
             'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap,outfit'],
@@ -549,8 +550,70 @@ class StudioController extends Controller
             'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
 
+        $parts = $this->assembleComposePrompt($data);
+
+        // Cho phép ghi đè prompt hoàn chỉnh (đã chỉnh tay từ ô "Xem trước prompt").
+        $override = trim((string) ($data['final_prompt'] ?? ''));
+        $finalPrompt = $override !== '' ? $override : $parts['prompt'];
+
+        $base = $this->downscaleSource((string) ($data['images'][0] ?? ''), 1600);
+        $cost = (int) studio_config('image_credits', 1);
+        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
+
+        logger()->info('Compose mode', ['mode' => $data['mode'] ?? '', 'is_faceswap' => $parts['is_faceswap'], 'face_ref' => (bool) $parts['face_ref'], 'images' => count($data['images'])]);
+
+        $items = [];
+        for ($i = 0; $i < $variants; $i++) {
+            $items[] = $this->queueGeneration('image', [
+                'prompt' => $finalPrompt,
+                'base_image' => $base,
+                'edit' => true,
+                'ref_images' => $parts['remaining_refs'],
+                'face_ref' => $parts['face_ref'],
+                'user_prompt' => $parts['user_prompt'],
+                'mode' => $data['mode'] ?? null,
+                'creative_level' => $parts['creative_level'],
+                'style' => $parts['style'],
+                'ornament_level' => $parts['ornament_level'],
+            ], $cost)->getData(true);
+        }
+
+        return response()->json([
+            'items' => $items,
+            'credits_left' => auth()->user()->fresh()->credits_balance,
+        ]);
+    }
+
+    /**
+     * Trả về prompt tiếng Anh HOÀN CHỈNH (đã thay @imageN) mà compose() sẽ gửi cho AI.
+     * Dùng cho ô "Xem trước prompt" — không tạo generation, không tốn credit.
+     */
+    public function composePreview(Request $request)
+    {
+        $data = $request->validate([
+            'images' => ['required', 'array', 'min:2', 'max:3'],
+            'images.*' => ['string', 'max:2048'],
+            'prompt' => ['required', 'string', 'max:4000'],
+            'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap,outfit'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'style' => ['nullable', 'string', 'max:400'],
+            'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
+        ]);
+
+        $parts = $this->assembleComposePrompt($data);
+
+        return response()->json(['prompt' => $parts['prompt']]);
+    }
+
+    /**
+     * Dựng prompt cuối cho Card Ghép ảnh — dùng chung bởi compose() và composePreview()
+     * để bản xem trước khớp 100% với prompt thực gửi.
+     *
+     * @return array{prompt:string,user_prompt:string,face_ref:?string,remaining_refs:array,creative_level:int,style:string,ornament_level:int,is_faceswap:bool}
+     */
+    private function assembleComposePrompt(array $data): array
+    {
         $imgs = array_values(array_slice($data['images'], 0, 3));
-        $base = $this->downscaleSource((string) $imgs[0], 1600);
         $refs = array_slice($imgs, 1);
         $userPrompt = trim((string) $data['prompt']);
         $isTryon = ($data['mode'] ?? '') === 'tryon';
@@ -605,34 +668,20 @@ class StudioController extends Controller
         ];
         $finalPrompt = strtr($finalPrompt, $tagMap);
 
-        $cost = (int) studio_config('image_credits', 1);
-        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
-
         // Thay khuôn mặt: ảnh thứ 2 (refs[0]) là khuôn mặt tham chiếu → face_ref; còn lại là ref_images.
         $faceRef = $isFaceSwap && isset($refs[0]) ? (string) $refs[0] : null;
         $remainingRefs = $isFaceSwap ? array_slice($refs, 1) : $refs;
-        logger()->info('Compose mode', ['mode' => $data['mode'] ?? '', 'is_faceswap' => $isFaceSwap, 'face_ref' => (bool) $faceRef, 'images' => count($imgs)]);
 
-        $items = [];
-        for ($i = 0; $i < $variants; $i++) {
-            $items[] = $this->queueGeneration('image', [
-                'prompt' => $finalPrompt,
-                'base_image' => $base,
-                'edit' => true,
-                'ref_images' => $remainingRefs,
-                'face_ref' => $faceRef,
-                'user_prompt' => $userPrompt,
-                'mode' => $data['mode'] ?? null,
-                'creative_level' => $creativeLevel,
-                'style' => $style,
-                'ornament_level' => $ornamentLevel,
-            ], $cost)->getData(true);
-        }
-
-        return response()->json([
-            'items' => $items,
-            'credits_left' => auth()->user()->fresh()->credits_balance,
-        ]);
+        return [
+            'prompt' => $finalPrompt,
+            'user_prompt' => $userPrompt,
+            'face_ref' => $faceRef,
+            'remaining_refs' => $remainingRefs,
+            'creative_level' => $creativeLevel,
+            'style' => $style,
+            'ornament_level' => $ornamentLevel,
+            'is_faceswap' => $isFaceSwap,
+        ];
     }
 
     /**
