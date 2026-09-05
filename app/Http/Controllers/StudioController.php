@@ -639,6 +639,66 @@ class StudioController extends Controller
     }
 
     /**
+     * GET /studio/outfit-settings — cài đặt Ghép Trang Phục của người dùng hiện tại
+     * (phong cách + mức trang trí + mức sáng tạo + danh sách preset). Chưa có → trả mặc định.
+     */
+    public function outfitSettings()
+    {
+        $s = \App\Models\StudioOutfitSetting::where('user_id', auth()->id())->first();
+
+        return response()->json([
+            'style' => $s->style ?? '',
+            'ornament_level' => $s->ornament_level ?? 0,
+            'creative_level' => $s->creative_level ?? 8,
+            'presets' => $s->presets ?? [],
+        ]);
+    }
+
+    /**
+     * POST /studio/outfit-settings — lưu cài đặt Ghép Trang Phục (upsert theo user).
+     */
+    public function saveOutfitSettings(Request $request)
+    {
+        $data = $request->validate([
+            'style' => ['nullable', 'string', 'max:400'],
+            'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'presets' => ['nullable', 'array', 'max:50'],
+            'presets.*.name' => ['required', 'string', 'max:60'],
+            'presets.*.style' => ['nullable', 'string', 'max:400'],
+            'presets.*.ornament' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'presets.*.creative' => ['nullable', 'integer', 'min:1', 'max:10'],
+        ]);
+
+        $presets = array_values(array_map(function ($p) {
+            return [
+                'name' => trim((string) ($p['name'] ?? '')),
+                'style' => trim((string) ($p['style'] ?? '')),
+                'ornament' => (int) ($p['ornament'] ?? 0),
+                'creative' => (int) ($p['creative'] ?? 8),
+            ];
+        }, $data['presets'] ?? []));
+
+        $s = \App\Models\StudioOutfitSetting::updateOrCreate(
+            ['user_id' => auth()->id()],
+            [
+                'style' => trim((string) ($data['style'] ?? '')),
+                'ornament_level' => (int) ($data['ornament_level'] ?? 0),
+                'creative_level' => (int) ($data['creative_level'] ?? 8),
+                'presets' => $presets,
+            ],
+        );
+
+        return response()->json([
+            'ok' => true,
+            'style' => $s->style,
+            'ornament_level' => $s->ornament_level,
+            'creative_level' => $s->creative_level,
+            'presets' => $s->presets,
+        ]);
+    }
+
+    /**
      * Dựng prompt cuối cho Card Ghép ảnh — dùng chung bởi compose() và composePreview()
      * để bản xem trước khớp 100% với prompt thực gửi.
      *
@@ -652,9 +712,9 @@ class StudioController extends Controller
         $isTryon = ($data['mode'] ?? '') === 'tryon';
         $isFaceSwap = ($data['mode'] ?? '') === 'faceswap';
         $isOutfit = ($data['mode'] ?? '') === 'outfit';
-        $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
+        $creativeLevel = (int) ($data['creative_level'] ?? 8);
         $style = trim((string) ($data['style'] ?? ''));
-        $ornamentLevel = (int) ($data['ornament_level'] ?? 3);
+        $ornamentLevel = (int) ($data['ornament_level'] ?? 0);
 
         if ($isTryon) {
             // Thử đồ ảo (chiến lược): @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tuỳ chọn).

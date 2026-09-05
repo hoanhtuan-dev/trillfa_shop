@@ -127,6 +127,8 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/reimagine', [StudioController::class, 'reimagine'])->name('reimagine');
     Route::post('/compose', [StudioController::class, 'compose'])->name('compose');
     Route::post('/compose/preview', [StudioController::class, 'composePreview'])->name('compose.preview');
+    Route::get('/outfit-settings', [StudioController::class, 'outfitSettings'])->name('outfit-settings');
+    Route::post('/outfit-settings', [StudioController::class, 'saveOutfitSettings'])->name('outfit-settings.save');
     Route::post('/remove-bg', [StudioController::class, 'removeBackground'])->name('remove-bg');
     Route::post('/face-swap', [StudioController::class, 'faceSwap'])->name('face-swap');
     Route::post('/generations/{generation}/region', [StudioController::class, 'regionEdit'])->name('region');

@@ -8,16 +8,16 @@ const store = useStudioStore();
 
 const prompt = ref('');
 const variants = ref(1);
-const creativeLevel = ref(6);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
+const creativeLevel = ref(8);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
 const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
-const ornamentLevel = ref(3);   // mức độ trang trí (0–10; 0 = tối giản, 10 = cầu kỳ) — dùng cho chế độ Ghép Trang Phục
+const ornamentLevel = ref(0);   // mức độ trang trí (0–10; 0 = tối giản, 10 = cầu kỳ) — dùng cho chế độ Ghép Trang Phục
 const busy = ref(false);
 const previewOpen = ref(false);
 const previewPrompt = ref('');
 const previewLoading = ref(false);
 const previewDirty = ref(false);
 const previewAxes = ref([]);
-const stylePresets = ref([]);   // preset phong cách (lưu localStorage)
+const stylePresets = ref([]);   // preset phong cách (lưu database theo tài khoản)
 const presetName = ref('');
 const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
 const open = ref(false);
@@ -113,7 +113,7 @@ function insertTag(tag) {
 
 onMounted(() => {
   timer = setInterval(() => { now.value = Date.now(); }, 1000);
-  loadPresets();
+  loadOutfitSettings();
 });
 onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 
@@ -163,30 +163,60 @@ async function loadPreview() {
 
 function onPreviewEdit() { previewDirty.value = true; }
 
-// ── Preset phong cách (lưu localStorage) ──
-const PRESET_KEY = 'trillfa.studio.outfit.presets';
-function loadPresets() {
-  try { stylePresets.value = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); } catch (e) { stylePresets.value = []; }
+// ── Preset phong cách + cài đặt (lưu database theo tài khoản) ──
+async function loadOutfitSettings() {
+  try {
+    const r = await fetch('/studio/outfit-settings', { headers: { Accept: 'application/json' } });
+    const d = await r.json();
+    if (!r.ok) return;
+    style.value = d.style || '';
+    ornamentLevel.value = Number(d.ornament_level) ?? 0;
+    creativeLevel.value = Number(d.creative_level) ?? 8;
+    stylePresets.value = Array.isArray(d.presets) ? d.presets : [];
+  } catch (e) { /* giữ mặc định */ }
+}
+async function persistOutfitSettings() {
+  try {
+    const res = await fetch('/studio/outfit-settings', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        style: style.value,
+        ornament_level: Number(ornamentLevel.value) ?? 0,
+        creative_level: Number(creativeLevel.value) ?? 8,
+        presets: stylePresets.value,
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.message || 'Không lưu được cài đặt.');
+    return true;
+  } catch (e) {
+    store.toast(e.message || 'Lỗi lưu cài đặt.', 'error');
+    return false;
+  }
 }
 function savePreset() {
   const name = presetName.value.trim();
   if (!name) { store.toast('Nhập tên preset.', 'error'); return; }
-  const p = { name, style: style.value, ornament: Number(ornamentLevel.value) ?? 3, creative: Number(creativeLevel.value) ?? 6 };
+  const p = { name, style: style.value, ornament: Number(ornamentLevel.value) ?? 0, creative: Number(creativeLevel.value) ?? 8 };
   const i = stylePresets.value.findIndex((x) => x.name === name);
   if (i >= 0) stylePresets.value[i] = p; else stylePresets.value.push(p);
-  try { localStorage.setItem(PRESET_KEY, JSON.stringify(stylePresets.value)); } catch (e) {}
   presetName.value = '';
+  persistOutfitSettings();
   store.toast('Đã lưu preset "' + name + '".');
 }
 function applyPreset(p) {
   style.value = p.style || '';
-  ornamentLevel.value = Number(p.ornament) ?? 3;
-  creativeLevel.value = Number(p.creative) ?? 6;
+  ornamentLevel.value = Number(p.ornament) ?? 0;
+  creativeLevel.value = Number(p.creative) ?? 8;
   store.toast('Đã áp preset "' + p.name + '".');
 }
 function deletePreset(p) {
   stylePresets.value = stylePresets.value.filter((x) => x.name !== p.name);
-  try { localStorage.setItem(PRESET_KEY, JSON.stringify(stylePresets.value)); } catch (e) {}
+  persistOutfitSettings();
+}
+function saveSettings() {
+  persistOutfitSettings().then((ok) => { if (ok) store.toast('Đã lưu cài đặt Ghép Trang Phục.'); });
 }
 </script>
 <template>
@@ -263,9 +293,12 @@ function deletePreset(p) {
     </div>
     <p v-if="mode === 'outfit'" class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Thấp = bám sát 2 trang phục gốc · Cao = tự do lai tạo, editorial.</p>
 
-    <!-- Preset phong cách (lưu nhanh) -->
+    <!-- Preset phong cách + lưu cài đặt (database) -->
     <div v-if="mode === 'outfit'" class="mt-3">
-      <label class="label">Preset phong cách</label>
+      <div class="flex items-center justify-between">
+        <label class="label mb-0">Preset phong cách</label>
+        <button @click="saveSettings" class="btn-ghost btn-sm shrink-0 whitespace-nowrap" title="Lưu phong cách + trang trí + sáng tạo hiện tại vào tài khoản">💾 Lưu cài đặt</button>
+      </div>
       <div class="mt-1 flex flex-wrap gap-1.5">
         <button v-for="p in stylePresets" :key="p.name" @click="applyPreset(p)" class="group inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-[10px] font-medium text-cream-200 transition hover:border-brand-400">
           {{ p.name }}
@@ -275,7 +308,7 @@ function deletePreset(p) {
       </div>
       <div class="mt-1.5 flex gap-1.5">
         <input v-model="presetName" type="text" maxlength="60" class="input !py-1.5 !text-xs" placeholder="Tên preset (VD: Bộ sưu tập Xuân)">
-        <button @click="savePreset" class="btn-ghost btn-sm shrink-0 whitespace-nowrap">Lưu</button>
+        <button @click="savePreset" class="btn-ghost btn-sm shrink-0 whitespace-nowrap">Lưu preset</button>
       </div>
     </div>
 
