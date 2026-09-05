@@ -122,6 +122,8 @@ export const useStudioStore = defineStore('studio', {
     inpaintError: '',         // thông báo lỗi cuối
     inpaintPreserveBg: true,  // giữ nguyên nền
     inpaintPreserveFace: true,// giữ nguyên khuôn mặt
+    inpaintModels: [],        // các model chỉnh sửa được phép chọn (load từ /studio/defaults)
+    inpaintModel: '',         // model đang chọn cho card Sửa ảnh — '' = mặc định (Qwen Edit cấu hình)
     // ── Inpaint Mask (tích hợp region selection vào Inpaint) ──
     inpaintMaskMode: 'none',   // 'none' | 'rect' | 'brush' — chọn vùng cần sửa
     inpaintMaskBox: { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }, // vùng mask mặc định = 15% ảnh (giữa), nhỏ để dễ thao tác
@@ -246,6 +248,8 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.suggest_enabled !== undefined) this.suggestEnabled = !!defaults.suggest_enabled;
       if (defaults.suggest_default_lang) this.suggestLang = defaults.suggest_default_lang === 'vi' ? 'vi' : 'en';
       if (defaults.image_credits != null) this.imageCreditCost = Number(defaults.image_credits);
+      // Card Sửa ảnh: danh sách model chỉnh sửa (mặc định đứng đầu).
+      if (Array.isArray(defaults.inpaint_models)) this.inpaintModels = defaults.inpaint_models;
     },
     applyDefaults() {
       // Re-fetch and apply default values (used by reset button)
@@ -1645,6 +1649,9 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintStartTs = Date.now();
       try {
         const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: this.upscaleSrc || src, feather: Number(this.inpaintFeather) || 0 };
+        // Model do người dùng CHỌN trên card Sửa ảnh ('' = mặc định: Qwen Edit trong Cài đặt).
+        const selModel = this.inpaintModel ? this.inpaintModels.find(o => o.provider + ':' + o.model === this.inpaintModel) : null;
+        if (selModel) { body.provider = selModel.provider; body.model = selModel.model; }
         // Gửi mask đã LƯU (bấm "Xong") — dù overlay công cụ đã tắt vẫn xử lý đúng vùng.
         if (this.inpaintMaskDone && this._inpaintMaskKind) {
           body.mask_mode = this._inpaintMaskKind;

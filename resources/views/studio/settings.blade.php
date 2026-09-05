@@ -134,10 +134,11 @@
                     <datalist id="qwen-edit-models">
                         <option value="qwen-image-edit"></option>
                         <option value="qwen-image-edit-plus"></option>
+                        <option value="qwen-image-3.0-pro"></option>
                         <option value="wanx2.1-imageedit"></option>
                         <option value="wanx2.1-imageedit-plus"></option>
                     </datalist>
-                    <p class="mt-1 text-xs text-ink-500">Có nhiều model edit ảnh chuyên dụng của Qwen (qwen-image-edit, qwen-image-edit-plus, wanx2.1-imageedit…). Nhập đúng model tài khoản bạn hỗ trợ; dùng chung khoá <strong>Qwen / Wan</strong> ở trang API.</p>
+                    <p class="mt-1 text-xs text-ink-500">Có nhiều model edit ảnh chuyên dụng của Qwen (qwen-image-edit, qwen-image-edit-plus, wanx2.1-imageedit…). Các model sinh ảnh <strong>qwen-image-*</strong> (vd qwen-image-3.0-pro) cũng chỉnh sửa được ảnh. Nhập đúng model tài khoản bạn hỗ trợ; dùng chung khoá <strong>Qwen / Wan</strong> ở trang API.</p>
                 </div>
 
                 <div>

@@ -194,6 +194,10 @@ class StudioController extends Controller
             // nên build mask & base phải dùng ĐÚNG ảnh này (không phải generation.media_url).
             'source_url' => ['nullable', 'string', 'max:2048'],
             'feather' => ['nullable', 'integer', 'min:0', 'max:50'],
+            // Model chỉnh sửa do người dùng CHỌN trên card Sửa ảnh (vd qwen-image-3.0-pro).
+            // Chỉ model edit-capable được tôn trọng; sai/không chọn → model Qwen Edit cấu hình.
+            'provider' => ['nullable', 'string', 'max:40'],
+            'model' => ['nullable', 'string', 'max:255'],
         ]);
 
         $preserveBg = ! empty($data['preserve_background']);
@@ -1368,8 +1372,19 @@ RULES:
         $user->decrement('credits_balance', $cost);
 
         if (! empty($data['edit'])) {
-            $provider = 'qwen';
-            $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+            // Per-request override from the Sửa ảnh card (e.g. qwen-image-3.0-pro). Only
+            // edit-capable models are honored — anything else keeps the configured Qwen
+            // Edit model so a wrong pick can never break editing.
+            $override = trim((string) ($data['model'] ?? ''));
+            if ($override !== '' && app(\App\Services\ImageAIService::class)->isImageEditCapableModel($override)) {
+                $provider = in_array((string) ($data['provider'] ?? ''), ['qwen', 'wan', 'dashscope'], true)
+                    ? (string) $data['provider']
+                    : 'qwen';
+                $model = $override;
+            } else {
+                $provider = 'qwen';
+                $model = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+            }
         } else {
             // Explicit provider/model from the registry selector wins; else resolve the default.
             [$provider, $model] = (! empty($data['provider']) && ! empty($data['model']))
@@ -4163,6 +4178,36 @@ RULES:
      */
     public function defaults(): \Illuminate\Http\JsonResponse
     {
+        // Options for the "Sửa ảnh" card model selector: the configured Qwen Edit model first
+        // (default), then edit-capable image models (e.g. qwen-image-3.0-pro) from the settings
+        // model + registry — same candidate list as 2D generation, filtered to what can edit.
+        $imageAi = app(\App\Services\ImageAIService::class);
+        $editDefault = (string) studio_config('qwen_edit_model', 'qwen-image-edit');
+        $inpaintModels = [];
+        $seen = [];
+        $addEditOption = function (string $provider, string $model, bool $default = false) use (&$inpaintModels, &$seen) {
+            if ($model === '' || isset($seen[$provider.':'.$model])) {
+                return;
+            }
+            $seen[$provider.':'.$model] = true;
+            $inpaintModels[] = [
+                'provider' => $provider,
+                'model' => $model,
+                'label' => $model.($default ? ' (mặc định)' : ''),
+                'default' => $default,
+            ];
+        };
+        $addEditOption('qwen', $editDefault, true);
+        foreach (studio_model_candidates('image') as $c) {
+            $p = (string) ($c['provider'] ?? '');
+            $m = (string) ($c['model'] ?? '');
+            // The edit pipeline only speaks DashScope-family hosts; skip other providers.
+            if (! in_array($p, ['qwen', 'wan', 'dashscope'], true) || ! $imageAi->isImageEditCapableModel($m)) {
+                continue;
+            }
+            $addEditOption($p, $m);
+        }
+
         return response()->json([
             'creative_level' => (int) studio_config('creative_level', 6),
             'texture' => (int) studio_config('texture', 5),
@@ -4176,6 +4221,8 @@ RULES:
             'suggest_enabled' => studio_suggest_enabled(),
             'suggest_default_lang' => (string) studio_suggest_config('default_lang', 'en'),
             'image_credits' => (int) studio_config('image_credits', 1),
+            // Card Sửa ảnh: các model chỉnh sửa được phép chọn (mặc định đứng đầu).
+            'inpaint_models' => $inpaintModels,
         ]);
     }
 

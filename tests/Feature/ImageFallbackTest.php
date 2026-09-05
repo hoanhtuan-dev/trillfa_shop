@@ -119,4 +119,57 @@ class ImageFallbackTest extends TestCase
         $this->assertSame('', (string) $res['base_url']);
         $this->assertStringContainsString('Chưa có KEY', (string) $res['note']);
     }
+
+    public function test_inpaint_uses_requested_edit_capable_image_model(): void
+    {
+        // Sửa ảnh với model tạo ảnh qwen-image-3.0-pro (do người dùng chọn) phải gửi ĐÚNG
+        // model đó tới DashScope thay vì luôn dùng qwen_edit_model cấu hình.
+        config(['studio.image_provider' => 'qwen']);
+        config(['studio.qwen_key' => 'sk-ws-test-paygo']);
+
+        // Ảnh nguồn + ảnh "kết quả từ provider" phải tồn tại trên đĩa (imageDataUri /
+        // storeRemoteImage đọc qua filesystem thật, không qua Http fake).
+        $srcRel = 'studio/edit-src-'.uniqid().'.png';
+        $srcAbs = storage_path('app/public/'.$srcRel);
+        $outAbs = storage_path('app/public/studio/edit-out-'.uniqid().'.png');
+        foreach ([$srcAbs, $outAbs] as $abs) {
+            if (! is_dir(dirname($abs))) {
+                mkdir(dirname($abs), 0777, true);
+            }
+            $im = imagecreatetruecolor(64, 64);
+            imagepng($im, $abs);
+            imagedestroy($im);
+        }
+
+        try {
+            Http::fake([
+                'dashscope-intl.aliyuncs.com*' => Http::response([
+                    'output' => ['choices' => [['message' => ['content' => [
+                        ['image' => 'file://'.$outAbs],
+                    ]]]]],
+                ], 200),
+            ]);
+
+            $service = app(ImageAIService::class);
+            $url = $service->generate(
+                'change the dress color to red',
+                '/storage/'.$srcRel,
+                null, null, null, null,
+                'qwen', 'qwen-image-3.0-pro',
+            );
+
+            $this->assertIsString($url);
+            $this->assertSame('qwen-image-3.0-pro', $service->lastModel());
+            Http::assertSent(function ($request) {
+                return str_contains($request->url(), 'multimodal-generation/generation')
+                    && $request['model'] === 'qwen-image-3.0-pro';
+            });
+        } finally {
+            foreach ([$srcAbs, $outAbs] as $abs) {
+                if (is_file($abs)) {
+                    @unlink($abs);
+                }
+            }
+        }
+    }
 }

@@ -53,6 +53,11 @@ const activeGen = computed(() => store.inpaintGenId ? store.generations.find(g =
 const canSubmit = computed(() => !!store.previewId && !!store.preview?.media_url && !store.inpainting && !!store.inpaintPrompt.trim());
 const running = computed(() => store.inpaintStage === 'send' || store.inpaintStage === 'processing');
 const maskActive = computed(() => store.inpaintMaskMode !== 'none');
+// Nhãn tùy chọn mặc định: model Qwen Edit đang cấu hình (mục default từ /studio/defaults).
+const defaultEditLabel = computed(() => {
+  const d = store.inpaintModels.find(o => o.default) || store.inpaintModels[0];
+  return d ? ('Mặc định — ' + d.model) : 'Mặc định (Qwen Edit trong Cài đặt)';
+});
 </script>
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
@@ -159,6 +164,14 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
         </button>
       </div>
     </BaseModal>
+
+    <label class="label mt-4">Model chỉnh sửa</label>
+    <select v-model="store.inpaintModel" class="input !py-2 !text-xs" title="Model dùng để sửa ảnh — mặc định theo “Qwen Edit” trong Cài đặt">
+      <option value="">{{ defaultEditLabel }}</option>
+      <template v-for="o in store.inpaintModels" :key="o.provider + ':' + o.model">
+        <option v-if="!o.default" :value="o.provider + ':' + o.model">{{ o.label }}</option>
+      </template>
+    </select>
 
     <label class="label mt-4">Mô tả chỉnh sửa</label>
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước…"></textarea>

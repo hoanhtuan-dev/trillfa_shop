@@ -62,7 +62,13 @@ class ImageAIService
         // Inpaint: when a source (base) image is supplied, use the dedicated Qwen image-edit model
         // WITH that image as input so the change applies to it (real editing), not a fresh text2image.
         if ($baseImage && (studio_api_key('qwen_edit') || $this->providerKey() || $dashscopeKey)) {
-            $edited = $this->editImage($prompt, $baseImage, null, $faceRef, null, $maskImage, $refImages);
+            // A requested model that is itself edit-capable (e.g. qwen-image-3.0-pro picked in the
+            // "Sửa ảnh" card) wins over the configured Qwen Edit model; anything else (text/vision
+            // models, unknown ids) keeps the configured edit model so editing never breaks.
+            $editModel = ($modelOverride && $this->isImageEditCapableModel($modelOverride))
+                ? $modelOverride
+                : null;
+            $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, null, $maskImage, $refImages);
             if ($edited) {
                 // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
                 // về ĐÚNG kích thước ảnh nguồn để kết quả khớp khung hình ban đầu.
@@ -81,7 +87,7 @@ class ImageAIService
             // Inpaint must NOT silently fall through to text2image — that produces a brand-new image
             // instead of editing the source. Surface the real error so the user can fix the edit model.
             logger()->warning('Inpaint failed: edit model returned no result (no text2image fallback)', [
-                'model' => studio_config('qwen_edit_model', 'qwen-image-edit'),
+                'model' => $editModel ?: (string) studio_config('qwen_edit_model', 'qwen-image-edit'),
                 'err' => $this->dashscopeError,
             ]);
             throw new \RuntimeException($this->dashscopeError ?: 'Không thể chỉnh sửa ảnh (model edit không trả kết quả). Kiểm tra model “Qwen Edit” trong Cài đặt và khoá “Qwen Edit” trong Quản lý API.');
@@ -798,8 +804,9 @@ class ImageAIService
     /**
      * Whether a model is an image-edit / image-generation model (so we don't send image content to a
      * text/vision model). Allows Qwen image models (qwen-image-3.0-pro etc.) which also do editing.
+     * Public so controllers building per-request edit-model options use the exact same gate.
      */
-    protected function isImageEditCapableModel(string $model): bool
+    public function isImageEditCapableModel(string $model): bool
     {
         $m = strtolower($model);
         return str_contains($m, 'edit') || str_contains($m, 'qwen-image') || str_contains($m, 'imagen')
