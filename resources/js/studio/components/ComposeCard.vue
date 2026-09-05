@@ -9,7 +9,7 @@ const store = useStudioStore();
 const prompt = ref('');
 const variants = ref(1);
 const busy = ref(false);
-const mode = ref('compose'); // 'compose' | 'tryon'
+const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
 const open = ref(false);
 const uploading = ref(false);
 const uploaded = ref([]);   // [{ url, name }]
@@ -80,7 +80,17 @@ const slotRoles = computed(() => mode.value === 'tryon'
   ? ['Trang phục', 'Pose', 'Bối cảnh (tùy chọn)']
   : mode.value === 'faceswap'
     ? ['Người mẫu', 'Khuôn mặt', 'Ảnh ghép (tùy chọn)']
-    : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+    : mode.value === 'outfit'
+      ? ['Trang phục 1', 'Trang phục 2', 'Bối cảnh (tùy chọn)']
+      : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+
+const promptPlaceholder = computed(() => mode.value === 'outfit'
+  ? 'VD: lai tạo trang phục từ phom dáng của @image1 và họa tiết, màu sắc của @image2…'
+  : mode.value === 'tryon'
+    ? 'VD: mặc @image1 lên người mẫu theo dáng @image2…'
+    : mode.value === 'faceswap'
+      ? 'VD: thay khuôn mặt @image2 vào người mẫu @image1…'
+      : 'VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…');
 
 function setTryon() {
   mode.value = 'tryon';
@@ -91,6 +101,11 @@ function setFaceSwap() {
   mode.value = 'faceswap';
   prompt.value = 'thay khuôn mặt của @image1 bằng khuôn mặt trong @image2, giữ nguyên dáng, trang phục, bối cảnh';
   store.toast('Thay khuôn mặt: @image1 = người mẫu, @image2 = khuôn mặt, @image3 = ảnh ghép (tùy chọn).');
+}
+function setOutfit() {
+  mode.value = 'outfit';
+  prompt.value = 'lai tạo trang phục mới từ @image1 và @image2: hòa trộn các đặc điểm nổi bật của cả hai (phom dáng, chất liệu, họa tiết, màu sắc, chi tiết) thành biến thể thời trang mới, đúng chuẩn thiết kế thời trang chuyên nghiệp';
+  store.toast('Ghép Trang Phục: @image1 + @image2 = trang phục, @image3 = bối cảnh (tùy chọn).');
 }
 function setCompose() {
   mode.value = 'compose';
@@ -153,7 +168,7 @@ async function run() {
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
 
     <!-- Chip chế độ -->
-    <div class="mt-3 flex gap-2">
+    <div class="mt-3 grid grid-cols-2 gap-2">
       <button @click="setCompose()" title="Ghép tự do: hòa trộn nhiều ảnh"
               :class="mode === 'compose' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="layers" size="h-5 w-5" /> Ghép tự do</button>
@@ -163,12 +178,18 @@ async function run() {
       <button @click="setFaceSwap()" title="Thay khuôn mặt người mẫu"
               :class="mode === 'faceswap' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
               class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="user" size="h-5 w-5" /> Thay khuôn mặt</button>
+      <button @click="setOutfit()" title="Ghép Trang Phục: lai tạo biến thể trang phục mới từ 2 trang phục"
+              :class="mode === 'outfit' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+              class="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition-colors"><StudioIcon name="shirt" size="h-5 w-5" /> Ghép Trang Phục</button>
     </div>
     <p v-if="mode === 'tryon'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = trang phục · @image2 = pose · @image3 = bối cảnh (tùy chọn)
     </p>
     <p v-if="mode === 'faceswap'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = người mẫu · @image2 = khuôn mặt · @image3 = ảnh ghép (tùy chọn)
+    </p>
+    <p v-if="mode === 'outfit'" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+      @image1 + @image2 = trang phục nguồn · @image3 = bối cảnh (tùy chọn) — lai tạo biến thể mới
     </p>
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-4 grid grid-cols-3 gap-2">
@@ -191,7 +212,7 @@ async function run() {
     </div>
 
     <label class="label mt-4">Mô tả ghép</label>
-    <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…"></textarea>
+    <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" :placeholder="promptPlaceholder"></textarea>
     <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
       <button v-for="n in 3" :key="n" @click="insertTag('@image' + n)"
               class="rounded-full bg-ink-800 px-2 py-0.5 font-semibold text-brand-300 transition hover:bg-brand-600 hover:text-white">@image{{ n }}</button>
