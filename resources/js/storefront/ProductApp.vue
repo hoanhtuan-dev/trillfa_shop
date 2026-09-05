@@ -88,23 +88,28 @@ onMounted(() => {
             <div class="grid gap-8 lg:grid-cols-2 lg:gap-12">
                 <!-- Gallery -->
                 <div>
-                    <div class="card-surface relative overflow-hidden rounded-[2rem]">
-                        <ProductGallery :src="images[activeImg] || product.image" :alt="product.name" />
-                        <BaseBadge v-if="onSale" variant="clay" class="absolute left-4 top-4">-{{ discount }}%</BaseBadge>
-                        <button @click="toggleWishlist" class="glass-strong absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full text-ink-900 transition hover:scale-110" :class="store.wishlistHas(product.id) ? 'text-clay-500' : ''" aria-label="Yêu thích">
-                            <Icon name="heart" :size="18" :fill="true" :stroke-width="0" />
-                        </button>
-                    </div>
-                    <div v-if="images.length > 1" class="mt-3 flex gap-3 overflow-x-auto no-scrollbar">
-                        <button
-                            v-for="(img, i) in images"
-                            :key="i"
-                            @click="activeImg = i"
-                            class="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 transition"
-                            :class="i === activeImg ? 'border-brand-500' : 'border-transparent opacity-70 hover:opacity-100'"
-                        >
-                            <img :src="img" :alt="product.name" class="h-full w-full object-cover" />
-                        </button>
+                    <div class="lg:flex lg:items-start lg:gap-4">
+                        <!-- Ảnh chính -->
+                        <div class="card-surface relative overflow-hidden rounded-[2rem] lg:flex-1">
+                            <ProductGallery :src="images[activeImg] || product.image" :alt="product.name" />
+                            <BaseBadge v-if="onSale" variant="clay" class="absolute left-4 top-4">-{{ discount }}%</BaseBadge>
+                            <button @click="toggleWishlist" class="glass-strong absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full text-ink-900 transition hover:scale-110" :class="store.wishlistHas(product.id) ? 'text-clay-500' : ''" aria-label="Yêu thích">
+                                <Icon name="heart" :size="18" :fill="true" :stroke-width="0" />
+                            </button>
+                        </div>
+
+                        <!-- Thumbnails: hàng ngang (mobile) / cột dọc bên trái ảnh chính (desktop) -->
+                        <div v-if="images.length > 1" class="no-scrollbar mt-3 flex gap-3 overflow-x-auto lg:order-first lg:mt-0 lg:max-h-[88vh] lg:w-20 lg:shrink-0 lg:flex-col lg:overflow-y-auto">
+                            <button
+                                v-for="(img, i) in images"
+                                :key="i"
+                                @click="activeImg = i"
+                                class="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 transition"
+                                :class="i === activeImg ? 'border-brand-500' : 'border-transparent opacity-70 hover:opacity-100'"
+                            >
+                                <img :src="img" :alt="product.name" class="h-full w-full object-cover" />
+                            </button>
+                        </div>
                     </div>
                 </div>
 

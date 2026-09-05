@@ -158,7 +158,7 @@
     "name": "useApi"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DjL8dp9s.css",
+    "file": "assets/app-CtvKrzMi.css",
     "name": "app",
     "names": [
       "app.css"
@@ -277,7 +277,7 @@
     ]
   },
   "resources/js/storefront/product.js": {
-    "file": "assets/product-Cb1serRj.js",
+    "file": "assets/product-CkJkqgs7.js",
     "name": "product",
     "src": "resources/js/storefront/product.js",
     "isEntry": true,
