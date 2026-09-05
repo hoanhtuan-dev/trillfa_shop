@@ -84,6 +84,18 @@ class ProductAIService
         return max(1, min($this->timeout, $left));
     }
 
+    /**
+     * Kind-aware HTTP timeout. VISION produces a short JSON (max_tokens ~400) and is
+     * fast, so it gets a hard cap — otherwise a slow/hanging vision call could eat the
+     * whole wall-clock budget and leave nothing for the (much longer) TEXT generation.
+     */
+    private function callTimeout(string $kind): int
+    {
+        $left = $this->remainingTimeout();
+
+        return $kind === 'vision' ? max(1, min($left, 25)) : $left;
+    }
+
     private function record(string $provider, string $detail): void
     {
         $this->attempts[] = $provider.': '.$detail;
@@ -303,7 +315,7 @@ class ProductAIService
         $keyId = fn (string $k) => sha1($k);
         $goodKey = Cache::get('product_ai_good_key:'.$kind);
         usort($keys, fn ($a, $b) => ($keyId($a) === $goodKey ? -1 : 0) <=> ($keyId($b) === $goodKey ? -1 : 0));
-        $fresh = array_values(array_filter($keys, fn ($k) => ! Cache::get('product_ai_bad_key:'.$keyId($k))));
+        $fresh = array_values(array_filter($keys, fn ($k) => ! Cache::get('product_ai_bad_key:'.$kind.':'.$keyId($k))));
         if (! empty($fresh)) {
             $keys = $fresh;
         }
@@ -342,7 +354,7 @@ class ProductAIService
                     : $prompt;
 
                 try {
-                    $resp = Http::withToken($key)->timeout($this->remainingTimeout())->post($base.'/chat/completions', [
+                    $resp = Http::withToken($key)->timeout($this->callTimeout($kind))->post($base.'/chat/completions', [
                         'model' => $model,
                         'messages' => [['role' => 'user', 'content' => $content]],
                         'temperature' => $this->temperature,
@@ -351,11 +363,14 @@ class ProductAIService
                         'response_format' => ['type' => 'json_object'],
                     ]);
                 } catch (\Throwable $e) {
-                    // A key that hangs is useless for this task — remember it and move on.
-                    Cache::put('product_ai_bad_key:'.$keyId($key), true, 300);
+                    // A network/timeout is NOT a permanent key failure — it usually
+                    // just means this model is slow for this kind of output. Try the
+                    // next model on the SAME key (a faster model may fit the budget)
+                    // and NEVER poison the key, otherwise the working vision key
+                    // would be dropped by a slow text attempt.
                     $this->record('qwen', 'network/timeout ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
 
-                    continue 2; // network error on this key -> next key
+                    continue;
                 }
 
                 $status = $resp->status();
@@ -363,7 +378,7 @@ class ProductAIService
 
                 // 429 = rate/quota limit on this key -> remember it and skip to the next key.
                 if ($status === 429 || is_qwen_quota_error($body)) {
-                    Cache::put('product_ai_bad_key:'.$keyId($key), true, 600);
+                    Cache::put('product_ai_bad_key:'.$kind.':'.$keyId($key), true, 600);
                     $this->record('qwen', '429/quota ('.$kind.', '.$model.', key '.$keyPrefix($key).')');
 
                     continue 2;
@@ -378,7 +393,7 @@ class ProductAIService
                     $json = $this->parseJson((string) data_get($resp->json(), 'choices.0.message.content'));
                     if ($json) {
                         Cache::put('product_ai_good_key:'.$kind, $keyId($key), 3600);
-                        Cache::forget('product_ai_bad_key:'.$keyId($key));
+                        Cache::forget('product_ai_bad_key:'.$kind.':'.$keyId($key));
                         $this->attempts[] = 'qwen: ok ('.$kind.', '.$model.', key '.$keyPrefix($key).')';
 
                         return $json;
@@ -415,7 +430,7 @@ class ProductAIService
         $model = product_ai_deepseek_model();
 
         try {
-            $resp = Http::withToken($key)->timeout($this->remainingTimeout())
+            $resp = Http::withToken($key)->timeout($this->callTimeout($kind))
                 ->post(deepseek_base_url($key).'/chat/completions', [
                     'model' => $model,
                     'messages' => [['role' => 'user', 'content' => $prompt]],
@@ -466,7 +481,7 @@ class ProductAIService
         }
 
         try {
-            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(min($this->timeout + 3, $this->remainingTimeout()))
+            $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout($this->callTimeout($kind))
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
                     'contents' => [['parts' => $parts]],
                 ]);

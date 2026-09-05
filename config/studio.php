@@ -101,8 +101,8 @@ return [
         'gemini_text_model' => env('STUDIO_PRODUCT_AI_GEMINI_TEXT_MODEL', 'gemini-2.5-flash'),
         'gemini_vision_model' => env('STUDIO_PRODUCT_AI_GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
         'deepseek_model' => env('STUDIO_PRODUCT_AI_DEEPSEEK_MODEL', 'deepseek-chat'),
-        'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 30), // đủ cho call text ~15s (không cắt ngang như 12s cũ)
-        'total_budget_seconds' => (int) env('STUDIO_PRODUCT_AI_TOTAL_BUDGET', 25), // trần tổng cho một lần bấm AI
+        'timeout_seconds' => (int) env('STUDIO_PRODUCT_AI_TIMEOUT', 55), // TEXT sinh mô tả dài cần ~30-50s (vision chỉ ~10s)
+        'total_budget_seconds' => (int) env('STUDIO_PRODUCT_AI_TOTAL_BUDGET', 55), // trần tổng cho một lần bấm AI (dưới gateway 60s)
         'max_models' => (int) env('STUDIO_PRODUCT_AI_MAX_MODELS', 2),
         'max_keys' => (int) env('STUDIO_PRODUCT_AI_MAX_KEYS', 3),
         'downscale_max' => (int) env('STUDIO_PRODUCT_AI_DOWNSCALE_MAX', 640),

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
-import BaseModal from './BaseModal.vue';
+import SourceLibraryPicker from './SourceLibraryPicker.vue';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
@@ -18,12 +18,8 @@ const previewLoading = ref(false);
 const previewDirty = ref(false);
 const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
 const open = ref(false);
-const uploading = ref(false);
-const uploaded = ref([]);   // [{ url, name }]
-const poses = ref([]);      // pose presets từ Settings
 const selected = ref([null, null, null]); // 3 slot cố định: image object hoặc null
 const targetSlot = ref(0);  // slot đang chọn trong popup
-const fileEl = ref(null);
 
 const baseUrl = ref('');
 const lastIds = ref([]);
@@ -40,16 +36,6 @@ const doneCount = computed(() => store.composeGenIds.filter(id => store.generati
 
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
-const genImages = computed(() => store.generations
-  .filter(g => g.media_url && g.type !== 'video' && g.status !== 'failed')
-  .map(g => ({ key: 'gen-' + g.id, url: g.media_url, label: '#' + g.id })));
-
-const poseImages = computed(() => poses.value
-  .filter(p => p.image)
-  .map(p => ({ key: 'pose-' + p.id, url: p.image, label: p.name, skeleton: p.skeleton || p.description || '' })));
-
-const upImages = computed(() => uploaded.value.map((u, i) => ({ key: 'up-' + i + '-' + u.name, url: u.url, label: u.name })));
-
 const selectedImgs = computed(() => selected.value.filter(Boolean));
 const selectedCount = computed(() => selectedImgs.value.length);
 
@@ -59,7 +45,7 @@ function openSlot(i) {
 }
 
 // Bấm 1 ảnh trong popup → gán vào slot đang chọn
-function pick(img) {
+function onPick(img) {
   selected.value[targetSlot.value] = img;
   open.value = false;
 }
@@ -122,38 +108,10 @@ function insertTag(tag) {
   prompt.value = (prompt.value ? prompt.value + ' ' : '') + tag + ' ';
 }
 
-onMounted(async () => {
+onMounted(() => {
   timer = setInterval(() => { now.value = Date.now(); }, 1000);
-  try {
-    const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } });
-    const d = await r.json();
-    poses.value = d.items || [];
-  } catch (e) { poses.value = []; }
 });
 onBeforeUnmount(() => { if (timer) clearInterval(timer); });
-
-async function uploadImage(e) {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  uploading.value = true;
-  try {
-    const fd = new FormData();
-    fd.append('image', file);
-    const res = await fetch('/studio/upload-ref', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
-    const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(d.message || 'Lỗi tải ảnh.');
-    const img = { key: 'up-' + uploaded.value.length + '-' + d.name, url: d.url, label: file.name };
-    uploaded.value.push({ url: d.url, name: d.name || file.name });
-    selected.value[targetSlot.value] = img;
-    open.value = false;
-    store.toast('Đã tải ảnh vào ' + roleLabel(targetSlot.value) + '.');
-  } catch (err) {
-    store.toast(err.message || 'Lỗi tải ảnh.', 'error');
-  } finally {
-    uploading.value = false;
-    if (fileEl.value) fileEl.value.value = '';
-  }
-}
 
 async function run() {
   if (selectedCount.value < 2 || busy.value) return;
@@ -339,46 +297,13 @@ function onPreviewEdit() { previewDirty.value = true; }
 
     <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">So sánh Trước/Sau</button>
 
-    <!-- Popup chọn/tải ảnh cho slot -->
-    <BaseModal v-model="open" :title="'Tải ảnh cho ' + roleLabel(targetSlot)" wide>
-      <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
-        <p class="font-semibold">@image{{ targetSlot + 1 }} = {{ slotRoles[targetSlot] }}</p>
-      </div>
-
-      <!-- Tải từ máy -->
-      <label class="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand-500/40 bg-brand-900/20 px-3 py-2.5 text-xs font-semibold text-brand-200 transition hover:bg-brand-900/40">
-        <span>{{ uploading ? 'Đang tải lên…' : 'Tải ảnh từ máy' }}</span>
-        <input ref="fileEl" type="file" accept="image/*" class="hidden" @change="uploadImage">
-      </label>
-
-      <!-- Vùng cuộn: pose + ảnh, lưới vuông -->
-      <div class="max-h-[52vh] overflow-y-auto pr-1">
-        <!-- Pose presets -->
-        <template v-if="poseImages.length">
-          <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="pose" size="h-4 w-4" /> Pose (dáng)</p>
-          <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            <button v-for="p in poseImages" :key="p.key" @click="pick(p)"
-                    class="relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
-              <img :src="p.url" class="h-full w-full bg-ink-900 object-cover" loading="lazy">
-              <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.label }}</span>
-            </button>
-          </div>
-        </template>
-
-        <!-- Ảnh của bạn (Outputs + đã tải lên) -->
-        <template v-if="genImages.length || upImages.length">
-          <p class="mb-1.5 mt-3 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="image" size="h-4 w-4" /> Ảnh của bạn</p>
-          <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            <button v-for="g in [...genImages, ...upImages]" :key="g.key" @click="pick(g)"
-                    class="relative aspect-square overflow-hidden rounded-xl border-2 border-ink-700 transition hover:border-brand-400">
-              <img :src="g.url" class="h-full w-full bg-ink-900 object-cover" loading="lazy">
-              <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ g.label }}</span>
-            </button>
-          </div>
-        </template>
-        <p v-if="!poseImages.length && !genImages.length && !upImages.length" class="rounded-2xl border border-dashed border-ink-600 p-4 text-center text-xs text-cream-300/60">Chưa có ảnh — hãy tải lên từ máy.</p>
-      </div>
-    </BaseModal>
+    <!-- Popup chọn/tải ảnh cho slot (dùng chung Thư viện ảnh nguồn) -->
+    <SourceLibraryPicker
+      v-model="open"
+      :title="'Tải ảnh cho ' + roleLabel(targetSlot) + ' · ' + slotRoles[targetSlot]"
+      mode="pick"
+      :include-poses="mode === 'tryon'"
+      @pick="onPick" />
 
     <!-- So sánh Trước/Sau -->
     <CompareSlider v-model="compareOpen" :before="baseUrl" :after="afterUrl" title="So sánh Trước/Sau khi ghép" />
