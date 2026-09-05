@@ -16,21 +16,11 @@ const similarity = ref(70);
 const variants = ref(1);
 const busy = ref(false);
 
-// Model sinh ảnh mặc định = qwen-image-3.0-pro; cho phép chọn từ các model edit-capable
-// (defaults.inpaint_models). Sử dụng .slice() để KHÔNG đột biến state store khi chèn default.
-const options = computed(() => {
-  const list = Array.isArray(store.inpaintModels) ? store.inpaintModels.slice() : [];
-  const hasDefault = list.some(o => o.provider === 'qwen' && o.model === 'qwen-image-3.0-pro');
-  if (!hasDefault) {
-    list.unshift({ provider: 'qwen', model: 'qwen-image-3.0-pro', label: 'qwen-image-3.0-pro (mặc định)', default: false });
-  }
-  return list;
-});
-const modelKey = ref('qwen:qwen-image-3.0-pro');
-const selectedModel = computed(() => {
-  const [provider, model] = (modelKey.value || '').split(':');
-  return provider && model ? { provider, model } : null;
-});
+// Không còn dropdown chọn model trên card này: backend refgen đã mặc định dùng model
+// sinh ảnh (qwen-image-3.0-pro / qwen_model trong Cài đặt) và tự fallback đúng model
+// sinh ảnh — không cần người dùng chọn. Danh sách trước đây lấy từ store.inpaintModels
+// (model EDIT) nên sai ngữ cảnh. Việc xoá tránh nhận nhầm "phải chọn mới có model".
+// selectedModel = null → refgen gửi không kèm provider/model → backend dùng default settings.
 
 // Cho phép tạo ngay cả khi chưa nhập mô tả — backend tự dựng prompt "create a fresh variation".
 const canSubmit = computed(() => !!img.value && !busy.value);
@@ -128,7 +118,8 @@ async function runRefgen() {
   if (!canSubmit.value) return;
   busy.value = true;
   // Ảnh tham chiếu có thể là data:URL (canvas flattened) → backend downscaleSource xử lý.
-  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, selectedModel.value);
+  // Không truyền selectedModel → backend dùng model sinh ảnh đã cấu hình trong Cài đặt.
+  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null);
   busy.value = false;
   if (items && items.length) {
     store.toast('Đã gửi ' + items.length + ' ảnh mới — đang tạo…');
@@ -180,12 +171,6 @@ async function runRefgen() {
         <span class="truncate">{{ a.label }}</span>
       </button>
     </div>
-
-    <!-- Model -->
-    <label class="label mt-4">Model</label>
-    <select v-model="modelKey" class="input !py-2 !text-xs" title="Model sinh ảnh nhận ảnh tham chiếu — mặc định qwen-image-3.0-pro">
-      <option v-for="o in options" :key="o.provider + ':' + o.model" :value="o.provider + ':' + o.model">{{ o.label }}</option>
-    </select>
 
     <!-- Mô tả -->
     <label class="label mt-4">Mô tả ảnh mới <span class="text-cream-300/40">(để trống = tạo biến thể giống ảnh mẫu)</span></label>
