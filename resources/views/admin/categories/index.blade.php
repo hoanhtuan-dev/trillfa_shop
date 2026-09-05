@@ -9,11 +9,14 @@
         'id' => $c->id, 'name' => $c->name, 'slug' => $c->slug, 'parent_id' => $c->parent_id,
         'description' => $c->description, 'sort_order' => $c->sort_order,
         'is_active' => $c->is_active, 'image' => $c->image_url, 'icon' => $c->icon,
+        'icon_image' => $c->icon_image_url,
     ])->values();
     $parents = $categories->whereNull('parent_id');
+    // URL gốc cho route update — thay __ID__ bằng id thật khi sửa (chống 405 khi app chạy sub-path/domain khác).
+    $updateUrl = str_replace('__ID__', '', route('admin.categories.update', ['category' => '__ID__'])) . '{id}';
 @endphp
 
-<div class="grid gap-6 lg:grid-cols-2" x-data="categoryForm({{ Js::from($catItems) }}, '{{ route('admin.categories.store') }}')">
+<div class="grid gap-6 lg:grid-cols-2" x-data="categoryForm({{ Js::from($catItems) }}, '{{ route('admin.categories.store') }}', '{{ $updateUrl }}')">
     <div class="card overflow-hidden">
         <div class="border-b border-cream-200 p-5"><h2 class="font-display text-lg font-semibold text-ink-900">Danh sách danh mục</h2></div>
         <table class="w-full text-sm">
@@ -50,9 +53,9 @@
 
     <div class="card p-6 h-fit">
         <h2 class="mb-4 font-display text-lg font-semibold text-ink-900" x-text="editing ? 'Sửa danh mục' : 'Thêm danh mục'"></h2>
-        <form :action="formAction" method="POST" enctype="multipart/form-data" class="space-y-4">
+        <form :action="formAction" method="POST" action="{{ route('admin.categories.store') }}" enctype="multipart/form-data" class="space-y-4">
             @csrf
-            <input type="hidden" name="_method" :value="formMethod">
+            <input type="hidden" name="_method" value="POST" :value="formMethod">
             <input type="hidden" name="is_active" value="0">
             <div>
                 <label class="label">Tên *</label>
@@ -129,15 +132,18 @@
 @push('scripts')
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('categoryForm', (items, createUrl) => ({
-        items, createUrl,
+    Alpine.data('categoryForm', (items, createUrl, updateUrl) => ({
+        items, createUrl, updateUrl,
         editing: null,
         form: { id: null, name: '', parent_id: '', description: '', sort_order: 0, is_active: true, icon: 'tag' },
         imagePreview: null,
         iconPreview: null,
         iconRemove: false,
         fileName: '',
-        get formAction() { return this.editing ? '/admin/categories/' + this.editing : this.createUrl; },
+        get formAction() {
+            if (this.editing) return this.updateUrl.replace('{id}', this.editing);
+            return this.createUrl;
+        },
         get formMethod() { return this.editing ? 'PUT' : 'POST'; },
         edit(id) {
             const c = this.items.find(x => x.id === id);
