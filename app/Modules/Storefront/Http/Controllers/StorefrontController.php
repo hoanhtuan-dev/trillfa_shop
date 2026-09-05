@@ -176,7 +176,10 @@ class StorefrontController extends Controller
         $payload = $this->bridge->staticPage($key, $slug);
         $title = $payload['page']['title'] ?? 'Trang';
 
-        seo()->title($title.' | '.setting('site_name'))->description($payload['page']['intro'] ?? '');
+        // Intro giờ là rich text (admin soạn bằng rich editor) — bỏ thẻ HTML khi dùng cho SEO description.
+        $introText = trim(strip_tags((string) ($payload['page']['intro'] ?? '')));
+
+        seo()->title($title.' | '.setting('site_name'))->description($introText);
 
         return view('storefront.static', ['boot' => $payload]);
     }

@@ -8,6 +8,9 @@ const store = useStudioStore();
 
 const prompt = ref('');
 const variants = ref(1);
+// Thử đồ ảo best-of-N + chấm điểm: số bản candidates + tự chấm điểm từng bản (vision QA).
+const bestOf = ref(3);
+const scoring = ref(true);
 const creativeLevel = ref(8);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
 const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
 const ornamentLevel = ref(0);   // mức độ trang trí (0–10; 0 = tối giản, 10 = cầu kỳ) — dùng cho chế độ Ghép Trang Phục
@@ -38,6 +41,11 @@ const running = computed(() => store.composeStage === 'send' || store.composeSta
 const doneCount = computed(() => store.composeGenIds.filter(id => store.generations.find(g => g.id === Number(id))?.status === 'completed').length);
 
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
+// Thử đồ ảo best-of-N: thông tin bản được chọn (điểm + từng tiêu chí) để hiển thị sau khi xong.
+const bestGen = computed(() => store.composeBestId ? store.generations.find(g => g.id === store.composeBestId) : null);
+const bestScore = computed(() => store.genScore(bestGen.value));
+const bestQa = computed(() => (bestGen.value && bestGen.value.meta && bestGen.value.meta.qa) || {});
 
 const selectedImgs = computed(() => selected.value.filter(Boolean));
 const selectedCount = computed(() => selectedImgs.value.length);
@@ -128,7 +136,7 @@ async function run() {
   }
   busy.value = true;
   const override = previewDirty.value ? previewPrompt.value : '';
-  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, creativeLevel.value, style.value, ornamentLevel.value, override);
+  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, creativeLevel.value, style.value, ornamentLevel.value, override, mode.value === 'tryon' ? bestOf.value : 1, mode.value === 'tryon' ? scoring.value : false);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
@@ -312,7 +320,23 @@ function saveSettings() {
       </div>
     </div>
 
-    <div class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
+    <!-- Thử đồ ảo: best-of-N (nhiều bản, chọn bản đẹp nhất) + chấm điểm tự động -->
+    <div v-if="mode === 'tryon'" class="mt-3">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs text-cream-200">Số bản thử <span class="text-cream-300/50">(best-of-<b class="text-brand-300">{{ bestOf }}</b>)</span></span>
+        <label class="flex cursor-pointer items-center gap-1.5 text-[10px] font-medium text-cream-200" title="Chấm điểm từng bản bằng AI (trang phục + dáng + chất lượng mặt + thẩm mỹ), tự chọn bản cao nhất">
+          <input type="checkbox" v-model="scoring" class="h-3.5 w-3.5 accent-brand-500"> Chấm điểm tự động
+        </label>
+      </div>
+      <div class="mt-1.5 flex items-center gap-1.5">
+        <button v-for="n in [2,3,4,6]" :key="n" @click="bestOf = n"
+                :class="bestOf === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                class="h-8 rounded-full px-3 text-xs font-semibold transition-colors">{{ n }}</button>
+      </div>
+      <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Tạo N bản khác nhau rồi <b class="text-brand-300">tự chọn bản đẹp nhất</b> theo điểm. N lớn = tốn {{ store.imageCreditCost }} credit/bản ({{ bestOf }} bản = {{ bestOf * store.imageCreditCost }} credits).</p>
+    </div>
+    <!-- Các chế độ khác: số biến thể -->
+    <div v-else class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
       <span class="mr-1">Số biến thể:</span>
       <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
               :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
@@ -341,7 +365,7 @@ function saveSettings() {
     </div>
 
     <button @click="run" :disabled="busy || selectedCount < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
-      {{ busy ? 'Đang ghép…' : 'Ghép ảnh' }} <span v-if="!busy" class="opacity-70">· {{ store.imageCreditCost }} credit</span>
+      {{ busy ? 'Đang ghép…' : (mode === 'tryon' ? 'Thử đồ ' + bestOf + ' bản' : 'Ghép ảnh') }} <span v-if="!busy" class="opacity-70">· {{ (mode === 'tryon' ? bestOf : 1) * store.imageCreditCost }} credit</span>
     </button>
 
     <!-- Tiến độ (giống Inpaint) -->
@@ -352,15 +376,22 @@ function saveSettings() {
       </div>
       <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-cream-200/80">
         <span><b>{{ fmt(elapsedSec) }}</b></span>
-        <span>{{ doneCount }}/{{ store.composeGenIds.length }} biến thể</span>
+        <span>{{ doneCount }}/{{ store.composeGenIds.length }} {{ mode === 'tryon' ? 'bản' : 'biến thể' }}</span>
         <button @click="store.cancelCompose()" class="ml-auto rounded-full bg-red-600/25 px-2.5 py-1 font-semibold text-red-200 hover:bg-red-600">Hủy</button>
       </div>
       <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full animate-pulse rounded-full bg-brand-400" :style="{ width: (doneCount / Math.max(1, store.composeGenIds.length) * 100) + '%' }"></div></div>
     </div>
 
     <!-- Thành công -->
-    <div v-if="store.composeStage === 'done'" class="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
-      Đã ghép xong — kết quả đã được chọn trong Outputs.
+    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
+      <template v-if="mode === 'tryon' && store.composeBestId">
+        <p class="font-semibold">✔ Đã thử đồ xong {{ store.composeGenIds.length }} bản — chọn bản tốt nhất<span v-if="bestScore"> ({{ bestScore.toFixed(1) }}/10)</span>.</p>
+        <p v-if="bestScore" class="mt-1 text-[10px] leading-relaxed text-emerald-200/80">Điểm theo tiêu chí: Giữ đồ {{ bestQa.garment_preservation }} · Đúng dáng {{ bestQa.pose_accuracy }} · Mặt {{ bestQa.face_quality }} · Thẩm mỹ {{ bestQa.overall_aesthetic }}. Bản tốt nhất đã được chọn trong Outputs — bấm vào từng ảnh để xem điểm.</p>
+        <p v-else class="mt-1 text-[10px] leading-relaxed text-emerald-200/80">Bản tốt nhất đã được chọn trong Outputs.</p>
+      </template>
+      <template v-else>
+        Đã ghép xong — kết quả đã được chọn trong Outputs.
+      </template>
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 

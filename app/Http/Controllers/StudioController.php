@@ -548,6 +548,9 @@ class StudioController extends Controller
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'style' => ['nullable', 'string', 'max:400'],
             'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
+            // Thử đồ ảo (best-of-N + chấm điểm): số bản candidates tạo ra, chọn bản đẹp nhất.
+            'best_of' => ['nullable', 'integer', 'min:1', 'max:6'],
+            'tryon_score' => ['nullable', 'boolean'],
         ]);
 
         $parts = $this->assembleComposePrompt($data);
@@ -558,10 +561,18 @@ class StudioController extends Controller
 
         $base = $this->downscaleSource((string) ($data['images'][0] ?? ''), 1600);
         $cost = (int) studio_config('image_credits', 1);
-        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
-        $isOutfit = ($data['mode'] ?? '') === 'outfit';
+        $mode = (string) ($data['mode'] ?? '');
+        $isTryon = $mode === 'tryon';
+        // Thử đồ ảo: best_of = số bản candidates (2-6, mặc định theo config); biến thể thường khác.
+        $variants = $isTryon
+            ? max(1, min(6, (int) ($data['best_of'] ?? studio_config('tryon_best_of', 3))))
+            : max(1, min(4, (int) ($data['variants'] ?? 1)));
+        $tryonScore = $isTryon && ($data['tryon_score'] ?? studio_config('tryon_score', true));
+        $isOutfit = $mode === 'outfit';
+        // Nhóm batch: các generation cùng một lần "Thử đồ ảo N bản" nhận chung id để xếp hạng/best-of-N.
+        $tryonBatch = $isTryon && $variants > 1 ? (string) Str::uuid() : null;
 
-        logger()->info('Compose mode', ['mode' => $data['mode'] ?? '', 'is_faceswap' => $parts['is_faceswap'], 'face_ref' => (bool) $parts['face_ref'], 'images' => count($data['images'])]);
+        logger()->info('Compose mode', ['mode' => $mode, 'is_faceswap' => $parts['is_faceswap'], 'face_ref' => (bool) $parts['face_ref'], 'images' => count($data['images']), 'variants' => $variants, 'best_of' => $isTryon ? $variants : null, 'tryon_score' => $tryonScore]);
 
         $items = [];
         for ($i = 0; $i < $variants; $i++) {
@@ -571,6 +582,12 @@ class StudioController extends Controller
             if ($isOutfit && $override === '' && $variants > 1) {
                 $variantPrompt .= ' '.$this->outfitVariationDirective($i);
             }
+            // Thử đồ ảo best-of-N: mỗi candidate một dạng diễn đạt khác để tăng độ đa dạng
+            // (model edit không deterministic — cùng prompt vẫn ra bản khác, nhưng variant giúp
+            // tránh trường hợp model "mắc kẹt" ở một kiểu lỗi chung).
+            if ($isTryon && $variants > 1 && $override === '') {
+                $variantPrompt .= ' '.$this->outfitVariationDirective($i);
+            }
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $variantPrompt,
                 'base_image' => $base,
@@ -578,16 +595,22 @@ class StudioController extends Controller
                 'ref_images' => $parts['remaining_refs'],
                 'face_ref' => $parts['face_ref'],
                 'user_prompt' => $parts['user_prompt'],
-                'mode' => $data['mode'] ?? null,
+                'mode' => $mode,
                 'creative_level' => $parts['creative_level'],
                 'style' => $parts['style'],
                 'ornament_level' => $parts['ornament_level'],
+                'best_of' => $isTryon ? $variants : null,
+                'candidate_idx' => $isTryon && $variants > 1 ? $i : null,
+                'tryon_batch' => $tryonBatch,
+                'tryon_score' => $tryonScore,
             ], $cost)->getData(true);
         }
 
         return response()->json([
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
+            'best_of' => $isTryon ? $variants : null,
+            'tryon_score' => $tryonScore ? true : null,
         ]);
     }
 
@@ -1353,6 +1376,11 @@ RULES:
                 'creative_level' => $data['creative_level'] ?? null,
                 'style' => $data['style'] ?? null,
                 'ornament_level' => $data['ornament_level'] ?? null,
+                // Thử đồ ảo best-of-N + chấm điểm: meta để RenderImageJob chấm điểm sau khi tạo xong.
+                'best_of' => $data['best_of'] ?? null,
+                'candidate_idx' => $data['candidate_idx'] ?? null,
+                'tryon_batch' => $data['tryon_batch'] ?? null,
+                'tryon_score' => $data['tryon_score'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 

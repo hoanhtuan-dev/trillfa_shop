@@ -443,6 +443,84 @@ document.addEventListener('alpine:init', () => {
             document.execCommand('styleWithCSS', false, style);
         },
     }));
+
+    // "Mở đầu (giới thiệu ngắn)" rich editor + ĐỒNG BỘ với "Nội dung mở rộng (HTML)".
+    // Giữ Mở đầu là đoạn <p> đầu tiên của Nội dung mở rộng:
+    //  - gõ trong Mở đầu → tự cập nhật đoạn đầu của Nội dung mở rộng (nếu đang khớp);
+    //  - nút "Đồng bộ vào" → luôn ghi Mở đầu thành đoạn đầu của Nội dung mở rộng;
+    //  - nút "Lấy từ" → kéo đoạn đầu của Nội dung mở rộng vào Mở đầu.
+    Alpine.data('introEditor', () => ({
+        lastSynced: '',
+        init() {
+            if (this.$refs.hidden && this.$refs.hidden.value) {
+                this.$refs.editor.innerHTML = this.$refs.hidden.value;
+            }
+            this.bodyEl = document.getElementById('about-body-editor');
+            this.bodyHidden = document.getElementById('about-body-hidden');
+            // Body editor init chạy SAU component này trong cùng lượt quét DOM,
+            // nên đánh dấu trạng thái đồng bộ sau khi cả hai đã được khởi tạo.
+            setTimeout(() => { this.lastSynced = this.firstParagraphText(); }, 0);
+        },
+        exec(cmd, val = null) {
+            this.$refs.editor.focus();
+            document.execCommand(cmd, false, val);
+            this.sync();
+        },
+        addLink() {
+            const url = window.prompt('Nhập địa chỉ liên kết (URL):');
+            if (url) this.exec('createLink', url);
+        },
+        plainText(html) {
+            const d = document.createElement('div');
+            d.innerHTML = html || '';
+            return (d.textContent || '').trim();
+        },
+        firstParagraphText() {
+            if (!this.bodyEl) return '';
+            const m = (this.bodyEl.innerHTML || '').match(/<p[^>]*>([\s\S]*?)<\/p>/);
+            return this.plainText(m ? m[1] : '');
+        },
+        sync() {
+            const html = this.$refs.editor.innerHTML;
+            this.$refs.hidden.value = html;
+            if (this.bodyEl && this.bodyHidden) {
+                const body = this.bodyEl.innerHTML || '';
+                let next = null;
+                if (body.trim() === '') {
+                    next = '<p>' + html + '</p>';
+                } else if (this.lastSynced !== '' && this.firstParagraphText() === this.lastSynced) {
+                    next = body.replace(/<p[^>]*>[\s\S]*?<\/p>/, '<p>' + html + '</p>');
+                }
+                if (next !== null) {
+                    this.bodyEl.innerHTML = next;
+                    this.bodyHidden.value = next;
+                }
+                this.lastSynced = this.plainText(html);
+            }
+        },
+        syncToBody() {
+            const html = this.$refs.editor.innerHTML;
+            if (!this.bodyEl || !this.bodyHidden) return;
+            const body = (this.bodyEl.innerHTML || '').trim();
+            let next = body;
+            if (/^<p[^>]*>[\s\S]*?<\/p>/.test(next)) {
+                next = next.replace(/^<p[^>]*>[\s\S]*?<\/p>/, '<p>' + html + '</p>');
+            } else {
+                next = '<p>' + html + '</p>' + (body ? body : '');
+            }
+            this.bodyEl.innerHTML = next;
+            this.bodyHidden.value = next;
+            this.lastSynced = this.plainText(html);
+        },
+        pullFromBody() {
+            const first = this.firstParagraphText();
+            if (first) {
+                this.$refs.editor.innerHTML = first;
+                this.$refs.hidden.value = first;
+                this.lastSynced = first;
+            }
+        },
+    }));
 });
 
     // Product collection picker with category filter (landing pages)

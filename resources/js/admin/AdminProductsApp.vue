@@ -168,6 +168,35 @@ const aiMsg = ref('');
 const aiState = ref('');
 const forceReanalyze = ref(false);
 
+// ---------- AI tinh chỉnh theo mục tiêu (Tên / Mô tả / SEO) ----------
+const aiPrompts = reactive({ name: '', desc: '', seo: '' });
+const aiBusy = reactive({ all: false, name: false, names: false, description: false, seo: false });
+const aiMsgs = reactive({ name: '', desc: '', seo: '' });
+const aiNameOptions = ref([]);
+const aiNameSel = ref(-1);
+
+// Chip nhanh — Tên sản phẩm
+const NAME_CHIPS = [
+    { label: 'Tìm thêm 5 tên tối ưu cho sao & đánh giá tốt nhất', prompt: 'Tìm thêm 5 tên sản phẩm tối ưu để nhận được điểm sao và đánh giá tốt nhất từ khách hàng — viết đúng giọng thương hiệu, kèm lý do ngắn cho từng tên.' },
+    { label: 'Tên ngắn gọn, dễ nhớ', prompt: 'Tìm thêm 5 tên sản phẩm ngắn gọn (tối đa 5 từ), dễ nhớ, dễ tìm kiếm.' },
+    { label: 'Tên sang trọng, cao cấp', prompt: 'Tìm thêm 5 tên sản phẩm mang âm hưởng sang trọng, cao cấp, đúng giọng văn thương hiệu trong hồ sơ.' },
+    { label: 'Tên tối ưu SEO', prompt: 'Tìm thêm 5 tên sản phẩm tối ưu SEO: từ khóa chính đặt gần đầu, tự nhiên, không nhồi nhét.' },
+];
+// Chip nhanh — Mô tả
+const DESC_CHIPS = [
+    { label: 'Mô tả hấp dẫn', prompt: 'Viết lại mô tả ngắn và mô tả chi tiết thật hấp dẫn, giàu cảm xúc, đúng giọng văn thương hiệu (hồ sơ bên trên).' },
+    { label: 'Mô tả ngắn ≤ 160 ký tự', prompt: 'Chỉ viết MÔ TẢ NGẮN: tối đa 160 ký tự, súc tích, kích thích mua hàng.' },
+    { label: 'Mô tả chi tiết chuẩn SEO', prompt: 'Viết MÔ TẢ CHI TIẾT (HTML) chuẩn SEO: cấu trúc h3 rõ ràng, từ khóa tự nhiên, khoảng 120–150 từ, đúng giọng thương hiệu.' },
+    { label: 'Chất liệu & bảo quản', prompt: 'Bổ sung vào mô tả chi tiết các mục: chất liệu, kích thước/quy cách, cách bảo quản.' },
+];
+// Chip nhanh — SEO
+const SEO_CHIPS = [
+    { label: 'Meta title ≤ 60 ký tự', prompt: 'Tối ưu meta title: tối đa 60 ký tự, hấp dẫn, chứa từ khóa chính, đúng giọng thương hiệu.' },
+    { label: 'Meta description 120–160 ký tự', prompt: 'Viết meta description dài 120–160 ký tự, hấp dẫn, có lời kêu gọi hành động.' },
+    { label: '5 từ khóa SEO chính', prompt: 'Đề xuất 5 từ khóa SEO chính cho sản phẩm này và gắn (đè) vào thẻ tags.' },
+    { label: 'Chuẩn Google', prompt: 'Rà soát và viết lại meta title/description chuẩn Google: ngắn gọn, đúng ý định tìm kiếm, không lặp từ.' },
+];
+
 const pickerOpen = ref(false);
 const studioImages = ref([]);
 const pickerLoading = ref(false);
@@ -187,6 +216,7 @@ const aiApplied = ref([]);
 
 const sections = [
     { id: 'info', label: 'Thông tin' },
+    { id: 'desc', label: 'Mô tả' },
     { id: 'images', label: 'Hình ảnh' },
     { id: 'variants', label: 'Biến thể' },
     { id: 'seo', label: 'SEO' },
@@ -220,6 +250,15 @@ function resetEditor() {
     aiMsg.value = '';
     aiState.value = '';
     forceReanalyze.value = false;
+    aiPrompts.name = '';
+    aiPrompts.desc = '';
+    aiPrompts.seo = '';
+    aiNameOptions.value = [];
+    aiNameSel.value = -1;
+    Object.keys(aiBusy).forEach((k) => { aiBusy[k] = false; });
+    aiMsgs.name = '';
+    aiMsgs.desc = '';
+    aiMsgs.seo = '';
     pickerOpen.value = false;
     selImages.value = [];
 }
@@ -307,13 +346,11 @@ async function aiSuggest() {
     aiMsg.value = '';
     aiState.value = aiImageUrl.value ? 'analyzing' : 'suggesting';
     try {
+        // Dữ liệu TOÀN CỤC hiện tại của form — AI luôn nhìn thấy mọi thứ.
         const body = {
-            name: editor.name,
-            category: catName(),
-            brand: editor.brand,
+            target: 'all',
             hint: hint.value,
-            short_description: editor.short_description,
-            force: forceReanalyze.value,
+            ...globalAiData(),
         };
         // Ảnh vừa upload (chưa lưu lên server) → gửi base64 để AI đọc được ngay,
         // thay vì để trống làm AI sinh mô tả lệch với ảnh.
@@ -323,6 +360,7 @@ async function aiSuggest() {
         } else {
             body.image_url = aiImageUrl.value;
         }
+        if (aiImageUrl.value) body.force = forceReanalyze.value;
 
         const res = await apiFetch('/admin/products/ai-suggest', {
             method: 'POST',
@@ -345,6 +383,89 @@ async function aiSuggest() {
         aiLoading.value = false;
         aiState.value = '';
     }
+}
+
+/** Toàn bộ dữ liệu hiện tại của form — gửi kèm MỌI lần gợi ý / tinh chỉnh. */
+function globalAiData() {
+    return {
+        name: editor.name,
+        category: catName(),
+        brand: editor.brand,
+        tags: editor.tags,
+        short_description: editor.short_description,
+        description: editor.description,
+        price: editor.price ?? '',
+        compare_price: editor.compare_price ?? '',
+        cost_price: editor.cost_price ?? '',
+        stock: editor.stock ?? 0,
+        meta_title: editor.meta_title,
+        meta_description: editor.meta_description,
+    };
+}
+
+/** Tinh chỉnh AI theo mục tiêu: name | names | description | seo */
+async function aiRefine(target, prompt) {
+    const key = target;
+    aiBusy[key] = true;
+    aiMsgs[key] = '';
+    try {
+        const res = await apiFetch('/admin/products/ai-suggest', {
+            method: 'POST',
+            body: { target, prompt, ...globalAiData() },
+        });
+        if (!res || res.status !== 'done' || !res.data) {
+            aiMsgs[key] = 'AI không trả kết quả — thử lại sau.';
+            return null;
+        }
+        const d = res.data;
+        if (d.source === 'stub') {
+            aiMsgs[key] = 'Dùng gợi ý offline' + (d.reason ? ' — ' + d.reason : '') + '.';
+        } else {
+            aiMsgs[key] = 'Đã tinh chỉnh bằng ' + (d.model || ai.model) + '.';
+        }
+        return d;
+    } catch (e) {
+        aiMsgs[key] = e.message || 'AI đang bận/quá lâu — thử lại sau.';
+        return null;
+    } finally {
+        aiBusy[key] = false;
+    }
+}
+
+/** Nút "Tinh chỉnh" của từng card (dùng prompt người dùng nhập). */
+async function refineTarget(target) {
+    const prompt = (target === 'name' ? aiPrompts.name : target === 'description' ? aiPrompts.desc : aiPrompts.seo).trim();
+    const d = await aiRefine(target, prompt || 'Hãy cải thiện nội dung ' + target + ' cho hấp dẫn và đúng giọng thương hiệu.');
+    if (!d) return;
+    const applied = applyResult(d);
+    if (applied.length) toast('AI đã điền ' + targetLabel(target) + ': ' + applied.join(', '));
+}
+
+function targetLabel(t) {
+    return { name: 'tên', names: 'tên', description: 'mô tả', seo: 'SEO' }[t] || t;
+}
+
+/** Chip nhanh "Tìm thêm 5 tên…" → hiện danh sách tên để chọn. */
+async function runNameIdeas(prompt) {
+    const d = await aiRefine('names', prompt);
+    if (!d) return;
+    const names = Array.isArray(d.names) ? d.names.filter((n) => n && String(n).trim()) : [];
+    if (names.length) {
+        aiNameOptions.value = names.slice(0, 6);
+        aiNameSel.value = -1;
+        toast('AI gợi ý ' + names.length + ' tên — chọn 1 để áp dụng.');
+    } else {
+        aiMsgs.name = 'AI không tìm được tên nào — thử lại với prompt khác.';
+    }
+}
+
+function applyNameOption() {
+    const n = aiNameOptions.value[aiNameSel.value];
+    if (!n) return;
+    editor.name = String(n).trim();
+    aiNameOptions.value = [];
+    aiNameSel.value = -1;
+    toast('Đã áp dụng tên sản phẩm.');
 }
 
 // ---------- Studio picker ----------
@@ -716,45 +837,117 @@ onMounted(() => {
         <form @submit.prevent="submit" class="grid gap-6 lg:grid-cols-[1fr_340px] lg:items-start">
           <!-- ============ Main column ============ -->
           <div class="space-y-6">
-            <!-- AI helper -->
-            <section class="rounded-2xl border border-brand-200/60 bg-gradient-to-r from-brand-50 to-cream-50 p-4">
-              <div class="flex flex-wrap items-center gap-3">
-                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-600 text-white">
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+            <!-- AI hero -->
+            <section class="relative overflow-hidden rounded-2xl border border-brand-200/50 bg-gradient-to-br from-brand-700 via-brand-800 to-ink-900 p-5 text-white shadow-lg shadow-brand-900/10 sm:p-6">
+              <div class="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-white/10 blur-2xl"></div>
+              <div class="pointer-events-none absolute -bottom-20 right-32 h-52 w-52 rounded-full bg-brand-400/25 blur-3xl"></div>
+              <div class="pointer-events-none absolute -left-10 top-8 h-24 w-24 rounded-full bg-brand-300/15 blur-2xl"></div>
+
+              <div class="relative flex flex-wrap items-center gap-4">
+                <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+                  <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
                 </span>
                 <div class="min-w-0 flex-1">
-                  <p class="text-sm font-semibold text-ink-900">Gợi ý nội dung &amp; SEO bằng AI</p>
-                  <p class="text-xs text-ink-500">Model chính: <span class="font-semibold text-ink-700">qwen3.8-flash</span> (đa phương thức — đọc ảnh + text). Chỉ đổi khi không khả dụng: {{ aiProvidersLabel }}.</p>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-200">Trí tuệ sáng tạo</p>
+                  <h2 class="font-display text-lg font-semibold">Trợ lý nội dung &amp; SEO</h2>
+                  <p class="text-xs text-white/70">Model chính <span class="font-semibold text-white">qwen3.8-flash</span> (đọc ảnh + text) · mọi gợi ý/tinh chỉnh đều hiểu giọng văn &amp; giá trị thương hiệu của bạn. Dự phòng: {{ aiProvidersLabel }}.</p>
                 </div>
-                <input v-model="hint" placeholder="Ý tưởng / điểm nhấn…" class="w-full rounded-lg border border-cream-200 bg-white px-3 py-2 text-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-none sm:w-56" @keyup.enter="aiSuggest" />
-                <label v-if="aiImageUrl" class="flex shrink-0 items-center gap-1.5 text-xs text-ink-600"><input type="checkbox" v-model="forceReanalyze" class="h-3.5 w-3.5 accent-brand-600" /> Phân tích lại ảnh</label>
-                <button type="button" @click="aiSuggest" :disabled="aiLoading" class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-ink-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-ink-800 disabled:opacity-60">
-                  <span v-if="aiLoading" class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
-                  {{ aiState === 'analyzing' ? 'Đang phân tích…' : aiState === 'suggesting' ? 'Đang sinh…' : 'Gợi ý AI' }}
-                </button>
+                <div class="flex w-full flex-col gap-2.5 sm:w-auto sm:min-w-[320px]">
+                  <div class="relative">
+                    <input v-model="hint" placeholder="Ý tưởng / yêu cầu tổng quát…" class="w-full rounded-xl border border-white/20 bg-white/10 px-3.5 py-2.5 pr-10 text-sm text-white placeholder:text-white/50 backdrop-blur transition focus:border-white/45 focus:outline-none focus:ring-2 focus:ring-white/25" @keyup.enter="aiSuggest" />
+                    <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="aiSuggest" :disabled="aiLoading" class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-800 shadow-lg transition hover:bg-cream-100 disabled:cursor-not-allowed disabled:opacity-60">
+                      <span v-if="aiLoading" class="h-4 w-4 animate-spin rounded-full border-2 border-brand-600/30 border-t-brand-600"></span>
+                      <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+                      {{ aiState === 'analyzing' ? 'Đang phân tích ảnh…' : aiState === 'suggesting' ? 'Đang sinh nội dung…' : 'Gợi ý toàn bộ' }}
+                    </button>
+                    <label v-if="aiImageUrl" class="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-white/75">
+                      <input type="checkbox" v-model="forceReanalyze" class="h-3.5 w-3.5 accent-brand-300" /> Phân tích lại ảnh
+                    </label>
+                  </div>
+                </div>
               </div>
-              <div v-if="aiImageUrl" class="mt-3 flex items-center gap-3">
-                <img :src="aiImageUrl" alt="" class="h-10 w-10 rounded-lg object-cover" />
-                <p class="text-xs text-ink-500">AI sẽ nhìn ảnh này{{ forceReanalyze ? ' (phân tích lại)' : ' (tái dùng phân tích cũ nếu ảnh không đổi)' }}.</p>
+
+              <div v-if="aiImageUrl" class="relative mt-3 flex items-center gap-3">
+                <img :src="aiImageUrl" alt="" class="h-10 w-10 rounded-lg object-cover ring-2 ring-white/30" />
+                <p class="text-xs text-white/70">AI sẽ nhìn ảnh này{{ forceReanalyze ? ' (phân tích lại)' : ' (tái dùng phân tích cũ nếu ảnh không đổi)' }}.</p>
               </div>
-              <p v-if="aiMsg" class="mt-2 w-full text-xs text-ink-600">{{ aiMsg }}</p>
-              <div v-if="!ai.enabled" class="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p v-if="aiMsg" class="relative mt-3 w-full rounded-lg bg-white/10 px-3 py-2 text-xs text-white ring-1 ring-white/15">{{ aiMsg }}</p>
+
+              <div v-if="!ai.enabled" class="relative mt-3 flex items-start gap-2 rounded-lg border border-amber-300/40 bg-amber-400/15 px-3 py-2 text-xs text-amber-100">
                 <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
                 <span>AI Sản phẩm đang bị tắt — bật lại trong <a href="/studio/settings" class="font-semibold underline">Cài đặt Studio</a>.</span>
               </div>
-              <div v-else-if="!ai.has_keys" class="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div v-else-if="!ai.has_keys" class="relative mt-3 flex items-start gap-2 rounded-lg border border-amber-300/40 bg-amber-400/15 px-3 py-2 text-xs text-amber-100">
                 <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
                 <span>Chưa có API key (Qwen / Gemini / DeepSeek) — AI sẽ dùng gợi ý offline. Thêm key tại <a href="/studio/settings" class="font-semibold underline">Cài đặt Studio</a>.</span>
+              </div>
+
+              <div class="relative mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+                <span class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium text-white ring-1 ring-white/20">
+                  <svg class="h-3.5 w-3.5 shrink-0 text-brand-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+                  <span class="truncate"><span class="font-semibold text-brand-100">Hồ sơ thương hiệu đã nạp:</span> “{{ ai.brand_preview }}…“</span>
+                </span>
+                <a href="/admin/pages/about" target="_blank" class="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20">Chỉnh sửa tại Trang Giới thiệu <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg></a>
               </div>
             </section>
 
             <!-- Info -->
             <section id="sec-info" class="scroll-mt-28 rounded-2xl border border-ink-900/5 bg-white p-5 shadow-sm sm:p-6">
-              <h2 class="text-sm font-semibold text-ink-900">Thông tin sản phẩm</h2>
-              <div class="mt-4 space-y-4">
+              <div class="flex items-center justify-between">
                 <div>
+                  <h2 class="text-sm font-semibold text-ink-900">Thông tin sản phẩm</h2>
+                  <p class="mt-0.5 text-xs text-ink-500">Tên, phân loại và định danh sản phẩm.</p>
+                </div>
+              </div>
+              <div class="mt-4 space-y-4">
+                <!-- Tên sản phẩm + AI -->
+                <div class="rounded-xl border border-cream-200 p-3 sm:p-4">
                   <label class="mb-1.5 block text-xs font-medium text-ink-500">Tên sản phẩm <span class="text-red-500">*</span></label>
                   <input v-model="editor.name" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10" placeholder="vd: Áo sơ mi linen oversize" />
+                  <div class="mt-2.5 rounded-xl border border-brand-200/60 bg-brand-50/70 p-2.5">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-white" title="AI tinh chỉnh tên">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                      </span>
+                      <input v-model="aiPrompts.name" placeholder="Tinh chỉnh AI: VD — thêm “Unisex”, viết sang trọng hơn…" class="min-w-0 flex-1 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-xs text-ink-900 placeholder:text-ink-400 transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/10" @keyup.enter="refineTarget('name')" />
+                      <button type="button" @click="refineTarget('name')" :disabled="aiBusy.name || aiBusy.names" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+                        <span v-if="aiBusy.name" class="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                        <template v-else>✨ Tinh chỉnh tên</template>
+                      </button>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                      <button
+                        v-for="chip in NAME_CHIPS"
+                        :key="chip.label"
+                        type="button"
+                        @click="runNameIdeas(chip.prompt)"
+                        :disabled="aiBusy.names || aiBusy.name"
+                        class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 transition hover:border-brand-500 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <svg class="h-3 w-3 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        {{ chip.label }}
+                      </button>
+                    </div>
+                    <p v-if="aiMsgs.name" class="mt-2 text-[11px] text-ink-600">{{ aiMsgs.name }}</p>
+                    <div v-if="aiNameOptions.length" class="mt-2 rounded-lg border border-cream-200 bg-white p-2">
+                      <p class="px-1 pb-1.5 text-[11px] font-semibold text-ink-700">AI gợi ý tên — chọn 1 để áp dụng:</p>
+                      <ul class="space-y-0.5">
+                        <li v-for="(n, i) in aiNameOptions" :key="i">
+                          <button type="button" @click="aiNameSel = i" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition" :class="aiNameSel === i ? 'bg-brand-50 ring-1 ring-brand-300' : 'hover:bg-cream-50'">
+                            <span class="grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] leading-none" :class="aiNameSel === i ? 'border-brand-500 bg-brand-600 text-white' : 'border-cream-300 text-transparent'">✓</span>
+                            <span class="flex-1 text-ink-800">{{ n }}</span>
+                          </button>
+                        </li>
+                      </ul>
+                      <div class="mt-2 flex justify-end gap-2">
+                        <button type="button" @click="aiNameOptions = []; aiNameSel = -1" class="rounded-lg px-2.5 py-1 text-[11px] font-medium text-ink-500 transition hover:bg-cream-100">Bỏ qua</button>
+                        <button type="button" @click="applyNameOption" :disabled="aiNameSel < 0" class="rounded-lg bg-ink-900 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-40">Áp dụng tên</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -780,13 +973,56 @@ onMounted(() => {
                     <input v-model="editor.tags" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10" />
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <!-- Mô tả -->
+            <section id="sec-desc" class="scroll-mt-28 rounded-2xl border border-ink-900/5 bg-white p-5 shadow-sm sm:p-6">
+              <div class="flex items-center justify-between">
                 <div>
-                  <label class="mb-1.5 block text-xs font-medium text-ink-500">Mô tả ngắn</label>
-                  <textarea v-model="editor.short_description" rows="2" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10"></textarea>
+                  <h2 class="text-sm font-semibold text-ink-900">Mô tả sản phẩm</h2>
+                  <p class="mt-0.5 text-xs text-ink-500">Mô tả ngắn hiển thị ở danh sách; mô tả chi tiết (HTML) hiển thị ở trang sản phẩm.</p>
+                </div>
+              </div>
+              <div class="mt-4 space-y-4">
+                <div>
+                  <div class="mb-1.5 flex items-center justify-between">
+                    <label class="text-xs font-medium text-ink-500">Mô tả ngắn</label>
+                    <span class="text-[11px] text-ink-400" :class="editor.short_description.length > 160 ? 'font-semibold text-red-500' : ''">{{ editor.short_description.length }}/160</span>
+                  </div>
+                  <textarea v-model="editor.short_description" rows="2" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10" placeholder="1–2 câu súc tích tóm tắt sản phẩm…"></textarea>
                 </div>
                 <div>
                   <label class="mb-1.5 block text-xs font-medium text-ink-500">Mô tả chi tiết (HTML)</label>
-                  <textarea v-model="editor.description" rows="8" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 font-mono text-xs text-ink-900 placeholder:text-ink-400 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10"></textarea>
+                  <textarea v-model="editor.description" rows="8" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 font-mono text-xs text-ink-900 placeholder:text-ink-400 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10" placeholder="<h3>Phong cách</h3>&#10;<p>…</p>"></textarea>
+                </div>
+
+                <!-- AI tinh chỉnh mô tả -->
+                <div class="rounded-xl border border-brand-200/60 bg-brand-50/70 p-2.5">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-white" title="AI tinh chỉnh mô tả">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                    </span>
+                    <input v-model="aiPrompts.desc" placeholder="Tinh chỉnh AI: VD — viết mô tả hấp dẫn hơn, thêm công dụng…" class="min-w-0 flex-1 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-xs text-ink-900 placeholder:text-ink-400 transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/10" @keyup.enter="refineTarget('description')" />
+                    <button type="button" @click="refineTarget('description')" :disabled="aiBusy.description" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+                      <span v-if="aiBusy.description" class="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                      <template v-else>✨ Tinh chỉnh mô tả</template>
+                    </button>
+                  </div>
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    <button
+                      v-for="chip in DESC_CHIPS"
+                      :key="chip.label"
+                      type="button"
+                      @click="aiPrompts.desc = chip.prompt; refineTarget('description')"
+                      :disabled="aiBusy.description"
+                      class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 transition hover:border-brand-500 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <svg class="h-3 w-3 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z"/></svg>
+                      {{ chip.label }}
+                    </button>
+                  </div>
+                  <p v-if="aiMsgs.desc" class="mt-2 text-[11px] text-ink-600">{{ aiMsgs.desc }}</p>
                 </div>
               </div>
             </section>
@@ -920,17 +1156,54 @@ onMounted(() => {
 
             <!-- SEO -->
             <section id="sec-seo" class="scroll-mt-28 rounded-2xl border border-ink-900/5 bg-white p-5 shadow-sm sm:p-6">
-              <h2 class="text-sm font-semibold text-ink-900">SEO</h2>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-sm font-semibold text-ink-900">SEO</h2>
+                  <p class="mt-0.5 text-xs text-ink-500">Meta title &amp; meta description hiển thị trên Google.</p>
+                </div>
+              </div>
               <div class="mt-4 space-y-4">
                 <div>
-                  <label class="mb-1.5 block text-xs font-medium text-ink-500">Meta title</label>
+                  <div class="mb-1.5 flex items-center justify-between">
+                    <label class="text-xs font-medium text-ink-500">Meta title</label>
+                    <span class="text-[11px] text-ink-400" :class="editor.meta_title.length > 60 ? 'font-semibold text-red-500' : ''">{{ editor.meta_title.length }}/60</span>
+                  </div>
                   <input v-model="editor.meta_title" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10" />
-                  <p class="mt-1 text-xs text-ink-400">{{ editor.meta_title.length }}/60</p>
                 </div>
                 <div>
-                  <label class="mb-1.5 block text-xs font-medium text-ink-500">Meta description</label>
+                  <div class="mb-1.5 flex items-center justify-between">
+                    <label class="text-xs font-medium text-ink-500">Meta description</label>
+                    <span class="text-[11px] text-ink-400" :class="editor.meta_description.length > 160 ? 'font-semibold text-red-500' : ''">{{ editor.meta_description.length }}/160</span>
+                  </div>
                   <textarea v-model="editor.meta_description" rows="2" class="w-full rounded-lg border border-cream-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10"></textarea>
-                  <p class="mt-1 text-xs text-ink-400">{{ editor.meta_description.length }}/160</p>
+                </div>
+
+                <!-- AI tinh chỉnh SEO -->
+                <div class="rounded-xl border border-brand-200/60 bg-brand-50/70 p-2.5">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-white" title="AI tinh chỉnh SEO">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+                    </span>
+                    <input v-model="aiPrompts.seo" placeholder="Tinh chỉnh AI: VD — nhấn mạnh từ khóa 'áo linen nam', chuẩn Google…" class="min-w-0 flex-1 rounded-lg border border-cream-200 bg-white px-3 py-1.5 text-xs text-ink-900 placeholder:text-ink-400 transition focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/10" @keyup.enter="refineTarget('seo')" />
+                    <button type="button" @click="refineTarget('seo')" :disabled="aiBusy.seo" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+                      <span v-if="aiBusy.seo" class="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                      <template v-else>✨ Tinh chỉnh SEO</template>
+                    </button>
+                  </div>
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    <button
+                      v-for="chip in SEO_CHIPS"
+                      :key="chip.label"
+                      type="button"
+                      @click="aiPrompts.seo = chip.prompt; refineTarget('seo')"
+                      :disabled="aiBusy.seo"
+                      class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-800 transition hover:border-brand-500 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <svg class="h-3 w-3 text-brand-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z"/></svg>
+                      {{ chip.label }}
+                    </button>
+                  </div>
+                  <p v-if="aiMsgs.seo" class="mt-2 text-[11px] text-ink-600">{{ aiMsgs.seo }}</p>
                 </div>
               </div>
             </section>

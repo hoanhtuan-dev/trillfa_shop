@@ -74,6 +74,9 @@ class AdminProductController extends Controller
                 // True when at least one provider has a usable API key — the UI uses
                 // this to explain why it fell back to offline suggestions.
                 'has_keys' => (bool) (studio_api_key('qwen') || studio_api_key('dashscope') || studio_api_key('gemini') || studio_api_key('deepseek')),
+                // Hồ sơ thương hiệu (nội dung trang /admin/pages/about) — AI luôn
+                // đưa vào suy luận; chỉ hiển thị preview ngắn ở UI.
+                'brand_preview' => mb_substr(app(\App\Services\ProductAIService::class)->brandContext(), 0, 96),
             ],
             'filters' => [
                 'q' => (string) $request->input('q'),
@@ -144,15 +147,31 @@ class AdminProductController extends Controller
 
     /**
      * Deep-AI content + SEO suggestions (qwen configurable).
+     *
+     * Hỗ trợ 2 chế độ:
+     *  - Gợi ý toàn bộ (mặc định): sinh toàn bộ nội dung + SEO từ ảnh/text.
+     *  - Tinh chỉnh theo mục tiêu (`target` = all|name|names|description|seo):
+     *    AI luôn nhìn TOÀN BỘ dữ liệu form hiện tại + hồ sơ thương hiệu
+     *    (trang /admin/pages/about, được cache tạo 1 lần tái sử dụng).
      */
     public function aiSuggest(Request $request)
     {
         $data = $request->validate([
+            'target' => ['nullable', 'string', 'in:all,name,names,description,seo'],
+            'prompt' => ['nullable', 'string', 'max:2000'],
             'name' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
             'brand' => ['nullable', 'string', 'max:120'],
+            'tags' => ['nullable', 'string', 'max:500'],
             'hint' => ['nullable', 'string', 'max:1000'],
             'short_description' => ['nullable', 'string', 'max:500'],
+            'description' => ['nullable', 'string', 'max:20000'],
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'compare_price' => ['nullable', 'numeric', 'min:0'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'stock' => ['nullable', 'integer', 'min:0'],
+            'meta_title' => ['nullable', 'string', 'max:255'],
+            'meta_description' => ['nullable', 'string', 'max:500'],
             'image_url' => ['nullable', 'string', 'max:2048'],
             'image_base64' => ['nullable', 'string'],
             'image_mime' => ['nullable', 'string', 'max:80'],
@@ -176,7 +195,16 @@ class AdminProductController extends Controller
         try {
             /** @var \App\Services\ProductAIService $service */
             $service = app(\App\Services\ProductAIService::class);
-            if ($imagePath && is_file($imagePath)) {
+            $target = $data['target'] ?? null;
+
+            // Tinh chỉnh theo mục tiêu: luôn kèm dữ liệu toàn cục + hồ sơ thương hiệu.
+            if (in_array($target, ['name', 'names', 'description', 'seo'], true)) {
+                $imageAnalysis = null;
+                if ($imagePath && is_file($imagePath)) {
+                    $imageAnalysis = $service->analyzeImage($imagePath, (bool) ($data['force'] ?? false));
+                }
+                $result = $service->refine($data, $imageAnalysis);
+            } elseif ($imagePath && is_file($imagePath)) {
                 $result = $service->generateFromImage($data, $imagePath, (bool) ($data['force'] ?? false));
             } else {
                 $result = $service->generate($data, null);

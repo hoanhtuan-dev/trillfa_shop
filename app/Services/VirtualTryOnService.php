@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Http;
+use Throwable;
+
 /**
  * "Thay Đổi Người Mẫu" (Click-to-Swap).
  *
@@ -470,6 +473,92 @@ class VirtualTryOnService
         return ((float) ($s['garment_preservation'] ?? 5) * 0.5)
             + ((float) ($s['pose_accuracy'] ?? 5) * 0.3)
             + ((float) ($s['overall_aesthetic'] ?? 5) * 0.2);
+    }
+
+    /**
+     * Chấm điểm kết quả Thử đồ ảo (best-of-N trong Card "Ghép ảnh" → slot Thử đồ ảo).
+     * Vision QA so sánh candidate với TRANG PHỤC gốc (@image1) và POSE tham chiếu (@image2,
+     * nếu có) trên 4 tiêu chí; trả mảng điểm + điểm tổng 0-10, hoặc null nếu chấm không được.
+     * Fail êm: không có key / rate-limit / model vision lỗi → null, pipeline vẫn giữ ảnh gốc.
+     */
+    public function scoreTryOnResult(string $resultUrl, ?string $garmentUrl = null, ?string $poseUrl = null): ?array
+    {
+        $key = studio_api_key('qwen') ?: studio_api_key('dashscope');
+        if (! $key) {
+            return null;
+        }
+
+        $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
+
+        $instruction = 'You are a fashion virtual-try-on quality evaluator. '
+            .'The FIRST image is the GARMENT (the product — it must be worn exactly as-is).';
+        if ($poseUrl) {
+            $instruction .= ' The SECOND image is the POSE reference (body stance to reproduce).';
+        }
+        $instruction .= ($poseUrl ? ' The LAST image' : ' The SECOND image').' is a try-on RESULT. Rate the result 1-10 for each criterion:'
+            .'\n1. garment_preservation: how identical is the garment in the result to the garment image (colors, patterns, prints, fabric, silhouette, length, details)'
+            .($poseUrl ? '\n2. pose_accuracy: how accurately the result reproduces the pose reference (stance, arm/leg placement, facing direction)' : '\n2. pose_accuracy: how natural and correctly executed the pose is')
+            .'\n3. face_quality: face sharp, natural, well-lit, photorealistic'
+            .'\n4. overall_aesthetic: overall appeal, lighting, composition, fashion quality'
+            .'\nReturn ONLY valid JSON: {"garment_preservation":N,"pose_accuracy":N,"face_quality":N,"overall_aesthetic":N}';
+
+        $content = [];
+        if ($garmentUrl) {
+            $content[] = ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_data_uri($garmentUrl, 1600) ?: studio_vision_image_url($garmentUrl)]];
+        }
+        if ($poseUrl) {
+            $content[] = ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_data_uri($poseUrl, 1600) ?: studio_vision_image_url($poseUrl)]];
+        }
+        $content[] = ['type' => 'image_url', 'image_url' => ['url' => studio_vision_image_data_uri($resultUrl, 1600) ?: studio_vision_image_url($resultUrl)]];
+        $content[] = ['type' => 'text', 'text' => $instruction];
+
+        foreach (studio_qwen_vision_models() as $model) {
+            try {
+                $resp = Http::withToken($key)->timeout(45)
+                    ->post($base, [
+                        'model' => $model,
+                        'messages' => [['role' => 'user', 'content' => $content]],
+                        'temperature' => 0.1,
+                    ]);
+
+                if ($resp->successful()) {
+                    $raw = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                    if (preg_match('/{[^}]+}/s', $raw, $m)) {
+                        $scores = json_decode($m[0], true);
+                        if (is_array($scores) && isset($scores['garment_preservation'])) {
+                            $score = $this->tryOnScore($scores);
+                            logger()->info('Try-on QA scored candidate', ['model' => $model, 'score' => round($score, 2), 'scores' => $scores]);
+
+                            return array_merge($scores, ['score' => round($score, 2)]);
+                        }
+                    }
+                }
+                if ($resp->status() === 404 || str_contains(strtolower((string) $resp->body()), 'not found')
+                    || $resp->status() === 429 || $resp->status() >= 500) {
+                    if ($resp->status() === 429) {
+                        sleep(2);
+                    }
+                    continue;
+                }
+                logger()->warning('Try-on QA scoring failed', ['model' => $model, 'status' => $resp->status()]);
+            } catch (\Throwable $e) {
+                logger()->warning('Try-on QA scoring error: '.$e->getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Điểm tổng cho kết quả Thử đồ ảo: trang phục (đồ chính) nặng nhất, pose quan trọng thứ nhì,
+     * mặt + thẩm mỹ chung bổ trợ — phản ánh đúng mục tiêu "mặc ĐÚNG đồ này, đúng dáng".
+     */
+    protected function tryOnScore(array $s): float
+    {
+        return ((float) ($s['garment_preservation'] ?? 5) * 0.45)
+            + ((float) ($s['pose_accuracy'] ?? 5) * 0.25)
+            + ((float) ($s['face_quality'] ?? 5) * 0.15)
+            + ((float) ($s['overall_aesthetic'] ?? 5) * 0.15);
     }
 
     /**

@@ -20,7 +20,33 @@
             </div>
             <div>
                 <label class="label">Mở đầu (giới thiệu ngắn)</label>
-                <textarea name="about_intro" rows="4" class="input">{{ old('about_intro', setting('about_intro')) }}</textarea>
+                <div x-data="introEditor" class="overflow-hidden rounded-xl border border-cream-300 bg-white focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10">
+                    <div class="flex flex-wrap items-center gap-1 border-b border-cream-200 bg-cream-100 px-2 py-1.5 text-ink-700">
+                        <button type="button" @click="exec('bold')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Đậm"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 01-4 4H6zM6 12h9a4 4 0 01-4 4H6z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        <button type="button" @click="exec('italic')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Nghiêng"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5h6M13 19h6M14 5l-4 14" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        <button type="button" @click="exec('formatBlock', 'h2')" class="px-2 text-sm font-semibold hover:bg-white">H2</button>
+                        <button type="button" @click="exec('formatBlock', 'h3')" class="px-2 text-sm font-semibold hover:bg-white">H3</button>
+                        <button type="button" @click="exec('insertUnorderedList')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white">•</button>
+                        <button type="button" @click="exec('insertOrderedList')" class="grid h-8 w-8 place-items-center rounded-lg text-xs hover:bg-white">1.</button>
+                        <button type="button" @click="exec('formatBlock', 'blockquote')" class="px-2 text-sm hover:bg-white">❝</button>
+                        <button type="button" @click="addLink()" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Liên kết"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.81 15.312a4.5 4.5 0 01-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        <button type="button" @click="exec('formatBlock', 'p')" class="px-2 text-sm hover:bg-white">¶</button>
+                        <button type="button" @click="exec('undo')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 016 6v3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    </div>
+                    <div x-ref="editor" contenteditable @input="sync" class="prose-content min-h-[130px] px-4 py-3 text-sm outline-none"></div>
+                    <textarea name="about_intro" x-ref="hidden" class="hidden">{{ old('about_intro', setting('about_intro')) }}</textarea>
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button type="button" @click="syncToBody()" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:border-brand-400 hover:bg-brand-100" title="Ghi Mở đầu thành đoạn mở đầu của Nội dung mở rộng">
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                        Đồng bộ vào Nội dung mở rộng
+                    </button>
+                    <button type="button" @click="pullFromBody()" class="inline-flex items-center gap-1.5 rounded-lg border border-cream-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 transition hover:border-ink-900 hover:text-ink-900" title="Lấy đoạn mở đầu của Nội dung mở rộng làm Mở đầu">
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16l-4-4m0 0l4-4m-4 4h18"/></svg>
+                        Lấy từ Nội dung mở rộng
+                    </button>
+                    <span class="text-xs text-ink-400">Gõ trong "Mở đầu" tự cập nhật đoạn mở đầu của "Nội dung mở rộng (HTML)".</span>
+                </div>
             </div>
             <div>
                 <label class="label">Nội dung mở rộng (HTML)</label>
@@ -37,8 +63,8 @@
                         <button type="button" @click="exec('formatBlock', 'p')" class="px-2 text-sm hover:bg-white">¶</button>
                         <button type="button" @click="exec('undo')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 016 6v3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                     </div>
-                    <div x-ref="editor" contenteditable @input="sync" class="prose-content min-h-[160px] px-4 py-3 text-sm outline-none"></div>
-                    <textarea name="about_body" x-ref="hidden" class="hidden">{{ old('about_body', setting('about_body')) }}</textarea>
+                    <div id="about-body-editor" x-ref="editor" contenteditable @input="sync" class="prose-content min-h-[160px] px-4 py-3 text-sm outline-none"></div>
+                    <textarea id="about-body-hidden" name="about_body" x-ref="hidden" class="hidden">{{ old('about_body', setting('about_body')) }}</textarea>
                 </div>
             </div>
         </div>

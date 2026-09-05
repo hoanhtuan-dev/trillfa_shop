@@ -111,6 +111,8 @@ export const useStudioStore = defineStore('studio', {
     composeError: '',
     composeStartTs: 0,
     composeGenIds: [],    // generation ids của lần ghép hiện tại
+    composeMode: '',      // mode của lần ghép hiện tại ('compose' | 'tryon' | 'faceswap' | 'outfit')
+    composeBestId: null,  // Thử đồ ảo best-of-N: id generation đạt điểm cao nhất
     inpainting: false,
     inpaintPrompt: '',
     // Inpaint progress/status state (rõ ràng cho người dùng)
@@ -364,14 +366,21 @@ export const useStudioStore = defineStore('studio', {
         return d;
       } catch (e) { this.toast(e.message || 'Lỗi thay khuôn mặt.', 'error'); return null; }
     },
-    // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend)
-    async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '', ornamentLevel = 3, overridePrompt = '') {
+    // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).
+    // Thử đồ ảo (mode='tryon'): bestOf = số bản candidates (best-of-N), scoring = chấm điểm tự động
+    // từng bản bằng vision QA — backend ghi meta.qa, ở đây xếp hạng và chọn bản đẹp nhất.
+    async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '', ornamentLevel = 3, overridePrompt = '', bestOf = 1, scoring = true) {
       if (!Array.isArray(images) || images.length < 2 || !(prompt || '').trim()) { this.toast('Chọn ít nhất 2 ảnh + nhập mô tả.', 'error'); return null; }
       this.composeStage = 'send';
       this.composeError = '';
       this.composeStartTs = Date.now();
+      this.composeMode = mode;
+      this.composeBestId = null;
+      const isTryon = mode === 'tryon';
+      const n = isTryon ? (Number(bestOf) > 0 ? Number(bestOf) : Number(variants) || 1) : (Number(variants) || 1);
       try {
-        const payload = { images, prompt, variants: Number(variants) || 1, mode, creative_level: Number(creativeLevel) || 6, style: style || '', ornament_level: Number(ornamentLevel) ?? 3 };
+        const payload = { images, prompt, variants: n, mode, creative_level: Number(creativeLevel) || 6, style: style || '', ornament_level: Number(ornamentLevel) ?? 3 };
+        if (isTryon) { payload.best_of = n; payload.tryon_score = scoring !== false; }
         if (overridePrompt && String(overridePrompt).trim()) payload.final_prompt = String(overridePrompt).trim();
         const d = await this.api('/studio/compose', payload);
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
@@ -391,6 +400,7 @@ export const useStudioStore = defineStore('studio', {
       }
     },
     // Kiểm tra khi mọi biến thể compose đã về trạng thái cuối → chuyển stage done/error.
+    // Thử đồ ảo best-of-N: xếp hạng các bản hoàn tất theo meta.qa.score, chọn bản cao nhất làm kết quả.
     _checkComposeDone() {
       if (!this.composeGenIds.length || this.composeStage !== 'processing') return;
       const gens = this.composeGenIds.map(id => this.generations.find(g => g.id === Number(id))).filter(Boolean);
@@ -399,12 +409,41 @@ export const useStudioStore = defineStore('studio', {
       const done = gens.filter(g => g.status === 'completed').length;
       if (done > 0) {
         this.composeStage = 'done';
-        this.toast('✅ Đã ghép xong ' + done + ' biến thể.');
+        const isTryon = this.composeMode === 'tryon';
+        // best-of-N + chấm điểm: chọn bản có điểm cao nhất (nếu có điểm) và highlight trong Outputs.
+        if (isTryon && done > 1) this.pickBestTryon(gens);
+        if (isTryon) {
+          const scored = gens.filter(g => g.meta && g.meta.qa && g.meta.qa.score != null);
+          if (this.composeBestId) {
+            const best = gens.find(g => g.id === this.composeBestId);
+            const sc = best && best.meta && best.meta.qa ? Number(best.meta.qa.score) : null;
+            this.toast('✅ Đã thử đồ xong ' + done + ' bản — chọn bản tốt nhất' + (sc != null ? ' (' + sc.toFixed(1) + '/10)' : '') + '.');
+          } else if (scored.length < gens.length) {
+            this.toast('✅ Đã thử đồ xong ' + done + ' bản (chưa chấm điểm được — thiếu key vision? Các bản vẫn ở Outputs).');
+          } else {
+            this.toast('✅ Đã thử đồ xong ' + done + ' bản.');
+          }
+        } else {
+          this.toast('✅ Đã ghép xong ' + done + ' biến thể.');
+        }
       } else {
         this.composeStage = 'error';
         this.composeError = gens.find(g => g.error)?.error || 'Ghép ảnh thất bại.';
         this.toast(this.composeError, 'error');
       }
+    },
+    // Thử đồ ảo best-of-N: xếp hạng candidates theo meta.qa.score (giảm dần), chọn bản cao nhất
+    // làm preview hiện tại + đánh dấu composeBestId cho Outputs. Không có điểm → giữ bản đầu tiên.
+    pickBestTryon(gens) {
+      const completed = gens.filter(g => g.status === 'completed' && g.media_url);
+      if (!completed.length) return;
+      const scored = completed
+        .map(g => ({ g, s: g.meta && g.meta.qa ? Number(g.meta.qa.score) : NaN }))
+        .filter(x => !Number.isNaN(x.s))
+        .sort((a, b) => b.s - a.s);
+      const best = scored.length ? scored[0].g : completed[0];
+      this.composeBestId = best.id;
+      this.select({ id: best.id, media_url: best.media_url, type: 'image', status: 'completed' });
     },
     async cancelCompose() {
       for (const id of this.composeGenIds) {
@@ -413,7 +452,7 @@ export const useStudioStore = defineStore('studio', {
       this.composeStage = 'cancelled';
       this.toast('Đã hủy ghép ảnh.');
     },
-    clearComposeStatus() { this.composeStage = ''; this.composeError = ''; this.composeGenIds = []; this.composeStartTs = 0; },
+    clearComposeStatus() { this.composeStage = ''; this.composeError = ''; this.composeGenIds = []; this.composeStartTs = 0; this.composeMode = ''; this.composeBestId = null; },
     async loadPalette(id) {
       if (!id) { this.palette = []; return; }
       try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
@@ -1515,6 +1554,9 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.canvasLayers = []; this.activeLayerId = ''; this.saveLayerLayout(); }
     },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },
+    // Thử đồ ảo best-of-N: điểm tổng của generation (meta.qa.score) — dùng cho badge Outputs.
+    genScore(g) { const s = g && g.meta && g.meta.qa && g.meta.qa.score; return (s != null && !Number.isNaN(Number(s))) ? Number(s) : null; },
+    qaLabels() { return { garment_preservation: 'Giữ đồ', pose_accuracy: 'Đúng dáng', face_quality: 'Chất lượng mặt', overall_aesthetic: 'Thẩm mỹ' }; },
     hideBatch() { this.showBatch = false; },
     setSource(url, name) {
       this.editSource = { url, name: name || 'Ảnh nguồn' };
@@ -1572,7 +1614,7 @@ export const useStudioStore = defineStore('studio', {
           if (!res.ok) { delete this._pollTimers[id]; return; }
           const g = await res.json();
           const item = this.generations.find(x => x.id === Number(g.id));
-          if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; }
+          if (item) { item.status = g.status; item.media_url = g.media_url; item.error = g.error; item.model = g.model; item.provider = g.provider; item.elapsed_ms = g.elapsed_ms; if (g.meta && typeof g.meta === 'object') item.meta = g.meta; }
           if (['completed', 'failed', 'cancelled'].includes(g.status)) {
             delete this._pollTimers[id];
             const isInpaint = String(id) === String(this.inpaintGenId);

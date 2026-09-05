@@ -28,6 +28,8 @@ return [
     'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-2.5-flash'),
     'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen multimodal trước)
     'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtualmodel'), // Virtual Try-On (Thay đổi người mẫu) — Beijing-only, free-trial
+    'tryon_best_of' => (int) env('STUDIO_TRYON_BEST_OF', 3), // best-of-N mặc định cho Thử đồ ảo: 2-6 bản, chọn bản đẹp nhất
+    'tryon_score' => (bool) env('STUDIO_TRYON_SCORE', true),  // chấm điểm QA tự động cho từng bản thử đồ (qwen vision, fail êm khi rate-limit)
     'swap_model' => env('STUDIO_SWAP_MODEL', ''), // '' = dùng chung qwen_edit_model (giống Inpaint: qwen-image-edit-max)
     'swap_candidates' => (int) env('STUDIO_SWAP_CANDIDATES', 1), // 1 = nhanh; 2-3 = chọn bản đẹp nhất (chậm hơn)
     'swap_superres_scale' => (int) env('STUDIO_SWAP_SUPERRES_SCALE', 2), // upscale 2x/4x trước khi trả kết quả

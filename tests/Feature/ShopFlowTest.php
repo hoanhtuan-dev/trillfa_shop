@@ -907,6 +907,55 @@ class ShopFlowTest extends TestCase
         $this->assertSame('completed', $tg->fresh()->status);
     }
 
+    public function test_studio_compose_tryon_best_of_creates_scored_candidates(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Thử đồ ảo best-of-N: best_of=3 phải tạo 3 generation (mỗi bản 1 meta riêng: mode=tryon,
+        // tryon_batch chung, candidate_idx 0..2, tryon_score=true — để RenderImageJob chấm điểm sau khi tạo).
+        $r = $this->postJson('/studio/compose', [
+            'images' => ['/storage/studio/garment.jpg', '/storage/studio/pose.jpg'],
+            'prompt' => 'mặc trang phục lên người mẫu',
+            'mode' => 'tryon',
+            'best_of' => 3,
+            'tryon_score' => true,
+        ])->assertOk();
+
+        $items = $r->json('items');
+        $this->assertCount(3, $items);
+        $this->assertSame(3, $r->json('best_of'));
+
+        $batchIds = [];
+        foreach ($items as $i => $item) {
+            $gen = \App\Models\Generation::find($item['generation_id']);
+            $this->assertNotNull($gen);
+            $meta = $gen->meta ?? [];
+            $this->assertSame('tryon', $meta['mode'] ?? null);
+            $this->assertSame(3, $meta['best_of'] ?? null);
+            $this->assertSame($i, $meta['candidate_idx'] ?? null);
+            $this->assertTrue((bool) ($meta['tryon_score'] ?? false));
+            $this->assertNotEmpty($meta['tryon_batch'] ?? '');
+            $batchIds[] = $meta['tryon_batch'];
+            // Poll → job xử lý lazy → hoàn tất (stub không cần key; chấm điểm fail êm khi không có key).
+            $this->getJson('/studio/generations/'.$item['generation_id'])->assertOk();
+            $this->assertSame('completed', $gen->fresh()->status);
+        }
+        $this->assertCount(1, array_unique($batchIds)); // cùng một lần "Thử đồ N bản"
+
+        // Chế độ thường vẫn giữ hành vi biến thể cũ (không best_of, không tryon metadata).
+        $c = $this->postJson('/studio/compose', [
+            'images' => ['/storage/studio/a.jpg', '/storage/studio/b.jpg'],
+            'prompt' => 'giữ nền, đặt cô gái vào studio',
+            'mode' => 'compose',
+            'variants' => 2,
+        ])->assertOk();
+        $this->assertCount(2, $c->json('items'));
+        $this->assertNull($c->json('best_of'));
+        $g0 = \App\Models\Generation::find($c->json('items.0.generation_id'));
+        $this->assertArrayNotHasKey('tryon_batch', $g0->meta ?? []);
+    }
+
     public function test_studio_preset_manager_and_references(): void
     {
         $customer = User::where('email', 'customer@trillfa.com')->first();

@@ -23,8 +23,8 @@
       "_BaseBadge-Cg2tg5YA.js"
     ]
   },
-  "_GalleryModal-Devkvw2G.js": {
-    "file": "assets/GalleryModal-Devkvw2G.js",
+  "_GalleryModal-dI9xVjr7.js": {
+    "file": "assets/GalleryModal-dI9xVjr7.js",
     "name": "GalleryModal",
     "imports": [
       "_runtime-dom.esm-bundler-B3mCrYD2.js",
@@ -158,7 +158,7 @@
     "name": "useApi"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DbGMr_pl.css",
+    "file": "assets/app-Dj-4DDut.css",
     "name": "app",
     "names": [
       "app.css"
@@ -167,7 +167,7 @@
     "isEntry": true
   },
   "resources/js/admin/admin-product.js": {
-    "file": "assets/admin-product-DvkLosxz.js",
+    "file": "assets/admin-product-DjfcYP2d.js",
     "name": "admin-product",
     "src": "resources/js/admin/admin-product.js",
     "isEntry": true,
@@ -177,11 +177,11 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/admin-product-X07pdKWM.css"
+      "assets/admin-product-BkM0W7qS.css"
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DD1flVBV.js",
+    "file": "assets/app-D_9sJTy1.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
@@ -307,7 +307,7 @@
     ]
   },
   "resources/js/storefront/static.js": {
-    "file": "assets/static-CWEcu5H9.js",
+    "file": "assets/static-S_X8ZdiY.js",
     "name": "static",
     "src": "resources/js/storefront/static.js",
     "isEntry": true,
@@ -330,7 +330,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DfgIbBT5.js",
+    "file": "assets/app-Bfb6uKz8.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -338,7 +338,7 @@
       "_runtime-dom.esm-bundler-B3mCrYD2.js",
       "_pinia-ZX6PfBqZ.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_GalleryModal-Devkvw2G.js",
+      "_GalleryModal-dI9xVjr7.js",
       "_StylistDataManager-DKq6p3oN.js"
     ],
     "css": [
@@ -346,14 +346,14 @@
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-BDLOCsp_.js",
+    "file": "assets/library-Csmdx8RL.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-B3mCrYD2.js",
       "_pinia-ZX6PfBqZ.js",
-      "_GalleryModal-Devkvw2G.js"
+      "_GalleryModal-dI9xVjr7.js"
     ]
   },
   "resources/js/studio/settings.js": {

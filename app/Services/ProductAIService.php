@@ -43,6 +43,66 @@ class ProductAIService
     private array $attempts = [];
     private string $lastError = '';
 
+    /**
+     * Hồ sơ thương hiệu (nội dung trang /admin/pages/about) — tạo MỘT LẦN rồi tái
+     * sử dụng trong cùng request (static) và qua các request (Laravel cache),
+     * được làm mới khi admin lưu trang Giới thiệu. Mọi lời gợi ý / tinh chỉnh AI
+     * đều đưa hồ sơ này vào quá trình suy luận.
+     */
+    private static ?string $brandContext = null;
+
+    /**
+     * Build (one time) / read the brand profile from the About page settings.
+     * Cached in-process for the whole request + in Laravel cache for reuse.
+     */
+    public function brandContext(bool $force = false): string
+    {
+        if (self::$brandContext !== null) {
+            return self::$brandContext;
+        }
+
+        if (! $force) {
+            $cached = Cache::get('product_ai:brand_ctx');
+            if (is_string($cached) && $cached !== '') {
+                return self::$brandContext = $cached;
+            }
+        }
+
+        $parts = [];
+        $heading = trim((string) setting('about_heading', ''));
+        $intro = trim(strip_tags((string) setting('about_intro', '')));
+        $body = trim(strip_tags((string) setting('about_body', '')));
+        if ($heading !== '') {
+            $parts[] = 'Tiêu đề / slogan: '.$heading;
+        }
+        if ($intro !== '') {
+            $parts[] = 'Giới thiệu ngắn: '.$intro;
+        }
+        if ($body !== '') {
+            $parts[] = 'Nội dung mở rộng: '.$body;
+        }
+        $values = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $t = trim((string) setting('about_v'.$i.'_title', ''));
+            $x = trim((string) setting('about_v'.$i.'_text', ''));
+            if ($t !== '') {
+                $values[] = $t.($x !== '' ? ': '.$x : '');
+            }
+        }
+        if ($values) {
+            $parts[] = 'Giá trị cốt lõi: '.implode(' | ', $values);
+        }
+
+        $text = implode("\n", $parts);
+        if ($text === '') {
+            $text = 'Thương hiệu thời trang phong cách sống Việt Nam, tối giản, tinh tế, hướng đến người hiện đại.';
+        }
+
+        Cache::put('product_ai:brand_ctx', $text, 3600);
+
+        return self::$brandContext = $text;
+    }
+
     public function __construct()
     {
         $this->providers = product_ai_providers();
@@ -203,6 +263,50 @@ class ProductAIService
         }
 
         return $this->stub($input, $imageAnalysis);
+    }
+
+    /**
+     * Tinh chỉnh (fine-tune) AI theo một mục tiêu riêng: tên, danh sách tên,
+     * mô tả hay SEO. Luôn nhìn TOÀN BỘ dữ liệu hiện tại của form + hồ sơ thương
+     * hiệu (trang Giới thiệu) trong quá trình suy luận.
+     *
+     * @param array $input dữ liệu toàn cục hiện tại: name, category, brand, tags,
+     *                     short_description, description, price, compare_price,
+     *                     cost_price, stock, meta_title, meta_description +
+     *                     'target' (all|name|names|description|seo) + 'prompt'
+     * @param ?array $imageAnalysis cached/fresh vision result
+     */
+    public function refine(array $input, ?array $imageAnalysis = null): array
+    {
+        $this->startBudget();
+
+        $target = (string) ($input['target'] ?? 'all');
+        if (! in_array($target, ['all', 'name', 'names', 'description', 'seo'], true)) {
+            $target = 'all';
+        }
+        $input['target'] = $target;
+
+        $prompt = $this->buildRefinePrompt($input, $imageAnalysis, $target);
+        $result = $this->attempt('text', $prompt);
+
+        if (is_array($result)) {
+            $result['source'] = 'ai';
+            $result['target'] = $target;
+            $result['reason'] = 'ok';
+            $result['attempts'] = $this->attempts;
+
+            // Chuẩn hoá danh sách tên: luôn là mảng chuỗi, tối đa 8 gợi ý.
+            if ($target === 'names') {
+                $result['names'] = array_slice(array_values(array_filter(
+                    array_map(fn ($n) => is_string($n) ? trim($n) : '', (array) ($result['names'] ?? [])),
+                    fn ($n) => $n !== ''
+                )), 0, 8);
+            }
+
+            return $result;
+        }
+
+        return $this->stubRefine($input, $imageAnalysis, $target);
     }
 
     /**
@@ -492,6 +596,74 @@ class ProductAIService
 
     // ------------------------------------------------------------- prompts
 
+    /**
+     * Prompt có cấu trúc cho tinh chỉnh theo mục tiêu. Luôn gồm 3 khối:
+     * HỒ SƠ THƯƠNG HIỆU (trang Giới thiệu), DỮ LIỆU SẢN PHẨM HIỆN TẠI (toàn cục),
+     * và YÊU CẦU TIN CHỈNH của người dùng.
+     */
+    protected function buildRefinePrompt(array $input, ?array $imageAnalysis, string $target): string
+    {
+        $name = trim((string) ($input['name'] ?? '')) ?: 'sản phẩm thời trang/phong cách sống';
+        $category = trim((string) ($input['category'] ?? ''));
+        $brand = trim((string) ($input['brand'] ?? ''));
+        $tags = trim((string) ($input['tags'] ?? ''));
+        $short = trim((string) ($input['short_description'] ?? ''));
+        $description = trim((string) ($input['description'] ?? ''));
+        $price = (string) ($input['price'] ?? '');
+        $metaTitle = trim((string) ($input['meta_title'] ?? ''));
+        $metaDesc = trim((string) ($input['meta_description'] ?? ''));
+        $userPrompt = trim((string) ($input['prompt'] ?? ''));
+
+        $img = '';
+        if ($imageAnalysis) {
+            $st = $imageAnalysis['styles'] ?? '';
+            $co = $imageAnalysis['colors'] ?? '';
+            $fa = $imageAnalysis['fabric'] ?? '';
+            $su = $imageAnalysis['subject'] ?? '';
+            $fe = $imageAnalysis['feeling'] ?? '';
+            $kw = implode(', ', (array) ($imageAnalysis['keywords'] ?? []));
+            $img = "\nDựa trên phân tích ảnh sản phẩm: phong cách={$st}, màu sắc={$co}, chất liệu={$fa}, chủ thể={$su}, cảm giác={$fe}, từ khóa={$kw}";
+        }
+
+        $schema = match ($target) {
+            'names' => '"names": ["5 tên sản phẩm, mỗi tên <=80 ký tự, phù hợp giọng thương hiệu"]',
+            'name' => '"suggested_name": "1 tên sản phẩm hấp dẫn <=80 ký tự"',
+            'description' => '"short_description": "1-2 câu <=160 ký tự", "description": "HTML mô tả chi tiết: 4-5 mục <h3> (Phong cách / Chất liệu / Màu sắc / Phù hợp / Bảo quản) + <p>/<ul><li>, tổng ~120-150 từ"',
+            'seo' => '"meta_title": "SEO <=60 ký tự", "meta_description": "SEO 120-160 ký tự", "tags": ["3-4 tag"]',
+            default => '"suggested_name": "...", "short_description": "...", "description": "HTML...", "meta_title": "...", "meta_description": "...", "tags": ["..."]',
+        };
+
+        $instruction = $userPrompt !== ''
+            ? "YÊU CẦU TIN CHỈNH CỦA NGƯỜI DÙNG: {$userPrompt}"
+            : 'Hãy cải thiện, làm giàu nội dung cho mục tiêu "'.$target.'" sao cho hấp dẫn và đúng giọng thương hiệu.';
+
+        return <<<PROMPT
+Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam.{$img}
+
+=== HỒ SƠ THƯƠNG HIỆU (lấy từ trang "/admin/pages/about" của cửa hàng — ĐỌC KỸ và luôn viết đúng giọng văn, giá trị này) ===
+{$this->brandContext()}
+=== HẾT HỒ SƠ THƯƠNG HIỆU ===
+
+=== DỮ LIỆU SẢN PHẨM HIỆN TẠI (toàn cục — giữ nguyên những gì không cần đổi) ===
+Tên: {$name}
+Danh mục: {$category}
+Thương hiệu sản phẩm: {$brand}
+Thẻ: {$tags}
+Mô tả ngắn: {$short}
+Mô tả chi tiết (HTML): {$description}
+Giá: {$price}
+Meta title: {$metaTitle}
+Meta description: {$metaDesc}
+=== HẾT DỮ LIỆU ===
+
+{$instruction}
+
+Trả về JSON hợp lệ DUY NHẤT (không markdown, không giải thích) đúng schema mục tiêu "{$target}":
+{{$schema}
+}
+PROMPT;
+    }
+
     protected function buildPrompt(array $input, ?array $imageAnalysis, bool $imageAttached = false): string
     {
         $name = ($input['name'] ?? '') ?: 'sản phẩm thời trang/phong cách sống';
@@ -499,6 +671,11 @@ class ProductAIService
         $brand = $input['brand'] ?? '';
         $hint = $input['hint'] ?? '';
         $currentShort = $input['short_description'] ?? '';
+        $currentTags = $input['tags'] ?? '';
+        $currentDesc = $input['description'] ?? '';
+        $currentPrice = $input['price'] ?? '';
+        $currentMetaTitle = $input['meta_title'] ?? '';
+        $currentMetaDesc = $input['meta_description'] ?? '';
 
         $img = '';
         if ($imageAnalysis) {
@@ -518,12 +695,20 @@ class ProductAIService
             ? 'HÃY NHÌN ẢNH SẢN PHẨM ĐÍNH KÈM và dựa trên đó'
             : 'dựa trên phân tích ảnh + thông tin người dùng';
 
+        $brandBlock = "\n=== HỒ SƠ THƯƠNG HIỆU (lấy từ trang \"/admin/pages/about\" của cửa hàng — ĐỌC KỸ, viết đúng giọng văn & giá trị) ===\n".$this->brandContext()."\n=== HẾT HỒ SƠ THƯƠNG HIỆU ===";
+
         return <<<PROMPT
 Bạn là chuyên gia content & SEO thương mại điện tử thời trang Việt Nam. Viết NGẮN GỌN nhưng hấp dẫn, {$basis}.
+{$brandBlock}
 {$img}
 {$refine}
 
 Thông tin người dùng: Tên={$name} · Danh mục={$category} · Thương hiệu={$brand} · Ý tưởng={$hint}
+Dữ liệu hiện tại: Giá={$currentPrice} · Thẻ={$currentTags}
+Mô tả ngắn hiện tại: {$currentShort}
+Mô tả chi tiết hiện tại: {$currentDesc}
+Meta title hiện tại: {$currentMetaTitle}
+Meta description hiện tại: {$currentMetaDesc}
 
 Trả về JSON hợp lệ DUY NHẤT (không markdown, không giải thích):
 {
@@ -669,6 +854,104 @@ PROMPT;
             'reason' => $this->failureReason(),
             'attempts' => $this->attempts,
         ];
+    }
+
+    /**
+     * Fallback offline (không có key/quota hết): trả về các biến thể an toàn,
+     * luôn dựa trên dữ liệu hiện tại + hồ sơ thương hiệu.
+     */
+    protected function stubRefine(array $input, ?array $imageAnalysis, string $target): array
+    {
+        $name = trim((string) ($input['name'] ?? '')) ?: 'Sản phẩm thời trang';
+        $brand = trim((string) ($input['brand'] ?? '')) ?: 'Trillfa';
+
+        $variants = [
+            $name,
+            $name.' — Phiên bản '.date('Y'),
+            $name.' | '.$brand,
+            $name.' — Bản giới hạn',
+            $name.' Cao cấp',
+        ];
+
+        $result = match ($target) {
+            'names' => [
+                'names' => $variants,
+                'short_description' => (string) ($input['short_description'] ?? ''),
+                'description' => (string) ($input['description'] ?? ''),
+                'meta_title' => (string) ($input['meta_title'] ?? ''),
+                'meta_description' => (string) ($input['meta_description'] ?? ''),
+                'tags' => $this->normalizeTags($input['tags'] ?? ''),
+            ],
+            'name' => [
+                'suggested_name' => $variants[0],
+                'short_description' => (string) ($input['short_description'] ?? ''),
+                'description' => (string) ($input['description'] ?? ''),
+                'meta_title' => (string) ($input['meta_title'] ?? ''),
+                'meta_description' => (string) ($input['meta_description'] ?? ''),
+                'tags' => $this->normalizeTags($input['tags'] ?? ''),
+            ],
+            'description' => [
+                'short_description' => trim((string) ($input['short_description'] ?? '')) ?: $name.' — '.$brand.', thiết kế tối giản, chất liệu cao cấp, dễ phối đồ và bền bỉ.',
+                'description' => trim((string) ($input['description'] ?? '')) ?: $this->stubDescription($name, $input, $imageAnalysis),
+            ],
+            'seo' => [
+                'meta_title' => trim((string) ($input['meta_title'] ?? '')) ?: mb_substr($name, 0, 55).' | '.$brand,
+                'meta_description' => trim((string) ($input['meta_description'] ?? '')) ?: 'Khám phá '.$name.' — chất liệu cao cấp, tôn dáng, giao nhanh, đổi trả dễ dàng.',
+                'tags' => $this->normalizeTags($input['tags'] ?? ''),
+            ],
+            default => [
+                'suggested_name' => $name,
+                'short_description' => (string) ($input['short_description'] ?? ''),
+                'description' => (string) ($input['description'] ?? ''),
+                'meta_title' => (string) ($input['meta_title'] ?? ''),
+                'meta_description' => (string) ($input['meta_description'] ?? ''),
+                'tags' => $this->normalizeTags($input['tags'] ?? ''),
+            ],
+        };
+
+        $result['target'] = $target;
+        $result['source'] = 'stub';
+        $result['reason'] = $this->failureReason();
+        $result['attempts'] = $this->attempts;
+
+        return $result;
+    }
+
+    protected function stubDescription(string $name, array $input, ?array $imageAnalysis): string
+    {
+        $category = (string) ($input['category'] ?? '');
+        $style = $imageAnalysis['styles'] ?? '';
+        $fabric = $imageAnalysis['fabric'] ?? '';
+        $color = $imageAnalysis['colors'] ?? '';
+
+        return '<h3>Phong cách</h3>'
+            .'<p>'.$name.' mang phong cách '.($style ?: 'tối giản, tinh tế, hiện đại').', tôn dáng và thoải mái — dễ dàng kết hợp trong nhiều hoàn cảnh.</p>'
+            .'<h3>Loại trang phục &amp; dáng</h3>'
+            .'<p>'.($category ?: 'Sản phẩm thời trang/phong cách sống').' với đường cắt tối giản, form cân đối, phù hợp vóc dáng người Việt.</p>'
+            .'<h3>Chất liệu &amp; chất lượng</h3>'
+            .'<ul><li>'.($fabric ?: 'Chất liệu cao cấp, thoáng mát và bền bỉ').'</li><li>Đường may chắc chắn, bền bỉ theo thời gian</li></ul>'
+            .'<h3>Màu sắc &amp; họa tiết</h3>'
+            .'<p>'.($color ?: 'Tông màu trung tính dễ phối đồ').'.</p>'
+            .'<h3>Bảo quản &amp; lưu ý</h3>'
+            .'<ul><li>Giặt nhẹ, tránh nước tẩy mạnh</li><li>Ủi ở nhiệt độ thấp để giữ form</li><li>Đổi trả trong 7 ngày</li></ul>';
+    }
+
+    protected function normalizeTags(mixed $tags): array
+    {
+        if (is_array($tags)) {
+            $raw = $tags;
+        } else {
+            $raw = explode(',', (string) $tags);
+        }
+        $out = [];
+        foreach ($raw as $t) {
+            $t = trim((string) $t);
+            if ($t !== '' && ! in_array($t, $out, true)) {
+                $out[] = $t;
+            }
+        }
+
+        return $out ?: ['thời trang', 'trillfa', 'phong cách'];
     }
 
     /**

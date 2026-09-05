@@ -16,7 +16,7 @@ class AdminPageContentController extends Controller
     {
         $data = $request->validate([
             'about_heading' => ['required', 'string', 'max:255'],
-            'about_intro' => ['nullable', 'string', 'max:2000'],
+            'about_intro' => ['nullable', 'string', 'max:5000'],
             'about_body' => ['nullable', 'string'],
             'about_image' => ['nullable', 'image', 'max:4096'],
             'about_v1_title' => ['nullable', 'string', 'max:255'],
@@ -30,6 +30,10 @@ class AdminPageContentController extends Controller
         foreach ($data as $key => $value) {
             set_setting($key, $value);
         }
+
+        // Hồ sơ thương hiệu (dùng cho AI sản phẩm) đã thay đổi → làm mới cache
+        // để lần gợi ý/tinh chỉnh sau của AI dùng nội dung mới nhất.
+        \Illuminate\Support\Facades\Cache::forget('product_ai:brand_ctx');
 
         if ($request->hasFile('about_image')) {
             set_setting('about_image', $request->file('about_image')->store('settings', 'public'));
