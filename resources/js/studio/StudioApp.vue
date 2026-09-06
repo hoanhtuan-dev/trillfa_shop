@@ -18,6 +18,8 @@ import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
 import GalleryModal from './components/GalleryModal.vue';
 const store = useStudioStore();
+// CSRF token cho form Đăng xuất (Laravel route POST /dang-xuat).
+const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 function copyColor(c) {
   store.inpaintFillColor = c; // đồng bộ màu cho công cụ tô màu
   try { navigator.clipboard.writeText(c); store.toast('Đã chọn màu ' + c); } catch (e) { store.toast('Lỗi copy.', 'error'); }
@@ -235,10 +237,33 @@ function onTouchEnd(e) {
 </script>
 <template>
   <div class="studio-dark flex h-full flex-col bg-ink-950 text-cream-100">
-    <!-- Chưa đăng nhập: studio cần session admin để tải data -->
-    <div v-if="store.needsLogin" class="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-900/30 px-4 py-2.5">
-      <p class="text-xs text-amber-100">🔒 Chưa đăng nhập — dữ liệu ✨ Trợ lý thiết kế đã load được; để tạo ảnh/video & lưu dữ liệu cần tài khoản admin.</p>
-      <a href="/dang-nhap?redirect=/studio" class="shrink-0 rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
+    <!-- ══ Top account bar: thông tin người dùng + đăng nhập/đăng xuất + điều hướng quản trị ══ -->
+    <div class="flex items-center justify-between gap-3 border-b border-ink-700 bg-ink-900/90 px-3 py-2.5 sm:px-4">
+      <div class="flex min-w-0 items-center gap-2.5">
+        <template v-if="store.user">
+          <img :src="store.user.avatar || '/images/placeholder.svg'" class="h-8 w-8 shrink-0 rounded-full bg-ink-700 object-cover ring-2 ring-brand-500/40" @error="$event.target.src = '/images/placeholder.svg'" alt="Ảnh đại diện">
+          <div class="min-w-0 leading-tight">
+            <p class="truncate text-sm font-semibold text-cream-50">{{ store.user.name }}</p>
+            <p class="truncate text-[11px] text-cream-300/60">{{ store.user.role_label || store.user.role }}<span class="hidden sm:inline"> · {{ store.user.email }}</span></p>
+          </div>
+        </template>
+        <template v-else>
+          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-500/20 text-amber-200">🔒</span>
+          <div class="leading-tight">
+            <p class="text-sm font-semibold text-cream-50">Chưa đăng nhập</p>
+            <p class="text-[11px] text-cream-300/60">Đăng nhập để tạo ảnh/video &amp; lưu dữ liệu.</p>
+          </div>
+        </template>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <span v-if="store.user" class="hidden rounded-full bg-ink-800 px-2.5 py-1 text-xs font-semibold text-cream-200 md:inline-block">Credit {{ store.creditsLeft }}</span>
+        <a v-if="store.user && store.user.is_admin" href="/admin" class="inline-flex items-center gap-1 rounded-full border border-brand-500/40 bg-brand-600/20 px-3 py-1 text-xs font-semibold text-brand-200 transition hover:bg-brand-600 hover:text-white" title="Đi tới trang quản trị (Dashboard Manager)">⚙️ Quản trị shop</a>
+        <form v-if="store.user" method="POST" action="/dang-xuat" class="m-0">
+          <input type="hidden" name="_token" :value="csrfToken">
+          <button type="submit" class="rounded-full border border-ink-700 px-3 py-1 text-xs font-semibold text-cream-100 transition hover:border-red-600 hover:bg-red-600 hover:text-white">Đăng xuất</button>
+        </form>
+        <a v-else href="/dang-nhap?redirect=/studio" class="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
+      </div>
     </div>
     <!-- toast (copy/status) -->
     <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>

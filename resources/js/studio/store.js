@@ -3,17 +3,26 @@ import { markRaw } from 'vue';
 
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
+function readBoot() {
+  return (typeof window !== 'undefined' && window.__STUDIO_BOOT__) || null;
+}
+function bootUser() {
+  return (readBoot() && readBoot().user) || null;
+}
+
 // Shared studio store — each card component reads/writes this so they can share data.
 export const useStudioStore = defineStore('studio', {
   state: () => ({
     step: 1,
     opening: false,
     defaultsLoaded: false,
-    needsLogin: false,
+    needsLogin: !bootUser(),
+    // Người dùng đã đăng nhập (server truyền qua window.__STUDIO_BOOT__ ở vue.blade.php).
+    user: bootUser(),
     previewId: null,
     preview: null,
     generations: [],
-    creditsLeft: 0,
+    creditsLeft: (bootUser() && Number(bootUser().credits_balance)) || 0,
     imageCreditCost: 1,  // chi phí credit cho 1 ảnh (load từ defaults)
     // film / reframe / swap share the source image (editSource || preview)
     editSource: null,
@@ -300,6 +309,8 @@ export const useStudioStore = defineStore('studio', {
       this.loadUpscaleMemory();
       // Load settings defaults from backend (set in Studio Settings page)
       await this.loadDefaults();
+      // Chưa có người dùng đăng nhập (server không truyền user) → dừng sớm, hiển thị nút Đăng nhập.
+      if (!this.user) { this.needsLogin = true; return; }
       try {
         const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } });
         if (res.status === 401 || res.status === 403 || res.redirected || (res.url && res.url.includes('/dang-nhap'))) { this.needsLogin = true; return; }

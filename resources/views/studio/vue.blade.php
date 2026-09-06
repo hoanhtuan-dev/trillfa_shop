@@ -11,5 +11,22 @@
 <body class="h-screen overflow-hidden bg-ink-900 text-cream-100 antialiased">
     <div class="flex h-full items-center justify-center text-sm text-cream-300/60">Đang tải Studio Vue…</div>
     <div id="studio-root" class="absolute inset-0"></div>
+    @php
+        $studioUser = auth()->user();
+    @endphp
+    <script>
+        window.__STUDIO_BOOT__ = @json([
+            'user' => $studioUser ? [
+                'id' => $studioUser->id,
+                'name' => $studioUser->name,
+                'email' => $studioUser->email,
+                'role' => $studioUser->role,
+                'role_label' => $studioUser->roleLabel(),
+                'avatar' => $studioUser->avatar,
+                'credits_balance' => $studioUser->credits_balance,
+                'is_admin' => $studioUser->isAdmin(),
+            ] : null,
+        ]);
+    </script>
 </body>
 </html>

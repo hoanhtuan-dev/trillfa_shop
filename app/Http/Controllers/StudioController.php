@@ -1777,6 +1777,12 @@ RULES:
             return response()->json(['error' => 'not found', 'path' => $path], 404);
         }
 
+        // Ảnh siêu lớn (>4096px) → bỏ qua thumbnail (trả ảnh gốc) để tránh memory spike/OOM trên host.
+        $dim = @getimagesize($file);
+        if ($dim && max($dim[0], $dim[1]) > 4096) {
+            return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
+        }
+
         $thumbDir = storage_path('app/public/studio/thumb/'.dirname($path));
         $useWebp = function_exists('imagewebp');
         $thumbExt = $useWebp ? 'webp' : 'jpg';

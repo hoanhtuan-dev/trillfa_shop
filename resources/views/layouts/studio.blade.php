@@ -60,13 +60,24 @@
                 <a x-show="false" href="{{ route('studio.library') }}" class="studio-nav {{ $routeName === 'studio.library' ? 'is-active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-1.5' : ''" :title="sidebarCollapsed ? 'Fabrics / Models / Poses' : null"><svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h18M3 18h18"/></svg><span class="truncate" x-show="!sidebarCollapsed">Fabrics / Models / Poses</span></a>
 <div class="studio-nav-head flex cursor-pointer items-center justify-between" @click="navOpen.sys = !navOpen.sys" x-show="!sidebarCollapsed">Hệ thống <span x-text="navOpen.sys ? '▾' : '▴'"></span></div>
                 <a x-show="navOpen.sys || sidebarCollapsed" href="{{ route('studio.settings') }}" class="studio-nav {{ $routeName === 'studio.settings' ? 'is-active' : '' }}" :class="sidebarCollapsed ? 'justify-center px-1.5' : ''" :title="sidebarCollapsed ? 'Cài đặt' : null"><svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="truncate" x-show="!sidebarCollapsed">Cài đặt</span></a>
+                @if($u && $u->isAdmin())
                 <a href="{{ route('admin.dashboard') }}" class="studio-nav" :class="sidebarCollapsed ? 'justify-center px-1.5' : ''" :title="sidebarCollapsed ? 'Quản trị shop' : null"><svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7l1.5-3h15L21 7M4 7v13h16V7M9 20v-6h6v6"/></svg><span class="truncate" x-show="!sidebarCollapsed">Quản trị shop</span></a>
+                @endif
             </nav>
             <div class="border-t border-ink-700 px-3 py-3" x-show="!sidebarCollapsed">
                 <div class="mb-2 flex items-center justify-between">
                     <span class="font-display text-sm font-semibold text-cream-50">@yield('title', 'Trillfa Studio')</span>
                     <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 hover:text-white" :title="'Ẩn thanh bên'">«</button>
                 </div>
+                @if($u)
+                <div class="mb-2 flex items-center gap-2 rounded-xl border border-ink-700 bg-ink-800/60 p-2">
+                    <img src="{{ $u->avatar ?: asset('images/placeholder.svg') }}" class="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-brand-500/40" alt="Ảnh đại diện">
+                    <div class="min-w-0 leading-tight">
+                        <p class="truncate text-sm font-semibold text-cream-50">{{ $u->name }}</p>
+                        <p class="truncate text-[11px] text-cream-300/60">{{ $u->roleLabel() }} · {{ $u->email }}</p>
+                    </div>
+                </div>
+                @endif
                 <div class="mb-2 flex items-center gap-1 text-[11px] text-cream-300"><span class="inline-block h-2 w-2 rounded-full {{ $connected ? 'bg-emerald-500' : 'bg-amber-400' }}"></span>{{ $connected ? 'Kết nối AI' : 'Chế độ Stub' }}</div>
                 <div class="mb-2 flex items-center justify-between text-xs"><span class="text-cream-300">Tín dụng</span><span class="font-semibold text-cream-50">{{ $credits }}</span></div>
                 <div class="flex items-center gap-2">
@@ -94,6 +105,9 @@
                     <span class="badge bg-ink-700 text-cream-200">{{ $connected ? 'AI' : 'Stub' }}</span>
                 </div>
                 <div class="flex items-center gap-2">
+                    @if($u && $u->isAdmin())
+                    <a href="{{ route('admin.dashboard') }}" class="rounded-full border border-brand-500/40 bg-brand-600/20 px-3 py-1.5 text-xs font-semibold text-brand-200 hover:bg-brand-600 hover:text-white">⚙️ Quản trị</a>
+                    @endif
                     <form method="POST" action="{{ route('logout') }}">@csrf
                         <button type="submit" class="rounded-full border border-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-100 hover:bg-ink-700 hover:text-white">Đăng xuất</button>
                     </form>
