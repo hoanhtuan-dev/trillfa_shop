@@ -187,21 +187,24 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');
     Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
+    // Quản lý data ✨ Trợ lý thiết kế (CRUD loại trang phục + câu hỏi + presets) — phải là admin.
+    // Chỉ phần ĐỌC (GET) nằm ở nhóm public bên dưới để card trợ lý tải được khi chưa login.
+    Route::post('/stylist-data/types', [StylistDataController::class, 'saveType'])->name('stylist.data.types.save');
+    Route::delete('/stylist-data/types/{id}', [StylistDataController::class, 'deleteType'])->name('stylist.data.types.delete');
+    Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
+    Route::delete('/stylist-data/questions/{id}', [StylistDataController::class, 'deleteQuestion'])->name('stylist.data.questions.delete');
+    Route::delete('/stylist/presets/{id}', [StylistDataController::class, 'deletePreset'])->name('stylist.presets.delete');
 });
 
-// Public stylist data (non-sensitive config) — để card ✨ Trợ lý thiết kế và popup quản lý
-// load + sửa/xóa dữ liệu (loại trang phục + câu hỏi) mà không cần login. LLM (refine) vẫn auth+admin.
+// Public stylist data (READ-ONLY) — để card ✨ Trợ lý thiết kế load loại trang phục + câu hỏi
+// mà không cần login. Mọi thao tác GHI (CRUD types/questions/presets) đã được chuyển vào
+// nhóm auth+admin ở trên; LLM (refine) cũng vẫn auth+admin.
 Route::prefix('studio')->name('studio.')->group(function () {
     Route::get('/stylist/types', [StudioController::class, 'stylistTypes'])->name('stylist.types');
     Route::post('/stylist/cluster', [StudioController::class, 'stylistCluster'])->name('stylist.cluster');
     Route::post('/stylist/prompt', [StudioController::class, 'stylistPrompt'])->name('stylist.prompt');
     Route::get('/stylist-data/data', [StylistDataController::class, 'data'])->name('stylist.data.json');
-    Route::post('/stylist-data/types', [StylistDataController::class, 'saveType'])->name('stylist.data.types.save');
-    Route::delete('/stylist-data/types/{id}', [StylistDataController::class, 'deleteType'])->name('stylist.data.types.delete');
-    Route::post('/stylist-data/questions', [StylistDataController::class, 'saveQuestion'])->name('stylist.data.questions.save');
-    Route::delete('/stylist-data/questions/{id}', [StylistDataController::class, 'deleteQuestion'])->name('stylist.data.questions.delete');
     Route::get('/stylist/presets', [StylistDataController::class, 'presets'])->name('stylist.presets');
-    Route::delete('/stylist/presets/{id}', [StylistDataController::class, 'deletePreset'])->name('stylist.presets.delete');
 });
 
 // PUBLIC studio page (renders the Vue app for everyone — no auth redirect, so /studio never loops).

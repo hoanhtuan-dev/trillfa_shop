@@ -16,9 +16,7 @@ use Illuminate\Http\Request;
  */
 class ProjectController extends Controller
 {
-    public function __construct(protected ProjectWorkflowService $workflow)
-    {
-    }
+    public function __construct(protected ProjectWorkflowService $workflow) {}
 
     /**
      * GET /studio/projects — danh sách dự án của user (kèm metadata workflow).
@@ -50,6 +48,7 @@ class ProjectController extends Controller
     {
         abort_unless($project->user_id === $request->user()->id, 403);
         $project->load(['generations' => fn ($q) => $q->latest()->limit(60), 'assets']);
+
         return response()->json($this->serialize($project, $request->user(), true));
     }
 
@@ -206,8 +205,9 @@ class ProjectController extends Controller
                 'model' => $g->model, 'provider' => $g->provider,
                 'created_at' => $g->created_at?->format('d/m H:i'),
             ]);
-            $data['assets'] = $project->assets()->orderByPivot('sort')->get(['id', 'type', 'name', 'path']);
+            $data['assets'] = $project->assets()->orderByPivot('sort')->get(['studio_assets.id', 'type', 'name', 'path']);
         }
+
         return $data;
     }
 }

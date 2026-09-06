@@ -600,14 +600,42 @@ export const useStudioStore = defineStore('studio', {
       });
     },
     async renderVideo() {
-      if (!this.videoPromptEn && !this.videoSourceId) { this.toast('Chọn ảnh nguồn hoặc nhập prompt video.', 'error'); return; }
+      const srcImage = this.upscaleSrc || '';
+      if (!this.videoPromptEn && !srcImage) { this.toast('Nhập prompt video hoặc chọn ảnh nguồn.', 'error'); return; }
       if (this.videoBusy) return;
       this.videoBusy = true;
       try {
-        const d = await this.api('/studio/render-video', { prompt: this.videoPromptEn, source_id: this.videoSourceId, model: this.videoModel, scene: this.videoScene, duration: this.videoDuration, resolution: this.videoRes, image: this.preview?.media_url || '' });
-        this.addGen({ id: d.generation_id, type: 'video', status: d.status || 'processing', model: d.model || this.videoModel, provider: d.provider || 'video', media_url: d.media_url || null, error: null, credits_cost: 1, created_at: 'Vừa gửi' });
+        // Prompt video: ưu tiên người dùng nhập, nếu trống thì ghép từ prompt ảnh đang có,
+        // cuối cùng rơi về mô tả catwalk mặc định (giống luồng Alpine cũ tại index.blade.php).
+        let prompt = this.videoPromptEn;
+        if (!prompt && this.imagePromptEn) {
+          prompt = 'Cinematic fashion catwalk: ' + this.imagePromptEn + ', dynamic fabric motion, professional fashion video.';
+        }
+        if (!prompt) {
+          prompt = 'a fashion model walking on a runway, cinematic fashion catwalk, dynamic fabric motion, professional fashion video';
+        }
+        const d = await this.api('/studio/video', {
+          prompt,
+          camera: this.videoSceneCamera(),
+          base_image: srcImage,
+          model: this.videoModel,
+          duration: this.videoDuration,
+          resolution: this.videoRes,
+          project_id: this.activeProject?.id || null,
+        });
+        this.addGen({ id: d.generation_id, type: 'video', status: d.status || 'processing', model: d.model || this.videoModel, provider: d.provider || 'video', media_url: d.media_url || null, error: null, credits_cost: d.credits_cost || 10, created_at: 'Vừa gửi' });
       } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
       finally { this.videoBusy = false; }
+    },
+    // Ánh xạ 3 nút "Kịch bản quay" của DirectorCard (catwalk/slow/closeup) sang câu mô tả
+    // camera tiếng Anh — đồng bộ với các preset video_scene ở database/data/studio_presets.php.
+    videoSceneCamera() {
+      const map = {
+        catwalk: 'Full body shot, model walking confidently forward on a runway, camera smoothly tracking backwards at the exact same speed, maintaining subject in center frame, dynamic fabric motion',
+        slow: 'Medium-full shot, camera static, model performing a slow elegant movement, 120fps slow-motion cinematic effect, graceful fabric motion',
+        closeup: 'Extreme close-up macro shot, shallow depth of field, sharp focus on fabric texture, weave, and intricate stitching',
+      };
+      return map[this.videoScene] || '';
     },
     // Zoom theo điểm chuột (cx, cy = px so với TÂM khung) — điểm ảnh dưới con trỏ
     // không trôi khi phóng/thu (pan' = c*(1-k) + pan*k).
