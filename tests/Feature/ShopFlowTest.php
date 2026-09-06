@@ -907,6 +907,53 @@ class ShopFlowTest extends TestCase
         $this->assertSame('video', ($vgen->fresh()->meta['type'] ?? null));
     }
 
+    public function test_studio_refgen_tryon_creates_generation_with_garment_prompt(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // Chip "Thử đồ" trong card Ảnh mới từ ảnh mẫu: gửi 1 ảnh trang phục + tryon=true →
+        // 1 generation mode='refgen' (model sinh ảnh, KHÔNG edit), prompt chứa "WEAR THE EXACT GARMENT"
+        // (bám mẫu trang phục). Kế thừa body/hair directive khi có.
+        $r = $this->postJson('/studio/refgen', [
+            'image' => '/storage/studio/garment.jpg',
+            'prompt' => 'mặc trang phục lên người mẫu, pose đứng',
+            'variants' => 1,
+            'tryon' => true,
+            'body_height' => 8,
+            'hair_color' => 'black',
+        ])->assertOk();
+
+        $items = $r->json('items');
+        $this->assertCount(1, $items);
+        $this->assertTrue((bool) $r->json('tryon'));
+        $gen = Generation::find($items[0]['generation_id']);
+        $this->assertNotNull($gen);
+        $this->assertSame('refgen', $gen->meta['mode'] ?? null);
+        // Prompt tryon phải là ngôn ngữ dương "WEARING THE EXACT GARMENT" (bám mẫu, không phải liệt kê "đừng đổi").
+        $this->assertStringContainsString('WEARING THE EXACT GARMENT', (string) $gen->prompt);
+        $this->assertStringContainsString('IDENTICAL garment', (string) $gen->prompt);
+        // Kế thừa body/hair directive: body_height=8 → "tall statuesque model", hair_color=black → "black hair color".
+        $this->assertStringContainsString('tall statuesque model', (string) $gen->prompt);
+        $this->assertStringContainsString('black hair color', (string) $gen->prompt);
+        // Chi phí = 1 credit (model sinh ảnh, không edit).
+        $this->assertSame(1, $gen->credits_cost);
+        // Generation được tạo đúng mode=refgen (poll không 500; stub offline có thể failed nhưng không nằm trong scope test này).
+        $this->getJson('/studio/generations/'.$gen->id)->assertOk();
+
+        // Không gửi tryon → refgen thường (prompt "Create a brand-new image based on the provided reference image").
+        $c = $this->postJson('/studio/refgen', [
+            'image' => '/storage/studio/sample.jpg',
+            'prompt' => '',
+            'variants' => 1,
+        ])->assertOk();
+        $this->assertNull($c->json('tryon'));
+        $cg = Generation::find($c->json('items.0.generation_id'));
+        $this->assertSame('refgen', $cg->meta['mode'] ?? null);
+        $this->assertStringContainsString('Create a brand-new image based on the provided reference image', (string) $cg->prompt);
+        $this->assertStringNotContainsString('WEARING THE EXACT GARMENT', (string) $cg->prompt);
+    }
+
     public function test_studio_is_admin_only(): void
     {
         // /studio is now a PUBLIC page (renders the Vue shell; the API routes remain admin-only).

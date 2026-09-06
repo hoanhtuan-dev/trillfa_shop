@@ -17,6 +17,22 @@ const similarity = ref(70);
 const variants = ref(1);
 const busy = ref(false);
 
+// Chip "Thử đồ": gửi 1 ảnh trang phục (ảnh đang chọn) → model SINH ẢNH (qwen-image-3.0-pro,
+// rẻ hơn tryon-by-edit) tạo ảnh người mẫu mặc đúng đồ đó. Không cần ảnh pose — pose do prompt
+// mô tả. Kế thừa body/hair directive (tạo ảnh 2D) để kiểm soát người mẫu.
+const tryon = ref(false);
+function toggleTryon() {
+  tryon.value = !tryon.value;
+  if (tryon.value) {
+    // Đặt prompt mẫu tiếng Việt cho Thử đồ
+    if (!prompt.value.trim()) {
+      prompt.value = 'mặc trang phục trong ảnh lên người mẫu thời trang, giữ nguyên màu sắc, chất liệu, họa tiết và phụ kiện, pose đứng tự nhiên, ánh sáng studio';
+    }
+    similarity.value = 85; // tryon cần độ giống cao (bám mẫu trang phục)
+    store.toast('Thử đồ (sinh ảnh): dùng ảnh làm trang phục, tạo người mẫu mặc đúng đồ. Rẻ hơn Thử đồ ảo (edit).');
+  }
+}
+
 // Không còn dropdown chọn model trên card này: backend refgen đã mặc định dùng model
 // sinh ảnh (qwen-image-3.0-pro / qwen_model trong Cài đặt) và tự fallback đúng model
 // sinh ảnh — không cần người dùng chọn. Danh sách trước đây lấy từ store.inpaintModels
@@ -120,7 +136,10 @@ async function runRefgen() {
   busy.value = true;
   // Ảnh tham chiếu có thể là data:URL (canvas flattened) → backend downscaleSource xử lý.
   // Không truyền selectedModel → backend dùng model sinh ảnh đã cấu hình trong Cài đặt.
-  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null);
+  // Thử đồ: gửi tryon=true + body/hair từ store (kế thừa tạo ảnh 2D) để kiểm soát người mẫu.
+  const body = tryon.value ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
+  const hair = tryon.value ? { style: store.hairStyle, color: store.hairColor } : null;
+  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, tryon.value, body, hair);
   busy.value = false;
   if (items && items.length) {
     store.toast('Đã gửi ' + items.length + ' ảnh mới — đang tạo…');
@@ -144,6 +163,20 @@ async function runRefgen() {
       </div>
     </div>
     <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trong <b>Outputs</b> để làm ảnh tham chiếu.</div>
+
+    <!-- Chip Thử đồ: dùng ảnh đang chọn làm trang phục → model sinh ảnh (rẻ hơn edit) tạo người mẫu mặc đúng đồ -->
+    <div class="mt-3">
+      <button @click="toggleTryon"
+              class="flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors"
+              :class="tryon ? 'border-emerald-400 bg-emerald-600/20 text-emerald-100' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+        <span class="flex items-center gap-1.5"><StudioIcon name="shirt" size="h-3.5 w-3.5" /> Thử đồ (sinh ảnh mới)</span>
+        <span v-if="tryon" class="text-[10px] text-emerald-200/80">✔ Bật</span>
+        <span v-else class="text-[10px] text-cream-300/50">Rẻ hơn edit</span>
+      </button>
+      <p v-if="tryon" class="mt-1.5 rounded-xl border border-emerald-400/30 bg-emerald-900/15 px-2.5 py-1.5 text-[10px] leading-relaxed text-emerald-100/80">
+        Ảnh đang chọn sẽ làm <b>trang phục</b>. AI dùng model <b>sinh ảnh</b> (qwen-image-3.0-pro) tạo người mẫu mặc đúng đồ — <b>rẻ hơn</b> Thử đồ ảo (edit). Độ bám mẫu có thể kém hơn edit một chút.
+      </p>
+    </div>
 
     <!-- Nền Studio -->
     <div class="mt-4 flex items-center justify-between">
@@ -178,9 +211,12 @@ async function runRefgen() {
     <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ chủ thể, đổi sang nền studio tối, góc máy chếch…"></textarea>
     <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
 
-    <!-- Độ giống ảnh mẫu -->
+    <!-- Độ giống ảnh mẫu (ẩn khi Thử đồ — tryon cần trung thực tuyệt đối, không phải biến thể) -->
     <label class="label mt-3">Độ giống ảnh mẫu</label>
-    <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+    <div v-if="tryon" class="rounded-2xl border border-emerald-400/30 bg-emerald-900/15 px-3 py-2.5 text-xs text-emerald-100/80">
+      <b>Trung thực tuyệt đối</b> — bám chính xác trang phục/Phụ kiện trong ảnh gốc.
+    </div>
+    <div v-else class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
       <span class="shrink-0 font-medium text-cream-200">Giống</span>
       <input type="range" min="0" max="100" step="5" v-model.number="similarity" class="h-2 w-full cursor-pointer accent-brand-500">
       <span class="shrink-0 font-semibold text-cream-50">{{ similarity }}%</span>

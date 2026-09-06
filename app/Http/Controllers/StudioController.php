@@ -596,16 +596,49 @@ class StudioController extends Controller
             // Model sinh ảnh do người dùng chọn (vd qwen-image-3.0-pro) — mặc định theo Cài đặt.
             'provider' => ['nullable', 'string', 'max:60'],
             'model' => ['nullable', 'string', 'max:120'],
+            // Chip "Thử đồ" trong card Ảnh mới từ ảnh mẫu: gửi 1 ảnh trang phục → model SINH ẢNH
+            // (qwen-image-3.0-pro, rẻ hơn edit) tạo ảnh người mẫu mặc đúng trang phục đó. KHÔNG cần
+            // ảnh pose — pose do prompt mô tả (hoặc model tự chọn). Kế thừa body/hair directive
+            // (tạo ảnh 2D) để kiểm soát người mẫu. mode='refgen' giữ nguyên → không ép model edit.
+            'tryon' => ['nullable', 'boolean'],
+            'body_height' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_build' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_waist' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_shoulders' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_hips' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'hair_style' => ['nullable', 'string', 'max:100'],
+            'hair_color' => ['nullable', 'string', 'max:100'],
         ]);
 
         $similarity = (int) ($data['similarity'] ?? 70);
         $userPrompt = trim((string) ($data['prompt'] ?? ''));
-        $finalPrompt = 'Create a brand-new image based on the provided reference image. '
-            .'Keep about '.$similarity.'% similarity to the reference: preserve the same subject, style, '
-            .'color palette, composition and proportions, but produce a fresh, original rendering — '
-            .'not an edit of the reference. '
-            .($userPrompt !== '' ? 'Additionally: '.$userPrompt.' ' : 'Produce a clean, refined variation of the reference itself. ')
-            .'High quality, photorealistic, sharp details, professional studio lighting, no text, no watermark.';
+        $isTryon = ! empty($data['tryon']);
+
+        if ($isTryon) {
+            // Tryon bằng model SINH ẢNH (qwen-image-3.0-pro): không edit ảnh gốc mà sinh ảnh mới
+            // dựa ảnh tham chiếu. Prompt nêu rõ "dựa trang phục trong ảnh tham chiếu, tạo ảnh người
+            // mẫu mặc đúng trang phục đó". Ngôn ngữ DƯƠNG (bám mẫu) — tránh model tự thiết kế lại đồ.
+            // Kế thừa body/hair directive (tạo ảnh 2D) để kiểm soát người mẫu.
+            $bodyDirective = $this->buildBodyDirective($data);
+            $hairDirective = $this->buildHairDirective($data);
+            $finalPrompt = 'Create a brand-new photorealistic fashion photo of a model WEARING THE EXACT GARMENT shown in the reference image. '
+                .'The reference image is a commercial product photo of a garment — reproduce this IDENTICAL garment on a new model: identical color, identical fabric, identical pattern/print, identical cut, identical length, identical neckline, identical sleeves, identical fit (tight stays tight, loose stays loose), identical buttons/zippers/belt/bow/brooch, identical stitching and seams. Copy the garment as-is from the reference photo; do not redesign, restyle, recolor, simplify, or invent any detail. '
+                .'Wear every accessory visible in the reference identically too — same shoes, bag, belt, hat, jewelry, scarf — identical color, size, placement. Do not add items not in the reference; do not drop items that are in it. '
+                .'Full body head to toe, not cropped. Standard anatomically correct human proportions: head-to-body about 1:7.5, shoulders and hips symmetric, spine aligned, arms reaching mid-thigh, 5 fingers per hand, correct shoulders/elbows/wrists/hips/knees/ankles. '
+                .'Single clean body — one model, one pose, no double exposure, no ghost, no overlapping or duplicated limbs. '
+                .'The model fills about 75-80% of the frame height with small headroom and footroom. '
+                .'Sharp, in-focus, photorealistic, clean high-resolution fashion photo, even studio lighting. No blur, no noise, no banding, no artifacts, no text, no watermark.'
+                .($bodyDirective !== '' ? $bodyDirective : '')
+                .($hairDirective !== '' ? $hairDirective : '')
+                .($userPrompt !== '' ? ' '.$userPrompt : '');
+        } else {
+            $finalPrompt = 'Create a brand-new image based on the provided reference image. '
+                .'Keep about '.$similarity.'% similarity to the reference: preserve the same subject, style, '
+                .'color palette, composition and proportions, but produce a fresh, original rendering — '
+                .'not an edit of the reference. '
+                .($userPrompt !== '' ? 'Additionally: '.$userPrompt.' ' : 'Produce a clean, refined variation of the reference itself. ')
+                .'High quality, photorealistic, sharp details, professional studio lighting, no text, no watermark.';
+        }
 
         $cost = (int) studio_config('image_credits', 1);
         $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
@@ -628,6 +661,7 @@ class StudioController extends Controller
         return response()->json([
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
+            'tryon' => $isTryon ? true : null,
         ]);
     }
 
