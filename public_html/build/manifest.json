@@ -338,7 +338,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DGXD1bO2.js",
+    "file": "assets/app-DfFzRNgb.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -350,7 +350,7 @@
       "_StylistDataManager-CpFKkPAA.js"
     ],
     "css": [
-      "assets/app-BA6K291y.css"
+      "assets/app-BGJu2gfA.css"
     ]
   },
   "resources/js/studio/library.js": {

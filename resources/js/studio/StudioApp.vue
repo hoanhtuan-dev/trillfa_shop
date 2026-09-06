@@ -7,7 +7,8 @@ import StylistCard from './components/StylistCard.vue';
 import UpscaleCard from './components/UpscaleCard.vue';
 // [SWAP TẠM ẨN] import SwapCard from './components/SwapCard.vue';
 import InpaintCard from './components/InpaintCard.vue';
-import ComposeCard from './components/ComposeCard.vue';
+// TẠM ẨN card "Ghép ảnh" (ComposeCard) để tập trung phát triển tính năng khác đã ổn định.
+// import ComposeCard from './components/ComposeCard.vue';
 import RefImageCard from './components/RefImageCard.vue';
 import RegionTools from './components/RegionTools.vue';
 import CanvasMaskTools from './components/CanvasMaskTools.vue';
@@ -99,7 +100,7 @@ function onHistoryKeys(e) {
   else if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); store.redo(); }
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [ComposeCard, RefImageCard, InpaintCard, UpscaleCard] : [DirectorCard]); // RefImageCard ngay dưới Ghép ảnh (vị trí 2) — [SWAP TẠM ẨN: bỏ SwapCard]
+const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [RefImageCard, InpaintCard, UpscaleCard] : [DirectorCard]); // TẠM ẨN ComposeCard — bỏ khỏi step 2
 
 // ── Layer editor (composite + transform) ──
 const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode);
