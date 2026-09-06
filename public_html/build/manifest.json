@@ -158,7 +158,7 @@
     "name": "useApi"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CZE5h6t-.css",
+    "file": "assets/app-BJnDYv8r.css",
     "name": "app",
     "names": [
       "app.css"
@@ -338,7 +338,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-s4eET1gS.js",
+    "file": "assets/app-DzaoTB3f.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,

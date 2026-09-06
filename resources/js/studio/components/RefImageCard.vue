@@ -30,6 +30,7 @@ const poseId = ref('');
 const faceOpen = ref(false); // thu gọn khối Khuôn mặt mẫu để card gọn
 const poseOpen = ref(false); // thu gọn khối Pose mẫu để card gọn
 const bodyOpen = ref(false); // thu gọn khối Phom dáng để card gọn
+const bgOpen = ref(false);   // thu gọn khối Nền Studio để card gọn (chế độ Thử đồ)
 onMounted(async () => {
   try {
     const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
@@ -62,7 +63,7 @@ function setMode(m) {
 // Cho phép tạo ngay cả khi chưa nhập mô tả — backend tự dựng prompt "create a fresh variation".
 const canSubmit = computed(() => !!img.value && !busy.value);
 
-// ── Nền Studio: 8 màu nền studio thông dụng (chỉ chế độ "Tạo ảnh mới") ──
+// ── Nền Studio: 16 màu nền studio (dùng chung cho cả "Tạo ảnh mới" và "Thử đồ") ──
 const presets = [
   { id: 'studio-white',  label: 'Trắng thuần',  color: '#ffffff', similarity: 82, prompt: 'keep the subject unchanged; replace the background with a pure-white seamless studio backdrop, even soft diffused lighting, no harsh shadows, clean editorial fashion look' },
   { id: 'studio-lgray',  label: 'Xám nhạt',     color: '#e8e8e8', similarity: 80, prompt: 'keep the subject unchanged; replace the background with a light neutral gray seamless studio backdrop, soft top-down diffused lighting, subtle gradient' },
@@ -72,6 +73,14 @@ const presets = [
   { id: 'studio-cream',  label: 'Kem',          color: '#f2e7d5', similarity: 80, prompt: 'keep the subject unchanged; replace the background with a warm cream/beige seamless studio backdrop, soft warm diffuse lighting, clean catalog look' },
   { id: 'studio-blue',   label: 'Xanh phấn',    color: '#c9d8e0', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a soft powder-blue seamless studio backdrop, cool soft lighting, calm editorial mood' },
   { id: 'studio-blush',  label: 'Hồng phấn',    color: '#ead3d5', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a dusty blush-pink seamless studio backdrop, soft warm diffuse lighting, fashion lookbook mood' },
+  { id: 'studio-lavender', label: 'Tím oải hương', color: '#d9d2e9', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a soft lavender seamless studio backdrop, gentle diffused lighting, calm elegant mood' },
+  { id: 'studio-mint',   label: 'Xanh bạc hà',  color: '#cfe8dd', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a fresh mint-green seamless studio backdrop, soft even lighting, clean airy look' },
+  { id: 'studio-peach',  label: 'Hồng đào',     color: '#f8d9c0', similarity: 80, prompt: 'keep the subject unchanged; replace the background with a warm peach seamless studio backdrop, soft flattering lighting, fresh beauty look' },
+  { id: 'studio-sand',   label: 'Cát',          color: '#e7dcc6', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a warm sand/beige seamless studio backdrop, soft natural lighting, earthy neutral mood' },
+  { id: 'studio-sage',   label: 'Xanh xô thơm', color: '#c8d6c0', similarity: 76, prompt: 'keep the subject unchanged; replace the background with a muted sage-green seamless studio backdrop, soft natural lighting, organic calm mood' },
+  { id: 'studio-rose',   label: 'Hồng cánh sen', color: '#f0cdd5', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a soft rose-pink seamless studio backdrop, gentle diffused lighting, romantic editorial mood' },
+  { id: 'studio-sky',    label: 'Xanh da trời', color: '#cfe3f2', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a light sky-blue seamless studio backdrop, airy bright lighting, fresh clean look' },
+  { id: 'studio-lilac',  label: 'Tím nhạt',     color: '#e3d9f0', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a pale lilac seamless studio backdrop, soft dreamy lighting, delicate fashion mood' },
 ];
 const activePreset = ref(null);
 function segmentList() {
@@ -173,12 +182,8 @@ async function runRefgen() {
 
     <!-- ============ CHẾ ĐỘ: TẠO ẢNH MỚI (refgen) ============ -->
     <template v-if="mode === 'refgen'">
-      <!-- Nền Studio -->
-      <div class="mt-4 flex items-center justify-between">
-        <p class="label">Nền Studio</p>
-        <span class="text-[9px] font-medium text-cream-300/40">{{ presets.length }} nền</span>
-      </div>
-      <div class="mt-1 grid grid-cols-2 gap-1.5">
+      <!-- Nền Studio (lưới 2x, không title) -->
+      <div class="mt-4 grid grid-cols-2 gap-1.5">
         <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
                 class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
                 :class="activePreset === p.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
@@ -217,8 +222,8 @@ async function runRefgen() {
 
     <!-- ============ CHẾ ĐỘ: THỬ ĐỒ (tryon sinh ảnh) ============ -->
     <template v-else>
-      <!-- 3 chip điều khiển cùng hàng: Khuôn mặt · Phom dáng · Pose -->
-      <div class="mt-4 grid grid-cols-3 gap-1.5">
+      <!-- 4 chip điều khiển cùng hàng: Khuôn mặt · Phom dáng · Pose · Nền Studio -->
+      <div class="mt-4 grid grid-cols-4 gap-1.5">
         <button @click="faceOpen = !faceOpen"
                 :class="faceOpen || faceModelId ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                 class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
@@ -240,23 +245,26 @@ async function runRefgen() {
           <span class="text-[11px] font-semibold leading-none text-cream-100">Pose</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ selectedPose ? selectedPose.name : 'Tự do' }}</span>
         </button>
+        <button @click="bgOpen = !bgOpen"
+                :class="bgOpen || activePreset ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+                class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
+          <span class="text-base leading-none">🎨</span>
+          <span class="text-[11px] font-semibold leading-none text-cream-100">Nền Studio</span>
+          <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ activePreset ? 'Đã chọn' : 'Mặc định' }}</span>
+        </button>
       </div>
 
-      <!-- Khuôn mặt mẫu (dropdown) -->
-      <div v-if="faceOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
-        <div class="mb-1.5 flex items-center justify-between">
-          <p class="text-[11px] font-semibold text-cream-200">Khuôn mặt mẫu</p>
-          <button v-if="faceModelId" @click="faceModelId = ''" class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ chọn</button>
-        </div>
-        <div class="flex flex-wrap gap-1.5">
-          <button v-for="f in faces" :key="f.id" @click="faceModelId = String(f.id)"
+      <!-- Khuôn mặt mẫu (lưới 2x, không title) -->
+      <div v-if="faceOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+        <div class="grid grid-cols-2 gap-1.5">
+          <button v-for="f in faces" :key="f.id" @click="faceModelId = (String(faceModelId) === String(f.id)) ? '' : String(f.id)"
                   :class="String(faceModelId) === String(f.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                   class="flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
-            <img v-if="f.image" :src="f.image" class="h-7 w-7 rounded-full object-cover ring-1 ring-white/20">
-            <span v-else class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-[11px]">👩</span>
+            <img v-if="f.image" :src="f.image" class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+            <span v-else class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-700 text-[12px]">👩</span>
             <span class="truncate">{{ f.name }}</span>
           </button>
-          <span v-if="!faces.length" class="text-[10px] text-cream-300/50">Chưa có khuôn mặt mẫu — để trống để AI tự chọn.</span>
+          <span v-if="!faces.length" class="col-span-2 text-[10px] text-cream-300/50">Chưa có khuôn mặt mẫu — để trống để AI tự chọn.</span>
         </div>
       </div>
 
@@ -284,21 +292,29 @@ async function runRefgen() {
         </div>
       </div>
 
-      <!-- Pose mẫu (dropdown) — AI đọc ẢNH pose để tạo mô tả tư thế (không gửi ảnh pose vào model) -->
-      <div v-if="poseOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
-        <div class="mb-1.5 flex items-center justify-between">
-          <p class="text-[11px] font-semibold text-cream-200">Pose mẫu <span class="text-cream-300/50">(AI đọc ảnh → mô tả tư thế)</span></p>
-          <button v-if="poseId" @click="poseId = ''" class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ chọn</button>
-        </div>
-        <div class="flex flex-wrap gap-1.5">
-          <button v-for="p in poses" :key="p.id" @click="poseId = String(p.id)"
+      <!-- Pose mẫu (lưới 2x, không title) — AI đọc ẢNH pose để tạo mô tả tư thế -->
+      <div v-if="poseOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+        <div class="grid grid-cols-2 gap-1.5">
+          <button v-for="p in poses" :key="p.id" @click="poseId = (String(poseId) === String(p.id)) ? '' : String(p.id)"
                   :class="String(poseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                   class="flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
-            <img v-if="p.image" :src="p.image" class="h-9 w-9 rounded-lg object-cover ring-1 ring-white/20">
-            <span v-else class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-sm">🧍</span>
+            <img v-if="p.image" :src="p.image" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+            <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700 text-sm">🧍</span>
             <span class="truncate">{{ p.name }}</span>
           </button>
-          <span v-if="!poses.length" class="text-[10px] text-cream-300/50">Chưa có pose mẫu — để trống để AI tự chọn.</span>
+          <span v-if="!poses.length" class="col-span-2 text-[10px] text-cream-300/50">Chưa có pose mẫu — để trống để AI tự chọn.</span>
+        </div>
+      </div>
+
+      <!-- Nền Studio (lưới 2x, không title) -->
+      <div v-if="bgOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+        <div class="grid grid-cols-2 gap-1.5">
+          <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
+                  class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+                  :class="activePreset === p.id ? 'border-emerald-400 bg-emerald-600/25 text-cream-50' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-emerald-400/50'">
+            <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }"></span>
+            <span class="truncate">{{ p.label }}</span>
+          </button>
         </div>
       </div>
 
