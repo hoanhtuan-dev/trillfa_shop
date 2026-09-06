@@ -1686,9 +1686,19 @@ RULES:
         if (str_contains($path, '..') || ! preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path)) {
             return response()->json(['error' => 'invalid'], 404);
         }
+        // Thử nhiều vị trí: storage/app/public (chuẩn), public_html/storage (symlink),
+        // public_html (web root Hostinger) — chống 404 khi deploy dùng cấu trúc khác.
         $file = storage_path('app/public/'.$path);
         if (! is_file($file)) {
-            return response()->json(['error' => 'not found'], 404);
+            $alt = base_path('public_html/storage/'.$path);
+            if (is_file($alt)) { $file = $alt; }
+        }
+        if (! is_file($file)) {
+            $alt2 = base_path('public_html/'.$path);
+            if (is_file($alt2)) { $file = $alt2; }
+        }
+        if (! is_file($file)) {
+            return response()->json(['error' => 'not found', 'path' => $path], 404);
         }
         return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
     }

@@ -53,6 +53,7 @@ const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
 const open = ref(false);
 const selected = ref([null, null, null]); // 3 slot cố định: image object hoặc null
 const targetSlot = ref(0);  // slot đang chọn trong popup
+const slotImgError = ref([false, false, false]); // ảnh slot bị lỗi (404/broken) — vẫn cho xóa
 
 const baseUrl = ref('');
 const lastIds = ref([]);
@@ -85,12 +86,15 @@ function openSlot(i) {
 // Bấm 1 ảnh trong popup → gán vào slot đang chọn
 function onPick(img) {
   selected.value[targetSlot.value] = img;
+  slotImgError.value[targetSlot.value] = false;
   open.value = false;
 }
 
 function removeSlot(i) {
   selected.value[i] = null;
+  slotImgError.value[i] = false;
 }
+function onSlotImgError(i) { slotImgError.value[i] = true; }
 
 // Đưa slot i lên làm @image1 (nền chính)
 function makeBase(i) {

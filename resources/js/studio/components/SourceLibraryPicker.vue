@@ -15,6 +15,7 @@ const emit = defineEmits(['update:modelValue', 'pick', 'add']);
 const refs = ref([]);
 const poses = ref([]);
 const posesLoading = ref(false);
+const poseImgError = ref({}); // pose ảnh bị lỗi (404) → hiện icon fallback
 const query = ref('');
 const sortKey = ref('newest');
 const gridCols = ref(4);
@@ -35,6 +36,7 @@ async function loadRefs() {
 async function loadPoses() {
   if (!props.includePoses) { poses.value = []; return; }
   posesLoading.value = true;
+  poseImgError.value = {};
   try { const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } }); const d = await r.json(); poses.value = d.items || []; } catch (e) { poses.value = []; } finally { posesLoading.value = false; }
 }
 
@@ -177,8 +179,8 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
           </div>
           <div v-else-if="poses.length" class="mb-3 grid gap-2" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
             <div v-for="p in poses" :key="'pose-' + p.id" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSel({ ...p, kind: 'pose', key: 'pose-' + p.id, url: p.image, name: p.name }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" style="padding-bottom: 133%" @click="clickItem({ key: 'pose-' + p.id, url: p.image, name: p.name, skeleton: p.skeleton, kind: 'pose' })">
-              <img v-if="p.image" :src="p.image" class="absolute inset-0 h-full w-full bg-ink-900 object-cover object-top" loading="lazy" alt="" @error="$event.target.style.display='none'">
-              <span v-else class="absolute inset-0 grid place-items-center bg-ink-800 text-2xl">🧍</span>
+              <img v-if="p.image && !poseImgError[p.id]" :src="p.image" class="absolute inset-0 h-full w-full bg-ink-900 object-cover object-top" loading="lazy" alt="" @error="poseImgError[p.id] = true">
+              <span v-if="!p.image || poseImgError[p.id]" class="absolute inset-0 grid place-items-center bg-ink-800 text-2xl" :title="'Dáng: ' + p.name">🧍</span>
               <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span>
             </div>
           </div>
