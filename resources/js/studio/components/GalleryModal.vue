@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
+import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 
 const store = useStudioStore();
 
@@ -216,7 +217,7 @@ onBeforeUnmount(() => {
                   :data-active="current?.id === g.id ? 'true' : 'false'"
                   class="relative h-11 w-11 shrink-0 snap-start overflow-hidden rounded-lg border-2 transition"
                   :class="current?.id === g.id ? 'border-brand-500' : 'border-ink-700/60 hover:border-ink-500'">
-            <img :src="g.media_url" class="h-full w-full bg-ink-900 object-cover" loading="lazy" />
+            <img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)" />
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { apiFetch, csrfToken } from '../storefront/composables/useApi.js';
+import { thumbUrl, onThumbError } from '../studio/composables/useStudioThumb.js';
 
 const boot = window.__PRODUCTS_BOOT__ || {};
 const categories = boot.categories || [];
@@ -1370,7 +1371,7 @@ onMounted(() => {
               </div>
               <div v-else-if="studioImages.length" class="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 <button v-for="img in studioImages" :key="img.id" type="button" @click="toggleSelImage(img)" class="group relative aspect-square overflow-hidden rounded-xl border transition" :class="isSelImage(img) ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-cream-200 hover:border-brand-400'">
-                  <img :src="img.url" :alt="img.label" class="h-full w-full object-cover" loading="lazy" />
+                  <img :src="thumbUrl(img.url)" :alt="img.label" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, img.url)" />
                   <span class="absolute inset-0 grid place-items-center text-white transition" :class="isSelImage(img) ? 'bg-brand-600/30' : 'bg-black/30 opacity-0 group-hover:opacity-100'">{{ isSelImage(img) ? '✓' : '＋' }}</span>
                 </button>
               </div>

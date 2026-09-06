@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useStudioStore } from '../store.js';
+import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 const store = useStudioStore();
 const showResults = ref(false), showProducts = ref(false);
 const products = ref([]);
@@ -23,10 +24,10 @@ function onFile(e) { const f = e.target.files?.[0]; if (f) store.uploadRef(f); i
     </div>
     <input ref="fileRef" type="file" accept="image/*" @change="onFile" class="hidden">
     <div v-if="showResults" class="mt-2 grid grid-cols-4 gap-1.5">
-      <button v-for="g in store.generations.slice(0,12)" :key="g.id" @click="store.pickFromResult(g)" class="relative h-14 w-14 overflow-hidden rounded-lg border border-ink-700"><img :src="g.media_url" class="h-full w-full bg-ink-900 object-cover"></button>
+      <button v-for="g in store.generations.slice(0,12)" :key="g.id" @click="store.pickFromResult(g)" class="relative h-14 w-14 overflow-hidden rounded-lg border border-ink-700"><img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>
     </div>
     <div v-if="showProducts" class="mt-2 grid grid-cols-4 gap-1.5">
-      <button v-for="p in products" :key="p.id" @click="store.pickFromProduct(p)" class="relative h-14 w-14 overflow-hidden rounded-lg border border-ink-700"><img :src="p.url" class="h-full w-full bg-ink-900 object-cover" loading="lazy"><span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 text-[8px] text-cream-200">{{ p.name }}</span></button>
+      <button v-for="p in products" :key="p.id" @click="store.pickFromProduct(p)" class="relative h-14 w-14 overflow-hidden rounded-lg border border-ink-700"><img :src="thumbUrl(p.url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, p.url)"><span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 text-[8px] text-cream-200">{{ p.name }}</span></button>
     </div>
     <button @click="store.suggestStyle(store.upscaleSrc)" :disabled="store.suggesting || !store.upscaleSrc" class="btn-brand btn-sm mt-3 w-full">{{ store.suggesting ? 'Đang gợi ý…' : '💡 Gợi ý phong cách' }}</button>
   </div>

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useStudioStore } from './store.js';
+import { thumbUrl, onThumbError } from './composables/useStudioThumb.js';
 import GalleryModal from './components/GalleryModal.vue';
 
 const store = useStudioStore();
@@ -237,7 +238,7 @@ onMounted(async () => {
              class="group relative overflow-hidden rounded-2xl border-2 transition"
              :class="isSelected(g.id) ? 'border-brand-400' : 'border-ink-700'">
           <div class="relative cursor-pointer" @click="openViewer(g)">
-            <img v-if="g.media_url" :src="g.media_url" class="aspect-[3/4] w-full bg-ink-900 object-cover" loading="lazy" @error="$event.target.src='/images/placeholder.svg'">
+            <img v-if="g.media_url" :src="thumbUrl(g.media_url)" class="aspect-[3/4] w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
             <div v-else class="grid aspect-[3/4] w-full place-items-center bg-ink-800 text-xs text-cream-300/60">
               {{ g.status === 'failed' ? 'Lỗi' : (g.status === 'cancelled' ? 'Đã hủy' : (g.type === 'video' ? '▶ Video' : 'Không có ảnh')) }}
             </div>

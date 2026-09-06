@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useStudioStore } from '../store.js';
+import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 const store = useStudioStore();
 
 const props = defineProps({
@@ -163,7 +164,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
           <p class="mb-1.5 text-xs font-semibold text-cream-200">🖼 Ảnh kết quả (output library)</p>
           <div class="mb-3 grid gap-2" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
             <div v-for="g in output" :key="g.key" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSel({ ...g, kind: 'output' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" style="padding-bottom: 100%" @click="clickItem({ ...g, kind: 'output' })">
-              <img :src="g.url" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="">
+              <img :src="thumbUrl(g.url)" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="" @error="onThumbError($event, g.url)">
               <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ g.name }}</span>
             </div>
           </div>
@@ -189,7 +190,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
         </div>
         <div class="grid content-start gap-2.5" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
           <div v-for="it in sortedRefs" :key="it.name" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSel({ ...it, key: 'ref-' + it.name, kind: 'ref' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" :title="it.name" style="padding-bottom: 100%" @click="clickItem({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })">
-            <img :src="it.url" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="">
+            <img :src="thumbUrl(it.url)" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, it.url)">
             <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
             <button v-if="!it.used" @click.stop="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white transition-colors hover:bg-red-500 group-hover:grid" title="Xóa ảnh"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
             <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1 pt-5">

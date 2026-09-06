@@ -15,7 +15,7 @@ function goLibrary() { window.location.href = '/studio/library'; }
       <div v-for="g in store.generations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'">
         <!-- Ảnh hoàn tất -->
         <template v-if="g.status === 'completed' && g.media_url">
-          <button @click="store.viewer = g" class="absolute inset-0"><img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy"></button>
+          <button @click="store.viewer = g" class="absolute inset-0"><img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>
         </template>
         <!-- Đang xử lý / chờ: skeleton shimmer + overlay tiến độ -->
         <template v-else>

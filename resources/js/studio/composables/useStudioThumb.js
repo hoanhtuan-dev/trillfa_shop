@@ -1,5 +1,5 @@
 // Composable dùng chung cho thumbnail ảnh Studio (single source of truth).
-// Trùng khớp 100% với PHP helper studio_image_thumb_url() ở app/Support/helpers.php:
+// Trùng khớp với PHP helper studio_image_thumb_url() ở app/Support/helpers.php:
 // chỉ tạo thumbnail cho path AN TOÀN (chữ-số / _ . - / /); path đặc biệt → giữ ảnh gốc,
 // tránh lỗi 500 do middleware ValidatePathEncoding khi URL chứa ký tự không hợp lệ.
 //
@@ -13,14 +13,27 @@ const SAFE = /^[a-zA-Z0-9/_.-]+$/;
 
 /**
  * Tạo URL thumbnail cho ảnh Studio từ media_url gốc.
+ * Nhận diện cả URL tương đối (/storage/..., /studio/image/...) lẫn URL tuyệt đối cùng origin
+ * (http(s)://<host>/storage/... — do asset() sinh ra ở AdminProductsApp picker).
  * - /storage/...      → /studio/image-thumb/{path}
  * - /studio/image/... → /studio/image-thumb/{path}
- * - URL ngoài / data:URL / path đặc biệt → trả nguyên url gốc (fallback an toàn).
+ * - URL ngoài / data:URL / path đặc biệt / khác origin → trả nguyên url gốc (fallback an toàn).
  * - url rỗng/null → trả nguyên (component tự xử lý v-if để tránh img rỗng).
  */
 export function thumbUrl(url) {
   if (!url) return url;
-  const clean = String(url).split(/[?#]/)[0]; // bỏ query string / fragment
+  let clean = String(url).split(/[?#]/)[0]; // bỏ query string / fragment
+  // URL tuyệt đối cùng origin → tách path (asset() có thể sinh http(s)://<host>/storage/...).
+  if (/^https?:\/\//i.test(clean)) {
+    try {
+      const u = new URL(clean);
+      // Khác origin (CDN/domain ngoài) → giữ nguyên ảnh gốc.
+      if (u.origin !== window.location.origin) return url;
+      clean = u.pathname;
+    } catch (e) {
+      return url; // URL malformed → giữ nguyên
+    }
+  }
   if (clean.startsWith('/storage/')) {
     const p = clean.slice(9);
     return SAFE.test(p) ? '/studio/image-thumb/' + p : url;

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
+import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import SourceLibraryPicker from './SourceLibraryPicker.vue';
 const store = useStudioStore();
 const uploadOpen = ref(false), productOpen = ref(false), products = ref([]);
@@ -76,7 +77,7 @@ const sortedProducts = computed(() => {
         </div>
         <div class="scrollbar-hide -mr-1 grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto overscroll-contain pr-1" :style="{ gridTemplateColumns: 'repeat(' + pCols + ', minmax(0, 1fr))' }">
           <div v-for="p in sortedProducts" :key="p.id" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSelProd(p) ? 'border-emerald-400 ring-2 ring-emerald-400/70' : 'border-ink-700 hover:border-ink-600'" :title="p.name" style="padding-bottom: 100%" @click="toggleProd(p)">
-            <img :src="p.url" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="">
+            <img :src="thumbUrl(p.url)" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="" @error="onThumbError($event, p.url)">
             <span v-if="isSelProd(p)" class="pointer-events-none absolute inset-0 grid place-items-center bg-emerald-500/15"><span class="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 text-white shadow-lg ring-2 ring-white/50"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></span>
             <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span>
           </div>
