@@ -663,12 +663,24 @@ class StudioController extends Controller
         $provider = trim((string) ($data['provider'] ?? ''));
         $model = trim((string) ($data['model'] ?? ''));
 
+        // downscaleSource tự xử lý cả data:URL (canvas flattened) → lưu file + trả /storage/ URL ngắn.
+        // Hoist ra KHỎI vòng lặp variants: trước đây gọi N lần → ghi N file ds-*.png trùng nội dung.
+        $baseImage = $this->downscaleSource((string) $data['image'], 1600);
+
+        // Chặn sớm request không đọc được ảnh (blob: URL chỉ tồn tại phía client, file đã bị xóa,
+        // URL ngoài không resolve được): trước đây vẫn tạo generation rồi job fail ngay (~0.04s)
+        // với "Không tạo được ảnh mới từ ảnh tham chiếu." — giờ trả 422 rõ ràng để chọn lại ảnh.
+        if (! $this->resolveLocalImage($baseImage)) {
+            return response()->json([
+                'message' => 'Không đọc được ảnh tham chiếu. Chọn lại ảnh từ Outputs (ảnh đã lưu trong Studio) — không dùng ảnh preview tạm hoặc ảnh đã bị xóa.',
+            ], 422);
+        }
+
         $items = [];
         for ($i = 0; $i < $variants; $i++) {
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $finalPrompt,
-                // downscaleSource tự xử lý cả data:URL (canvas flattened) → lưu file + trả /storage/ URL ngắn.
-                'base_image' => $this->downscaleSource((string) $data['image'], 1600),
+                'base_image' => $baseImage,
                 'edit' => false,       // KHÔNG ép model Qwen Edit — giữ model sinh ảnh đã chọn.
                 'mode' => 'refgen',    // RenderImageJob → generate(mode='refgen') → nhánh i2i.
                 'provider' => $provider !== '' ? $provider : null,

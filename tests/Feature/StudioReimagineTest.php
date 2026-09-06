@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Generation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -15,11 +16,28 @@ class StudioReimagineTest extends TestCase
 {
     use RefreshDatabase;
 
+    private string $fixtureRel = 'test-src.png';
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed();
         $this->actingAs(User::where('email', 'admin@trillfa.com')->firstOrFail());
+
+        // Fixture ảnh THẬT trên public disk — refgen giờ pre-validate ảnh tham chiếu
+        // resolve được (422 nếu không), nên URL /storage/test-src.png phải tồn tại.
+        $img = imagecreatetruecolor(32, 32);
+        imagefill($img, 0, 0, imagecolorallocate($img, 200, 120, 60));
+        ob_start();
+        imagepng($img);
+        Storage::disk('public')->put($this->fixtureRel, (string) ob_get_clean());
+        imagedestroy($img);
+    }
+
+    protected function tearDown(): void
+    {
+        Storage::disk('public')->delete($this->fixtureRel);
+        parent::tearDown();
     }
 
     private function sourceUrl(): string
@@ -107,6 +125,26 @@ class StudioReimagineTest extends TestCase
     public function test_refgen_requires_image(): void
     {
         $this->postJson('/studio/refgen', ['prompt' => 'mô tả', 'similarity' => 70])->assertStatus(422);
+    }
+
+    /**
+     * Ảnh tham chiếu không resolve được (file đã xóa, blob:/URL ngoài): endpoint trả 422
+     * NGAY và KHÔNG tạo generation — trước đây tạo generation rồi job fail với
+     * "Không tạo được ảnh mới từ ảnh tham chiếu." (lỗi production gen #3).
+     */
+    public function test_refgen_rejects_unresolvable_image(): void
+    {
+        $before = Generation::count();
+
+        $res = $this->postJson('/studio/refgen', [
+            'image' => '/storage/studio/file-da-bi-xoa-xyz.png',
+            'prompt' => 'mô tả',
+            'similarity' => 70,
+            'variants' => 1,
+        ]);
+
+        $res->assertStatus(422);
+        $this->assertSame($before, Generation::count());
     }
 
     public function test_refgen_creates_one_generation_per_variant(): void
