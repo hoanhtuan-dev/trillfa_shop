@@ -734,11 +734,13 @@ class StudioController extends Controller
      */
     private function tryonVariationDirective(int $i): string
     {
-        return match ($i % 4) {
+        return match ($i % 6) {
             0 => ' Emphasis: reproduce the garment EXACTLY — identical colors, prints, fabric, silhouette and length; then match the pose.',
             1 => ' Emphasis: copy the outfit details 100% faithfully while accurately reproducing the body stance and proportions.',
             2 => ' Emphasis: photorealistic natural blend — sharp face, coherent lighting, seamless garment fit, exact pose.',
             3 => ' Emphasis: balanced fashion composition — clean full-body framing, natural pose, flawless garment rendering.',
+            4 => ' Emphasis: preserve every accessory and detail — shoes, handbag, belt, earrings, hat — exactly as in the garment image.',
+            5 => ' Emphasis: natural skin texture and fabric drape — photorealistic material, wrinkles, folds, no airbrushed or plastic look.',
             default => '',
         };
     }
@@ -842,14 +844,14 @@ class StudioController extends Controller
             // Thử đồ ảo: @image1 = trang phục (base/source), @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
             // Chất lượng cao: khóa nguyên vẹn trang phục + tái tạo chính xác tư thế + tỷ lệ người mẫu
             // + câu tránh lỗi (cùng kỹ thuật đang dùng cho "Thay Đổi Người Mẫu").
+            // Bối cảnh (@image3) được tách ra PASS 2 riêng (giống Click-to-Swap PASS 2) —
+            // KHÔNG gộp vào PASS 1 vì model sẽ bỏ qua pose khi prompt có cả đổi nền.
             $finalPrompt = 'Virtual try-on: dress the model in the EXACT garment and every accessory shown in @image1 — identical colors, prints, patterns, fabric, silhouette, length and details. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'Reproduce the EXACT body pose, stance, arm/leg placement, facing direction and posture from the pose reference in @image2 — do NOT copy the garment or the person from the pose image; keep the model\'s face, hairstyle and skin tone natural and consistent with @image2. '
                 .'Render a vertically-balanced FULL BODY from head to toe (not cropped), with natural elongated fashion-model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat or stubby. '
-                .'The model should occupy about 75-80% of the frame height with headroom above and footroom below.';
-            if (count($refs) > 1) {
-                $finalPrompt .= ' Place the result into the background shown in @image3, keeping the person and garment fully lit and clearly visible.';
-            }
+                .'The model should occupy about 75-80% of the frame height with headroom above and footroom below. '
+                .'Keep the original background of @image1 UNCHANGED — do NOT modify, replace or redraw the background.';
             $finalPrompt .= ' Avoid: cropped body, wrong pose, deformed hands, extra garments or accessories not in @image1, wrong colors, blurry, low quality. '
                 .'Photorealistic, full body, studio quality, high fashion, consistent lighting. '.$userPrompt;
         } elseif ($isFaceSwap) {

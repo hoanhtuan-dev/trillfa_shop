@@ -81,7 +81,18 @@ class ImageAIService
                 ? $modelOverride
                 : $configuredEdit;
             $triedModels = [$editModel];
-            $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, null, $maskImage, $refImages);
+            // Thử đồ ảo (mode='tryon'): pose ref (ref_images[0]) được tách ra làm tham số riêng
+            // poseRefUrl thay vì nằm gộp trong refImages — nhờ đó pose được hưởng retry 3 bậc
+            // (face+pose+source → face+source → source) giống "Thay Đổi Người Mẫu", không bị vứt
+            // sớm chung với compose refs khi model từ chối nhiều ảnh. Còn lại ref_images[1..] (bối cảnh)
+            // vẫn gửi qua $refImages.
+            $tryonPose = null;
+            $tryonRefs = $refImages;
+            if ($mode === 'tryon' && ! empty($refImages)) {
+                $tryonPose = (string) $refImages[0];
+                $tryonRefs = array_slice($refImages, 1);
+            }
+            $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, $tryonPose, $maskImage, $tryonRefs);
             // Model được chọn (vd qwen-image-3.0-pro) thất bại ở MỌI key (hết hạn mức, 403/404…) →
             // tự fallback sang model Qwen Edit cấu hình — đúng cơ chế "tự chuyển sang model kế tiếp"
             // của Tạo ảnh 2D. Hạn mức DashScope tính THEO MODEL nên model edit chuyên dụng
@@ -89,7 +100,7 @@ class ImageAIService
             if (! $edited && $editModel !== $configuredEdit && $this->isImageEditCapableModel($configuredEdit)) {
                 logger()->info('Inpaint: selected edit model failed, falling back to configured Qwen Edit model', ['from' => $editModel, 'to' => $configuredEdit]);
                 $triedModels[] = $configuredEdit;
-                $edited = $this->editImage($prompt, $baseImage, $configuredEdit, $faceRef, null, $maskImage, $refImages);
+                $edited = $this->editImage($prompt, $baseImage, $configuredEdit, $faceRef, $tryonPose, $maskImage, $tryonRefs);
             }
             if ($edited) {
                 // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
@@ -103,6 +114,27 @@ class ImageAIService
                     // smear khi AI no-op (giữ nguyên để user biết AI chưa tạo).
                     $eraseFallback = str_contains($prompt, 'REMOVAL');
                     $edited = $this->compositeMaskedEdit($edited, $baseImage, $maskImage, $eraseFallback) ?: $edited;
+                }
+                // Thử đồ ảo PASS 2 — đổi NỀN (bối cảnh @image3) khi có bối cảnh riêng.
+                // Tách pass nền ra khỏi PASS 1 (mặc đồ + pose) vì gộp chung khiến model bỏ qua
+                // tư thế (đã verified trong "Thay Đổi Người Mẫu" PASS 2). Giữ nguyên người
+                // + trang phục + pose, chỉ đổi hậu cảnh.
+                if ($mode === 'tryon' && ! empty($tryonRefs)) {
+                    $bgUrl = (string) $tryonRefs[0];
+                    $bgPrompt = 'Replace the ENTIRE background of the scene with the background from the FIRST image. '
+                        .'Keep the person, their pose, the garment and body shape 100% unchanged. '
+                        .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look and stay clearly visible; do NOT darken or shade them into a silhouette. '
+                        .'Frame the person at about 75-80% of the image height, with the background clearly visible all around them. '
+                        .'Blend the person into the scene: the HAIR and its edges, the clothing silhouette and the body outline must merge naturally with the background — NO hard cut-out outline, halo, white fringe or aliasing around the hair. '
+                        .'Unify the color grading, warmth and lighting of the person and the new background so they blend into ONE cohesive photograph with no visible seam. '
+                        .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, deformed hands, blurry, low quality. Photorealistic.';
+                    $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, $bgUrl, null, []);
+                    if ($bgResult) {
+                        $edited = $bgResult;
+                        logger()->info('Try-on PASS 2 (background) succeeded');
+                    } else {
+                        logger()->warning('Try-on PASS 2 (background) failed; keeping PASS 1 result');
+                    }
                 }
                 return $edited;
             }
@@ -583,10 +615,57 @@ class ImageAIService
      * Re-edit a generated image so the model's face matches the reference face
      * (best-effort via the qwen-edit image model). Returns null on failure so the
      * original image is kept.
+     *
+     * Độ trung thực trang phục (tryon/swap): ảnh NGUỒN gửi tới model edit phải giữ được
+     * vân vải/đường may/hoa tiết in. Trước đây hàm này cán mọi ảnh về 768px + JPEG Q85,
+     * làm mờ/làm trơn chi tiết trước khi model kịp thấy — mâu thuẫn với prompt "preserve
+     * EXACT colors, prints, patterns, fabric".
+     *
+     * Nay:
+     *  - $max cao hơn (mặc định 2560 cho ảnh edit — Qwen Edit chấp nhận ảnh lớn), chỉ thu
+     *    nhỏ thực sự khi cạnh dài vượt ngưỡng.
+     *  - $quality JPEG nâng lên 95 (ảnh edit cần chi tiết; ảnh preview nhỏ vẫn dùng 85).
+     *  - $keepPng: nếu nguồn là PNG (có chi tiết sắc nét / trong suốt), giữ NGUYÊN định
+     *    dạng PNG lossless thay vì ép JPEG (nén mất dữ liệu, sai lệch màu/vân).
      */
-    protected function downscaleImageBase64(string $path, int $max = 768): array
+    protected function downscaleImageBase64(string $path, int $max = 768, int $quality = 85, bool $keepPng = false): array
     {
-        $img = @imagecreatefromstring((string) file_get_contents($path));
+        $raw = (string) @file_get_contents($path);
+        if ($raw === '') {
+            return ['', 'image/jpeg'];
+        }
+        $isPng = str_starts_with(strtolower((string) mime_content_type($path) ?: ''), 'image/png')
+            || in_array(strtolower((string) pathinfo($path, PATHINFO_EXTENSION)), ['png'], true);
+
+        // Ảnh PNG + keepPng: chỉ resample (nếu quá lớn) rồi giữ PNG lossless — KHÔNG ép JPEG,
+        // preserves alpha + chi tiết sắc nét (ren, thêu, đính đá, họa tiết in nhỏ).
+        if ($keepPng && $isPng) {
+            $img = @imagecreatefromstring($raw);
+            if (! $img) {
+                return ['', 'image/png'];
+            }
+            $w = imagesx($img);
+            $h = imagesy($img);
+            if ($w > $max || $h > $max) {
+                $scale = min($max / $w, $max / $h);
+                $nw = max(1, (int) ($w * $scale));
+                $nh = max(1, (int) ($h * $scale));
+                $tmp = imagecreatetruecolor($nw, $nh);
+                imagealphablending($tmp, false);
+                imagesavealpha($tmp, true);
+                imagecopyresampled($tmp, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                imagedestroy($img);
+                $img = $tmp;
+            }
+            ob_start();
+            imagepng($img);
+            $data = (string) ob_get_clean();
+            imagedestroy($img);
+
+            return [base64_encode($data), 'image/png'];
+        }
+
+        $img = @imagecreatefromstring($raw);
         if (! $img) {
             return ['', 'image/jpeg'];
         }
@@ -602,11 +681,11 @@ class ImageAIService
             $img = $tmp;
         }
         ob_start();
-        imagejpeg($img, null, 85);
-        $data = ob_get_clean();
+        imagejpeg($img, null, $quality);
+        $data = (string) ob_get_clean();
         imagedestroy($img);
 
-        return [base64_encode((string) $data), 'image/jpeg'];
+        return [base64_encode($data), 'image/jpeg'];
     }
 
     /**
@@ -616,8 +695,12 @@ class ImageAIService
     /**
      * Return the source image as a base64 data URI so the edit model is guaranteed to receive it
      * (a URL the provider can't fetch makes the model fall back to text2image -> creates a new image).
+     *
+     * Độ trung thực: ảnh NGUỒN (base/pose ref) đi qua đây phải giữ chi tiết cao — dùng ngưỡng
+     * 2560px + giữ PNG lossless + JPEG Q95. $forEdit=true cho mọi ảnh gửi tới model edit
+     * (tryon/swap/inpaint); $forEdit=false cho ảnh preview/thumbnail nhỏ.
      */
-    protected function imageDataUri(string $url): ?string
+    protected function imageDataUri(string $url, bool $forEdit = false): ?string
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
         // URL route /studio/image/{path} (studio_image_url) → {path} nằm trong storage/app/public
@@ -634,7 +717,14 @@ class ImageAIService
         if (! $file) {
             return null;
         }
-        [$b64, $mime] = $this->downscaleImageBase64($file, 1600);
+        // Ảnh nguồn edit: ngưỡng 2560 (không 1600), JPEG Q95 (không 85), giữ PNG lossless.
+        // Ảnh preview/vision-QA nhỏ: giữ ngưỡng 1600 cũ, JPEG Q85 (rẻ, nhanh).
+        if ($forEdit) {
+            $max = (int) studio_config('edit_source_max', 2560);
+            [$b64, $mime] = $this->downscaleImageBase64($file, $max, 95, true);
+        } else {
+            [$b64, $mime] = $this->downscaleImageBase64($file, 1600);
+        }
         if ($b64 === '') {
             return null;
         }
@@ -651,13 +741,13 @@ class ImageAIService
             logger()->warning('Edit model không phải model edit', ['model' => $model]);
             return null;
         }
-        $source = $this->imageDataUri($imageUrl);
+        $source = $this->imageDataUri($imageUrl, true);
         if (! $source) {
             logger()->warning('Edit: cannot read source image', ['url' => $imageUrl]);
             return null;
         }
-        $faceRef = $faceRefUrl ? $this->imageDataUri($faceRefUrl) : null;
-        $poseRef = $poseRefUrl ? $this->imageDataUri($poseRefUrl) : null;
+        $faceRef = $faceRefUrl ? $this->imageDataUri($faceRefUrl, true) : null;
+        $poseRef = $poseRefUrl ? $this->imageDataUri($poseRefUrl, true) : null;
         // Region edit (xóa/thay vùng chọn): mask image kèm theo, vùng ĐEN = nơi được chỉnh sửa.
         if ($maskImage) {
             $prompt .= ' A mask image is provided (last image, same size as the base): its BLACK region is the exact area to edit — change ONLY that black region and keep every pixel outside it identical to the original image.';
@@ -680,7 +770,7 @@ class ImageAIService
             if ($poseRef) { $content[] = ['image' => $poseRef]; }
             // Compose (ghép nhiều ảnh): các ảnh tham chiếu bổ sung được thêm trước ảnh gốc.
             foreach ($refImages as $refUrl) {
-                $ref = $this->imageDataUri((string) $refUrl);
+                $ref = $this->imageDataUri((string) $refUrl, true);
                 if ($ref) { $content[] = ['image' => $ref]; }
             }
             $content[] = ['image' => $source];
@@ -1001,43 +1091,59 @@ class ImageAIService
         return null;
     }
 
-    protected function storeRemoteImage(string $url): ?string
+    protected function storeRemoteImage(string $url, ?bool $postprocess = null): ?string
     {
         $contents = @file_get_contents($url);
         if (! $contents) {
             return null;
         }
 
-        // Tăng nét cuối (unsharp mask nhẹ 0.22) + chuẩn hóa PNG LOSSLESS — cải thiện chất lượng
-        // đầu ra, không blur/noise (chỉ sharpen chi tiết). Bỏ qua nếu ảnh quá lớn hoặc không đọc được.
-        $img = @imagecreatefromstring($contents);
-        if ($img) {
-            $w = imagesx($img); $h = imagesy($img);
-            if ($w * $h <= 24000000 && function_exists('imagefilter')) {
-                $blur = imagecreatetruecolor($w, $h);
-                imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
-                @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
-                $amt = 0.22;
-                for ($y = 0; $y < $h; $y++) {
-                    for ($x = 0; $x < $w; $x++) {
-                        $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
-                        $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
-                        $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
-                        imagesetpixel($img, $x, $y, imagecolorallocate($img,
-                            (int) max(0, min(255, $cr + $amt * ($cr - $br))),
-                            (int) max(0, min(255, $cg + $amt * ($cg - $bg))),
-                            (int) max(0, min(255, $cb + $amt * ($cb - $bb)))));
-                    }
-                }
-                imagedestroy($blur);
-            }
-            ob_start(); imagepng($img); $bytes = (string) ob_get_clean();
-            imagedestroy($img);
-        } else {
-            $bytes = $contents;
+        // Độ trung thực: kết quả edit từ DashScope/Qwen đã sắc nét đúng mức model tạo ra. Trước đây
+        // MỌI ảnh đi qua unsharp mask 0.22 (vòng lặp pixel-by-pixel thủ công) + re-encode PNG qua GD,
+        // gây (1) chậm trên ảnh lớn, (2) halo khô quanh edge sắc, (3) lệch nhẹ màu do GD re-sample.
+        // Cờ studio.edit_postprocess (mặc định FALSE) cho phép bật lại sharpen cũ khi muốn;
+        // mặc định giờ lưu raw bytes thẳng từ API — giữ đúng từng pixel model trả về.
+        if ($postprocess === null) {
+            $postprocess = (bool) studio_config('edit_postprocess', false);
         }
 
-        $name = Str::uuid().'.png';
+        $bytes = $contents;
+        if ($postprocess) {
+            // Tăng nét cuối (unsharp mask nhẹ 0.22) + chuẩn hóa PNG LOSSLESS — cải thiện chất lượng
+            // đầu ra, không blur/noise (chỉ sharpen chi tiết). Bỏ qua nếu ảnh quá lớn hoặc không đọc được.
+            $img = @imagecreatefromstring($contents);
+            if ($img) {
+                $w = imagesx($img); $h = imagesy($img);
+                if ($w * $h <= 24000000 && function_exists('imagefilter')) {
+                    $blur = imagecreatetruecolor($w, $h);
+                    imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+                    @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+                    $amt = 0.22;
+                    for ($y = 0; $y < $h; $y++) {
+                        for ($x = 0; $x < $w; $x++) {
+                            $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
+                            $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                            $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
+                            imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                                (int) max(0, min(255, $cr + $amt * ($cr - $br))),
+                                (int) max(0, min(255, $cg + $amt * ($cg - $bg))),
+                                (int) max(0, min(255, $cb + $amt * ($cb - $bb)))));
+                        }
+                    }
+                    imagedestroy($blur);
+                }
+                ob_start(); imagepng($img); $bytes = (string) ob_get_clean();
+                imagedestroy($img);
+            }
+        }
+
+        // Lưu nguyên định dạng model trả về (thường PNG/JPEG từ DashScope). Ưu tiên giữ đúng
+        // extension theo content-type để trình duyệt/cache xử lý đúng; fallback .png cho text2image cũ.
+        $ext = 'png';
+        $sniff = substr($contents, 0, 3);
+        if ($sniff === "\xFF\xD8\xFF") { $ext = 'jpg'; }
+        elseif (str_starts_with($contents, "\x89PNG")) { $ext = 'png'; }
+        $name = Str::uuid().'.'.$ext;
         Storage::disk('public')->put('studio/'.$name, $bytes);
 
         return '/storage/studio/'.$name;

@@ -27,7 +27,7 @@ return [
     'qwen_max_model' => env('STUDIO_QWEN_MAX_MODEL', 'qwen3.8-max'), // chất lượng cao hơn cho vision/chat
     'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-2.5-flash'),
     'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen multimodal trước)
-    'tryon_model' => env('STUDIO_TRYON_MODEL', 'wanx-virtualmodel'), // Virtual Try-On (Thay đổi người mẫu) — Beijing-only, free-trial
+    'tryon_model' => env('STUDIO_TRYON_MODEL', ''), // DEPRECATED — wanx-virtualmodel không khả dụng trên host intl; tryon thực tế chạy qua qwen-image-edit*
     'tryon_best_of' => (int) env('STUDIO_TRYON_BEST_OF', 3), // best-of-N mặc định cho Thử đồ ảo: 2-6 bản, chọn bản đẹp nhất
     'tryon_score' => (bool) env('STUDIO_TRYON_SCORE', true),  // chấm điểm QA tự động cho từng bản thử đồ (qwen vision, fail êm khi rate-limit)
     'swap_model' => env('STUDIO_SWAP_MODEL', ''), // '' = dùng chung qwen_edit_model (giống Inpaint: qwen-image-edit-max)
@@ -63,6 +63,10 @@ return [
     'prompt_prefix' => env('STUDIO_PROMPT_PREFIX', 'High-fashion editorial photograph, professional fashion photography'),
     'prompt_suffix' => env('STUDIO_PROMPT_SUFFIX', 'soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus'),
     'enrich_prompt' => (bool) env('STUDIO_ENRICH_PROMPT', true), // tự động làm giàu prompt với prefix/suffix/negative
+
+    // Độ trung thực ảnh edit/tryon — kiểm soát chất lượng ảnh NGUỒN gửi tới model và hậu kỳ.
+    'edit_source_max' => (int) env('STUDIO_EDIT_SOURCE_MAX', 2560), // ảnh nguồn edit chỉ downscale nếu cạnh dài > 2560px (trước đây 1600 → mất chi tiết đồ)
+    'edit_postprocess' => (bool) env('STUDIO_EDIT_POSTPROCESS', false), // false = lưu raw bytes từ API (không sharpen/re-encode qua GD) — trung thực cao; true = bật lại unsharp mask 0.22 cũ
 
     /*
     |--------------------------------------------------------------------------

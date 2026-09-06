@@ -284,6 +284,34 @@ class ShopFlowTest extends TestCase
         $this->assertFalse(Hash::check('different456', $superAdmin->fresh()->password));
     }
 
+    public function test_super_admin_can_edit_own_profile_but_not_role_or_active(): void
+    {
+        $superAdmin = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $this->actingAs($superAdmin);
+
+        $originalRole = $superAdmin->role;
+        $originalActive = $superAdmin->is_active;
+
+        // Tự sửa thông tin cá nhân (tên) — cho phép.
+        $this->put('/admin/users/'.$superAdmin->id, [
+            'name' => 'Tuan Ho (Đã đổi)',
+            'email' => $superAdmin->email,
+            'phone' => '0912345678',
+            'role' => 'customer', // cố hạ quyền — phải bị bỏ qua
+            'password' => '',
+            'password_confirmation' => '',
+            'is_active' => '0', // cố khóa chính mình — phải bị bỏ qua
+        ])->assertSessionHasNoErrors();
+
+        $fresh = $superAdmin->fresh();
+        $this->assertSame('Tuan Ho (Đã đổi)', $fresh->name);
+        $this->assertSame('0912345678', $fresh->phone);
+        // Role & trạng thái hoạt động phải GIỮ NGUYÊN.
+        $this->assertSame($originalRole, $fresh->role);
+        $this->assertSame($originalActive, $fresh->is_active);
+        $this->assertTrue($fresh->isSuperAdmin());
+    }
+
     public function test_regular_admin_cannot_manage_users(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();

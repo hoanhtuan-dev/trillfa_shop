@@ -24,21 +24,29 @@ class UserPolicy
     }
 
     /**
-     * Super Admin có thể sửa tài khoản khác, nhưng không được tự sửa
-     * chính mình qua đây (tránh tự hạ quyền / tự khóa tài khoản quản trị).
+     * Super Admin có thể sửa tài khoản khác, và cũng có thể tự sửa
+     * thông tin cá nhân của chính mình (tên/email/SĐT). Controller sẽ
+     * ngăn không cho tự đổi role / tự khóa / tự đặt lại mật khẩu.
      */
     public function update(User $actor, User $target): bool
     {
-        return $actor->isSuperAdmin() && $actor->id !== $target->id;
+        return $actor->isSuperAdmin();
     }
 
+    /**
+     * Không được tự xóa chính mình (tránh mất quyền quản trị cuối cùng).
+     */
     public function delete(User $actor, User $target): bool
     {
         return $actor->isSuperAdmin() && $actor->id !== $target->id;
     }
 
+    /**
+     * Không được tự đặt lại mật khẩu của chính mình qua đây —
+     * đổi mật khẩu cá nhân phải qua trang Tài khoản (cần mật khẩu hiện tại).
+     */
     public function resetPassword(User $actor, User $target): bool
     {
-        return $this->update($actor, $target);
+        return $actor->isSuperAdmin() && $actor->id !== $target->id;
     }
 }

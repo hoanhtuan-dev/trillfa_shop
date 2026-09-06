@@ -59,11 +59,11 @@ class AdminUserController extends Controller
 
     public function update(Request $request, User $user)
     {
-        // Không được tự sửa tài khoản của chính mình qua đây (tránh tự hạ quyền/khóa nhầm).
-        if ($user->id === auth()->id()) {
-            return back()->with('error', 'Không thể tự chỉnh sửa tài khoản của chính bạn tại đây.');
-        }
-        if ($this->isLastSuperAdmin($user)) {
+        $isSelf = $user->id === auth()->id();
+
+        // Không được sửa tài khoản Super Admin cuối cùng (tránh mất quyền quản trị).
+        // Trừ trường hợp Super Admin tự sửa thông tin cá nhân của chính mình.
+        if (! $isSelf && $this->isLastSuperAdmin($user)) {
             return back()->with('error', 'Không thể sửa tài khoản Super Admin cuối cùng.');
         }
         $this->authorize('update', $user);
@@ -77,11 +77,21 @@ class AdminUserController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        // Khi tự sửa chính mình: KHÔNG cho phép đổi role và trạng thái hoạt động
+        // (tránh tự hạ quyền / tự khóa tài khoản, gây lockout hệ thống).
+        if ($isSelf) {
+            $data['role'] = $user->role;
+            $data['is_active'] = $user->is_active;
+        } else {
+            $data['role'] = in_array($data['role'], User::ADMIN_ROLES, true) ? $data['role'] : User::ROLE_CUSTOMER;
+            $data['is_active'] = (bool) ($data['is_active'] ?? true);
+        }
+
         $user->name = $data['name'];
         $user->email = $data['email'];
         $user->phone = $data['phone'] ?? null;
-        $user->role = in_array($data['role'], User::ADMIN_ROLES, true) ? $data['role'] : User::ROLE_CUSTOMER;
-        $user->is_active = (bool) ($data['is_active'] ?? true);
+        $user->role = $data['role'];
+        $user->is_active = $data['is_active'];
 
         if (! empty($data['password'])) {
             $user->password = $data['password'];
