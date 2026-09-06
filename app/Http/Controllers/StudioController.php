@@ -847,12 +847,14 @@ class StudioController extends Controller
             // Bối cảnh (@image3) được tách ra PASS 2 riêng (giống Click-to-Swap PASS 2) —
             // KHÔNG gộp vào PASS 1 vì model sẽ bỏ qua pose khi prompt có cả đổi nền.
             $finalPrompt = 'Virtual try-on: dress the model in the EXACT garment and every accessory shown in @image1 — identical colors, prints, patterns, fabric, silhouette, length and details. '
+                .'CRITICAL — preserve the ORIGINAL GARMENT FIT (tight/loose/cropped/oversized/draped) exactly as it appears in @image1: if the garment is tight-fitting, it must be tight on the body; if it is loose or oversized, it must drape loosely; if it is cropped (shows midriff), keep the midriff exposed — do NOT stretch, shrink, tighten or loosen the garment. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
+                .'COMPLETE THE LOOK: if the garment image does NOT show shoes, handbag, belt, jewelry or other accessories, add complementary, stylish accessories that match the garment style and color palette — elegant shoes, a matching handbag, subtle jewelry — so the model looks polished and complete. Do NOT add accessories that clash with the garment style. '
                 .'Reproduce the EXACT body pose, stance, arm/leg placement, facing direction and posture from the pose reference in @image2 — do NOT copy the garment or the person from the pose image; keep the model\'s face, hairstyle and skin tone natural and consistent with @image2. '
                 .'Render a vertically-balanced FULL BODY from head to toe (not cropped), with natural elongated fashion-model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat or stubby. '
                 .'The model should occupy about 75-80% of the frame height with headroom above and footroom below. '
                 .'Keep the original background of @image1 UNCHANGED — do NOT modify, replace or redraw the background.';
-            $finalPrompt .= ' Avoid: cropped body, wrong pose, deformed hands, extra garments or accessories not in @image1, wrong colors, blurry, low quality. '
+            $finalPrompt .= ' Avoid: cropped body, wrong pose, deformed hands, extra garments or accessories not in @image1, wrong colors, wrong fit (garment tighter or looser than original), blurry, low quality. '
                 .'Photorealistic, full body, studio quality, high fashion, consistent lighting. '.$userPrompt;
         } elseif ($isFaceSwap) {
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.

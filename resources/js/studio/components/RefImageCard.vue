@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
+import LoadingSpinner from './LoadingSpinner.vue';
 
 const store = useStudioStore();
 
@@ -197,6 +198,7 @@ async function runRefgen() {
       <span v-if="busy">Đang tạo {{ variants }} ảnh…</span>
       <span v-else>Tạo {{ variants }} ảnh mới <span class="opacity-70">· {{ store.imageCreditCost * variants }} credit</span></span>
     </button>
+    <LoadingSpinner v-if="busy" text="AI đang tạo ảnh từ ảnh mẫu…" subtext="Quá trình này có thể mất vài giây" size="sm" />
     <p class="mt-2 text-[10px] leading-relaxed text-cream-300/40">Kết quả xuất hiện trong <b>Outputs</b> — chọn ảnh nào cũng được để xem lớn / làm ảnh gốc tiếp theo.</p>
   </div>
 </template>

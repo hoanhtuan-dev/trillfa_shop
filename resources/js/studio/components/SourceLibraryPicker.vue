@@ -14,6 +14,7 @@ const emit = defineEmits(['update:modelValue', 'pick', 'add']);
 
 const refs = ref([]);
 const poses = ref([]);
+const posesLoading = ref(false);
 const query = ref('');
 const sortKey = ref('newest');
 const gridCols = ref(4);
@@ -33,7 +34,8 @@ async function loadRefs() {
 }
 async function loadPoses() {
   if (!props.includePoses) { poses.value = []; return; }
-  try { const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } }); const d = await r.json(); poses.value = d.items || []; } catch (e) { poses.value = []; }
+  posesLoading.value = true;
+  try { const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } }); const d = await r.json(); poses.value = d.items || []; } catch (e) { poses.value = []; } finally { posesLoading.value = false; }
 }
 
 watch(() => props.modelValue, (open) => {
@@ -168,14 +170,19 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
 
       <div class="scrollbar-hide -mr-1 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
         <!-- Pose (dáng) -->
-        <template v-if="poses.length">
+        <template v-if="includePoses">
           <p class="mb-1.5 text-xs font-semibold text-cream-200">🧍 Pose (dáng)</p>
-          <div class="mb-3 grid gap-2" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
+          <div v-if="posesLoading" class="mb-3 flex items-center gap-2 py-2 text-[11px] text-cream-300/50">
+            <span class="h-3 w-3 animate-spin rounded-full border border-brand-300 border-t-transparent"></span> Đang tải dáng…
+          </div>
+          <div v-else-if="poses.length" class="mb-3 grid gap-2" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
             <div v-for="p in poses" :key="'pose-' + p.id" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSel({ ...p, kind: 'pose', key: 'pose-' + p.id, url: p.image, name: p.name }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" style="padding-bottom: 133%" @click="clickItem({ key: 'pose-' + p.id, url: p.image, name: p.name, skeleton: p.skeleton, kind: 'pose' })">
-              <img :src="p.image" class="absolute inset-0 h-full w-full bg-ink-900 object-cover object-top" loading="lazy" alt="">
+              <img v-if="p.image" :src="p.image" class="absolute inset-0 h-full w-full bg-ink-900 object-cover object-top" loading="lazy" alt="" @error="$event.target.style.display='none'">
+              <span v-else class="absolute inset-0 grid place-items-center bg-ink-800 text-2xl">🧍</span>
               <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span>
             </div>
           </div>
+          <p v-else class="mb-3 text-[11px] text-cream-300/50">Chưa có dáng mẫu — tải ảnh dáng của riêng bạn từ mục "Tải ảnh mới".</p>
         </template>
 
         <!-- Kết quả (output library) -->

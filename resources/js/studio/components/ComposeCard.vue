@@ -4,6 +4,7 @@ import { useStudioStore } from '../store.js';
 import SourceLibraryPicker from './SourceLibraryPicker.vue';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
+import LoadingSpinner from './LoadingSpinner.vue';
 const store = useStudioStore();
 
 const prompt = ref('');
@@ -14,6 +15,32 @@ const scoring = ref(true);
 const creativeLevel = ref(8);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
 const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
 const ornamentLevel = ref(0);   // mức độ trang trí (0–10; 0 = tối giản, 10 = cầu kỳ) — dùng cho chế độ Ghép Trang Phục
+const garmentFit = ref('auto'); // phom dáng trang phục: 'auto' | 'tight' | 'loose' | 'crop' | 'oversized'
+// ── Nền Studio: kế thừa từ RefImageCard — 8 màu nền studio thông dụng. Bấm chip → chèn mô tả
+// nền vào prompt; PASS 2 backend sẽ đọc và đổi nền. Bấm lại chip đang active → bỏ.
+const studioBgPresets = [
+  { id: 'bg-white',  label: 'Trắng',   color: '#ffffff', prompt: 'nền trắng studio sạch, ánh sáng khuếch tán đều' },
+  { id: 'bg-cream',  label: 'Kem',     color: '#f2e7d5', prompt: 'nền kem/beige studio ấm, ánh sáng dịu' },
+  { id: 'bg-lgray',  label: 'Xám nhạt', color: '#e8e8e8', prompt: 'nền xám nhạt studio, ánh sáng softbox từ trên' },
+  { id: 'bg-mgray',  label: 'Xám trung', color: '#9a9a9a', prompt: 'nền xám trung studio 18%, tương phản cân bằng' },
+  { id: 'bg-storm',  label: 'Xám đậm', color: '#4a4a4a', prompt: 'nền xám đậm studio, rim light mềm, mood thời trang' },
+  { id: 'bg-black',  label: 'Đen',     color: '#0a0a0a', prompt: 'nền đen studio, key light đơn, tương phản cao' },
+  { id: 'bg-blue',   label: 'Xanh phấn', color: '#c9d8e0', prompt: 'nền xanh pastel studio, ánh sáng mát dịu' },
+  { id: 'bg-blush',  label: 'Hồng phấn', color: '#ead3d5', prompt: 'nền hồng phấn studio, ánh sáng ấm khuếch tán' },
+];
+const activeBg = ref(null);
+function applyBgChip(bg) {
+  if (activeBg.value === bg.id) {
+    // Bấm lại → bỏ
+    activeBg.value = null;
+    prompt.value = prompt.value.replace(/;\s*nền\s+[^;]+/i, '').trim();
+    return;
+  }
+  activeBg.value = bg.id;
+  // Gỡ segment nền cũ (nếu có) rồi nối segment mới
+  prompt.value = prompt.value.replace(/;\s*nền\s+[^;]+/i, '').trim();
+  prompt.value = (prompt.value ? prompt.value + '; ' : '') + bg.prompt;
+}
 const busy = ref(false);
 const previewOpen = ref(false);
 const previewPrompt = ref('');
@@ -133,6 +160,10 @@ async function run() {
   let finalPrompt = prompt.value;
   if (mode.value === 'tryon' && selected.value[1]?.skeleton) {
     finalPrompt += '. Pose detail: ' + selected.value[1].skeleton;
+  }
+  // Thử đồ ảo: chèn directive phom dáng (fit) để model giữ đúng silhouette gốc
+  if (mode.value === 'tryon' && garmentFit.value !== 'auto') {
+    finalPrompt += '. The garment fit must be: ' + garmentFit.value + ' — reproduce this exact fit on the model body.';
   }
   busy.value = true;
   const override = previewDirty.value ? previewPrompt.value : '';
@@ -275,6 +306,23 @@ function saveSettings() {
       </button>
     </div>
 
+    <!-- Nền Studio: chip nhanh cho slot bối cảnh — kế thừa từ card "Ảnh mới từ ảnh mẫu" -->
+    <div v-if="mode === 'tryon'" class="mt-3">
+      <p class="text-[10px] font-semibold text-cream-200 mb-1.5">🎨 Nền Studio</p>
+      <div class="flex flex-wrap gap-1.5">
+        <button v-for="bg in studioBgPresets" :key="bg.id" @click="applyBgChip(bg)"
+                :class="activeBg === bg.id ? 'bg-brand-600 text-white ring-2 ring-brand-400/50' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors"
+                :title="bg.label">
+          <span class="inline-block h-3 w-3 rounded-full border border-white/20" :style="{ background: bg.color }"></span>
+          {{ bg.label }}
+        </button>
+        <button v-if="activeBg" @click="activeBg = null; prompt.value = prompt.value.replace(/;\s*nền\s+[^;]+/i, '').trim();"
+                class="rounded-full bg-red-600/20 px-2 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ nền</button>
+      </div>
+      <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Bấm chip để chọn nền studio — AI sẽ đổi hậu cảnh giữ nguyên người + trang phục.</p>
+    </div>
+
     <label class="label mt-4">Mô tả ghép</label>
     <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" :placeholder="promptPlaceholder"></textarea>
     <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -334,6 +382,16 @@ function saveSettings() {
                 class="h-8 rounded-full px-3 text-xs font-semibold transition-colors">{{ n }}</button>
       </div>
       <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Tạo N bản khác nhau rồi <b class="text-brand-300">tự chọn bản đẹp nhất</b> theo điểm. N lớn = tốn {{ store.imageCreditCost }} credit/bản ({{ bestOf }} bản = {{ bestOf * store.imageCreditCost }} credits).</p>
+      <!-- Phom dáng trang phục (fit) — chỉ thị rõ ràng để model giữ đúng silhouette -->
+      <div class="mt-2 flex items-center justify-between gap-2">
+        <span class="text-xs text-cream-200">Phom dáng <span class="text-cream-300/50">(fit)</span></span>
+      </div>
+      <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <button v-for="f in [{v:'auto',l:'🤖 Tự động'},{v:'tight',l:'👗 Ôm sát'},{v:'loose',l:'👘 Suông rộng'},{v:'crop',l:'✂️ Crop-top'},{v:'oversized',l:'🦺 Oversized'}]" :key="f.v" @click="garmentFit = f.v"
+                :class="garmentFit === f.v ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
+                class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">{{ f.l }}</button>
+      </div>
+      <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Chọn phom dáng để AI giữ đúng độ ôm/buông của trang phục gốc. "Tự động" = AI tự nhận diện.</p>
     </div>
     <!-- Các chế độ khác: số biến thể -->
     <div v-else class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
@@ -368,18 +426,15 @@ function saveSettings() {
       {{ busy ? 'Đang ghép…' : (mode === 'tryon' ? 'Thử đồ ' + bestOf + ' bản' : 'Ghép ảnh') }} <span v-if="!busy" class="opacity-70">· {{ (mode === 'tryon' ? bestOf : 1) * store.imageCreditCost }} credit</span>
     </button>
 
-    <!-- Tiến độ (giống Inpaint) -->
+    <!-- Tiến độ (LoadingSpinner dùng chung) -->
     <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
-      <div class="flex items-center gap-2 text-xs text-brand-100">
-        <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-300 border-t-transparent"></span>
-        <span class="font-semibold">{{ store.composeStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang ghép ảnh…' }}</span>
+      <LoadingSpinner
+        :text="store.composeStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang ghép ảnh…'"
+        :subtext="fmt(elapsedSec) + ' · ' + doneCount + '/' + store.composeGenIds.length + ' ' + (mode === 'tryon' ? 'bản' : 'biến thể')"
+        :progress="doneCount / Math.max(1, store.composeGenIds.length) * 100" />
+      <div class="mt-2 flex justify-end">
+        <button @click="store.cancelCompose()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">Hủy</button>
       </div>
-      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-cream-200/80">
-        <span><b>{{ fmt(elapsedSec) }}</b></span>
-        <span>{{ doneCount }}/{{ store.composeGenIds.length }} {{ mode === 'tryon' ? 'bản' : 'biến thể' }}</span>
-        <button @click="store.cancelCompose()" class="ml-auto rounded-full bg-red-600/25 px-2.5 py-1 font-semibold text-red-200 hover:bg-red-600">Hủy</button>
-      </div>
-      <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full animate-pulse rounded-full bg-brand-400" :style="{ width: (doneCount / Math.max(1, store.composeGenIds.length) * 100) + '%' }"></div></div>
     </div>
 
     <!-- Thành công -->

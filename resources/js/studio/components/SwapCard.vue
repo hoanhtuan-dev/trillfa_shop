@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
+import LoadingSpinner from './LoadingSpinner.vue';
 const store = useStudioStore();
 const now = ref(Date.now()); let _timer = null;
 onMounted(() => { _timer = setInterval(() => { now.value = Date.now(); }, 1000); });
@@ -112,17 +113,13 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
     </div>
     <p v-if="!canApply && !running" class="mt-1 text-[10px] text-cream-300/50">{{ changeFace ? 'Chọn 1 khuôn mặt + ít nhất 1 dáng.' : 'Chọn ít nhất 1 dáng.' }}</p>
 
-    <!-- Trạng thái hoạt động (giống Inpaint) -->
+    <!-- Trạng thái hoạt động (LoadingSpinner dùng chung) -->
     <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
-      <div class="flex items-center gap-2 text-xs text-brand-100">
-        <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-300 border-t-transparent"></span>
-        <span class="font-semibold">{{ store.swapStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang đổi người mẫu…' }}</span>
-      </div>
-      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-cream-200/80">
-        <span>⏱ <b>{{ fmt(elapsedSec) }}</b></span>
-        <span>{{ doneCount }}/{{ store.swapGenIds.length || store.swapTotal }} dáng</span>
-        <span v-if="activeModel">Model: {{ activeModel }}</span>
-        <button @click="store.cancelSwap()" class="ml-auto rounded-full bg-red-600/25 px-2.5 py-1 font-semibold text-red-200 hover:bg-red-600">✕ Hủy</button>
+      <LoadingSpinner
+        :text="store.swapStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang đổi người mẫu…'"
+        :subtext="'⏱ ' + fmt(elapsedSec) + ' · ' + doneCount + '/' + (store.swapGenIds.length || store.swapTotal) + ' dáng' + (activeModel ? ' · Model: ' + activeModel : '')" />
+      <div class="mt-2 flex justify-end">
+        <button @click="store.cancelSwap()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">✕ Hủy</button>
       </div>
       <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full animate-pulse rounded-full bg-brand-400" style="width:60%"></div></div>
     </div>

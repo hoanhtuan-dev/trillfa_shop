@@ -119,19 +119,39 @@ class ImageAIService
                 // Tách pass nền ra khỏi PASS 1 (mặc đồ + pose) vì gộp chung khiến model bỏ qua
                 // tư thế (đã verified trong "Thay Đổi Người Mẫu" PASS 2). Giữ nguyên người
                 // + trang phục + pose, chỉ đổi hậu cảnh.
-                if ($mode === 'tryon' && ! empty($tryonRefs)) {
+                // Hỗ trợ 2 nguồn nền: (1) ảnh bối cảnh từ slot 3, (2) text mô tả nền từ chip "Nền Studio".
+                $bgUrl = null;
+                $bgText = null;
+                if (! empty($tryonRefs)) {
                     $bgUrl = (string) $tryonRefs[0];
-                    $bgPrompt = 'Replace the ENTIRE background of the scene with the background from the FIRST image. '
-                        .'Keep the person, their pose, the garment and body shape 100% unchanged. '
-                        .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look and stay clearly visible; do NOT darken or shade them into a silhouette. '
-                        .'Frame the person at about 75-80% of the image height, with the background clearly visible all around them. '
-                        .'Blend the person into the scene: the HAIR and its edges, the clothing silhouette and the body outline must merge naturally with the background — NO hard cut-out outline, halo, white fringe or aliasing around the hair. '
-                        .'Unify the color grading, warmth and lighting of the person and the new background so they blend into ONE cohesive photograph with no visible seam. '
-                        .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, deformed hands, blurry, low quality. Photorealistic.';
-                    $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, $bgUrl, null, []);
+                } elseif (preg_match('/nền\s+([^;]+)/u', $prompt, $m)) {
+                    // Chip "Nền Studio" → mô tả nền text. Dùng text làm instruction, không cần ảnh.
+                    $bgText = trim($m[1]);
+                }
+                if ($bgUrl || $bgText) {
+                    if ($bgUrl) {
+                        $bgPrompt = 'Replace the ENTIRE background of the scene with the background from the FIRST image. '
+                            .'Keep the person, their pose, the garment and body shape 100% unchanged. '
+                            .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look and stay clearly visible; do NOT darken or shade them into a silhouette. '
+                            .'Frame the person at about 75-80% of the image height, with the background clearly visible all around them. '
+                            .'Blend the person into the scene: the HAIR and its edges, the clothing silhouette and the body outline must merge naturally with the background — NO hard cut-out outline, halo, white fringe or aliasing around the hair. '
+                            .'Unify the color grading, warmth and lighting of the person and the new background so they blend into ONE cohesive photograph with no visible seam. '
+                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, deformed hands, blurry, low quality. Photorealistic.';
+                        $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, $bgUrl, null, []);
+                    } else {
+                        // Text nền (chip "Nền Studio"): model edit tự sinh nền từ text description.
+                        $bgPrompt = 'Replace the ENTIRE background of the scene with a new background: '.$bgText.'. '
+                            .'Keep the person, their pose, the garment and body shape 100% unchanged. '
+                            .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look. '
+                            .'Frame the person at about 75-80% of the image height. '
+                            .'Blend the person naturally into the background — NO hard outline, halo, white fringe. '
+                            .'Unify the color grading, warmth and lighting so the person and background blend into ONE cohesive photograph. '
+                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, deformed hands, blurry, low quality. Photorealistic.';
+                        $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, null, null, []);
+                    }
                     if ($bgResult) {
                         $edited = $bgResult;
-                        logger()->info('Try-on PASS 2 (background) succeeded');
+                        logger()->info('Try-on PASS 2 (background) succeeded', ['has_bg_image' => (bool) $bgUrl]);
                     } else {
                         logger()->warning('Try-on PASS 2 (background) failed; keeping PASS 1 result');
                     }

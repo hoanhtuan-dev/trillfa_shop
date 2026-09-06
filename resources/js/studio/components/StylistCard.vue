@@ -4,6 +4,7 @@ import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import StylistDataManager from './StylistDataManager.vue';
 import StudioIcon from './StudioIcon.vue';
+import LoadingSpinner from './LoadingSpinner.vue';
 const store = useStudioStore();
 const open = ref(false);
 const settingsOpen = ref(false);
@@ -81,7 +82,7 @@ function openSettings() { settingsOpen.value = true; }
           <p class="text-xs font-semibold text-cream-100">{{ typeName }}</p>
           <button @click="step='type'" title="Chọn loại trang phục khác" class="btn-outline btn-sm">Đổi loại</button>
         </div>
-        <p v-if="loading" class="py-6 text-center text-xs text-cream-300/60">Đang tải câu hỏi…</p>
+        <LoadingSpinner v-if="loading" text="Đang tải câu hỏi…" size="sm" />
         <div v-else class="space-y-3">
           <div v-for="q in questions" :key="q.key" class="rounded-2xl border border-ink-700 bg-ink-800/60 p-3">
             <p class="mb-2 text-xs font-semibold text-brand-200">{{ q.q }}</p>
