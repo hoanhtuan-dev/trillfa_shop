@@ -27,10 +27,11 @@ const faces = ref([]);
 const faceModelId = ref('');
 const poses = ref([]);
 const poseId = ref('');
-const faceOpen = ref(false); // thu gọn khối Khuôn mặt mẫu để card gọn
-const poseOpen = ref(false); // thu gọn khối Pose mẫu để card gọn
-const bodyOpen = ref(false); // thu gọn khối Phom dáng để card gọn
-const bgOpen = ref(false);   // thu gọn khối Nền Studio để card gọn (chế độ Thử đồ)
+// Chỉ 1 chip mở tại 1 thời điểm (accordion) — '' | 'face' | 'body' | 'pose' | 'bg'
+const openPanel = ref('');
+function togglePanel(name) {
+  openPanel.value = openPanel.value === name ? '' : name;
+}
 onMounted(async () => {
   try {
     const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
@@ -222,40 +223,40 @@ async function runRefgen() {
 
     <!-- ============ CHẾ ĐỘ: THỬ ĐỒ (tryon sinh ảnh) ============ -->
     <template v-else>
-      <!-- 4 chip điều khiển cùng hàng: Khuôn mặt · Phom dáng · Pose · Nền Studio -->
+      <!-- 4 chip điều khiển: chỉ 1 chip mở/tô sáng tại 1 thời điểm -->
       <div class="mt-4 grid grid-cols-4 gap-1.5">
-        <button @click="faceOpen = !faceOpen"
-                :class="faceOpen || faceModelId ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+        <button @click="togglePanel('face')"
+                :class="openPanel === 'face' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                 class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
           <StudioIcon name="user" size="h-5 w-5" class="text-emerald-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Khuôn mặt</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ selectedFace ? selectedFace.name : 'Mặc định' }}</span>
         </button>
-        <button @click="bodyOpen = !bodyOpen"
-                :class="bodyOpen || bodyTouched ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+        <button @click="togglePanel('body')"
+                :class="openPanel === 'body' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                 class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
           <StudioIcon name="body" size="h-5 w-5" class="text-emerald-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Phom dáng</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ bodyTouched ? bodyBuildLabel : 'Mặc định' }}</span>
         </button>
-        <button @click="poseOpen = !poseOpen"
-                :class="poseOpen || poseId ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+        <button @click="togglePanel('pose')"
+                :class="openPanel === 'pose' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                 class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
           <StudioIcon name="pose" size="h-5 w-5" class="text-emerald-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Pose</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ selectedPose ? selectedPose.name : 'Tự do' }}</span>
         </button>
-        <button @click="bgOpen = !bgOpen"
-                :class="bgOpen || activePreset ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+        <button @click="togglePanel('bg')"
+                :class="openPanel === 'bg' ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                 class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
-          <span class="text-base leading-none">🎨</span>
+          <StudioIcon name="background" size="h-5 w-5" class="text-emerald-300" />
           <span class="text-[11px] font-semibold leading-none text-cream-100">Nền Studio</span>
           <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ activePreset ? 'Đã chọn' : 'Mặc định' }}</span>
         </button>
       </div>
 
       <!-- Khuôn mặt mẫu (lưới 2x, không title) -->
-      <div v-if="faceOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+      <div v-if="openPanel === 'face'" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button v-for="f in faces" :key="f.id" @click="faceModelId = (String(faceModelId) === String(f.id)) ? '' : String(f.id)"
                   :class="String(faceModelId) === String(f.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
@@ -269,7 +270,7 @@ async function runRefgen() {
       </div>
 
       <!-- Phom dáng người mẫu (dropdown) -->
-      <div v-if="bodyOpen" class="mt-2 space-y-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
+      <div v-if="openPanel === 'body'" class="mt-2 space-y-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
         <div>
           <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Chiều cao</span><span class="font-semibold text-emerald-300">{{ bodyHeightLabel }}</span></p>
           <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHeight" class="h-1.5 w-full cursor-pointer accent-emerald-400">
@@ -293,7 +294,7 @@ async function runRefgen() {
       </div>
 
       <!-- Pose mẫu (lưới 2x, không title) — AI đọc ẢNH pose để tạo mô tả tư thế -->
-      <div v-if="poseOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+      <div v-if="openPanel === 'pose'" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button v-for="p in poses" :key="p.id" @click="poseId = (String(poseId) === String(p.id)) ? '' : String(p.id)"
                   :class="String(poseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
@@ -307,7 +308,7 @@ async function runRefgen() {
       </div>
 
       <!-- Nền Studio (lưới 2x, không title) -->
-      <div v-if="bgOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
+      <div v-if="openPanel === 'bg'" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-2.5">
         <div class="grid grid-cols-2 gap-1.5">
           <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
                   class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
