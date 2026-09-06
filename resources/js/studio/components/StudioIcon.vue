@@ -38,6 +38,14 @@ const ICONS = {
   shirt: '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  body: '<path d="M12 2a5 5 0 0 0-5 5v6a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5z"/><path d="M6 15c0 3 2 5 6 5s6-2 6-5"/><circle cx="12" cy="7" r="2"/>',
+  hair: '<path d="M12 2C8 2 5 5 5 9c0 2 .5 4 2 5.5L8 21h8l1-6.5c1.5-1.5 2-3.5 2-5.5 0-4-3-7-7-7z"/><path d="M7 9c.5-1.5 2-3 5-3s4.5 1.5 5 3"/>',
+  height: '<path d="M12 2v20"/><path d="M8 6h8"/><path d="M8 18h8"/><path d="M6 12h12"/>',
+  waist: '<path d="M7 4a5 5 0 0 1 10 0c0 3-2 8-5 10s-5-7-5-10z"/><path d="M12 14v6"/><path d="M9 22h6"/>',
+  shoulder: '<path d="M2 7c2-3 8-4 10-1s2 8 0 10-8-4-10-1z"/><path d="M22 7c-2-3-8-4-10-1s-2 8 0 10 8-4 10-1z"/>',
+  hip: '<path d="M12 3v5"/><path d="M5 12c0-4 3-7 7-7s7 3 7 7-3 7-7 7-7-3-7-7z"/><path d="M8 8h8"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>',
+  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
 };
 </script>
 <template>

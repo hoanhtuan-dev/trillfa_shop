@@ -83,6 +83,17 @@ export const useStudioStore = defineStore('studio', {
     imageRatio: '1:1',
     imageRes: '1K',
     generating: false,
+    generateProgress: 0,      // 0-100 tiến trình generate (hoạt ảnh)
+    generateStage: '',        // 'preparing' | 'enriching' | 'rendering' | 'done'
+    generatedCount: 0,        // số ảnh đã tạo xong trong batch
+    // ── Kiểm soát phom dáng nhân vật (inject vào prompt) ──
+    bodyHeight: 5,       // 1-10: 1=rất thấp, 5=trung bình, 10=siêu cao
+    bodyBuild: 5,         // 1-10: 1=siêu gầy, 5=cân đối, 10=đầy đặn/curvy
+    bodyWaist: 5,         // 1-10: 1=eo to/straight, 5=cân đối, 10=eo siêu thon (hourglass)
+    bodyShoulders: 5,     // 1-10: 1=hẹp, 5=cân đối, 10=rộng
+    bodyHips: 5,          // 1-10: 1=hẹp, 5=cân đối, 10=rộng/pear
+    hairStyle: '',        // tên kiểu tóc (để trống = không ép)
+    hairColor: '',        // màu tóc (để trống = không ép)
     // palette / texture
     palette: [],
     // director
@@ -311,6 +322,19 @@ export const useStudioStore = defineStore('studio', {
     async generateImage() {
       if (!this.imagePromptEn || this.generating) return;
       this.generating = true;
+      this.generateProgress = 0;
+      this.generateStage = 'preparing';
+      this.generatedCount = 0;
+      const variants = Number(this.variantCount) || 1;
+      // Mô phỏng tiến trình hoạt ảnh
+      const progressTimer = setInterval(() => {
+        if (this.generateProgress < 90) {
+          this.generateProgress += Math.random() * 12 + 4;
+          if (this.generateProgress > 90) this.generateProgress = 90;
+        }
+        if (this.generateProgress > 30 && this.generateStage === 'preparing') this.generateStage = 'enriching';
+        if (this.generateProgress > 60 && this.generateStage === 'enriching') this.generateStage = 'rendering';
+      }, 400);
       try {
         const d = await this.api('/studio/generate', {
           prompt: this.imagePromptEn,
@@ -319,16 +343,30 @@ export const useStudioStore = defineStore('studio', {
           negative_prompt: this.negativePromptEn || '',
           resolution: this.imageRes,
           ratio: this.imageRatio,
-          variants: Number(this.variantCount) || 1
+          variants,
+          // Phom dáng + tóc
+          body_height: this.bodyHeight,
+          body_build: this.bodyBuild,
+          body_waist: this.bodyWaist,
+          body_shoulders: this.bodyShoulders,
+          body_hips: this.bodyHips,
+          hair_style: this.hairStyle || '',
+          hair_color: this.hairColor || '',
         });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
         this.setBatch(items.map(it => it.generation_id));
         if (d.credits_left != null) this.creditsLeft = d.credits_left;
-        // Process the pending generations (RenderImageJob::dispatchSync, fire-and-forget so the UI isn't blocked).
         this.processQueue();
+        this.generateProgress = 100;
+        this.generateStage = 'done';
+        this.generatedCount = items.length;
       } catch (e) { this.toast(e.message || 'Lỗi tạo ảnh.', 'error'); }
-      finally { this.generating = false; }
+      finally {
+        clearInterval(progressTimer);
+        this.generating = false;
+        setTimeout(() => { this.generateProgress = 0; this.generateStage = ''; }, 1500);
+      }
     },
     // i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation)
     // process=true (mặc định) chạy processQueue ngay sau khi tạo. Render đa góc truyền process=false

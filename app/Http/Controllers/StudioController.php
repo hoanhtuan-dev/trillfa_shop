@@ -83,6 +83,14 @@ class StudioController extends Controller
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
             'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            // Phom dáng + tóc (không bắt buộc)
+            'body_height' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_build' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_waist' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_shoulders' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_hips' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'hair_style' => ['nullable', 'string', 'max:100'],
+            'hair_color' => ['nullable', 'string', 'max:100'],
         ]);
 
         $userPrompt = (string) $data['prompt'];
@@ -90,6 +98,13 @@ class StudioController extends Controller
         $texture = (int) ($data['texture'] ?? studio_config('texture', 5));
         $customNegative = $data['negative_prompt'] ?? null;
         $shouldEnrich = (bool) studio_config('enrich_prompt', true);
+
+        // ── Inject phom dáng + tóc vào user prompt (trước khi enrich) ──
+        $bodyDirectives = $this->buildBodyDirective($data);
+        $hairDirective = $this->buildHairDirective($data);
+        if ($bodyDirectives !== '' || $hairDirective !== '') {
+            $userPrompt = trim($userPrompt.' '.trim($bodyDirectives.' '.$hairDirective));
+        }
 
         // Enrich the prompt with CreativeDirectionService
         $direction = app(\App\Services\CreativeDirectionService::class);
@@ -4436,5 +4451,84 @@ RULES:
             'texture_descriptor' => $enriched['texture_descriptor'],
             'creativity_directive' => $enriched['creativity_directive'],
         ]);
+    }
+
+    /**
+     * Build a body-shape directive from slider values (1-10). Only injects when
+     * the value deviates from the neutral 5 (balanced). Returns an English phrase
+     * that describes the model's body shape to append to the user prompt.
+     */
+    protected function buildBodyDirective(array $data): string
+    {
+        $parts = [];
+        $height = (int) ($data['body_height'] ?? 5);
+        $build = (int) ($data['body_build'] ?? 5);
+        $waist = (int) ($data['body_waist'] ?? 5);
+        $shoulders = (int) ($data['body_shoulders'] ?? 5);
+        $hips = (int) ($data['body_hips'] ?? 5);
+
+        // Height
+        if ($height <= 3) {
+            $parts[] = 'petite short model';
+        } elseif ($height >= 8) {
+            $parts[] = 'tall statuesque model';
+        }
+
+        // Build
+        if ($build <= 2) {
+            $parts[] = 'very slim slender model';
+        } elseif ($build <= 4) {
+            $parts[] = 'slim fit model';
+        } elseif ($build >= 9) {
+            $parts[] = 'full-figured curvy plus-size model';
+        } elseif ($build >= 7) {
+            $parts[] = 'curvy voluptuous model';
+        }
+
+        // Waist
+        if ($waist <= 2) {
+            $parts[] = 'straight rectangular body shape';
+        } elseif ($waist >= 8) {
+            $parts[] = 'hourglass figure, cinched narrow waist';
+        }
+
+        // Shoulders
+        if ($shoulders <= 3) {
+            $parts[] = 'narrow sloping shoulders';
+        } elseif ($shoulders >= 8) {
+            $parts[] = 'broad strong shoulders';
+        }
+
+        // Hips
+        if ($hips <= 3) {
+            $parts[] = 'narrow hips';
+        } elseif ($hips >= 8) {
+            $parts[] = 'wide hips, pear-shaped silhouette';
+        }
+
+        return $parts !== [] ? ', model appearance: '.implode(', ', $parts) : '';
+    }
+
+    /**
+     * Build a hair directive from selected style + colour. Returns an English
+     * phrase appended to the user prompt.
+     */
+    protected function buildHairDirective(array $data): string
+    {
+        $style = trim((string) ($data['hair_style'] ?? ''));
+        $color = trim((string) ($data['hair_color'] ?? ''));
+        if ($style === '' && $color === '') {
+            return '';
+        }
+
+        $parts = [];
+        if ($style !== '') {
+            $parts[] = $style.' hairstyle';
+        }
+        if ($color !== '') {
+            $parts[] = $color.' hair color';
+        }
+
+        return $parts !== [] ? ', hair: '.implode(', ', $parts) : '';
     }
 }

@@ -4,6 +4,11 @@ import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
+
+// ── Tab navigation trong modal ──
+const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'advanced'
+
+// ── Sub-panels ──
 const showAdvanced = ref(false);
 const promptLoading = ref(false);
 const showHistory = ref(false);
@@ -20,13 +25,13 @@ const enrichPreview = ref('');
 const enrichLoading = ref(false);
 const enrichError = ref('');
 
-// ── 7. Character counter ──
+// ── Character counter ──
 const MAX_CHARS = 4000;
 const charCount = computed(() => (store.imagePromptEn || '').length);
 const charWarning = computed(() => charCount.value > MAX_CHARS * 0.85);
 const charDanger = computed(() => charCount.value >= MAX_CHARS);
 
-// ── 8. Undo/Redo ──
+// ── Undo/Redo ──
 const undoStack = ref([]);
 const redoStack = ref([]);
 const MAX_UNDO = 30;
@@ -34,10 +39,10 @@ let ignoreNextInput = false;
 function pushUndo(text) {
   if (ignoreNextInput) { ignoreNextInput = false; return; }
   const last = undoStack.value[undoStack.value.length - 1];
-  if (last === text) return; // no change
+  if (last === text) return;
   undoStack.value.push(text);
   if (undoStack.value.length > MAX_UNDO) undoStack.value.shift();
-  redoStack.value = []; // clear redo on new input
+  redoStack.value = [];
 }
 function undo() {
   if (undoStack.value.length < 2) return;
@@ -58,14 +63,13 @@ function onPromptKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
 }
-// Watch for text changes → push to undo stack (debounced)
 let undoPushTimer = null;
 watch(() => store.imagePromptEn, (val) => {
   if (undoPushTimer) clearTimeout(undoPushTimer);
   undoPushTimer = setTimeout(() => pushUndo(val || ''), 500);
 });
 
-// ── 12. Auto-save draft ──
+// ── Auto-save draft ──
 const DRAFT_KEY = 'trillfa.prompt-draft';
 function saveDraft() {
   try {
@@ -77,6 +81,10 @@ function saveDraft() {
       imageRatio: store.imageRatio,
       imageRes: store.imageRes,
       negativePrompt: store.negativePromptEn || '',
+      bodyHeight: store.bodyHeight, bodyBuild: store.bodyBuild,
+      bodyWaist: store.bodyWaist, bodyShoulders: store.bodyShoulders,
+      bodyHips: store.bodyHips,
+      hairStyle: store.hairStyle, hairColor: store.hairColor,
       timestamp: Date.now()
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -95,25 +103,31 @@ function loadDraft() {
     if (draft.imageRatio) store.imageRatio = draft.imageRatio;
     if (draft.imageRes) store.imageRes = draft.imageRes;
     if (draft.negativePrompt) store.negativePromptEn = draft.negativePrompt;
+    if (draft.bodyHeight != null) store.bodyHeight = draft.bodyHeight;
+    if (draft.bodyBuild != null) store.bodyBuild = draft.bodyBuild;
+    if (draft.bodyWaist != null) store.bodyWaist = draft.bodyWaist;
+    if (draft.bodyShoulders != null) store.bodyShoulders = draft.bodyShoulders;
+    if (draft.bodyHips != null) store.bodyHips = draft.bodyHips;
+    if (draft.hairStyle) store.hairStyle = draft.hairStyle;
+    if (draft.hairColor) store.hairColor = draft.hairColor;
     return true;
   } catch (e) { return false; }
 }
 function clearDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
 }
-// Auto-save on changes (debounced)
 let draftSaveTimer = null;
-watch(() => [store.imagePromptEn, store.creativeLevel, store.texture, store.variantCount, store.imageRatio, store.imageRes, store.negativePromptEn], () => {
+watch(() => [
+  store.imagePromptEn, store.creativeLevel, store.texture, store.variantCount,
+  store.imageRatio, store.imageRes, store.negativePromptEn,
+  store.bodyHeight, store.bodyBuild, store.bodyWaist, store.bodyShoulders, store.bodyHips,
+  store.hairStyle, store.hairColor
+], () => {
   if (draftSaveTimer) clearTimeout(draftSaveTimer);
   draftSaveTimer = setTimeout(saveDraft, 1000);
 }, { deep: true });
-
-// Save draft on generate
 const origGenerate = store.generateImage.bind(store);
-store.generateImage = function() {
-  clearDraft();
-  return origGenerate();
-};
+store.generateImage = function() { clearDraft(); return origGenerate(); };
 
 // ── Prompt templates ──
 const templates = ref([
@@ -124,8 +138,6 @@ const templates = ref([
   { id: 'luxury', name: 'Luxury', prompt: 'luxury fashion editorial, high-end magazine, dramatic lighting, premium quality' },
   { id: 'street', name: 'Street style', prompt: 'street style fashion, urban background, candid shot, natural pose' },
 ]);
-
-// Load saved templates from localStorage
 function loadTemplates() {
   try {
     const saved = JSON.parse(localStorage.getItem('trillfa.prompt-templates') || '[]');
@@ -139,17 +151,11 @@ loadTemplates();
 const promptPreview = computed(() => { const t = store.imagePromptEn || ''; return t.length > 54 ? t.slice(0, 54) + '…' : (t || 'Nhập/áp dụng prompt…'); });
 const textureLabel = computed(() => {
   const t = store.texture;
-  if (t <= 0) return 'Không';
-  if (t <= 2) return 'Mịn phẳng';
-  if (t <= 4) return 'Dệt nhẹ';
-  if (t <= 6) return 'Rõ vừa';
-  if (t <= 8) return 'Chi tiết cao';
-  return 'Siêu chi tiết';
+  if (t <= 0) return 'Không'; if (t <= 2) return 'Mịn phẳng';
+  if (t <= 4) return 'Dệt nhẹ'; if (t <= 6) return 'Rõ vừa';
+  if (t <= 8) return 'Chi tiết cao'; return 'Siêu chi tiết';
 });
-const creditEstimate = computed(() => {
-  const base = 1;
-  return base * store.variantCount;
-});
+const creditEstimate = computed(() => { const base = 1; return base * store.variantCount; });
 
 // ── Debounce for sliders ──
 const debounceTimers = {};
@@ -157,16 +163,30 @@ function debouncedSet(key, value, delay = 300) {
   if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
   debounceTimers[key] = setTimeout(() => { store[key] = value; }, delay);
 }
-// Local reactive copies for sliders (instant UI feedback, debounced store write)
 const localCreative = ref(store.creativeLevel);
 const localTexture = ref(store.texture);
 const localVariant = ref(store.variantCount);
+const localBodyHeight = ref(store.bodyHeight);
+const localBodyBuild = ref(store.bodyBuild);
+const localBodyWaist = ref(store.bodyWaist);
+const localBodyShoulders = ref(store.bodyShoulders);
+const localBodyHips = ref(store.bodyHips);
 watch(() => store.creativeLevel, (v) => { localCreative.value = v; });
 watch(() => store.texture, (v) => { localTexture.value = v; });
 watch(() => store.variantCount, (v) => { localVariant.value = v; });
+watch(() => store.bodyHeight, (v) => { localBodyHeight.value = v; });
+watch(() => store.bodyBuild, (v) => { localBodyBuild.value = v; });
+watch(() => store.bodyWaist, (v) => { localBodyWaist.value = v; });
+watch(() => store.bodyShoulders, (v) => { localBodyShoulders.value = v; });
+watch(() => store.bodyHips, (v) => { localBodyHips.value = v; });
 watch(localCreative, (v) => { debouncedSet('creativeLevel', v); });
 watch(localTexture, (v) => { debouncedSet('texture', v); });
 watch(localVariant, (v) => { debouncedSet('variantCount', v); });
+watch(localBodyHeight, (v) => { debouncedSet('bodyHeight', v); });
+watch(localBodyBuild, (v) => { debouncedSet('bodyBuild', v); });
+watch(localBodyWaist, (v) => { debouncedSet('bodyWaist', v); });
+watch(localBodyShoulders, (v) => { debouncedSet('bodyShoulders', v); });
+watch(localBodyHips, (v) => { debouncedSet('bodyHips', v); });
 
 // ── Draft state ──
 const showDraftNotice = ref(false);
@@ -178,13 +198,15 @@ async function openPrompt() {
     try { await store.loadDefaults(); } catch (e) {}
     finally { promptLoading.value = false; }
   }
-  // Sync local copies
   localCreative.value = store.creativeLevel;
   localTexture.value = store.texture;
   localVariant.value = store.variantCount;
+  localBodyHeight.value = store.bodyHeight;
+  localBodyBuild.value = store.bodyBuild;
+  localBodyWaist.value = store.bodyWaist;
+  localBodyShoulders.value = store.bodyShoulders;
+  localBodyHips.value = store.bodyHips;
   enrichPreview.value = '';
-  
-  // Check for saved draft
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (raw) {
@@ -196,31 +218,17 @@ async function openPrompt() {
       }
     }
   } catch (e) {}
-  
   store.promptOpen = true;
 }
-
-function restoreDraft() {
-  loadDraft();
-  showDraftNotice.value = false;
-  undoStack.value = [store.imagePromptEn || ''];
-  redoStack.value = [];
-  store.toast('Đã khôi phục bản nháp.');
-}
-
-function dismissDraft() {
-  showDraftNotice.value = false;
-  clearDraft();
-}
-
+function restoreDraft() { loadDraft(); showDraftNotice.value = false; undoStack.value = [store.imagePromptEn || '']; redoStack.value = []; store.toast('Đã khôi phục bản nháp.'); }
+function dismissDraft() { showDraftNotice.value = false; clearDraft(); }
 function resetToDefaults() {
   store.applyDefaults();
-  localCreative.value = store.creativeLevel;
-  localTexture.value = store.texture;
-  localVariant.value = store.variantCount;
-  clearDraft();
-  undoStack.value = [];
-  redoStack.value = [];
+  localCreative.value = store.creativeLevel; localTexture.value = store.texture;
+  localVariant.value = store.variantCount; localBodyHeight.value = store.bodyHeight;
+  localBodyBuild.value = store.bodyBuild; localBodyWaist.value = store.bodyWaist;
+  localBodyShoulders.value = store.bodyShoulders; localBodyHips.value = store.bodyHips;
+  clearDraft(); undoStack.value = []; redoStack.value = []; store.hairStyle = ''; store.hairColor = '';
   store.toast('Đã đặt lại về mặc định hệ thống.');
 }
 
@@ -239,18 +247,11 @@ function applyHistory(item) {
   if (item.creative_level != null) { store.creativeLevel = Number(item.creative_level); localCreative.value = store.creativeLevel; }
   if (item.texture != null) { store.texture = Number(item.texture); localTexture.value = store.texture; }
   if (item.negative_prompt) store.negativePromptEn = item.negative_prompt;
-  showHistory.value = false;
-  store.toast('Đã áp dụng prompt từ lịch sử.');
+  showHistory.value = false; store.toast('Đã áp dụng prompt từ lịch sử.');
 }
+function applyTemplate(tpl) { store.imagePromptEn = tpl.prompt; showTemplates.value = false; store.toast('Đã áp dụng template: ' + tpl.name); }
 
-// ── Prompt Templates ──
-function applyTemplate(tpl) {
-  store.imagePromptEn = tpl.prompt;
-  showTemplates.value = false;
-  store.toast('Đã áp dụng template: ' + tpl.name);
-}
-
-// ── Preset (danh sách loại trang phục từ Trợ lý thiết kế) ──
+// ── Preset ──
 async function loadPresets() {
   presetsLoading.value = true;
   try {
@@ -258,201 +259,373 @@ async function loadPresets() {
     const tD = await tRes.json().catch(() => ({}));
     presetTypes.value = tD.types || tD.items || [];
   } catch (e) { presetTypes.value = []; }
-
   try {
     const pRes = await fetch('/studio/stylist/presets', { headers: { Accept: 'application/json' } });
     const pD = await pRes.json().catch(() => ({}));
     presets.value = pD.presets || pD.items || [];
   } catch (e) { presets.value = []; }
-
   presetsLoading.value = false;
 }
 const filteredPresets = computed(() => {
   if (!presetType.value) return presets.value;
   return presets.value.filter((p) => p.type === presetType.value);
 });
-function applyPreset(p) {
-  if (p.prompt) store.imagePromptEn = p.prompt;
-  showPresets.value = false;
-  store.toast('Đã áp dụng preset: ' + (p.name || p.id));
-}
+function applyPreset(p) { if (p.prompt) store.imagePromptEn = p.prompt; showPresets.value = false; store.toast('Đã áp dụng preset: ' + (p.name || p.id)); }
 
 // ── Live Enrich Preview ──
-let enrichDebounce = null;
 let enrichAbort = null;
-
-// Open the enrich preview popup — triggers immediately
 async function openEnrichPreview() {
-  if (!store.imagePromptEn?.trim()) {
-    store.toast('Nhập prompt trước khi preview enrich.', 'error');
-    return;
-  }
-  showEnrich.value = true;
-  // Immediately fetch enrich preview
-  await doEnrichPreview();
+  if (!store.imagePromptEn?.trim()) { store.toast('Nhập prompt trước khi preview enrich.', 'error'); return; }
+  showEnrich.value = true; await doEnrichPreview();
 }
 async function doEnrichPreview() {
   const p = store.imagePromptEn?.trim();
   if (!p) { enrichPreview.value = ''; enrichLoading.value = false; return; }
-  // Cancel any in-flight request
   if (enrichAbort) { enrichAbort.abort(); enrichAbort = null; }
-  const controller = new AbortController();
-  enrichAbort = controller;
-  enrichLoading.value = true;
-  enrichError.value = '';
+  const controller = new AbortController(); enrichAbort = controller;
+  enrichLoading.value = true; enrichError.value = '';
   try {
     const res = await fetch('/studio/preview-enrich', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({
-        prompt: p,
-        creative_level: store.creativeLevel,
-        texture: store.texture,
-        negative_prompt: store.negativePromptEn || null
-      })
+      method: 'POST', signal: controller.signal,
+      headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ prompt: p, creative_level: store.creativeLevel, texture: store.texture, negative_prompt: store.negativePromptEn || null })
     });
     if (!res.ok) throw new Error('Lỗi preview');
     const d = await res.json();
-    // Only update if this request wasn't superseded
     if (enrichAbort === controller) {
       enrichPreview.value = d.enriched || '';
       if (d.negative_prompt) enrichPreview.value += '\n\n— Negative: ' + d.negative_prompt;
-      enrichLoading.value = false;
-      enrichAbort = null;
+      enrichLoading.value = false; enrichAbort = null;
     }
   } catch (e) {
-    if (e.name === 'AbortError') return; // silently ignore aborted requests
-    if (enrichAbort === controller) {
-      enrichError.value = e.message;
-      enrichLoading.value = false;
-      enrichAbort = null;
-    }
+    if (e.name === 'AbortError') return;
+    if (enrichAbort === controller) { enrichError.value = e.message; enrichLoading.value = false; enrichAbort = null; }
   }
 }
+
+// ── Kiểu tóc thời thượng (30+ kiểu) ──
+const hairStyles = [
+  { id: '', name: 'Không ép', emoji: '🚫' },
+  // Ngắn
+  { id: 'pixie cut', name: 'Pixie Cut', emoji: '✂️', group: 'Ngắn' },
+  { id: 'bob cut', name: 'Bob Cut', emoji: '💇', group: 'Ngắn' },
+  { id: 'blunt bob', name: 'Blunt Bob', emoji: '💇', group: 'Ngắn' },
+  { id: 'asymmetrical bob', name: 'Asymmetrical Bob', emoji: '💇', group: 'Ngắn' },
+  { id: 'french bob', name: 'French Bob', emoji: '🥖', group: 'Ngắn' },
+  { id: 'bixie cut', name: 'Bixie (Bob+Pixie)', emoji: '✂️', group: 'Ngắn' },
+  // Trung bình
+  { id: 'wolf cut', name: 'Wolf Cut', emoji: '🐺', group: 'Trung bình' },
+  { id: 'shag cut', name: 'Shag Cut', emoji: '🎸', group: 'Trung bình' },
+  { id: 'butterfly cut', name: 'Butterfly Cut', emoji: '🦋', group: 'Trung bình' },
+  { id: 'curtain bangs', name: 'Curtain Bangs', emoji: '🎭', group: 'Trung bình' },
+  { id: 'wispy bangs', name: 'Wispy Bangs', emoji: '🌬️', group: 'Trung bình' },
+  { id: 'layered mid-length', name: 'Layer Trung Bình', emoji: '💇', group: 'Trung bình' },
+  { id: 'clavicut', name: 'Clavicut (Xương Quai Xanh)', emoji: '✨', group: 'Trung bình' },
+  { id: 'hush cut', name: 'Hush Cut', emoji: '🤫', group: 'Trung bình' },
+  // Dài
+  { id: 'long straight', name: 'Dài Thẳng', emoji: '👩', group: 'Dài' },
+  { id: 'long layered', name: 'Dài Layer', emoji: '💇', group: 'Dài' },
+  { id: 'v-cut long', name: 'V-Cut Dài', emoji: '🔽', group: 'Dài' },
+  { id: 'u-cut long', name: 'U-Cut Dài', emoji: '🔽', group: 'Dài' },
+  { id: 'jellyfish cut', name: 'Jellyfish Cut', emoji: '🪼', group: 'Dài' },
+  { id: 'long curtain bangs', name: 'Dài Curtain Bangs', emoji: '🎭', group: 'Dài' },
+  // Xoăn / texture
+  { id: 'beach waves', name: 'Beach Waves', emoji: '🌊', group: 'Xoăn/Texture' },
+  { id: 'loose curls', name: 'Loose Curls', emoji: '🌀', group: 'Xoăn/Texture' },
+  { id: 'tight curls', name: 'Tight Curls', emoji: '🪢', group: 'Xoăn/Texture' },
+  { id: 'body wave perm', name: 'Body Wave Perm', emoji: '🌊', group: 'Xoăn/Texture' },
+  { id: 'digital perm', name: 'Digital Perm', emoji: '💻', group: 'Xoăn/Texture' },
+  { id: 'water wave', name: 'Water Wave', emoji: '💧', group: 'Xoăn/Texture' },
+  { id: 'natural afro', name: 'Natural Afro', emoji: '🌿', group: 'Xoăn/Texture' },
+  // Búi / tết
+  { id: 'sleek bun', name: 'Sleek Bun', emoji: '🎀', group: 'Búi/Tết' },
+  { id: 'messy bun', name: 'Messy Bun', emoji: '🎀', group: 'Búi/Tết' },
+  { id: 'low ponytail', name: 'Low Ponytail', emoji: '🐴', group: 'Búi/Tết' },
+  { id: 'high ponytail', name: 'High Ponytail', emoji: '🐴', group: 'Búi/Tết' },
+  { id: 'braided crown', name: 'Braided Crown', emoji: '👑', group: 'Búi/Tết' },
+  { id: 'french braid', name: 'French Braid', emoji: '🥖', group: 'Búi/Tết' },
+  { id: 'dutch braid', name: 'Dutch Braid', emoji: '🇳🇱', group: 'Búi/Tết' },
+  { id: 'half up half down', name: 'Half Up Half Down', emoji: '🔝', group: 'Búi/Tết' },
+];
+const hairColors = [
+  { id: '', name: 'Không ép', hex: 'transparent' },
+  { id: 'jet black', name: 'Đen tuyền', hex: '#1a1a2e' },
+  { id: 'natural black', name: 'Đen tự nhiên', hex: '#2c2c2c' },
+  { id: 'dark brown', name: 'Nâu đậm', hex: '#3e2723' },
+  { id: 'chestnut brown', name: 'Nâu hạt dẻ', hex: '#5d4037' },
+  { id: 'milk tea brown', name: 'Nâu trà sữa', hex: '#8d6e63' },
+  { id: 'honey blonde', name: 'Vàng mật ong', hex: '#d4a574' },
+  { id: 'platinum blonde', name: 'Bạch kim', hex: '#e8d5c4' },
+  { id: 'ash grey', name: 'Xám khói', hex: '#9e9e9e' },
+  { id: 'silver white', name: 'Bạc trắng', hex: '#cfd8dc' },
+  { id: 'burgundy', name: 'Đỏ rượu', hex: '#6d1a1a' },
+  { id: 'rose gold', name: 'Hồng vàng', hex: '#b76e79' },
+  { id: 'pastel pink', name: 'Hồng pastel', hex: '#f8bbd0' },
+  { id: 'lavender', name: 'Tím oải hương', hex: '#b39ddb' },
+  { id: 'copper', name: 'Đồng', hex: '#c75b39' },
+  { id: 'auburn', name: 'Nâu đỏ', hex: '#8b4513' },
+  { id: 'ombre caramel', name: 'Ombre Caramel', hex: '#c68e5b' },
+  { id: 'balayage', name: 'Balayage', hex: '#d4a373' },
+];
+const hairGroups = computed(() => {
+  const groups = new Map();
+  hairStyles.forEach(h => {
+    if (!h.id) return;
+    const g = h.group || 'Khác';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(h);
+  });
+  return [...groups.entries()];
+});
+
+// ── Body shape labels ──
+const bodyHeightLabel = computed(() => {
+  const v = localBodyHeight.value;
+  if (v <= 2) return 'Rất thấp'; if (v <= 4) return 'Hơi thấp';
+  if (v <= 6) return 'Trung bình'; if (v <= 8) return 'Cao';
+  return 'Siêu cao';
+});
+const bodyBuildLabel = computed(() => {
+  const v = localBodyBuild.value;
+  if (v <= 2) return 'Siêu gầy'; if (v <= 4) return 'Thon gọn';
+  if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Đầy đặn';
+  return 'Curvy';
+});
+const bodyWaistLabel = computed(() => {
+  const v = localBodyWaist.value;
+  if (v <= 2) return 'Thẳng'; if (v <= 4) return 'Ít eo';
+  if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Eo thon';
+  return 'Đồng hồ cát';
+});
+const bodyShouldersLabel = computed(() => {
+  const v = localBodyShoulders.value;
+  if (v <= 2) return 'Rất hẹp'; if (v <= 4) return 'Hẹp';
+  if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Rộng';
+  return 'Rất rộng';
+});
+const bodyHipsLabel = computed(() => {
+  const v = localBodyHips.value;
+  if (v <= 2) return 'Rất hẹp'; if (v <= 4) return 'Hẹp';
+  if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Nở';
+  return 'Rất nở';
+});
 </script>
+
 <template>
   <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
-    <button @click="openPrompt" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
-      <span class="min-w-0 flex-1 overflow-hidden"><span class="flex items-center gap-2 truncate text-sm font-semibold text-brand-300"><StudioIcon name="sliders" /> Prompt Tạo Ảnh</span><span class="mt-0.5 block w-full truncate text-[11px] text-ink-500">{{ promptPreview }}</span></span><span class="ml-1 shrink-0 text-lg text-cream-200">›</span>
+    <!-- Header card: click mở modal -->
+    <button @click="openPrompt" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-brand-400 hover:bg-white/[0.07] group">
+      <span class="min-w-0 flex-1 overflow-hidden">
+        <span class="flex items-center gap-2 text-sm font-semibold text-brand-300">
+          <span class="flex h-7 w-7 items-center justify-center rounded-xl bg-brand-500/20 text-brand-300"><StudioIcon name="sliders" size="h-4 w-4" /></span>
+          Prompt Tạo Ảnh
+        </span>
+        <span class="mt-1 block w-full truncate text-[11px] text-ink-500">{{ promptPreview }}</span>
+      </span>
+      <span class="ml-2 shrink-0 text-lg text-cream-200 transition group-hover:translate-x-0.5">›</span>
     </button>
-    <!-- Prompt popup (shared for AI generation) -->
+
+    <!-- Progress bar (hiển thị ngoài card khi đang generate) -->
+    <div v-if="store.generating || store.generateProgress > 0" class="mt-3 overflow-hidden rounded-xl border border-brand-500/20 bg-brand-900/20 p-3">
+      <div class="mb-1.5 flex items-center justify-between text-[11px]">
+        <span class="flex items-center gap-1.5 font-semibold text-brand-200">
+          <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-brand-400"></span>
+          {{ store.generateStage === 'preparing' ? 'Đang chuẩn bị…' : store.generateStage === 'enriching' ? 'Đang làm giàu prompt…' : store.generateStage === 'rendering' ? 'Đang tạo ảnh…' : 'Hoàn tất!' }}
+        </span>
+        <span class="font-semibold text-brand-300">{{ Math.round(store.generateProgress) }}%</span>
+      </div>
+      <div class="h-2 w-full overflow-hidden rounded-full bg-ink-800">
+        <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-400 transition-all duration-500 ease-out" :style="{ width: store.generateProgress + '%' }"></div>
+      </div>
+      <p v-if="store.generateStage === 'done'" class="mt-1.5 text-[10px] text-emerald-300/70">Đã tạo {{ store.generatedCount }} ảnh ✅</p>
+    </div>
+
+    <!-- ===== MODAL ===== -->
     <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="Prompt Tạo Ảnh" wide>
-      <div v-if="promptLoading" class="py-8 text-center text-sm text-cream-300/60">Đang tải cài đặt mặc định…</div>
+      <div v-if="promptLoading" class="py-16 text-center">
+        <div class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></div>
+        <p class="text-sm text-cream-300/60">Đang tải cài đặt mặc định…</p>
+      </div>
       <template v-else>
-        <!-- ── Top bar: History + Templates + Credit ── -->
-        <div class="mb-3 flex items-center gap-2">
-          <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" title="Xem lịch sử prompt" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showHistory ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử</span></button>
-          <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" title="Prompt templates có sẵn" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="template" size="h-3.5 w-3.5" /> Templates</span></button>
-          <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" title="Prompt đã lưu từ Trợ lý thiết kế" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showPresets ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Preset</span></button>
-          <span class="ml-auto text-xs text-cream-300/40">~{{ creditEstimate }} credit</span>
-        </div>
-
-        <!-- History panel (inline expand) -->
-        <div v-if="showHistory" class="mb-3 max-h-44 overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-800 p-2">
-          <div v-if="historyLoading" class="py-3 text-center text-xs text-cream-300/50">Đang tải lịch sử…</div>
-          <div v-else-if="!history.length" class="py-3 text-center text-xs text-cream-300/50">Chưa có prompt nào. Tạo ảnh đầu tiên để lưu lịch sử.</div>
-          <button v-for="h in history" :key="h.id" @click="applyHistory(h)" class="mb-1 w-full rounded-lg border border-white/5 bg-white/5 p-2 text-left text-[11px] transition hover:border-brand-400">
-            <p class="truncate text-cream-100">{{ h.prompt }}</p>
-            <p class="mt-0.5 text-cream-300/40">{{ h.created_at }} · Sáng tạo {{ h.creative_level || '—' }}/10</p>
+        <!-- ── Tab navigation ── -->
+        <div class="mb-4 flex gap-1 rounded-2xl border border-white/10 bg-ink-800/70 p-1">
+          <button v-for="tab in [
+            { id: 'prompt', icon: 'pencil', label: 'Prompt' },
+            { id: 'body', icon: 'body', label: 'Phom dáng' },
+            { id: 'hair', icon: 'hair', label: 'Kiểu tóc' },
+            { id: 'advanced', icon: 'gear', label: 'Nâng cao' },
+          ]" :key="tab.id" @click="activeTab = tab.id" class="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition"
+            :class="activeTab === tab.id ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/25' : 'text-cream-300/60 hover:text-cream-200'">
+            <StudioIcon :name="tab.icon" size="h-3.5 w-3.5" />
+            <span class="hidden sm:inline">{{ tab.label }}</span>
           </button>
         </div>
 
-        <!-- Templates popup -->
-        <div v-if="showTemplates" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showTemplates = false">
-          <div class="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
-            <div class="mb-3 flex items-center justify-between">
-              <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="template" /> Prompt Templates</span>
-              <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white"><StudioIcon name="x" size="h-4 w-4" /></button>
+        <!-- ===== TAB: PROMPT ===== -->
+        <div v-show="activeTab === 'prompt'" class="space-y-3">
+          <!-- Top bar -->
+          <div class="flex items-center gap-2">
+            <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" title="Xem lịch sử prompt" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showHistory ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử</span></button>
+            <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" title="Prompt templates" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="template" size="h-3.5 w-3.5" /> Templates</span></button>
+            <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" title="Prompt đã lưu từ Trợ lý thiết kế" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showPresets ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Preset</span></button>
+            <span class="ml-auto text-xs text-cream-300/40">~{{ creditEstimate }} credit</span>
+          </div>
+
+          <!-- History panel -->
+          <div v-if="showHistory" class="max-h-44 overflow-y-auto rounded-xl border border-brand-500/30 bg-ink-800 p-2">
+            <div v-if="historyLoading" class="py-3 text-center text-xs text-cream-300/50">Đang tải lịch sử…</div>
+            <div v-else-if="!history.length" class="py-3 text-center text-xs text-cream-300/50">Chưa có prompt nào.</div>
+            <button v-for="h in history" :key="h.id" @click="applyHistory(h)" class="mb-1 w-full rounded-lg border border-white/5 bg-white/5 p-2 text-left text-[11px] transition hover:border-brand-400">
+              <p class="truncate text-cream-100">{{ h.prompt }}</p>
+              <p class="mt-0.5 text-cream-300/40">{{ h.created_at }} · Sáng tạo {{ h.creative_level || '—' }}/10</p>
+            </button>
+          </div>
+
+          <!-- Prompt textarea -->
+          <div class="relative">
+            <textarea v-model="store.imagePromptEn" @keydown="onPromptKeydown" rows="5" class="input !text-sm !py-3 !pr-16 !rounded-2xl" placeholder="Mô tả trang phục, phong cách, bối cảnh, ánh sáng… (EN hoặc VI)"></textarea>
+            <div class="absolute bottom-2 right-2 flex items-center gap-1">
+              <button @click="undo" :disabled="undoStack.length < 2" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Undo (Ctrl+Z)"><StudioIcon name="undo" size="h-3.5 w-3.5" /></button>
+              <button @click="redo" :disabled="!redoStack.length" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Redo (Ctrl+Y)"><StudioIcon name="redo" size="h-3.5 w-3.5" /></button>
+              <span class="text-[10px] font-semibold" :class="charDanger ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-cream-300/50'">{{ charCount }}/{{ MAX_CHARS }}</span>
             </div>
-            <div class="grid grid-cols-2 gap-2">
-              <button v-for="t in templates" :key="t.id" @click="applyTemplate(t)" class="rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
-                <span class="block text-sm font-semibold text-cream-100">{{ t.name }}</span>
-                <span class="mt-1 block text-[11px] leading-snug text-cream-300/50 line-clamp-2">{{ t.prompt }}</span>
+          </div>
+
+          <!-- Templates popup -->
+          <div v-if="showTemplates" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showTemplates = false">
+            <div class="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+              <div class="mb-3 flex items-center justify-between">
+                <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="template" /> Prompt Templates</span>
+                <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white"><StudioIcon name="x" size="h-4 w-4" /></button>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <button v-for="t in templates" :key="t.id" @click="applyTemplate(t)" class="rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
+                  <span class="block text-sm font-semibold text-cream-100">{{ t.name }}</span>
+                  <span class="mt-1 block text-[11px] leading-snug text-cream-300/50 line-clamp-2">{{ t.prompt }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sáng tạo + Biến thể -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+              <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">🎨 Sáng tạo</span><span class="font-semibold text-brand-300">{{ localCreative }}/10</span></p>
+              <input type="range" min="1" max="10" v-model.number="localCreative" class="w-full cursor-pointer accent-brand-500">
+            </div>
+            <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+              <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">🖼️ Biến thể</span><span class="font-semibold text-brand-300">{{ localVariant }}</span></p>
+              <input type="range" min="1" max="4" step="1" v-model.number="localVariant" class="w-full cursor-pointer accent-brand-500">
+            </div>
+          </div>
+
+          <!-- Ratio + Resolution -->
+          <div class="grid grid-cols-2 gap-3">
+            <select v-model="store.imageRatio" class="input !py-2.5 !text-sm !rounded-xl"><option v-for="r in ['1:1','4:3','3:4','9:16','16:9','4:5','21:9']" :key="r" :value="r">{{ r }}</option></select>
+            <select v-model="store.imageRes" class="input !py-2.5 !text-sm !rounded-xl"><option value="1K">1K</option><option value="2K">2K</option></select>
+          </div>
+
+          <!-- Texture -->
+          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">🧵 Texture</span><span class="font-semibold text-brand-300">{{ textureLabel }}</span></p>
+            <input type="range" min="0" max="10" step="1" v-model.number="localTexture" class="w-full cursor-pointer accent-brand-500">
+          </div>
+
+          <!-- Enrich Preview -->
+          <button @click="openEnrichPreview" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800 px-4 py-2.5 text-xs font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10">
+            <StudioIcon name="wand" size="h-3.5 w-3.5" /> Preview Enrich Prompt
+          </button>
+        </div>
+
+        <!-- ===== TAB: PHOM DÁNG ===== -->
+        <div v-show="activeTab === 'body'" class="space-y-3">
+          <div class="rounded-2xl border border-purple-500/20 bg-purple-900/10 p-3">
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-purple-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Điều chỉnh phom dáng người mẫu</p>
+            <p class="mt-0.5 text-[10px] text-purple-300/50">Để ở mức 5 (trung bình) nếu không muốn ép phom dáng cụ thể.</p>
+          </div>
+
+          <!-- Chiều cao -->
+          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="height" size="h-3.5 w-3.5" /> Chiều cao</span><span class="font-semibold text-brand-300">{{ bodyHeightLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyHeight" class="w-full cursor-pointer accent-purple-400">
+            <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>1.5m</span><span>1.65m</span><span>1.80m+</span></div>
+          </div>
+
+          <!-- Độ gầy/béo -->
+          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Vóc dáng</span><span class="font-semibold text-brand-300">{{ bodyBuildLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyBuild" class="w-full cursor-pointer accent-purple-400">
+            <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Siêu gầy</span><span>Cân đối</span><span>Curvy</span></div>
+          </div>
+
+          <!-- Eo -->
+          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="waist" size="h-3.5 w-3.5" /> Eo</span><span class="font-semibold text-brand-300">{{ bodyWaistLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyWaist" class="w-full cursor-pointer accent-purple-400">
+            <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Thẳng</span><span>Cân đối</span><span>Đồng hồ cát</span></div>
+          </div>
+
+          <!-- Vai -->
+          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="shoulder" size="h-3.5 w-3.5" /> Vai</span><span class="font-semibold text-brand-300">{{ bodyShouldersLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyShoulders" class="w-full cursor-pointer accent-purple-400">
+            <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Hẹp</span><span>Cân đối</span><span>Rộng</span></div>
+          </div>
+
+          <!-- Hông -->
+          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3">
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="hip" size="h-3.5 w-3.5" /> Hông</span><span class="font-semibold text-brand-300">{{ bodyHipsLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="localBodyHips" class="w-full cursor-pointer accent-purple-400">
+            <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Hẹp</span><span>Cân đối</span><span>Nở</span></div>
+          </div>
+        </div>
+
+        <!-- ===== TAB: KIỂU TÓC ===== -->
+        <div v-show="activeTab === 'hair'" class="space-y-3">
+          <div class="rounded-2xl border border-pink-500/20 bg-pink-900/10 p-3">
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-pink-200"><StudioIcon name="hair" size="h-3.5 w-3.5" /> Kiểu tóc & Màu tóc</p>
+            <p class="mt-0.5 text-[10px] text-pink-300/50">Chọn kiểu tóc thời thượng và màu tóc. Để trống nếu không muốn ép.</p>
+          </div>
+
+          <!-- Kiểu tóc grid -->
+          <div class="space-y-2.5">
+            <div v-for="[groupName, styles] in hairGroups" :key="groupName">
+              <p class="mb-1.5 text-[10px] font-semibold text-cream-300/50">{{ groupName }}</p>
+              <div class="flex flex-wrap gap-1.5">
+                <button v-for="h in styles" :key="h.id" @click="store.hairStyle = store.hairStyle === h.id ? '' : h.id" class="rounded-xl px-3 py-1.5 text-[11px] font-semibold transition"
+                  :class="store.hairStyle === h.id ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-ink-800 text-cream-200 hover:bg-ink-700 border border-ink-700'">
+                  <span class="mr-1">{{ h.emoji }}</span>{{ h.name }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Màu tóc -->
+          <div class="mt-3">
+            <p class="mb-2 text-[10px] font-semibold text-cream-300/50">Màu tóc</p>
+            <div class="flex flex-wrap gap-2">
+              <button v-for="c in hairColors" :key="c.id" @click="store.hairColor = store.hairColor === c.id ? '' : c.id" class="flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold transition"
+                :class="store.hairColor === c.id ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-ink-800 text-cream-200 hover:bg-ink-700 border border-ink-700'">
+                <span v-if="c.hex !== 'transparent'" class="inline-block h-3.5 w-3.5 rounded-full border border-white/20" :style="{ background: c.hex }"></span>
+                {{ c.name }}
               </button>
             </div>
-            <p class="mt-3 text-[10px] text-cream-300/30">Template giúp bạn bắt đầu nhanh. Chọn 1 template để đưa vào ô prompt.</p>
           </div>
         </div>
 
-        <!-- Preset popup (danh sách prompt đã lưu từ Trợ lý thiết kế) -->
-        <div v-if="showPresets" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
-          <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
-            <div class="mb-3 flex items-center justify-between">
-              <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Preset — Prompt đã lưu</span>
-              <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white"><StudioIcon name="x" size="h-4 w-4" /></button>
-            </div>
-            <!-- Lọc theo loại trang phục -->
-            <div class="mb-3 flex flex-wrap gap-1.5">
-              <button @click="presetType = ''" :class="presetType === '' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition">Tất cả</button>
-              <button v-for="t in presetTypes" :key="t.id" @click="presetType = t.id" :class="presetType === t.id ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition">{{ t.emoji }} {{ t.name }}</button>
-            </div>
-            <p v-if="presetsLoading" class="py-6 text-center text-xs text-cream-300/60">Đang tải preset…</p>
-            <div v-else-if="!filteredPresets.length" class="py-6 text-center text-xs text-cream-300/50">Chưa có preset cho lựa chọn này — dùng Trợ lý thiết kế để tạo prompt, nó sẽ tự lưu tại đây.</div>
-            <div v-else class="space-y-2">
-              <button v-for="p in filteredPresets" :key="p.id" @click="applyPreset(p)" class="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
-                <span class="block text-sm font-semibold text-cream-100">{{ p.name }}</span>
-                <span class="mt-1 block text-[11px] leading-snug text-cream-300/50 line-clamp-2">{{ p.prompt }}</span>
-              </button>
-            </div>
-            <p class="mt-3 text-[10px] text-cream-300/40">Prompt tạo bằng Trợ lý thiết kế được lưu tự động theo loại trang phục; chọn 1 preset để điền vào ô prompt.</p>
+        <!-- ===== TAB: NÂNG CAO ===== -->
+        <div v-show="activeTab === 'advanced'" class="space-y-3">
+          <!-- Negative prompt -->
+          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
+            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="x" size="h-3.5 w-3.5" /> Negative Prompt</label>
+            <p class="mb-2 text-[10px] text-cream-300/50">Điều model KHÔNG nên tạo. Để trống sẽ dùng mặc định từ Cài đặt.</p>
+            <textarea v-model="store.negativePromptEn" rows="3" class="input !text-sm !py-2 !rounded-xl" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..."></textarea>
           </div>
-        </div>
 
-        <!-- ── Prompt textarea + char counter + undo/redo ── -->
-        <div class="relative">
-          <textarea v-model="store.imagePromptEn" @keydown="onPromptKeydown" rows="6" class="input !text-sm !py-3 !pr-16" placeholder="Nhập ý tưởng / prompt (EN hoặc VI). Mô tả trang phục, phong cách, bối cảnh, ánh sáng…"></textarea>
-          <!-- Char counter + undo/redo -->
-          <div class="absolute bottom-2 right-2 flex items-center gap-1">
-            <button @click="undo" :disabled="undoStack.length < 2" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Undo (Ctrl+Z)"><StudioIcon name="undo" size="h-3.5 w-3.5" /></button>
-            <button @click="redo" :disabled="!redoStack.length" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Redo (Ctrl+Y)"><StudioIcon name="redo" size="h-3.5 w-3.5" /></button>
-            <span class="text-[10px] font-semibold" :class="charDanger ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-cream-300/50'">{{ charCount }}/{{ MAX_CHARS }}</span>
-          </div>
-        </div>
-
-        <!-- ── Sáng tạo + Biến thể: chung 1 hàng 2 cột ── -->
-        <div class="my-3 grid grid-cols-2 gap-3">
-          <div class="rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2.5">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">Sáng tạo</span><span class="font-semibold text-cream-50">{{ localCreative }}/10</span></p>
-            <input type="range" min="1" max="10" v-model.number="localCreative" class="w-full cursor-pointer accent-brand-500">
-          </div>
-          <div class="rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2.5">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">Biến thể</span><span class="font-semibold text-cream-50">{{ localVariant }}</span></p>
-            <input type="range" min="1" max="4" step="1" v-model.number="localVariant" class="w-full cursor-pointer accent-brand-500">
-          </div>
-        </div>
-
-        <!-- ── Ratio + Resolution ── -->
-        <div class="my-3 grid grid-cols-2 gap-3">
-          <select v-model="store.imageRatio" class="input !py-2.5 !text-sm"><option v-for="r in ['1:1','4:3','3:4','9:16','16:9','4:5','21:9']" :key="r" :value="r">{{ r }}</option></select>
-          <select v-model="store.imageRes" class="input !py-2.5 !text-sm"><option value="1K">1K</option><option value="2K">2K</option></select>
-        </div>
-
-        <!-- ── Texture ── -->
-        <div class="my-3 rounded-2xl border border-ink-700 bg-ink-800 px-3 py-2.5">
-          <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">Texture</span><span class="font-semibold text-brand-300">{{ textureLabel }}</span></p>
-          <input type="range" min="0" max="10" step="1" v-model.number="localTexture" class="w-full cursor-pointer accent-brand-500">
-        </div>
-
-        <!-- ── Nâng cao + Preview Enrich: nút bấm rõ ràng ── -->
-        <div class="my-3 flex gap-2">
-          <button @click="showAdvanced = !showAdvanced" title="Thiết lập negative prompt" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showAdvanced ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
-            {{ showAdvanced ? '▾' : '▸' }} Nâng cao (negative prompt)
+          <!-- Enrich Preview trong tab nâng cao -->
+          <button @click="openEnrichPreview" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800 px-4 py-2.5 text-xs font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10">
+            <StudioIcon name="wand" size="h-3.5 w-3.5" /> Preview Enrich Prompt
           </button>
-          <button @click="openEnrichPreview" title="Xem trước prompt sau khi làm giàu" class="flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition" :class="showEnrich ? 'border-brand-500 bg-brand-600/20 text-brand-200' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'">
-            <span class="flex items-center justify-center gap-1"><StudioIcon name="wand" size="h-3.5 w-3.5" /> Preview Enrich</span>
-          </button>
-        </div>
-
-        <!-- Advanced: Negative prompt -->
-        <div v-if="showAdvanced" class="my-3 rounded-2xl border border-ink-700 bg-ink-800 p-3">
-          <label class="label text-sm">Negative prompt (điều model KHÔNG nên tạo)</label>
-          <textarea v-model="store.negativePromptEn" rows="2" class="input !text-sm !py-2" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..."></textarea>
-          <p class="mt-1 text-[10px] text-cream-300/50">Để trống để dùng negative prompt mặc định từ Cài đặt.</p>
         </div>
 
         <!-- Enrich Preview popup -->
@@ -465,33 +638,50 @@ async function doEnrichPreview() {
                 <button @click="showEnrich = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white"><StudioIcon name="x" size="h-4 w-4" /></button>
               </div>
             </div>
-            <!-- Original prompt -->
             <div class="mb-3 rounded-xl border border-ink-600 bg-ink-800 p-3">
               <p class="mb-1 text-[10px] text-cream-300/40">Prompt gốc:</p>
               <p class="text-xs leading-relaxed text-cream-200 whitespace-pre-wrap">{{ store.imagePromptEn || '(chưa nhập prompt)' }}</p>
             </div>
-            <!-- Enriched prompt -->
             <div class="rounded-xl border border-emerald-500/30 bg-emerald-900/20 p-3">
               <p class="mb-1 text-[10px] text-emerald-300/60">Prompt sau khi enrich (gửi lên model):</p>
-              <div v-if="enrichLoading" class="py-4 text-center text-xs text-brand-300/60">Đang xử lý…</div>
+              <div v-if="enrichLoading" class="py-4 text-center"><div class="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></div></div>
               <div v-else-if="enrichError" class="text-xs text-red-300/60">{{ enrichError }}</div>
               <p v-else-if="enrichPreview" class="max-h-60 overflow-y-auto text-xs leading-relaxed text-emerald-100 whitespace-pre-wrap">{{ enrichPreview }}</p>
               <p v-else class="text-xs text-cream-300/40">Bấm "Làm mới" để xem prompt đã enrich.</p>
             </div>
-            <!-- Settings summary -->
             <div class="mt-3 grid grid-cols-4 gap-2 text-[10px] text-cream-300/40">
-              <span>Sáng tạo: {{ store.creativeLevel }}/10</span>
-              <span>Texture: {{ textureLabel }}</span>
-              <span>Ratio: {{ store.imageRatio }}</span>
-              <span>Res: {{ store.imageRes }}</span>
+              <span>Sáng tạo: {{ store.creativeLevel }}/10</span><span>Texture: {{ textureLabel }}</span>
+              <span>Ratio: {{ store.imageRatio }}</span><span>Res: {{ store.imageRes }}</span>
             </div>
           </div>
         </div>
 
-        <!-- ── Draft restore notice ── -->
+        <!-- Preset popup -->
+        <div v-if="showPresets" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
+          <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+            <div class="mb-3 flex items-center justify-between">
+              <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Preset — Prompt đã lưu</span>
+              <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white"><StudioIcon name="x" size="h-4 w-4" /></button>
+            </div>
+            <div class="mb-3 flex flex-wrap gap-1.5">
+              <button @click="presetType = ''" :class="presetType === '' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition">Tất cả</button>
+              <button v-for="t in presetTypes" :key="t.id" @click="presetType = t.id" :class="presetType === t.id ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition">{{ t.emoji }} {{ t.name }}</button>
+            </div>
+            <p v-if="presetsLoading" class="py-6 text-center text-xs text-cream-300/60">Đang tải preset…</p>
+            <div v-else-if="!filteredPresets.length" class="py-6 text-center text-xs text-cream-300/50">Chưa có preset.</div>
+            <div v-else class="space-y-2">
+              <button v-for="p in filteredPresets" :key="p.id" @click="applyPreset(p)" class="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
+                <span class="block text-sm font-semibold text-cream-100">{{ p.name }}</span>
+                <span class="mt-1 block text-[11px] leading-snug text-cream-300/50 line-clamp-2">{{ p.prompt }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Draft restore notice -->
         <div v-if="showDraftNotice" class="my-3 rounded-xl border border-amber-500/30 bg-amber-900/20 p-2.5">
           <div class="flex items-center justify-between">
-            <p class="text-[11px] text-amber-300/80">Có bản nháp chưa gửi từ lúc {{ draftTime }}</p>
+            <p class="text-[11px] text-amber-300/80">Có bản nháp từ lúc {{ draftTime }}</p>
             <div class="flex gap-1.5">
               <button @click="restoreDraft" class="rounded-lg bg-amber-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-amber-500">Khôi phục</button>
               <button @click="dismissDraft" class="rounded-lg bg-ink-700 px-2 py-1 text-[10px] text-cream-200 hover:bg-red-600">Bỏ qua</button>
@@ -499,11 +689,19 @@ async function doEnrichPreview() {
           </div>
         </div>
 
-        <!-- ── Reset + Generate ── -->
-        <div class="my-3 flex items-center justify-between">
+        <!-- Reset + Generate -->
+        <div class="mt-4 flex items-center justify-between">
           <button @click="resetToDefaults" class="text-xs text-cream-300/50 underline hover:text-brand-300">Đặt lại mặc định</button>
         </div>
-        <button @click="store.promptOpen = false; store.generateImage()" :disabled="store.generating || !store.imagePromptEn" class="btn-brand mt-1 w-full whitespace-nowrap !py-3 !text-sm">{{ store.generating ? 'Đang gửi…' : 'Tạo Ảnh 2D' }}</button>
+        <button @click="store.promptOpen = false; store.generateImage()" :disabled="store.generating || !store.imagePromptEn" class="btn-brand mt-1 w-full whitespace-nowrap !py-3.5 !text-sm !rounded-2xl !font-bold tracking-wide">
+          <span v-if="store.generating" class="flex items-center justify-center gap-2">
+            <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+            Đang tạo ảnh…
+          </span>
+          <span v-else class="flex items-center justify-center gap-2">
+            <StudioIcon name="zap" size="h-4 w-4" /> Tạo Ảnh 2D
+          </span>
+        </button>
       </template>
     </BaseModal>
   </div>
