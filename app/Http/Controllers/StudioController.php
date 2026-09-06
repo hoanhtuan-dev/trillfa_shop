@@ -1782,35 +1782,44 @@ RULES:
         $thumbExt = $useWebp ? 'webp' : 'jpg';
         $thumbFile = $thumbDir.'/'.basename($path).'.'.$thumbExt;
 
-        // Cache: chỉ tạo thumbnail lần đầu.
+        // Cache: chỉ tạo thumbnail lần đầu (atomic write tránh race/file corrupt).
         if (! is_file($thumbFile)) {
-            @mkdir($thumbDir, 0775, true);
-            $img = @imagecreatefromstring((string) file_get_contents($file));
-            if (! $img) {
-                return response()->file($file); // fallback ảnh gốc nếu không đọc được
-            }
-            $w = imagesx($img);
-            $h = imagesy($img);
-            $max = 160;
-            $scale = min(1.0, $max / max($w, $h));
-            $nw = max(1, (int) round($w * $scale));
-            $nh = max(1, (int) round($h * $scale));
-            $out = imagecreatetruecolor($nw, $nh);
-            imagealphablending($out, false);
-            imagesavealpha($out, true);
-            imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
-            if ($useWebp) {
-                imagewebp($out, $thumbFile, 80);
-            } else {
-                // JPEG không có alpha → đổ nền trắng trước khi nén.
-                $white = imagecolorallocate($out, 255, 255, 255);
-                imagefilledrectangle($out, 0, 0, $nw - 1, $nh - 1, $white);
-                imagealphablending($out, true);
+            try {
+                @mkdir($thumbDir, 0775, true);
+                $img = @imagecreatefromstring((string) file_get_contents($file));
+                if (! $img) {
+                    return response()->file($file); // ảnh không đọc được → trả ảnh gốc
+                }
+                $w = imagesx($img);
+                $h = imagesy($img);
+                $max = 160;
+                $scale = min(1.0, $max / max($w, $h));
+                $nw = max(1, (int) round($w * $scale));
+                $nh = max(1, (int) round($h * $scale));
+                $out = imagecreatetruecolor($nw, $nh);
+                imagealphablending($out, false);
+                imagesavealpha($out, true);
                 imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
-                imagejpeg($out, $thumbFile, 80);
+                $tmp = $thumbFile.'.tmp';
+                if ($useWebp) {
+                    imagewebp($out, $tmp, 80);
+                } else {
+                    // JPEG không có alpha → đổ nền trắng trước khi nén.
+                    $white = imagecolorallocate($out, 255, 255, 255);
+                    imagefilledrectangle($out, 0, 0, $nw - 1, $nh - 1, $white);
+                    imagealphablending($out, true);
+                    imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                    imagejpeg($out, $tmp, 80);
+                }
+                imagedestroy($out);
+                imagedestroy($img);
+                if (is_file($tmp)) {
+                    @rename($tmp, $thumbFile);
+                }
+            } catch (\Throwable $e) {
+                // Mọi lỗi GD → log + fallback ảnh gốc (không bao giờ 500).
+                logger()->warning('studioImageThumb failed: '.$e->getMessage(), ['path' => $path]);
             }
-            imagedestroy($out);
-            imagedestroy($img);
         }
 
         if (! is_file($thumbFile)) {
