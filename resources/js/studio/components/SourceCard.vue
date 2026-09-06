@@ -6,7 +6,7 @@ const store = useStudioStore();
 const showResults = ref(false), showProducts = ref(false);
 const products = ref([]);
 const fileRef = ref(null);
-onMounted(async () => { try { const r = await fetch('/studio/references', { headers: { Accept: 'application/json' } }); const d = await r.json(); products.value = d.items || []; } catch(e){} });
+onMounted(async () => { try { const r = await fetch('/studio/references', { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); products.value = d.items || []; } catch(e){ console.error('studio request failed', e); } });
 function onFile(e) { const f = e.target.files?.[0]; if (f) store.uploadRef(f); if (fileRef.value) fileRef.value.value = ''; }
 </script>
 <template>

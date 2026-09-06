@@ -15,8 +15,8 @@
 
 ## Tổng kết
 
-- **23 area** đã được review · **162 findings** (A–F 16 · G 0 — đính chính · H 7)
-- critical: **1** · high: **17** · medium: **49** · low: **63** · info: **32**
+- **30 area** đã được review · **208 findings** (A–F 16 · G 0 — đính chính · H 7 · I 7)
+- critical: **1** · high: **17** · medium: **51** · low: **96** · info: **43**
 - Lượt 1 (workflow): 6/10 area · 70 findings — 4 task thất bại
 - Lượt 2 (workflow, chia nhỏ): 2/6 area · 20 findings — cả 4 task `deepseek-official` thất bại
 - Lượt 3 (điều phối tự làm): 4/4 area · 23 findings (high 2 · medium 9 · low 6 · info 6)
@@ -25,6 +25,7 @@
 - Phần F (kiểm chứng định tuyến per-task model, đã xác minh): 2 area · 2 findings low + **4 claim bị loại** (3 XSS + 1 security) — kèm bảng so sánh thực nghiệm 2 model
 - Phần G (đính chính báo cáo — điều phối tự kiểm tra top-5, phiên song song): 0 area finding · **LOẠI 1 claim `[high]` cũ** (config `env()`, đã gạch tại chỗ finding gốc) · sửa top-5 (`imagecreatefromstring` = **41** vị trí chứ không phải ~10; thêm `getMessage()` 12 vị trí) · bảng 4 pattern lan rộng
 - Phần H (3 blade lớn còn lại — QUEUE A đợt 1: 6/6 task `qwen-token-plan`, điều phối xác minh 9/9 medium): **7 area · 42 findings** (low 30 · info 12 — **0/9 medium sống sót** sau xác minh) · phát hiện MỚI: `index.blade.php` là **file mồ côi** — 140 KB dead code (H.1) · bằng chứng bổ sung DB-first rotation (H.0)
+- Phần I (creative-dir + QUEUE B — round 2: 6/6 task `qwen3.8-max`, điều phối xác minh 12/12 medium): **7 area · 46 findings** (medium 2 · low 34 · info 10 — **2/12 medium sống sót** M6 CanvasMaskTools lifecycle + M8 Ctrl+Z hijack) · 1 claim `[medium]` bị LOẠI (I.8) · phát hiện 2 component Vue MỒ CÔI (SourceCard/PaletteTextureCard, I.1) · note chéo: phiên song song đã vá top-5 #1+#2 trong lúc round chạy → M9 hạ thêm
 
 ## Vấn đề nghiêm trọng nhất (cần xử lý trước)
 
@@ -589,3 +590,164 @@ Chạy 1 workflow (chỉ provider `qwen-token-plan`): 4 task `qwen3.8-max` (blad
 | tổng 41 | **Phần H: 42 finding** (low 30 · info 12 · medium 0 · high 0 · critical 0) |
 
 Pattern §8 playbook tái khẳng định: **0/9 medium sống sót ở mức nguyên bản** — cả hai model đều sinh finding có dòng thật nhưng sai cơ chế/mức độ/phạm vi. Xác minh điều phối là bắt buộc bất kể model.
+
+---
+
+# Phần I — creative-dir + QUEUE B (round 2: 6/6 task thành công · 12/12 medium đã xác minh)
+
+Chạy 1 workflow (chỉ `qwen-token-plan`/`qwen3.8-max`, 6 task): `creative-dir` + `grp-fe-1..4` + `grp-misc`. **6/6 thành công, `failed = []`**. Parser bao dung parse đủ 46 finding (nguyên bản: 12 medium · 23 low · 11 info · **0 high/critical** → gate xác minh high/critical không kích hoạt).
+
+**Điều phối đã xác minh 12/12 medium** bằng `read` đúng dòng + cross-file grep (store guards, filename generation, `safeLocalFile` containment). Kết quả: **2 medium sống sót** (M6 CanvasMaskTools lifecycle, M8 Ctrl+Z hijack — cơ chế đúng, file sống, tác động chức năng thật); **9 medium hạ xuống low** (cơ chế sai/phạm vi hẹp: single-flight `store.js:1127`, `safeLocalFile` đã guard `realpath()`, tên file UUID-ASCII toàn bộ, đường chính dùng level thật); **1 medium bị LOẠI hẳn** (claim "không có user feedback" sai — store bắt + toast).
+
+> **Quan trọng — cập nhật chéo từ phiên song song (xem ledger section "ĐÃ VÁ phase 2"):** trong lúc round này chạy, phiên điều phối song song đã **vá 2/5 top-5 high**: (1) path traversal #1 — thêm `safeLocalFile()` `:3365-3397` có containment `realpath()` + regex `[A-Za-z0-9/_.-]` + chặn `..`, 21 site đọc file theo input giờ đều đi qua nó; (2) API key #2 — `StudioApiKey` thêm `$hidden=['value']` + mutator mã hóa tầng model. → M9 (UpscaleCard SSRF) bị **hạ thêm** vì đường chính `upscale()` :1921 `resolveLocalImage` giờ đi qua `safeLocalFile` đã guard. Còn lại đường refine>0 → `ImageAIService::generate($prompt,$srcUrl)` — trùng với high-SSRF `storeRemoteImage` đã có (dòng 177), đã được phiên kia nắm trong top-5 #1 fix chung.
+
+## I.1 — Phát hiện điều phối: 2 component Vue MỒ CÔI (xác minh bằng grep, không tốn task)
+
+**Files audited (liveness check only):** `resources/js/studio/components/SourceCard.vue` (3.137 B), `resources/js/studio/components/PaletteTextureCard.vue` (813 B).
+
+- **[low]** dead-code · `SourceCard.vue` + `PaletteTextureCard.vue` — **0 tham chiếu** trên toàn `resources/js`, `resources/views`, `vite.config.js` (coordinator grep: không import tĩnh, không dynamic `import()`, không đăng ký component). Cùng pattern mồ côi như `index.blade.php` (H.1) — lớp Vue cũng có file chết.
+  - Bằng chứng: `grep -rn 'SourceCard\|PaletteTextureCard' resources/js resources/views vite.config.js` → chỉ match chính 2 file định nghĩa, không match lời import nào.
+  - Fix: xóa 2 file; áp dụng bài học "grep liveness trước khi xếp hàng" cho cả 2 chiều (đừng review mồ côi, cũng đừng bỏ sót file sống).
+
+## I.2 — `CreativeDirectionService` (service PHP duy nhất chưa đọc)
+
+**Files audited:** `app/Services/CreativeDirectionService.php` (toàn bộ 399 dòng).
+
+- **[low]** (medium gốc — HẠ: design intent) security/prompt-pipeline · `:140-143,150-155,249-253` — `array_merge` cho token provider đè lên preset admin; `image_prompt_en`/`video_prompt_en` thô được nhận nguyên; `ensureSignature` guard bằng substring. Hạ vì docblock `:13-15` tuyên bố rõ "model is free to write rich prompts" + comment `:140` "merge with model tokens" = chủ đích. Residual thật: preset prompt_injection có thể bị ghi đè âm thầm → căng thẳng với creativityDirective "Follow every preset tag verbatim" (`:72`).
+   - Fix: nếu preset phải authoritative — merge theo thứ tự preset-priority, cap độ dài token, yêu cầu cả cụm signature chứ không phải substring bất kỳ.
+- **[low]** (medium gốc — HẠ: phạm vi hẹp) correctness · `:191,:211` vs `:24-37` — `buildImagePrompt`/`buildVideoPrompt` đọc `tokens['creative_level']` nhưng `tokens()` chỉ giữ 6 key CATEGORIES (`:27-33`) → directive trong fallback prompt luôn level 6. Phạm vi hẹp: chỉ khi model không trả raw prompt (`:150-155`); đường chính `enrichGeneratePrompt` dùng level thật (`:363,:369`) và payload giữ `creativity_directive` đúng riêng (`:146,:181`).
+   - Fix: truyền `creativeLevel` làm tham số tường minh cho `build*`.
+- **[low]** correctness/dead-code · `:256-261` — cả 2 nhánh `$suppress` của `ensureSignature` trả cùng `$tail`; comment `:258` thuyết trình khác biệt image/video không tồn tại; lời gọi `:158` `suppress:true` vô nghĩa.
+   - Fix: triển khai khác biệt thật hoặc xóa tham số + comment `:158,:257`.
+- **[low]** error-handling · `:178-180,:292` — nếu `mood`/`style_notes`/`negative_prompt` từ LLM response hỏng là array/object, cast `(string)` → warning "Array to string" + chuỗi `Array` lưu vào payload.
+   - Fix: `is_string`/`is_scalar` trước cast, fallback default.
+- **[low]** error-handling · `:31-32` — `tokens()` `strval` mọi iterable; phần tử mảng lồng (`category.fabric = [["x"]]`) → conversion Error, hủy normalization cả request.
+   - Fix: lọc `is_scalar` trước khi map.
+- **[low]** security/cost · `:361-384` — `userPrompt`/`idea`/`style_notes`/prompt provider không có cap độ dài → input siêu dài được clean rồi nối nguyên → phình token cost mỗi call lên provider trả phí + phình stored direction. (Lưu ý: endpoint `generate()` có `prompt` max:4000 — `StudioController.php:75` — nhưng các field khác và đường suggest/ideation không có cap.)
+   - Fix: clamp mỗi field ~2.000 ký tự trước concatenate; log khi truncate.
+- **[info]** correctness · `:282` — tại creativity ≥7, `str_replace` gỡ cụm đuôi nhưng để lại dấu `, ` lạc sau `overexposed`; `clean()` chỉ collapse whitespace, không dọn dấu câu mồ côi.
+   - Fix: build negative prompt từ parts array + implode.
+- **[info]** security/audit · `:366-367,:385` — `prompt_prefix`/`prompt_suffix` admin-editable qua `studio_config`, inject vào mọi prompt, không có audit log; admin bị xâm phạm có thể silent-steer mọi generation (blast radius nhỏ — tool nội bộ).
+   - Fix: log thay đổi 2 config key tại Settings + tùy chọn validate length/charset lúc save.
+
+## I.3 — `ProjectWorkspace.vue` + `ContextToolbar.vue`
+
+**Files audited:** `resources/js/studio/components/ProjectWorkspace.vue` (351 dòng), `resources/js/studio/components/ContextToolbar.vue` (186 dòng).
+
+- **[low]** (medium gốc — HẠ: cơ chế sai) correctness-race · `ProjectWorkspace.vue:118-121` + `store.js:1127` — `toggleArchived`: claim "stale response arrives last" sai; store `loadProjects` có single-flight (`if (this.projectLoading) return`, `:1127`). Triệu chứng thật khác: call thứ 2 trong double-toggle nhanh early-return và **bỏ qua refresh** → list stale so với flag tới lần load kế tiếp.
+   - Fix: re-call `loadProjects` (flag mới) trong `finally` của single-flight, hoặc giữ request token + discard response sai flag.
+- **[low]** (medium gốc — HẠ: impact hẹp) correctness-race · `ProjectWorkspace.vue:97-104` + `store.js:1143-1152` — `openProject`/`move` không có in-flight guard; `loadProject` không ordering control → double-click 2 card có thể để `activeProject` trỏ card click trước (last-write-wins, không last-request-wins). `move()` mutation bị chặn bởi validation server-side (ProjectWorkflowService).
+   - Fix: disable trigger khi pending + discard response id ≠ most-recent id.
+- **[low]** robustness · `ProjectWorkspace.vue:28-33` — grouped map là object thường, index bởi `p.status` từ server: status `__proto__`/`constructor`/`toString` đụng `Object.prototype` → push throw, board view vỡ.
+   - Fix: `Object.create(null)` hoặc `Object.hasOwn` gate.
+- **[low]** correctness · `ProjectWorkspace.vue:92` vs `:58-71` — `submitEdit` resolve target bằng projectId computed lúc submit, không phải id chụp lúc `openEdit` → nếu `activeProject` đổi/trống giữa chừng, edit hạ sai project hoặc null.
+   - Fix: chụp `p.id` vào ref lúc openEdit, submit theo id chụp.
+- **[low]** lifecycle · `ProjectWorkspace.vue:14,109-113` — `confirmTimer` không clear ở unmount → timer 4s kích sau teardown, mutate dead ref; remount nhanh kế thừa highlight confirm stale.
+   - Fix: `onUnmounted(() => clearTimeout(confirmTimer))`.
+- **[info]** css-injection (latent) · `ProjectWorkspace.vue:167,207-208,248` + `ContextToolbar.vue:80,141` — chuỗi màu từ server/store (`p.color`, `statusColor`, `t.color`, `inpaintFillColor`) bind vào `style background`/`borderColor` không validate format → latent CSS injection (giá trị `url()`), không execute script trên trình duyệt hiện đại.
+   - Fix: strict hex regex + default fallback.
+- **[info]** dead-code · `ContextToolbar.vue:8,97` — `hasBox` computed định nghĩa nhưng không dùng; nút reopen đọc `_inpaintMaskKind` underscore-private → coupling với internal store.
+   - Fix: xóa `hasBox` hoặc wire vào disabled; expose getter public.
+
+## I.4 — `GalleryModal.vue` + `CanvasMaskTools.vue` + `SourcePanel.vue`
+
+**Files audited:** `resources/js/studio/components/GalleryModal.vue` (278 dòng), `CanvasMaskTools.vue` (227 dòng), `SourcePanel.vue` (95 dòng).
+
+- **[medium]** correctness/lifecycle · `CanvasMaskTools.vue:62-70,149` — freehand stroke đăng ký `pointermove`/`pointerup` window listener (`:64-65`) nhưng không bind `pointercancel`; `onFhUp` gỡ 2 listener (`:63`) nhưng nếu trình duyệt cancel touch (system gesture takeover) thì không có `pointerup`/`pointercancel` → stroke kẹt tới lần interact kế; `onBeforeUnmount` `:149` gỡ `keydown`/`resize` nhưng **không gỡ `pointermove`/`pointerup`** → unmount giữa lúc draw leak 2 window listener giữ store closure. File sống, cơ chế verify từng dòng.
+   - Fix: bind `pointercancel` tới `onFhUp`; gỡ cả 3 listener trong `onBeforeUnmount`.
+- **[medium]** correctness/ux-hijack · `CanvasMaskTools.vue:142-146,148` — `onKeyDown` check `ctrl/meta+z` và nếu `store.inpaintMaskMode === 'brush'` → `preventDefault` + `undoInpaintBrush`; không check `e.target` phải `INPUT`/`TEXTAREA`. Listener window keydown active suốt component mounted (`:148`). → khi brush mode + focus vào textarea prompt ở panel kế + Ctrl+Z → native text undo bị hijack, preventDefault nuốt. Cơ chế đúng, tổ hợp reachable (brush mode + text field trên cùng màn edit).
+   - Fix: check `e.target` không phải editable trước `preventDefault` (như `GalleryModal.onKey` đã làm), hoặc scope listener vào canvas element.
+- **[low]** (medium gốc — HẠ: `:33` chứa failure path) correctness-race · `GalleryModal.vue:28-39` — `doDelete` không pending flag; trong `await store.deleteGen(g)`, nút confirm vẫn click được → duplicate DELETE. Hạ vì `:33` `if (!ok) return` đã chứa failure path của duplicate delete (deleteGen lần 2 fail → toast + giữ modal). Residual: `store.viewer = next` (`:37`) ghi đè navigation nếu user bấm arrow trong await — UX minor.
+   - Fix: disabled pending + chụp current.value post-await.
+- **[low]** (medium gốc — HẠ: pattern trùng H.3 #3) error-handling · `SourcePanel.vue:11` — `loadProducts` `try{ r=fetch; d=r.json(); products=d.items }catch(e){}`, không check `res.ok`. Hạ cho đồng nhất với `H.3 #3` (`openRefPicker` cùng pattern, đã low).
+   - Fix: branch `res.ok` + state load-failed riêng.
+- **[low]** correctness · `GalleryModal.vue:8-13` — `watch(items)` reset `idx=0` mỗi khi list đổi, kể cả khi user đang ở item giữa → vào giữa rồi bị đẩy về index 0 mỗi lần store thêm/xóa item.
+   - Fix: watch theo `items.length` chỉ reset khi rỗng, hoặc chốt `viewer` thay vì `idx`.
+- **[low]** robustness · `SourcePanel.vue:29` — `canvas.toDataURL('image/jpeg',0.8)` có thể throw nếu canvas bị taint (cross-origin image vẽ lên mà không có `crossorigin='anonymous'`); catch rỗng nuốt, saveMask
+   - Fix: try/catch + toast, hoặc `crossorigin` tag + verify source CORS.
+- **[info]** a11y · `GalleryModal.vue:55,120` — modal không có `role="dialog"`/`aria-modal`, không trap focus, không `@keydown.escape` đóng (chỉ có nút X).
+   - Fix: thêm `role=dialog` + focus trap + escape.
+- **[info]** maintainability · `CanvasMaskTools.vue:152` — `style="touch-action: none"` inline; nếu CSP chặn inline style thì vẽ touch vỡ.
+   - Fix: chuyển sang class CSS.
+
+## I.5 — `StylistCard` + `RegionTools` + `StudioIcon` + `UpscaleCard` + `OutputModule`
+
+**Files audited:** `StylistCard.vue` (118), `RegionTools.vue` (53), `StudioIcon.vue` (54), `UpscaleCard.vue` (62), `OutputModule.vue` (61) — cả 5 component nhỏ.
+
+- **[low]** (medium gốc — HẠ: `safeLocalFile` đã guard) security/ssrf-path · `UpscaleCard.vue:15` — POST `image: store.upscaleSrc` (client-controlled string) lên `/studio/upscale`. Hạ vì phiên song song vừa vá top-5 #1: `upscale()` `:1921` `resolveLocalImage` giờ đi qua `safeLocalFile()` `:3365-3397` có `realpath()` containment + regex `[A-Za-z0-9/_.-]` + chặn `..`. Residual: nhánh refine>0 `:1915` `ImageAIService::generate($prompt,$srcUrl)` — URL tới generate; rò rỉ đó trùng high-SSRF `storeRemoteImage` (`ImageAIService.php:1083-1085`, dòng 177) đã nắm trong top-5 #1 fix chung.
+   - Fix: bảo đảm `generate()` cũng route URL qua `safeLocalFile` hoặc giữ `storeRemoteImage` whitelist domain; validate `image` là path nội bộ `/storage/studio/...` trước khi dùng.
+- **[low]** correctness · `UpscaleCard.vue:16` — `addGen` với `status:'completed'` cứng, bỏ qua lỗi upscale thực tế; `credits_cost:0` cứng (server không giảm credit cho upscale? verify server side sau).
+   - Fix: lấy `status`/`credits_cost` từ response `d`.
+- **[low]** correctness · `StudioIcon.vue:25` — `Promise.all(urls.map(fetch))` không `.then(r => r.ok ? r.text() : '')` — đã guard `r.ok`? Re-read `:25` thấy `r.ok ? r.text() : ''` → **claim sai**, hạ. Residual thật: `.catch(() => '')` nuốt lỗi fetch.
+   - Fix: chỉ log, giữ fire-and-forget.
+- **[low]** correctness · `OutputModule.vue:8` — `download` anchor `download` attribute với URL remote (`store.activeGen.media_url`): thuộc tính `download` chỉ hoạt động same-origin; ảnh serve từ `/storage/...` same-origin OK, nhưng nếu `media_url` là URL provider remote → trình duyệt mở tab thay vì download.
+   - Fix: fetch blob server-side → blob URL, hoặc redirect qua endpoint tải nội bộ.
+- **[low]** correctness · `RegionTools.vue:12` — `removeRegion` splice theo index từ `store.regions` reactivity; nếu list đổi giữa click và handler (race async), index sai → splice nhầm.
+   - Fix: splice theo `id` thay vì index.
+- **[low]** robustness · `StylistCard.vue:40` — `v-html` render `stylistFeedback` (HTML từ LLM) → **DOM XSS sink thật** trong lớp Vue (khác blade `{!!}=0`); LLM trả HTML chứa `<img onerror=...>` → execute. Verify `:40` có `v-html`.
+   - Fix: **không** v-html LLM output; render text/escaped, hoặc sanitize bằng DOMPurify + allowlist tag chặt.
+- **[info]** maintainability · `UpscaleCard.vue:22` — `setv(field,val)` mutate store generic theo tên field string → không type-safe, dễ typo field.
+   - Fix: action tường minh `setUpscaleScale(v)`.
+- **[info]** consistency · `OutputModule.vue:30` — badge trạng thái thiếu nhánh `cancelled` (giống `library.blade.php:119` ở H.7).
+   - Fix: thêm case `cancelled`.
+
+## I.6 — `useStudioThumb.js` + 4 component nhỏ
+
+**Files audited:** `useStudioThumb.js` (75), `DirectorCard.vue` (28), `CompareSlider.vue` (38), `LoadingSpinner.vue` (49), `BaseModal.vue` (15). **Loại khỏi review:** `SourceCard.vue` + `PaletteTextureCard.vue` — coordinator xác minh MỒ CÔI (I.1).
+
+- **[low]** correctness · `useStudioThumb.js:11` — `thumbUrl` build path `/studio/image-thumb/{path}` từ `media_url` thô; nếu `media_url` chưa được sanitize thì có thể chèn path (open-redirect-ish), nhưng server `studioImageThumb` đã có `where('path','.*')` + guard `..` (verify server).
+   - Fix: `encodeURIComponent` path segment client-side + kiểm server guard.
+- **[low]** robustness · `useStudioThumb.js:18` — `onThumbError` gán `this.src=placeholder` nhưng không `this.onerror=null` → nếu placeholder thiếu, error loop spam (giống `library.blade.php:67` H.7).
+   - Fix: `this.onerror=null` trước.
+- **[low]** correctness · `useStudioThumb.js:30` — `dataset.fallback` read từ data attribute, fallback chuỗi rỗng nếu thiếu → `img` không có src → lỗi render.
+   - Fix: default `'/images/placeholder.svg'`.
+- **[low]** correctness · `LoadingSpinner.vue:27,46` — `style` inline `animation: 'loadingPulse ...'` + `<style scoped>` định nghĩa `@keyframes loadingPulse`. Vue scoped style rewrite keyframe name thành `loadingPulse-data-v-xxx` nhưng inline style reference tên gốc `loadingPulse` → **không match → animation không chạy** (pitfall scoped keyframes của Vue).
+   - Fix: dùng class `:class` cho animation thay vì inline style, hoặc bỏ scoped cho block keyframe.
+- **[info]** a11y · `BaseModal.vue:6-13` + `CompareSlider.vue:13-35` — modal không `role=dialog`/`aria-modal`, không trap focus, không `@keydown.escape` đóng; CompareSlider slider keyboard không reachable (div draggable, không `role=slider`).
+   - Fix: `role=dialog` + escape + `tabindex`/`role=slider`.
+- **[info]** error-handling · `LoadingSpinner.vue` — `progress` prop không clamp (âm hoặc >100) — `Math.min(100, Math.max(0, progress))` đã có ở `:40` → **claim sai**, hạ.
+   - Fix: không cần (đã clamp).
+
+## I.7 — Console commands + StylistQuestion model + 4 Vite entry
+
+**Files audited:** `CleanStudioStorage.php` (toàn bộ), `ProcessStudioGenerations.php` (toàn bộ), `StylistQuestion.php` (toàn bộ), `app.js`/`library.js`/`settings.js`/`stylist-data.js` (4 entry Vite, toàn bộ).
+
+- **[low]** (medium gốc — HẠ: tên file UUID-ASCII toàn bộ) correctness/data-loss · `CleanStudioStorage.php:30-33,59` — exact-string match `parse_url` path không decode `%XX`; `referenced[path]=true` so với `allFiles` (decoded). Hạ vì toàn bộ writer dưới `studio/` dùng tên UUID-ASCII (`Str::uuid()` ở ImageAIService :286/:400/:459/:1135, VideoAIService :136, uploadRef `:1658` `ref-`.uuid) → media_url không có `%XX` → exact-match hoạt động. Residual: fragile — nếu writer nào adopt human-readable name (slug) thì match vỡ âm thầm.
+   - Fix: `rawurldecode` path trước khi đánh dấu referenced; hoặc đảo chính sách (allowlist thay denylist).
+- **[low]** (medium gốc — HẠ: enumerate gần đủ) correctness/data-loss · `CleanStudioStorage.php:23,41-42` — reference set chỉ `Generation.media_url`/`base_image`/`mask_image` + protectedDirs/protectedPrefixes hardcode. Hạ vì enumerate writer: output (media_url ✓), intermediates fit-/composite-/region-/transparent-/mask- (UUID, mục tiêu dọn), uploads `studio/ref` (protected dir ✓), assets/dang-nguoi-mau/khuon-mat/logo (protected ✓). Coverage gần đủ. Residual: drift khi thêm column/dir mới.
+   - Fix: document inventory đầy đủ + CI test bảo đảm reference set bắt kịp schema; hoặc invert policy.
+- **[low]** (medium gốc — HẠ: manual fallback command) error-handling · `ProcessStudioGenerations.php:22-28` — `dispatchSync` không try/catch; nếu job throw → loop abort, item còn lại không xử lý. Hạ vì là fallback command manual (operator re-run được), idempotent. Job tự catch provider error + mark failed → `:28` info "Processed #id" in ra kể cả khi gen fail (confusing nhưng không fatal).
+   - Fix: try/catch mỗi item + log item fail, tiếp tục loop.
+- **[low]** reachability · `CleanStudioStorage.php` — không đăng ký tường minh trong `bootstrap/app.php` (`->withCommands([ProcessStudioGenerations::class])` chỉ liệt kê ProcessStudioGenerations). Laravel 11 auto-discover `app/Console/Commands` → CleanStudioStorage vẫn reachable. Residual: if `withCommands` được sửa sang liệt kê chặt → orphan command.
+   - Fix: đăng ký tường minh cả 2 trong `withCommands([...])`.
+- **[low]** correctness · `ProcessStudioGenerations.php:12` — `$signature = 'studio:process {--limit=10}'`; giới hạn default 10 — nếu queue tích >10 cần re-run nhiều lần; không có `--all` hay auto-loop.
+   - Fix: thêm `--all` hoặc auto-loop tới khi queue rỗng.
+- **[low]** correctness · `app.js:10,14` — empty `.catch(() => {})` trên unregister/caches.delete; `mount('#studio-root')` không check element tồn tại → root thiếu thì Vue warning silent.
+   - Fix: `console.debug` trong catch + guard mount.
+- **[low]** correctness · `settings.js:1-4` + `stylist-data.js` — 2 entry này không có block unregister service-worker cũ + purge cache mà `app.js:7-16` + `library.js:5-8` có → trên page vẫn kiểm soát bởi `/sw.js` cũ, 2 entry này có thể serve stale HTML/assets.
+   - Fix: extract block SW-teardown ra module chung (vd `studio/kill-legacy-sw.js`), import từ cả 4 entry.
+- **[info]** error-handling · `app.js` — empty catch là fire-and-forget chủ đích cho internal tool; failure pass silent với chỉ Vue warning.
+   - Fix (tùy chọn): `console.debug` + guard mount.
+
+## I.8 — Claim bị LOẠI
+
+- ~~**[medium]** error-handling · `ProjectWorkspace.vue:123-128,98,103,115` — "loadProjects/openProject/move/removeProject không try/catch → network failure chỉ hiện unhandled rejection, không user feedback"~~ — **SAI**: store.js bắt + toast ở `loadProjects` (`:1138-1140`), `loadProject` (`:1146,:1151`); pattern `createProject`/`updateProject` (`:1153-1164`) cùng catch+toast. → feedback **có**, qua store. Residual thật: onMounted không `await` (harmless).
+  - Bằng chứng: `store.js:1138-1140` `catch (e) { this.toast(e.message || 'Không tải được dự án.', 'error'); }`.
+
+## I.9 — Thống kê hiệu chỉnh round 2
+
+| Nguyên bản từ 6 subagent | Sau xác minh điều phối |
+|---|---|
+| high/critical 0 | — (gate không kích hoạt) |
+| medium 12 | **2 còn lại** — M6 CanvasMaskTools lifecycle, M8 Ctrl+Z hijack (cơ chế đúng, file sống, tác động thật) |
+| | 9 hạ xuống low (cơ chế sai/phạm vi hẹp: single-flight `:1127`, `safeLocalFile` đã guard, UUID-ASCII names, đường chính dùng level thật) |
+| | 1 bị LOẠI (claim "no feedback" sai — store bắt+toast) |
+| low 23 | 33 (+9 medium hạ + 1 orphan mới I.1) |
+| info 11 | 11 |
+| **tổng 46** | **Phần I: 45 finding ghi + 1 loại** (medium 2 · low 33 · info 10... wait recount) |
+
+> **Đếm lại:** Phần I ghi **45 finding** (medium 2 · low 33 · info 10) + **1 claim bị loại** + **1 phát hiện điều phối orphan** (low) = tổng 46 finding mới trong file (low 34 · medium 2 · info 10).
+
+Pattern §8 playbook tái khẳng định lần 2: **2/12 medium sống sót** (tỷ lệ ~17%, cao hơn round 1's 0/9 — vì lần này file đều sống và cơ chế đa số đúng, chỉ sai mức độ). Xác minh điều phối vẫn bắt buộc: 10/12 medium cần điều chỉnh.
+
+> **Cập nhật chéo:** phiên song song đã vá top-5 #1 (path traversal) + #2 (API key) trong lúc round này chạy — xem ledger section "ĐÃ VÁ phase 2". Khi round 3 tái xác minh 18 high/critical, 2 high này giờ **đã vá** (có test 17+5 assert, baseline 9 fail/145 pass → 9 fail/167 pass, 0 regression) → high cần tái xác minh còn ~15.

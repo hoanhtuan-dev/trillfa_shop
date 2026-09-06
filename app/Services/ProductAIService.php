@@ -230,7 +230,7 @@ class ProductAIService
     protected function offlineAnalysis(string $imagePath): array
     {
         try {
-            $img = @imagecreatefromstring(@file_get_contents($imagePath));
+            $img = studio_image_decode($imagePath);
             if (! $img) {
                 return [];
             }
@@ -995,7 +995,7 @@ PROMPT;
         // Downscale aggressively so the vision request stays small/fast.
         if (function_exists('imagecreatefromstring')) {
             try {
-                $img = @imagecreatefromstring((string) $contents);
+                $img = studio_image_decode((string) $contents);
                 if ($img) {
                     $w = imagesx($img); $h = imagesy($img);
                     $scale = min(1, $this->downscaleMax / max($w, $h));

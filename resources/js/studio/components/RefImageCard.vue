@@ -40,11 +40,13 @@ const bgOpenRefgen = ref(false);
 onMounted(async () => {
   try {
     const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     if (Array.isArray(d.items)) faces.value = d.items;
   } catch (e) { /* giữ mặc định */ }
   try {
     const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     if (Array.isArray(d.items)) poses.value = d.items;
   } catch (e) { /* giữ mặc định */ }

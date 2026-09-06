@@ -304,4 +304,97 @@ class ProjectWorkflowServiceTest extends TestCase
     {
         $this->assertSame('Foobar', $this->workflow->label('foobar'));
     }
+
+    // ── Reviewer gate thích ứng (tách nhiệm vụ + chống lockout, Phần I) ──────
+
+    public function test_reviewer_gate_blocks_self_approval_when_second_super_exists(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]); // Super Admin thứ hai
+        $project = Project::factory()->create([
+            'user_id' => $owner->id,
+            'status' => Project::STATUS_REVIEW,
+        ]);
+
+        [$ok, $error] = $this->workflow->canTransition($project, Project::STATUS_APPROVED, $owner);
+        $this->assertFalse($ok);
+        $this->assertStringContainsString('tự duyệt', $error);
+    }
+
+    public function test_reviewer_gate_blocks_self_archive_when_second_super_exists(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $project = Project::factory()->create([
+            'user_id' => $owner->id,
+            'status' => Project::STATUS_APPROVED,
+        ]);
+
+        [$ok, $error] = $this->workflow->canTransition($project, Project::STATUS_ARCHIVED, $owner);
+        $this->assertFalse($ok);
+        $this->assertStringContainsString('tự duyệt', $error);
+    }
+
+    public function test_sole_super_admin_may_self_approve_and_history_is_flagged(): void
+    {
+        $sole = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $project = Project::factory()->create([
+            'user_id' => $sole->id,
+            'status' => Project::STATUS_REVIEW,
+            'settings' => null,
+        ]);
+
+        $result = $this->workflow->transition($project, Project::STATUS_APPROVED, $sole);
+        $this->assertSame(Project::STATUS_APPROVED, $result->status);
+
+        $history = $result->settings['status_history'] ?? [];
+        $this->assertCount(1, $history);
+        $this->assertTrue($history[0]['self_approved']);
+        $this->assertNull($history[0]['note']);
+        $this->assertSame($sole->id, $history[0]['by']);
+    }
+
+    public function test_cross_approval_by_second_super_is_not_flagged_self_approved(): void
+    {
+        $owner = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $reviewer = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $project = Project::factory()->create([
+            'user_id' => $owner->id,
+            'status' => Project::STATUS_REVIEW,
+            'settings' => null,
+        ]);
+
+        $result = $this->workflow->transition($project, Project::STATUS_APPROVED, $reviewer, 'Duyệt chéo');
+        $history = $result->settings['status_history'] ?? [];
+        $this->assertCount(1, $history);
+        $this->assertArrayNotHasKey('self_approved', $history[0]);
+        $this->assertSame('Duyệt chéo', $history[0]['note']);
+        $this->assertSame($reviewer->id, $history[0]['by']);
+    }
+
+    public function test_transition_with_note_saves_exactly_once(): void
+    {
+        $sole = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $project = Project::factory()->create([
+            'user_id' => $sole->id,
+            'status' => Project::STATUS_DRAFT,
+            'started_at' => null,
+            'settings' => null,
+        ]);
+
+        $updates = 0;
+        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$updates) {
+            if (str_starts_with(strtolower($q->sql), 'update')) {
+                $updates++;
+            }
+        });
+
+        $result = $this->workflow->transition($project, Project::STATUS_IN_PROGRESS, $sole, 'Bắt đầu làm');
+
+        // Trước fix: 2 câu UPDATE (status riêng, settings history riêng, không transaction).
+        $this->assertSame(1, $updates);
+        $this->assertSame(Project::STATUS_IN_PROGRESS, $result->status);
+        $this->assertNotNull($result->started_at);
+        $this->assertCount(1, $result->settings['status_history']);
+    }
 }

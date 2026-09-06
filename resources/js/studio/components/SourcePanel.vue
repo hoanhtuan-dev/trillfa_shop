@@ -8,7 +8,7 @@ const uploadOpen = ref(false), productOpen = ref(false), products = ref([]);
 const pquery = ref(''), pCols = ref(4), pSort = ref('newest');
 const selProds = ref([]);
 
-async function loadProducts() { try { const r = await fetch('/studio/references?_=' + Date.now(), { headers: { Accept: 'application/json' } }); const d = await r.json(); products.value = d.items || []; } catch(e){} }
+async function loadProducts() { try { const r = await fetch('/studio/references?_=' + Date.now(), { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); products.value = d.items || []; } catch(e){ console.error('studio request failed', e); } }
 function openProducts() { productOpen.value = true; pquery.value = ''; selProds.value = []; loadProducts(); }
 
 function toggleProd(p) { const i = selProds.value.findIndex((x) => x.id === p.id); if (i >= 0) selProds.value.splice(i, 1); else selProds.value.push(p); }

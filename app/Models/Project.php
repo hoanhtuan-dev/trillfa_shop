@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Trillfa Studio — Project (Design Board).
@@ -39,11 +40,16 @@ class Project extends Model
         self::STATUS_ARCHIVED,
     ];
 
+    /**
+     * `user_id` và `status` KHÔNG fillable (chống mass-assignment):
+     *  - user_id chỉ được gán lúc create qua quan hệ $user->projects();
+     *  - status chỉ được dẫn dắt bởi ProjectWorkflowService (forceFill) —
+     *    mọi chuyển trạng thái phải đi qua transition() để bị gate kiểm duyệt.
+     * Seeder dùng Project::unguarded() khi cần set cả hai.
+     */
     protected $fillable = [
-        'user_id',
         'name',
         'base_concept',
-        'status',
         'brief',
         'deadline',
         'thumbnail_url',
@@ -82,6 +88,15 @@ class Project extends Model
         return $this->hasMany(Generation::class);
     }
 
+    /**
+     * Generation mới nhất có media_url — eager-load (`with('latestGeneration')`)
+     * cho accessor thumbnail để tránh N+1 khi serialize danh sách dự án.
+     */
+    public function latestGeneration(): HasOne
+    {
+        return $this->hasOne(Generation::class)->whereNotNull('media_url')->latestOfMany('id');
+    }
+
     public function prompts(): HasMany
     {
         return $this->hasMany(PromptsHistory::class);
@@ -103,6 +118,10 @@ class Project extends Model
         return Attribute::get(function () {
             if (! empty($this->thumbnail_url)) {
                 return $this->thumbnail_url;
+            }
+            // Ưu tiên relation đã eager-load (index) — tránh 1 query/project (N+1).
+            if ($this->relationLoaded('latestGeneration')) {
+                return $this->latestGeneration?->media_url;
             }
             $latest = $this->generations()->whereNotNull('media_url')->latest('id')->first();
             return $latest?->media_url;

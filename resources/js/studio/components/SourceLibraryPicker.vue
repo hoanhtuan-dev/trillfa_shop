@@ -27,7 +27,7 @@ const isPick = computed(() => props.mode === 'pick');
 function close() { emit('update:modelValue', false); }
 
 async function loadRefs() {
-  try { const r = await fetch('/studio/ref-images?_=' + Date.now(), { headers: { Accept: 'application/json' } }); const d = await r.json(); refs.value = d.items || []; } catch (e) { refs.value = []; }
+  try { const r = await fetch('/studio/ref-images?_=' + Date.now(), { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); refs.value = d.items || []; } catch (e) { refs.value = []; }
 }
 watch(() => props.modelValue, (open) => {
   if (open) {

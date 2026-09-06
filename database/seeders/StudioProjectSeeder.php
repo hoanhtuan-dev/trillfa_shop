@@ -73,7 +73,9 @@ class StudioProjectSeeder extends Seeder
             if (! $user) {
                 continue;
             }
-            Project::updateOrCreate(
+            // user_id + status đã rút khỏi $fillable của Project (chống
+            // mass-assignment) → seeder chạy trong unguarded() để set được cả hai.
+            Project::unguarded(fn () => Project::updateOrCreate(
                 ['user_id' => $user->id, 'name' => $s['name']],
                 [
                     'base_concept' => $s['base_concept'],
@@ -87,7 +89,7 @@ class StudioProjectSeeder extends Seeder
                     'started_at' => $s['started_at'] ?? null,
                     'completed_at' => $s['completed_at'] ?? null,
                 ]
-            );
+            ));
         }
     }
 }

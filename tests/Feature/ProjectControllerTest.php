@@ -6,6 +6,7 @@ use App\Models\Generation;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -302,5 +303,184 @@ class ProjectControllerTest extends TestCase
             'generation_id' => $gen->id,
             'action' => 'attach',
         ])->assertStatus(403);
+    }
+
+    // ── Duyệt chéo (reviewer flow thật, Phần I) ──────────────────────────────
+
+    public function test_super_admin_can_approve_other_users_project(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $project = Project::factory()->create([
+            'user_id' => $admin->id,
+            'status' => Project::STATUS_REVIEW,
+        ]);
+        $this->actingAs($super);
+
+        $res = $this->postJson('/studio/projects/'.$project->id.'/transition', [
+            'to' => Project::STATUS_APPROVED,
+            'note' => 'Duyệt thay designer',
+        ])->assertOk();
+
+        $res->assertJsonPath('status', Project::STATUS_APPROVED);
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => Project::STATUS_APPROVED]);
+    }
+
+    public function test_admin_cannot_transition_other_users_project(): void
+    {
+        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $project = Project::factory()->create([
+            'user_id' => $super->id,
+            'status' => Project::STATUS_REVIEW,
+        ]);
+        $this->actingAs($admin);
+
+        $this->postJson('/studio/projects/'.$project->id.'/transition', [
+            'to' => Project::STATUS_IN_PROGRESS,
+        ])->assertStatus(403);
+    }
+
+    public function test_super_admin_cannot_self_approve_when_second_super_exists(): void
+    {
+        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]); // Super Admin thứ hai
+        $project = Project::factory()->create([
+            'user_id' => $super->id,
+            'status' => Project::STATUS_REVIEW,
+        ]);
+        $this->actingAs($super);
+
+        $res = $this->postJson('/studio/projects/'.$project->id.'/transition', [
+            'to' => Project::STATUS_APPROVED,
+        ]);
+        $res->assertStatus(422);
+        $this->assertStringContainsString('tự duyệt', $res->json('message'));
+    }
+
+    public function test_super_admin_can_show_other_users_project_with_owner_name(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $project = Project::factory()->create(['user_id' => $admin->id, 'name' => 'Dự án của admin']);
+        $this->actingAs($super);
+
+        $res = $this->getJson('/studio/projects/'.$project->id)->assertOk();
+        $res->assertJsonPath('owner_name', $admin->name);
+        $res->assertJsonPath('user_id', $admin->id);
+    }
+
+    public function test_transition_rejects_unknown_status_with_422_validation(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $project = Project::factory()->create(['user_id' => $admin->id, 'status' => Project::STATUS_DRAFT]);
+        $this->actingAs($admin);
+
+        $res = $this->postJson('/studio/projects/'.$project->id.'/transition', ['to' => 'hacked_status']);
+        $res->assertStatus(422);
+        $res->assertJsonValidationErrors('to');
+        $res->assertJsonPath('message', 'Trạng thái không hợp lệ.');
+    }
+
+    // ── Hàng đợi duyệt (scope=pending) ───────────────────────────────────────
+
+    public function test_pending_scope_lists_review_projects_of_all_users_for_super(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        Project::factory()->create([
+            'user_id' => $admin->id, 'name' => 'Chờ duyệt A',
+            'status' => Project::STATUS_REVIEW, 'archived' => false,
+        ]);
+        Project::factory()->create([
+            'user_id' => $admin->id, 'name' => 'Nháp B', 'status' => Project::STATUS_DRAFT,
+        ]);
+        $this->actingAs($super);
+
+        $res = $this->getJson('/studio/projects?scope=pending')->assertOk();
+        $res->assertJsonPath('scope', 'pending');
+        $res->assertJsonPath('can_review', true);
+        $names = array_column($res->json('items'), 'name');
+        $this->assertContains('Chờ duyệt A', $names);
+        $this->assertNotContains('Nháp B', $names);
+        $item = collect($res->json('items'))->firstWhere('name', 'Chờ duyệt A');
+        $this->assertSame($admin->name, $item['owner_name']);
+    }
+
+    public function test_pending_scope_forbidden_for_regular_admin(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $this->getJson('/studio/projects?scope=pending')->assertStatus(403);
+    }
+
+    public function test_own_scope_reports_can_review_flag(): void
+    {
+        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $this->actingAs($super);
+        $this->getJson('/studio/projects')->assertOk()
+            ->assertJsonPath('can_review', true)
+            ->assertJsonPath('scope', 'own');
+
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+        $this->getJson('/studio/projects')->assertOk()
+            ->assertJsonPath('can_review', false)
+            ->assertJsonPath('scope', 'own');
+    }
+
+    // ── N+1 regression + endpoint legacy ─────────────────────────────────────
+
+    public function test_index_avoids_n_plus_one_queries(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        $countFor = function (int $n) use ($admin) {
+            Project::query()->where('user_id', $admin->id)->delete();
+            for ($i = 0; $i < $n; $i++) {
+                $p = Project::factory()->create(['user_id' => $admin->id, 'thumbnail_url' => null]);
+                Generation::factory()->create([
+                    'user_id' => $admin->id, 'project_id' => $p->id,
+                    'media_url' => '/storage/t'.$i.'.png',
+                ]);
+            }
+            $queries = 0;
+            DB::listen(function () use (&$queries) {
+                $queries++;
+            });
+            $this->getJson('/studio/projects')->assertOk();
+
+            return $queries;
+        };
+
+        $one = $countFor(1);
+        $five = $countFor(5);
+
+        // Trước fix: mỗi project tốn thêm 1 query thumbnail (+1 count fallback)
+        // → số query phải KHÔNG tăng theo số project.
+        $this->assertLessThanOrEqual(2, $five - $one, 'index() vẫn còn N+1 theo số project');
+    }
+
+    public function test_legacy_store_route_uses_full_project_validation(): void
+    {
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $this->actingAs($admin);
+
+        // POST /studio/projects (route cũ projects.store) nay trỏ về
+        // ProjectController::store → cùng validation đầy đủ, response serialize chuẩn.
+        $this->postJson('/studio/projects', [])->assertStatus(422);
+
+        $res = $this->postJson('/studio/projects', [
+            'name' => 'Tạo qua route legacy',
+            'tags' => ['legacy'],
+        ])->assertStatus(201);
+
+        $res->assertJsonPath('status', Project::STATUS_DRAFT);
+        $res->assertJsonStructure([
+            'id', 'name', 'status', 'transitions', 'generations_count', 'thumbnail',
+        ]);
+        $this->assertDatabaseHas('projects', ['name' => 'Tạo qua route legacy', 'user_id' => $admin->id]);
     }
 }

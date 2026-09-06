@@ -46,21 +46,8 @@ class StudioController extends Controller
         return response()->view('studio.vue')->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
-    public function storeProject(Request $request)
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'base_concept' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $project = auth()->user()->projects()->create($data);
-
-        if ($request->wantsJson()) {
-            return response()->json(['project_id' => $project->id, 'name' => $project->name]);
-        }
-
-        return redirect()->route('studio.index')->with('success', 'Đã tạo dự án.');
-    }
+    // storeProject() đã bị loại bỏ (finding: duplicate endpoint với validation yếu hơn
+    // ProjectController::store). Route POST /studio/projects nay trỏ về ProjectController::store.
 
     /**
      * Ideation — Gemini turns idea + presets into English image/video prompts.
@@ -263,7 +250,7 @@ class StudioController extends Controller
     {
         $file = $this->resolveLocalImage($sourceUrl);
         if (! $file) return null;
-        $src = @imagecreatefromstring((string) file_get_contents($file));
+        $src = studio_image_decode($file);
         if (! $src) return null;
 
         $w = imagesx($src); $h = imagesy($src);
@@ -282,7 +269,7 @@ class StudioController extends Controller
             }
             $brushRaw = base64_decode($b64, true);
             if ($brushRaw !== false && $brushRaw !== '') {
-                $brushImg = @imagecreatefromstring($brushRaw);
+                $brushImg = studio_image_decode($brushRaw);
                 if ($brushImg) {
                     $bw = imagesx($brushImg); $bh = imagesy($brushImg);
                     if ($bw > 0 && $bh > 0) {
@@ -334,7 +321,7 @@ class StudioController extends Controller
             if ($comma !== false) {
                 $raw = base64_decode(substr($url, $comma + 1), true);
                 if ($raw !== false && $raw !== '') {
-                    $img = @imagecreatefromstring($raw);
+                    $img = studio_image_decode($raw);
                     if ($img) {
                         $w = imagesx($img); $h = imagesy($img);
                         $long = max($w, $h);
@@ -359,7 +346,7 @@ class StudioController extends Controller
 
         $file = $this->resolveLocalImage($url);
         if (! $file) { return $url; }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return $url; }
         $w = imagesx($img); $h = imagesy($img);
         $long = max($w, $h);
@@ -525,7 +512,7 @@ class StudioController extends Controller
     {
         $file = $this->resolveLocalImage($sourceUrl);
         if (! $file) return null;
-        $src = @imagecreatefromstring((string) file_get_contents($file));
+        $src = studio_image_decode($file);
         if (! $src) return null;
         $w = imagesx($src); $h = imagesy($src);
         imagedestroy($src);
@@ -537,7 +524,7 @@ class StudioController extends Controller
         if (str_starts_with($b64, 'data:')) { $comma = strpos($b64, ','); if ($comma !== false) { $b64 = substr($b64, $comma + 1); } }
         $raw = base64_decode($b64, true);
         if ($raw !== false && $raw !== '') {
-            $brushImg = @imagecreatefromstring($raw);
+            $brushImg = studio_image_decode($raw);
             if ($brushImg) {
                 $bw = imagesx($brushImg); $bh = imagesy($brushImg);
                 if ($bw > 0 && $bh > 0) {
@@ -998,7 +985,7 @@ class StudioController extends Controller
 
         $file = $this->resolveLocalImage($sourceUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
-        $src = @imagecreatefromstring((string) file_get_contents($file));
+        $src = studio_image_decode($file);
         if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
 
         $w = imagesx($src); $h = imagesy($src);
@@ -1039,7 +1026,7 @@ class StudioController extends Controller
             }
             $brushRaw = base64_decode($b64, true);
             if ($brushRaw !== false && $brushRaw !== '') {
-                $brushImg = @imagecreatefromstring($brushRaw);
+                $brushImg = studio_image_decode($brushRaw);
                 if ($brushImg) {
                     $bw = imagesx($brushImg); $bh = imagesy($brushImg);
                     if ($bw > 0 && $bh > 0 && ($bw !== $w || $bh !== $h)) {
@@ -1719,21 +1706,11 @@ RULES:
      */
     public function studioImage(string $path)
     {
-        if (str_contains($path, '..') || ! preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path)) {
-            return response()->json(['error' => 'invalid'], 404);
-        }
-        // Thử nhiều vị trí: storage/app/public (chuẩn), public_html/storage (symlink),
-        // public_html (web root Hostinger) — chống 404 khi deploy dùng cấu trúc khác.
-        $file = storage_path('app/public/'.$path);
-        if (! is_file($file)) {
-            $alt = base_path('public_html/storage/'.$path);
-            if (is_file($alt)) { $file = $alt; }
-        }
-        if (! is_file($file)) {
-            $alt2 = base_path('public_html/'.$path);
-            if (is_file($alt2)) { $file = $alt2; }
-        }
-        if (! is_file($file)) {
+        // Containment + image/video-extension allowlist — see studioServePath().
+        // The previous public_html/ fallback served ANY document-root file
+        // (.htaccess, .env, JS bundles) to an unauthenticated visitor.
+        $file = $this->studioServePath($path);
+        if (! $file) {
             return response()->json(['error' => 'not found', 'path' => $path], 404);
         }
         return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
@@ -1747,15 +1724,9 @@ RULES:
      */
     public function studioImageThumb(string $path, Request $request)
     {
-        if (str_contains($path, '..') || ! preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path)) {
-            return response()->json(['error' => 'invalid'], 404);
-        }
-        // Resolve ảnh gốc (cùng cơ chế studioImage).
-        $file = storage_path('app/public/'.$path);
-        foreach ([base_path('public_html/storage/'.$path), base_path('public_html/'.$path)] as $alt) {
-            if (! is_file($file) && is_file($alt)) { $file = $alt; }
-        }
-        if (! is_file($file)) {
+        // Containment + image/video-extension allowlist — see studioServePath().
+        $file = $this->studioServePath($path);
+        if (! $file) {
             return response()->json(['error' => 'not found', 'path' => $path], 404);
         }
 
@@ -1781,7 +1752,7 @@ RULES:
         if (! is_file($thumbFile)) {
             try {
                 @mkdir($thumbDir, 0775, true);
-                $img = @imagecreatefromstring((string) file_get_contents($file));
+                $img = studio_image_decode($file);
                 if (! $img) {
                     return response()->file($file); // ảnh không đọc được → trả ảnh gốc
                 }
@@ -1921,7 +1892,7 @@ RULES:
         $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
 
-        $src = @imagecreatefromstring((string) file_get_contents($file));
+        $src = studio_image_decode($file);
         if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
         $sw = imagesx($src); $sh = imagesy($src);
         $dst = $this->smartUpscale($src, $scale);
@@ -1961,7 +1932,7 @@ RULES:
         $srcUrl = (string) $data['image'];
         $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
         $this->applyLook($img, (string) $data['look'], $level);
         $this->unsharpMask($img, 0.4);
@@ -2007,7 +1978,7 @@ RULES:
     {
         $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
         $img = $cb($img);
         $name = 'studio/'.Str::slug($model).'-'.Str::uuid().'.png';
@@ -2423,7 +2394,7 @@ RULES:
         }
         $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return null; }
         $this->applyLook($img, $look, max(1, min(10, $level)));
         $name = 'studio/swaptone-'.Str::uuid().'.png';
@@ -2540,7 +2511,7 @@ RULES:
 
         $load = function (string $url) {
             $file = $this->resolveLocalImage($url);
-            return $file ? @imagecreatefromstring((string) file_get_contents($file)) : null;
+            return $file ? studio_image_decode($file) : null;
         };
         $comp = $load($compositeUrl); $cut = $load($cutout);
         if (! $comp || ! $cut) { return null; }
@@ -2616,7 +2587,7 @@ RULES:
     {
         $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return null; }
         $w = imagesx($img); $h = imagesy($img);
         $cw = (int) round($w / $scale); $ch = (int) round($h / $scale);
@@ -2668,7 +2639,7 @@ RULES:
 
         $load = function (string $url) {
             $file = $this->resolveLocalImage($url);
-            return $file ? @imagecreatefromstring((string) file_get_contents($file)) : null;
+            return $file ? studio_image_decode($file) : null;
         };
         $comp = $load($compositeUrl); $clean = $load($bgClean);
         if (! $comp || ! $clean) { return null; }
@@ -2756,7 +2727,7 @@ RULES:
     {
         $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return null; }
         $w = imagesx($img); $h = imagesy($img);
         $scale = 0.82;   // subject target ~82% of frame height
@@ -2804,7 +2775,7 @@ RULES:
     {
         $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return null; }
 
         $w = imagesx($img); $h = imagesy($img);
@@ -3038,7 +3009,7 @@ RULES:
     {
         $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) { return null; }
         $w = imagesx($img); $h = imagesy($img);
         $cx = $w / 2;
@@ -3318,6 +3289,51 @@ RULES:
     }
 
     /**
+     * Resolve a PUBLIC-served studio image path (the /studio/image/{path} and
+     * /studio/image-thumb/{path} endpoints) to a real file, with the same
+     * traversal/charset/realpath containment as safeLocalFile() PLUS:
+     *   - reject dotfile segments (blocks .htaccess / .env / .git*), and
+     *   - require an image/video extension (this endpoint serves studio media,
+     *     never .php/.env/.htaccess/JS bundles — the previous base_path('public_html/'.$path)
+     *     fallback served ANY file in the document root unauthenticated).
+     */
+    protected function studioServePath(string $path): ?string
+    {
+        if ($path === '' || str_contains($path, '..') || ! preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path)) {
+            return null;
+        }
+        foreach (explode('/', $path) as $seg) {
+            if ($seg !== '' && $seg[0] === '.') {
+                return null;
+            }
+        }
+        if (! preg_match('#\.(jpe?g|png|webp|gif|svg|avif|mp4|webm|mov)$#i', $path)) {
+            return null;
+        }
+
+        $roots = [storage_path('app/public'), base_path('public_html/storage'), base_path('public_html')];
+        $candidates = [
+            storage_path('app/public/'.$path),
+            base_path('public_html/storage/'.$path),
+            base_path('public_html/'.$path),
+        ];
+        foreach ($candidates as $candidate) {
+            $real = realpath($candidate);
+            if ($real === false || ! is_file($real)) {
+                continue;
+            }
+            foreach ($roots as $root) {
+                $rootReal = realpath($root);
+                if ($rootReal !== false && str_starts_with($real, $rootReal.DIRECTORY_SEPARATOR)) {
+                    return $real;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Resolve a user-supplied image URL/path to a REAL local file, confined to
      * public/ and storage/app/public.
      *
@@ -3401,7 +3417,7 @@ RULES:
                 default => ['ok' => false, 'message' => 'Không hỗ trợ test '.$service.'.'],
             };
         } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => $e->getMessage()]);
+            return studio_fail($e, 'Kiểm tra API key', 500);
         }
 
         return response()->json($result);
@@ -3462,7 +3478,7 @@ RULES:
 
             return ['ok' => false, 'message' => 'HTTP '.$resp->status().': '.substr((string) $resp->body(), 0, 180)];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'message' => 'Đã gửi yêu cầu nhưng chưa có phản hồi ('.$e->getMessage().'). Model có thể đang xử lý — thử lại sau.'];
+            return ['ok' => false, 'message' => 'Đã gửi yêu cầu nhưng chưa có phản hồi. Model có thể đang xử lý — thử lại sau.'];
         }
     }
 
@@ -3723,7 +3739,7 @@ RULES:
 
     protected function extractPalette(string $file, int $count = 6): array
     {
-        $src = @imagecreatefromstring((string) file_get_contents($file));
+        $src = studio_image_decode($file);
         if (! $src) {
             return [];
         }

@@ -33,20 +33,20 @@ function loadSwapMemory() {
     if (m.tone) swapTone.value = m.tone;
     if (typeof m.bg === 'string') swapBg.value = m.bg;
     // changeFace KHÔNG persist — luôn mặc định BẬT mỗi phiên.
-  } catch (e) {}
+  } catch (e) { console.error('studio operation failed', e); }
 }
 function saveSwapMemory() {
   try {
     localStorage.setItem(SWAP_KEY, JSON.stringify({ tone: swapTone.value, bg: swapBg.value }));
-  } catch (e) {}
+  } catch (e) { console.error('studio operation failed', e); }
 }
 watch([swapBg, swapTone], saveSwapMemory);
 onMounted(async () => {
   loadSwapMemory();
-  try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); const d = await r.json(); models.value = d.items || []; if (changeFace.value && !store.swapModelIds.length && models.value.length) store.swapModelIds = [String(models.value[0].id)]; } catch(e){}
-  try { const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } }); const d = await r.json(); poses.value = d.items || []; } catch(e){}
-  try { const r = await fetch('/studio/swap-backgrounds', { headers: { Accept: 'application/json' } }); const d = await r.json(); bgs.value = d.items || []; } catch(e){}
-  try { const r = await fetch('/studio/assets', { headers: { Accept: 'application/json' } }); const d = await r.json(); assets.value = d.items || []; } catch(e){}
+  try { const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); models.value = d.items || []; if (changeFace.value && !store.swapModelIds.length && models.value.length) store.swapModelIds = [String(models.value[0].id)]; } catch(e){ console.error('studio request failed', e); }
+  try { const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); poses.value = d.items || []; } catch(e){ console.error('studio request failed', e); }
+  try { const r = await fetch('/studio/swap-backgrounds', { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); bgs.value = d.items || []; } catch(e){ console.error('studio request failed', e); }
+  try { const r = await fetch('/studio/assets', { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); assets.value = d.items || []; } catch(e){ console.error('studio request failed', e); }
 });
 const faceList = computed(() => [...models.value, ...assets.value.filter(a => a.type === 'model').map(a => ({ id: String(a.id), name: a.name, image: a.path, custom: true }))]);
 const poseList = computed(() => [...poses.value, ...assets.value.filter(a => a.type === 'pose').map(a => ({ id: String(a.id), name: a.name, image: a.path, custom: true }))]);
@@ -75,7 +75,7 @@ async function addAsset() {
   const res = await fetch('/studio/assets', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' }, body: fd });
   const d = await res.json().catch(() => ({})); if (!res.ok) { store.toast(d.message || 'Lỗi thêm.', 'error'); return; }
   addName.value = ''; addFile.value = null; if (addFileEl.value) addFileEl.value.value = '';
-  const r = await fetch('/studio/assets', { headers: { Accept: 'application/json' } }); assets.value = (await r.json()).items || [];
+  const r = await fetch('/studio/assets', { headers: { Accept: 'application/json' } }); if (!r.ok) { store.toast('Lỗi tải thư viện.', 'error'); return; } assets.value = (await r.json()).items || [];
   store.toast('Đã thêm ' + (addType.value === 'model' ? 'khuôn mặt' : 'dáng') + '.');
 }
 async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); if (r.ok) { assets.value = assets.value.filter(x => x.id !== a.id); const id = String(a.id); if (store.swapModelIds.includes(id)) { store.swapModelIds = store.swapModelIds.filter(x => x !== id); } if (store.swapPoseIds.includes(id)) { store.swapPoseIds = store.swapPoseIds.filter(x => x !== id); } store.toast('Đã xóa.'); } }

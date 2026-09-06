@@ -230,6 +230,8 @@ export const useStudioStore = defineStore('studio', {
     activeProjectGenerations: [], // generations của dự án đang xem
     projectView: 'board',         // 'board' (kanban) | 'list'
     projectsArchived: false,      // lọc dự án đã lưu trữ
+    projectScope: 'own',          // 'own' (dự án của mình) | 'pending' (hàng đợi duyệt — Super Admin)
+    projectCanReview: false,      // true khi user là Super Admin (được duyệt/lưu trữ dự án của người khác)
   }),
   getters: {
     upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
@@ -356,9 +358,9 @@ export const useStudioStore = defineStore('studio', {
       if (setActive) this.setActiveLayer(lid);
     },
     async processQueue() {
-      try { await fetch('/studio/process', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); } catch (e) {}
+      try { await fetch('/studio/process', { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); } catch (e) { console.error('studio operation failed', e); }
       // refresh the generations so the processed images appear
-      try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); const items = d.items || d.generations || []; if (Array.isArray(items)) this.generations = items; } catch (e) {}
+      try { const res = await fetch('/studio/latest', { headers: { Accept: 'application/json' } }); const d = await res.json(); const items = d.items || d.generations || []; if (Array.isArray(items)) this.generations = items; } catch (e) { console.error('studio operation failed', e); }
     },
     async generateImage() {
       if (!this.imagePromptEn || this.generating) return;
@@ -547,7 +549,7 @@ export const useStudioStore = defineStore('studio', {
     },
     async cancelCompose() {
       for (const id of this.composeGenIds) {
-        try { await this.api('/studio/generations/' + id + '/cancel', {}); } catch (e) {}
+        try { await this.api('/studio/generations/' + id + '/cancel', {}); } catch (e) { console.error('studio operation failed', e); }
       }
       this.composeStage = 'cancelled';
       this.toast('Đã hủy ghép ảnh.');
@@ -555,7 +557,7 @@ export const useStudioStore = defineStore('studio', {
     clearComposeStatus() { this.composeStage = ''; this.composeError = ''; this.composeGenIds = []; this.composeStartTs = 0; },
     async loadPalette(id) {
       if (!id) { this.palette = []; return; }
-      try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); const d = await res.json(); this.palette = d.colors || []; }
+      try { const res = await fetch('/studio/generations/' + id + '/palette', { headers: { Accept: 'application/json' } }); if (!res.ok) throw new Error('HTTP ' + res.status); const d = await res.json(); this.palette = d.colors || []; }
       catch (e) { this.palette = []; }
     },
     // Palette màu cho ẢNH BẤT KỲ (source/uploaded/product/result/dataURL) — trích màu NGAY TRÊN TRÌNH DUYỆT.
@@ -871,9 +873,9 @@ export const useStudioStore = defineStore('studio', {
     },
     upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, light: this.lightShadow, sharpen: this.sharpen, clarity: this.clarity, vibrance: this.vibrance }; },
     loadUpscaleMemory() {
-      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, lightShadow: m.settings.light ?? 5, sharpen: m.settings.sharpen ?? 3, clarity: m.settings.clarity ?? 3, vibrance: m.settings.vibrance ?? 3 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) {}
+      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, lightShadow: m.settings.light ?? 5, sharpen: m.settings.sharpen ?? 3, clarity: m.settings.clarity ?? 3, vibrance: m.settings.vibrance ?? 3 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) { console.error('studio operation failed', e); }
     },
-    saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg(), presets: this.upscalePresets })); } catch (e) {} },
+    saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg(), presets: this.upscalePresets })); } catch (e) { console.error('studio operation failed', e); } },
     savePreset(name) { const n = (name || 'Preset ' + (this.upscalePresets.length + 1)).trim(); const existing = this.upscalePresets.find(p => p.name === n); const cfg = this.upscaleCfg(); if (existing) Object.assign(existing, cfg); else this.upscalePresets.push({ name: n, ...cfg }); this.saveUpscaleMemory(); this.toast('Đã lưu preset "' + n + '".'); },
     applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, lightShadow: p.light ?? 5, sharpen: p.sharpen ?? 3, clarity: p.clarity ?? 3, vibrance: p.vibrance ?? 3 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
     deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
@@ -1126,13 +1128,26 @@ export const useStudioStore = defineStore('studio', {
     async loadProjects() {
       if (this.projectLoading) return this.projects;
       this.projectLoading = true;
+      // Hàng đợi duyệt (Super Admin): ?scope=pending — bỏ param archived.
+      const mkQuery = () => this.projectScope === 'pending'
+        ? new URLSearchParams({ scope: 'pending' }).toString()
+        : new URLSearchParams({ archived: this.projectsArchived ? '1' : '0' }).toString();
       try {
-        const qs = new URLSearchParams({ archived: this.projectsArchived ? '1' : '0' });
-        const res = await fetch('/studio/projects?' + qs.toString(), { headers: { Accept: 'application/json' } });
+        let res = await fetch('/studio/projects?' + mkQuery(), { headers: { Accept: 'application/json' } });
+        if (res.status === 403 && this.projectScope === 'pending') {
+          // Không (còn) là Super Admin → quay về scope cá nhân rồi tải lại.
+          const msg = (await res.json().catch(() => ({}))).message || 'Bạn không có quyền xem hàng đợi duyệt.';
+          this.projectScope = 'own';
+          this.projectCanReview = false;
+          this.toast(msg, 'error');
+          res = await fetch('/studio/projects?' + mkQuery(), { headers: { Accept: 'application/json' } });
+        }
         if (res.status === 401 || res.status === 403) { this.needsLogin = true; return []; }
         const d = await res.json();
         this.projects = Array.isArray(d.items) ? d.items : [];
         if (d.statuses) this.projectStatuses = d.statuses;
+        this.projectCanReview = !!d.can_review;
+        if (d.scope === 'pending' || d.scope === 'own') this.projectScope = d.scope;
         this.projectLoaded = true;
         return this.projects;
       } catch (e) {
@@ -1901,7 +1916,7 @@ export const useStudioStore = defineStore('studio', {
     },
     // Lưu bố cục layer (danh sách + layer active) để khôi phục khi tải lại trang.
     saveLayerLayout() {
-      try { localStorage.setItem('trillfa.layers', JSON.stringify({ layers: this.canvasLayers, activeLayerId: this.activeLayerId })); } catch (e) {}
+      try { localStorage.setItem('trillfa.layers', JSON.stringify({ layers: this.canvasLayers, activeLayerId: this.activeLayerId })); } catch (e) { console.error('studio operation failed', e); }
     },
     // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).
     restoreLayerLayout() {

@@ -328,7 +328,7 @@ class StyleSuggestService
 
     protected function downscaleBase64(string $path, int $max = 1024): array
     {
-        $img = @imagecreatefromstring((string) file_get_contents($path));
+        $img = studio_image_decode($path);
         if (! $img) {
             return ['', 'image/jpeg'];
         }
@@ -471,7 +471,7 @@ class StyleSuggestService
     protected function analyzeImage(string $path): array
     {
         try {
-            $img = @imagecreatefromstring(@file_get_contents($path));
+            $img = studio_image_decode($path);
             if (! $img) {
                 return [0, 0.5];
             }

@@ -93,7 +93,9 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function
 // Trillfa Studio — INTERNAL only (admin team). Not a public customer service.
 Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.')->group(function () {
     Route::get('/vue', [StudioController::class, 'studioVue'])->name('vue');
-    Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
+    // Endpoint legacy (Alpine cũ) — đã deprecate StudioController::storeProject,
+    // trỏ về ProjectController::store để chỉ còn MỘT đường tạo dự án với cùng validation.
+    Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     // Project workflow (Designer design board) — CRUD + transitions + attach generations.
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects/new', [ProjectController::class, 'store'])->name('projects.create');

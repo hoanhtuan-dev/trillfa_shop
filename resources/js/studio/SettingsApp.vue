@@ -3,13 +3,14 @@ import { ref, onMounted } from 'vue';
 const data = ref(null); const tab = ref('keys');
 const form = ref({ key_provider:'', key_label:'', key_value:'', key_kind:'', key_priority:5, model_group:'image', model_name:'', model_provider:'', model_id:'', model_key_ref:'', model_priority:5 });
 const saving = ref(false);
-async function load() { try { const r = await fetch('/studio/settings/data', { headers: { Accept:'application/json' } }); data.value = await r.json(); } catch(e){} }
+async function load() { try { const r = await fetch('/studio/settings/data', { headers: { Accept:'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); data.value = await r.json(); } catch(e){ console.error('studio request failed', e); } }
 onMounted(load);
 async function save() {
   saving.value = true;
   try { const r = await fetch('/studio/settings/save', { method:'POST', headers:{ 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]')||{}).content||'', 'Content-Type':'application/json', Accept:'application/json' }, body: JSON.stringify({ key_value: form.value.key_value, key_provider: form.value.key_provider, key_label: form.value.key_label, key_kind: form.value.key_kind, key_priority: Number(form.value.key_priority)||5, model_name: form.value.model_name, model_group: form.value.model_group, model_provider: form.value.model_provider, model_id: form.value.model_id, model_key_ref: form.value.model_key_ref, model_priority: Number(form.value.model_priority)||5 }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json(); if (d.ok) { form.value = { key_provider:'', key_label:'', key_value:'', key_kind:'', key_priority:5, model_group:'image', model_name:'', model_provider:'', model_id:'', model_key_ref:'', model_priority:5 }; await load(); }
-  } catch(e){}
+  } catch(e){ console.error('studio request failed', e); }
   finally { saving.value = false; }
 }
 </script>

@@ -185,6 +185,69 @@ if (! function_exists('widget_field')) {
         return (string) setting('widget_'.$key.'_'.$field, $default);
     }
 }
+
+if (! function_exists('studio_fail')) {
+    /**
+     * Build a generic client-facing error response while logging the real exception.
+     *
+     * Server-error catch blocks returned $e->getMessage() raw in 500 responses,
+     * leaking SQL fragments, table/column names, and framework paths. This helper
+     * returns a stable generic message, logs the detail server-side, and is
+     * debug-aware (verbose only when APP_DEBUG). Use for SERVER errors (500);
+     * 422 paths often throw user-authored validation messages and keep their text.
+     */
+    function studio_fail(\Throwable $e, string $context = '', int $status = 500, ?string $safeMessage = null): \Illuminate\Http\JsonResponse
+    {
+        \Illuminate\Support\Facades\Log::warning('studio_fail: '.$context, [
+            'exception' => get_class($e),
+            'message' => $e->getMessage(),
+            'file' => $e->getFile().':'.$e->getLine(),
+        ]);
+        $msg = $safeMessage ?? ($context !== '' ? $context.' thất bại.' : 'Lỗi hệ thống, vui lòng thử lại.');
+        $payload = ['ok' => false, 'message' => $msg];
+        if (config('app.debug')) {
+            $payload['debug'] = $e->getMessage();
+        }
+        return response()->json($payload, $status);
+    }
+}
+
+if (! function_exists('studio_image_decode')) {
+    /**
+     * Decode an image from a file path OR raw bytes with an OOM guard.
+     *
+     * The module had ~41 `@imagecreatefromstring(file_get_contents(...))` sites with
+     * no size check — a maliciously large image (or a non-image file the GD still
+     * tries to allocate for) could OOM a worker. This helper caps the input at a
+     * generous 64 MiB (configurable) before calling imagecreatefromstring().
+     *
+     * @param  string  $dataOrPath  raw image bytes OR a local file path (auto-detected)
+     * @param  int     $maxBytes    hard cap on the input size; 0 = 64 MiB default
+     * @return \GdImage|false  GD resource, or false on reject/failure
+     */
+    function studio_image_decode($dataOrPath, int $maxBytes = 0)
+    {
+        $maxBytes = $maxBytes > 0 ? $maxBytes : 67108864; // 64 MiB
+        $data = $dataOrPath;
+
+        if (is_file($dataOrPath)) {
+            $size = @filesize($dataOrPath);
+            if ($size === false || $size > $maxBytes) {
+                return false;
+            }
+            $data = @file_get_contents($dataOrPath);
+            if ($data === false || strlen($data) > $maxBytes) {
+                return false;
+            }
+        } elseif (strlen((string) $data) > $maxBytes) {
+            return false;
+        }
+
+        $gd = studio_image_decode((string) $data);
+        return $gd === false ? false : $gd;
+    }
+}
+
 if (! function_exists('studio_config')) {
     function studio_config(string $key, $default = null)
     {
@@ -342,7 +405,7 @@ if (! function_exists('studio_vision_image_data_uri')) {
             return null;
         }
 
-        $img = @imagecreatefromstring((string) file_get_contents($file));
+        $img = studio_image_decode($file);
         if (! $img) {
             return null;
         }

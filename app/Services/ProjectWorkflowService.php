@@ -16,13 +16,25 @@ use Illuminate\Support\Carbon;
  *        └────────────┴───────────────┘        └──▶ (reopen về review, rare)
  *
  * Quy tắc:
- *  - Chỉ SUPER ADMIN / DESIGNER role mới được APPROVE / ARCHIVE (reviewer gate).
+ *  - Chỉ SUPER ADMIN mới được APPROVE / ARCHIVE (reviewer gate).
+ *  - Tách nhiệm vụ (separation of duties): owner KHÔNG được approve/archive dự án
+ *    của chính mình khi hệ thống có Super Admin thứ hai. Ngoại lệ chống lockout:
+ *    nếu actor là Super Admin DUY NHẤT của hệ thống, self-approval vẫn được phép
+ *    và bị đánh dấu `self_approved` trong status_history để audit.
  *  - Mỗi transition có thể chạy side-effect: cập nhật started_at / completed_at,
  *    bump sort (đưa dự án đang hoạt động lên đầu), v.v.
  *  - Trạng thái hợp lệ được dẫn dắt duy nhất bởi service này để Controller/UI không tự ý.
  */
 class ProjectWorkflowService
 {
+    /**
+     * Memoize kết quả "có phải Super Admin duy nhất không" theo user id —
+     * tránh lặp query User::exists() khi availableTransitions() gọi canTransition()
+     * cho từng trạng thái đích × từng project (N+1 ở endpoint index).
+     *
+     * @var array<int, bool>
+     */
+    protected array $soleSuperAdminCache = [];
     /**
      * Trạng thái hợp lệ + metadata hiển thị (label, màu, mô tả).
      * Giữ đồng bộ với App\Models\Project::STATUSES.
@@ -106,10 +118,29 @@ class ProjectWorkflowService
             return [false, sprintf('Không thể chuyển từ "%s" sang "%s".', $this->label($from), $this->label($to))];
         }
         // Reviewer gate: chỉ Super Admin được APPROVE / ARCHIVE.
-        if (in_array($to, self::REVIEWER_GATES, true) && ! $user->isSuperAdmin()) {
-            return [false, 'Chỉ Super Admin mới được duyệt / lưu trữ dự án.'];
+        if (in_array($to, self::REVIEWER_GATES, true)) {
+            if (! $user->isSuperAdmin()) {
+                return [false, 'Chỉ Super Admin mới được duyệt / lưu trữ dự án.'];
+            }
+            // Tách nhiệm vụ: owner không tự duyệt dự án của mình khi tồn tại
+            // Super Admin khác. Super Admin duy nhất được phép (chống lockout,
+            // có đánh dấu self_approved trong status_history khi transition chạy).
+            if ((int) $project->user_id === (int) $user->id && ! $this->isOnlySuperAdmin($user)) {
+                return [false, 'Không thể tự duyệt / lưu trữ dự án của chính mình — cần một Super Admin khác.'];
+            }
         }
         return [true, null];
+    }
+
+    /**
+     * Actor có phải Super Admin DUY NHẤT của hệ thống không (memoized theo request).
+     */
+    protected function isOnlySuperAdmin(User $user): bool
+    {
+        return $this->soleSuperAdminCache[$user->id] ??= ! User::query()
+            ->where('role', User::ROLE_SUPER_ADMIN)
+            ->where('id', '!=', $user->id)
+            ->exists();
     }
 
     /**
@@ -143,20 +174,32 @@ class ProjectWorkflowService
             }
         }
 
-        $project->fill($updates)->save();
-
-        // Ghi lại ghi chú chuyển trạng thái vào settings (lịch sử đơn giản, không cần bảng riêng).
-        if ($note !== null && $note !== '') {
+        // Ghi lịch sử chuyển trạng thái vào settings (không cần bảng riêng).
+        // Gộp vào CÙNG một lần save với status/side-effects — trước đây project bị
+        // save 2 lần ngoài transaction, save thứ hai fail sẽ để lại state lệch.
+        // Self-approval (chỉ xảy ra khi actor là Super Admin duy nhất — xem
+        // canTransition) luôn được ghi lịch sử kèm cờ `self_approved` để audit.
+        $selfApproved = in_array($to, self::REVIEWER_GATES, true)
+            && (int) $project->user_id === (int) $user->id;
+        $hasNote = $note !== null && $note !== '';
+        if ($hasNote || $selfApproved) {
             $current = $project->settings;
             $history = is_object($current) ? $current->getArrayCopy() : (array) ($current ?? []);
             $history['status_history'] = $history['status_history'] ?? [];
-            $history['status_history'][] = [
-                'from' => $from, 'to' => $to, 'note' => mb_substr($note, 0, 500),
+            $entry = [
+                'from' => $from, 'to' => $to, 'note' => $hasNote ? mb_substr($note, 0, 500) : null,
                 'at' => Carbon::now()->toDateTimeString(), 'by' => $user->id,
             ];
-            $project->settings = $history;
-            $project->save();
+            if ($selfApproved) {
+                $entry['self_approved'] = true;
+            }
+            $history['status_history'][] = $entry;
+            $updates['settings'] = $history;
         }
+
+        // Service là thẩm quyền duy nhất của `status` (đã rút khỏi $fillable của
+        // model để chặn mass-assignment từ request) → dùng forceFill.
+        $project->forceFill($updates)->save();
 
         return $project->fresh();
     }

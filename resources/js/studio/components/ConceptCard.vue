@@ -88,7 +88,7 @@ function saveDraft() {
       timestamp: Date.now()
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  } catch (e) {}
+  } catch (e) { console.error('studio operation failed', e); }
 }
 function loadDraft() {
   try {
@@ -114,7 +114,7 @@ function loadDraft() {
   } catch (e) { return false; }
 }
 function clearDraft() {
-  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) { console.error('studio operation failed', e); }
 }
 let draftSaveTimer = null;
 watch(() => [
@@ -144,7 +144,7 @@ function loadTemplates() {
     if (Array.isArray(saved) && saved.length) {
       templates.value = [...templates.value, ...saved.map((t, i) => ({ ...t, id: 'custom-' + i }))];
     }
-  } catch (e) {}
+  } catch (e) { console.error('studio operation failed', e); }
 }
 loadTemplates();
 
@@ -195,7 +195,7 @@ const draftTime = ref('');
 async function openPrompt() {
   if (!store.defaultsLoaded) {
     promptLoading.value = true;
-    try { await store.loadDefaults(); } catch (e) {}
+    try { await store.loadDefaults(); } catch (e) { console.error('studio operation failed', e); }
     finally { promptLoading.value = false; }
   }
   localCreative.value = store.creativeLevel;
@@ -217,7 +217,7 @@ async function openPrompt() {
         draftTime.value = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
       }
     }
-  } catch (e) {}
+  } catch (e) { console.error('studio operation failed', e); }
   store.promptOpen = true;
 }
 function restoreDraft() { loadDraft(); showDraftNotice.value = false; undoStack.value = [store.imagePromptEn || '']; redoStack.value = []; store.toast('Đã khôi phục bản nháp.'); }
@@ -237,6 +237,7 @@ async function loadHistory() {
   historyLoading.value = true;
   try {
     const res = await fetch('/studio/prompt-history', { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
     history.value = d.items || [];
   } catch (e) { history.value = []; }
@@ -274,11 +275,13 @@ async function loadPresets() {
   presetsLoading.value = true;
   try {
     const tRes = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } });
+    if (!tRes.ok) throw new Error('HTTP ' + tRes.status);
     const tD = await tRes.json().catch(() => ({}));
     presetTypes.value = tD.types || tD.items || [];
   } catch (e) { presetTypes.value = []; }
   try {
     const pRes = await fetch('/studio/stylist/presets', { headers: { Accept: 'application/json' } });
+    if (!pRes.ok) throw new Error('HTTP ' + pRes.status);
     const pD = await pRes.json().catch(() => ({}));
     presets.value = pD.presets || pD.items || [];
   } catch (e) { presets.value = []; }

@@ -107,7 +107,7 @@ class StylistDataController extends Controller
                 'id' => $m->id, 'slug' => $m->slug, 'name' => $m->name, 'emoji' => $m->emoji, 'color' => $m->color, 'sort_order' => $m->sort_order,
             ]]);
         } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => 'Lỗi lưu: '.$e->getMessage()], 500);
+            return studio_fail($e, 'Lưu mục stylist', 500);
         }
     }
 
@@ -118,7 +118,7 @@ class StylistDataController extends Controller
             StylistGarmentType::where('id', $id)->delete();
             return response()->json(['ok' => true]);
         } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => 'Lỗi xóa: '.$e->getMessage()], 500);
+            return studio_fail($e, 'Xóa mục stylist', 500);
         }
     }
 
@@ -156,7 +156,7 @@ class StylistDataController extends Controller
                 'id' => $m->id, 'key' => $m->key, 'q' => $m->question, 'opts' => $m->options, 'sort_order' => $m->sort_order,
             ]]);
         } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => 'Lỗi lưu: '.$e->getMessage()], 500);
+            return studio_fail($e, 'Lưu mục stylist', 500);
         }
     }
 
@@ -167,7 +167,7 @@ class StylistDataController extends Controller
             StylistQuestion::where('id', $id)->delete();
             return response()->json(['ok' => true]);
         } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => 'Lỗi xóa: '.$e->getMessage()], 500);
+            return studio_fail($e, 'Xóa mục stylist', 500);
         }
     }
 }

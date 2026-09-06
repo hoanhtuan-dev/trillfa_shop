@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 
@@ -12,6 +12,9 @@ const editing = ref(false);
 const busy = ref(false);
 const confirmDelete = ref('');
 let confirmTimer = null;
+const movingId = ref(null);   // id dự án đang chuyển trạng thái — chống double-click
+const openingId = ref(null);  // id dự án đang tải chi tiết — spinner trên card/row
+const transNote = ref('');    // ghi chú (tùy chọn) kèm lần chuyển trạng thái
 
 // Form state
 const form = ref(blankForm());
@@ -34,6 +37,19 @@ const grouped = computed(() => {
   return map;
 });
 
+// Empty state riêng theo scope (hàng đợi duyệt / lưu trữ) — scope own giữ khung kanban.
+const boardEmptyMessage = computed(() => {
+  if (store.projects.length) return '';
+  if (store.projectScope === 'pending') return 'Không có dự án chờ duyệt 🎉';
+  if (store.projectsArchived) return 'Không có dự án lưu trữ.';
+  return '';
+});
+const listEmptyMessage = computed(() => {
+  if (store.projectScope === 'pending') return 'Không có dự án chờ duyệt 🎉';
+  if (store.projectsArchived) return 'Không có dự án lưu trữ.';
+  return 'Chưa có dự án. Bấm "＋ Dự án mới" để bắt đầu.';
+});
+
 function statusLabel(s) { return statuses.value[s]?.label || s; }
 function statusColor(s) { return statuses.value[s]?.color || '#6b6657'; }
 
@@ -47,6 +63,28 @@ function isOverdue(p) {
   if (!p.deadline) return false;
   const dt = new Date(p.deadline);
   return !isNaN(dt.getTime()) && dt.getTime() < Date.now() && !['approved', 'archived'].includes(p.status);
+}
+// Số ngày còn lại / quá hạn (tính theo ngày lịch, bỏ giờ).
+function deadlineDays(d) {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(dt.getTime()); target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+function deadlineCountdown(p) {
+  const n = deadlineDays(p && p.deadline);
+  if (n === null) return '';
+  if (n < 0) return ['approved', 'archived'].includes(p.status) ? '' : 'Quá hạn ' + Math.abs(n) + ' ngày';
+  if (n === 0) return 'Hôm nay đến hạn';
+  return 'Còn ' + n + ' ngày';
+}
+function deadlineFull(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return dt.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 async function openCreate() {
@@ -95,12 +133,28 @@ async function submitEdit() {
 }
 
 async function openProject(p) {
-  await store.loadProject(p.id);
+  if (openingId.value) return;
+  openingId.value = p.id;
+  try { await store.loadProject(p.id); }
+  finally { openingId.value = null; }
 }
-function closeProject() { store.activeProject = null; store.activeProjectGenerations = []; }
+function closeProject() {
+  store.activeProject = null;
+  store.activeProjectGenerations = [];
+  transNote.value = '';
+}
 
 async function move(p, to) {
-  await store.transitionProject(p.id, to);
+  if (movingId.value) return; // chống double-click
+  movingId.value = p.id;
+  try {
+    const d = await store.transitionProject(p.id, to, transNote.value.trim());
+    if (d) {
+      transNote.value = '';
+      // Ở hàng đợi duyệt: tải lại để dự án vừa duyệt rời khỏi danh sách pending.
+      if (store.projectScope === 'pending') await store.loadProjects();
+    }
+  } finally { movingId.value = null; }
 }
 
 async function removeProject(p) {
@@ -117,11 +171,34 @@ async function removeProject(p) {
 
 async function toggleArchived() {
   store.projectsArchived = !store.projectsArchived;
+  if (store.projectsArchived) store.projectScope = 'own'; // loại trừ lẫn nhau với hàng đợi duyệt
+  await store.loadProjects();
+}
+async function togglePending() {
+  if (store.projectScope === 'pending') {
+    store.projectScope = 'own';
+  } else {
+    store.projectScope = 'pending';
+    store.projectsArchived = false; // loại trừ lẫn nhau với lưu trữ
+  }
   await store.loadProjects();
 }
 
+// ESC: đóng modal tạo/sửa trước → thoát detail về board → đóng workspace.
+function onKeydown(e) {
+  if (e.key !== 'Escape' || !open.value) return;
+  if (creating.value || editing.value) { closeForm(); return; }
+  if (store.activeProject) { closeProject(); return; }
+  open.value = false;
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', onKeydown);
   if (!store.projectLoaded) store.loadProjects();
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown);
+  clearTimeout(confirmTimer);
 });
 watch(() => open.value, (v) => {
   if (v && !store.projectLoaded) store.loadProjects();
@@ -130,7 +207,7 @@ watch(() => open.value, (v) => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-3 sm:p-6">
+    <div v-if="open" role="dialog" aria-modal="true" aria-label="Dự án thiết kế" class="fixed inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-3 sm:p-6">
       <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-950 text-cream-100 shadow-2xl">
         <!-- ══ Header ══ -->
         <div class="flex shrink-0 items-center justify-between gap-3 border-b border-ink-700 bg-ink-900 px-4 py-3">
@@ -142,42 +219,55 @@ watch(() => open.value, (v) => {
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <button v-if="store.projectCanReview" @click="togglePending" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectScope === 'pending' ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-700 text-cream-200 hover:bg-ink-800'">⏳ Chờ duyệt</button>
             <button @click="toggleArchived" class="rounded-full border px-3 py-1.5 text-xs font-semibold" :class="store.projectsArchived ? 'border-brand-500 bg-brand-600/30 text-brand-100' : 'border-ink-700 text-cream-200 hover:bg-ink-800'">📦 Đã lưu trữ</button>
             <button @click="openCreate" class="rounded-full bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-500">+ Dự án mới</button>
-            <button @click="open = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
+            <button @click="open = false" aria-label="Đóng không gian dự án" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
           </div>
         </div>
 
         <!-- ══ Body ══ -->
         <div class="flex flex-1 overflow-hidden">
+          <!-- Loading (board + list) — spinner gọn, không để khoảng trống im lặng -->
+          <div v-if="!store.activeProject && store.projectLoading" class="flex flex-1 flex-col items-center justify-center gap-3 p-10">
+            <span class="h-7 w-7 animate-spin rounded-full border-2 border-ink-700 border-t-brand-500"></span>
+            <p class="text-xs text-cream-300/50">Đang tải dự án…</p>
+          </div>
+
           <!-- Board view -->
-          <div v-if="store.projectView === 'board' && !store.activeProject" class="scrollbar-hide flex flex-1 gap-3 overflow-x-auto p-4">
-            <div v-for="s in statusOrder" :key="s" class="flex w-60 shrink-0 flex-col rounded-xl border border-ink-700/60 bg-ink-900/50">
-              <div class="flex items-center justify-between border-b border-ink-700/60 px-3 py-2">
-                <span class="flex items-center gap-2 text-xs font-bold">
-                  <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ background: statusColor(s) }"></span>
-                  {{ statusLabel(s) }}
-                </span>
-                <span class="rounded-full bg-ink-800 px-2 py-0.5 text-[10px] text-cream-300">{{ (grouped[s] || []).length }}</span>
-              </div>
-              <div class="flex min-h-24 flex-col gap-2 p-2">
-                <div v-for="p in grouped[s]" :key="p.id" class="group cursor-pointer rounded-lg border border-ink-700/60 bg-ink-800/70 p-2.5 transition hover:border-brand-500/50 hover:bg-ink-800" @click="openProject(p)">
-                  <div class="flex items-start justify-between gap-2">
-                    <p class="line-clamp-2 text-xs font-semibold text-cream-50">{{ p.name }}</p>
-                    <span v-if="p.color" class="h-3 w-3 shrink-0 rounded-full border border-white/20" :style="{ background: p.color }"></span>
-                  </div>
-                  <div v-if="p.thumbnail" class="mt-2 h-20 w-full overflow-hidden rounded-md bg-ink-900">
-                    <img :src="thumbUrl(p.thumbnail)" :alt="p.name" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, p.thumbnail)">
-                  </div>
-                  <div class="mt-2 flex items-center justify-between gap-2">
-                    <span class="text-[10px] text-cream-300/60">{{ p.generations_count || 0 }} ảnh</span>
-                    <span v-if="p.deadline" class="text-[10px] font-semibold" :class="isOverdue(p) ? 'text-red-400' : 'text-cream-300/70'">⏱ {{ deadlineLabel(p.deadline) }}</span>
-                  </div>
-                  <div v-if="p.tags && p.tags.length" class="mt-1.5 flex flex-wrap gap-1">
-                    <span v-for="t in p.tags.slice(0, 3)" :key="t" class="rounded-full bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-300">{{ t }}</span>
-                  </div>
+          <div v-else-if="store.projectView === 'board' && !store.activeProject" class="flex flex-1 overflow-hidden">
+            <!-- Empty state cho hàng đợi duyệt / scope lưu trữ -->
+            <div v-if="boardEmptyMessage" class="flex flex-1 items-center justify-center p-10 text-center text-xs text-cream-300/40">{{ boardEmptyMessage }}</div>
+            <div v-else class="scrollbar-hide flex flex-1 gap-3 overflow-x-auto p-4">
+              <div v-for="s in statusOrder" :key="s" class="flex w-60 shrink-0 flex-col rounded-xl border border-ink-700/60 bg-ink-900/50">
+                <div class="flex items-center justify-between border-b border-ink-700/60 px-3 py-2">
+                  <span class="flex items-center gap-2 text-xs font-bold">
+                    <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ background: statusColor(s) }"></span>
+                    {{ statusLabel(s) }}
+                  </span>
+                  <span class="rounded-full bg-ink-800 px-2 py-0.5 text-[10px] text-cream-300">{{ (grouped[s] || []).length }}</span>
                 </div>
-                <p v-if="!grouped[s].length" class="py-6 text-center text-[10px] text-cream-300/30">Trống</p>
+                <div class="flex min-h-24 flex-col gap-2 p-2">
+                  <div v-for="p in grouped[s]" :key="p.id" class="group relative cursor-pointer rounded-lg border border-ink-700/60 bg-ink-800/70 p-2.5 transition hover:border-brand-500/50 hover:bg-ink-800" :class="openingId === p.id ? 'pointer-events-none opacity-60' : ''" @click="openProject(p)">
+                    <span v-if="openingId === p.id" class="absolute right-2 top-2 z-10 h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink-600 border-t-brand-400"></span>
+                    <div class="flex items-start justify-between gap-2">
+                      <p class="line-clamp-2 text-xs font-semibold text-cream-50">{{ p.name }}</p>
+                      <span v-if="p.color" class="h-3 w-3 shrink-0 rounded-full border border-white/20" :style="{ background: p.color }"></span>
+                    </div>
+                    <span v-if="store.projectScope === 'pending' && p.owner_name" class="mt-1 inline-block max-w-full truncate rounded-full bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-300">👤 {{ p.owner_name }}</span>
+                    <div v-if="p.thumbnail" class="mt-2 h-20 w-full overflow-hidden rounded-md bg-ink-900">
+                      <img :src="thumbUrl(p.thumbnail)" :alt="p.name" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, p.thumbnail)">
+                    </div>
+                    <div class="mt-2 flex items-center justify-between gap-2">
+                      <span class="text-[10px] text-cream-300/60">{{ p.generations_count || 0 }} ảnh</span>
+                      <span v-if="p.deadline" class="text-[10px] font-semibold" :class="isOverdue(p) ? 'text-red-400' : 'text-cream-300/70'" :title="deadlineFull(p.deadline)">⏱ {{ deadlineLabel(p.deadline) }}{{ deadlineCountdown(p) ? ' · ' + deadlineCountdown(p) : '' }}</span>
+                    </div>
+                    <div v-if="p.tags && p.tags.length" class="mt-1.5 flex flex-wrap gap-1">
+                      <span v-for="t in p.tags.slice(0, 3)" :key="t" class="rounded-full bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-300">{{ t }}</span>
+                    </div>
+                  </div>
+                  <p v-if="!grouped[s].length" class="py-6 text-center text-[10px] text-cream-300/30">Trống</p>
+                </div>
               </div>
             </div>
           </div>
@@ -196,10 +286,11 @@ watch(() => open.value, (v) => {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-ink-800">
-                  <tr v-for="p in store.projects" :key="p.id" class="bg-ink-900/40 hover:bg-ink-800/60">
+                  <tr v-for="p in store.projects" :key="p.id" class="bg-ink-900/40 hover:bg-ink-800/60" :class="openingId === p.id ? 'opacity-60' : ''">
                     <td class="px-3 py-2.5">
-                      <button class="text-left" @click="openProject(p)">
+                      <button class="text-left" :disabled="openingId === p.id" @click="openProject(p)">
                         <span class="font-semibold text-cream-50">{{ p.name }}</span>
+                        <span v-if="store.projectScope === 'pending' && p.owner_name" class="ml-1.5 inline-block max-w-[10rem] truncate rounded-full bg-ink-700/70 px-1.5 py-0.5 align-middle text-[9px] text-cream-300">👤 {{ p.owner_name }}</span>
                         <span v-if="p.base_concept" class="mt-0.5 block max-w-xs truncate text-[10px] text-cream-300/50">{{ p.base_concept }}</span>
                       </button>
                     </td>
@@ -208,15 +299,15 @@ watch(() => open.value, (v) => {
                         <span class="h-1.5 w-1.5 rounded-full" :style="{ background: statusColor(p.status) }"></span>{{ statusLabel(p.status) }}
                       </span>
                     </td>
-                    <td class="px-3 py-2.5" :class="isOverdue(p) ? 'text-red-400' : 'text-cream-300/70'">{{ deadlineLabel(p.deadline) || '—' }}</td>
+                    <td class="px-3 py-2.5" :class="isOverdue(p) ? 'text-red-400' : 'text-cream-300/70'" :title="deadlineFull(p.deadline)">{{ deadlineLabel(p.deadline) ? deadlineLabel(p.deadline) + (deadlineCountdown(p) ? ' · ' + deadlineCountdown(p) : '') : '—' }}</td>
                     <td class="px-3 py-2.5 text-cream-300/70">{{ p.generations_count || 0 }}</td>
                     <td class="px-3 py-2.5 text-right">
-                      <button @click="openProject(p)" class="rounded-md bg-brand-600/20 px-2 py-1 text-[10px] font-semibold text-brand-200 hover:bg-brand-600 hover:text-white">Mở</button>
+                      <button @click="openProject(p)" :disabled="openingId === p.id" class="rounded-md bg-brand-600/20 px-2 py-1 text-[10px] font-semibold text-brand-200 hover:bg-brand-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">{{ openingId === p.id ? 'Đang mở…' : 'Mở' }}</button>
                     </td>
                   </tr>
                 </tbody>
               </table>
-              <p v-if="!store.projects.length" class="py-10 text-center text-xs text-cream-300/40">Chưa có dự án. Bấm "＋ Dự án mới" để bắt đầu.</p>
+              <p v-if="!store.projects.length" class="py-10 text-center text-xs text-cream-300/40">{{ listEmptyMessage }}</p>
             </div>
           </div>
 
@@ -224,7 +315,7 @@ watch(() => open.value, (v) => {
           <div v-else-if="store.activeProject" class="flex flex-1 flex-col overflow-y-auto">
             <div class="sticky top-0 z-10 flex items-center justify-between border-b border-ink-700 bg-ink-900/95 px-4 py-3">
               <div class="flex items-center gap-3">
-                <button @click="closeProject" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">←</button>
+                <button @click="closeProject" aria-label="Quay lại bảng" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">←</button>
                 <div>
                   <p class="font-display text-sm font-semibold text-cream-50">{{ store.activeProject.name }}</p>
                   <p class="text-[11px] text-cream-300/60">{{ statusLabel(store.activeProject.status) }} · {{ store.activeProject.generations_count || 0 }} ảnh</p>
@@ -244,11 +335,22 @@ watch(() => open.value, (v) => {
                   v-for="t in store.activeProject.transitions || []"
                   :key="t.to"
                   @click="move(store.activeProject, t.to)"
-                  class="rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110"
+                  :disabled="movingId === store.activeProject.id"
+                  class="rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                   :style="{ borderColor: t.color, color: t.color, background: t.color + '1a' }"
                   :title="t.hint"
                 >{{ t.label }}</button>
+                <span v-if="movingId === store.activeProject.id" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink-600 border-t-brand-400"></span>
                 <span v-if="!((store.activeProject.transitions || []).length)" class="text-[11px] text-cream-300/40">Không có chuyển trạng thái khả dụng.</span>
+                <input
+                  v-if="(store.activeProject.transitions || []).length"
+                  v-model="transNote"
+                  type="text"
+                  maxlength="255"
+                  :disabled="movingId === store.activeProject.id"
+                  placeholder="Lý do chuyển trạng thái…"
+                  class="w-full rounded-full border border-ink-700 bg-ink-900 px-3 py-1.5 text-[11px] text-cream-50 placeholder:text-cream-300/30 focus:border-brand-500 focus:outline-none disabled:opacity-50 sm:w-64"
+                >
               </div>
             </div>
 
@@ -279,7 +381,7 @@ watch(() => open.value, (v) => {
               <div class="space-y-3">
                 <div class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3">
                   <p class="mb-1 text-[11px] font-bold uppercase tracking-wide text-cream-300/50">Deadline</p>
-                  <p class="text-xs" :class="isOverdue(store.activeProject) ? 'text-red-400' : 'text-cream-100'">{{ deadlineLabel(store.activeProject.deadline) || 'Không đặt' }}</p>
+                  <p class="text-xs" :class="isOverdue(store.activeProject) ? 'text-red-400' : 'text-cream-100'" :title="deadlineFull(store.activeProject.deadline)">{{ deadlineLabel(store.activeProject.deadline) || 'Không đặt' }}<span v-if="deadlineCountdown(store.activeProject)" class="ml-1 text-[10px] opacity-80">({{ deadlineCountdown(store.activeProject) }})</span></p>
                 </div>
                 <div v-if="store.activeProject.tags && store.activeProject.tags.length" class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3">
                   <p class="mb-2 text-[11px] font-bold uppercase tracking-wide text-cream-300/50">Thẻ</p>
@@ -301,11 +403,11 @@ watch(() => open.value, (v) => {
 
   <!-- ══ Modal tạo/sửa ══ -->
   <Teleport to="body">
-    <div v-if="creating || editing" class="fixed inset-0 z-[96] flex items-center justify-center bg-black/70 p-4" @click.self="closeForm">
+    <div v-if="creating || editing" role="dialog" aria-modal="true" :aria-label="creating ? 'Tạo dự án mới' : 'Sửa dự án'" class="fixed inset-0 z-[96] flex items-center justify-center bg-black/70 p-4" @click.self="closeForm">
       <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-5 text-cream-100 shadow-2xl">
         <div class="mb-4 flex items-center justify-between">
           <p class="font-display text-sm font-semibold">{{ creating ? 'Dự án mới' : 'Sửa dự án' }}</p>
-          <button @click="closeForm" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
+          <button @click="closeForm" aria-label="Đóng biểu mẫu" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600">✕</button>
         </div>
         <div class="space-y-3">
           <div>

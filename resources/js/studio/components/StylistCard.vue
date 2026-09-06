@@ -18,7 +18,7 @@ const loading = ref(false);
 const promptLang = ref('en');
 const promptEn = ref(''), promptVi = ref('');
 const typeName = computed(() => types.value.find(t => t.id === type.value)?.name || type.value);
-onMounted(async () => { try { const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }); const d = await r.json(); types.value = d.types || d.items || []; } catch(e){} });
+onMounted(async () => { try { const r = await fetch('/studio/stylist/types', { headers: { Accept: 'application/json' } }); if (!r.ok) throw new Error('HTTP ' + r.status); const d = await r.json(); types.value = d.types || d.items || []; } catch(e){ console.error('studio request failed', e); } });
 function pickType(t) { type.value = t.id; step.value = 'survey'; answers.value = {}; customNotes.value = {}; loadCluster(); }
 async function loadCluster() {
   loading.value = true;

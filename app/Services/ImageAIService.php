@@ -327,7 +327,7 @@ class ImageAIService
 
             // Gemini mask convention is INVERTED vs our/Qwen's: WHITE = editable region,
             // BLACK = preserved. Our mask is BLACK=edit on WHITE=keep → invert pixel values.
-            $maskImg = @imagecreatefromstring($maskBytes);
+            $maskImg = studio_image_decode($maskBytes);
             if (! $maskImg) {
                 logger()->warning('Gemini edit: mask decode failed');
                 return null;
@@ -336,7 +336,7 @@ class ImageAIService
             // Base image dimensions AFTER downscale — Gemini requires the mask to be the SAME size
             // as the base image; if they differ (crop > 1600 shrank the base but not the mask),
             // resample the mask to match exactly.
-            $baseCheck = @imagecreatefromstring(base64_decode($imgB64, true));
+            $baseCheck = studio_image_decode(base64_decode($imgB64, true));
             $bw = $baseCheck ? imagesx($baseCheck) : imagesx($maskImg);
             $bh = $baseCheck ? imagesy($baseCheck) : imagesy($maskImg);
             if ($baseCheck) { imagedestroy($baseCheck); }
@@ -608,7 +608,7 @@ class ImageAIService
         // Ảnh PNG + keepPng: chỉ resample (nếu quá lớn) rồi giữ PNG lossless — KHÔNG ép JPEG,
         // preserves alpha + chi tiết sắc nét (ren, thêu, đính đá, họa tiết in nhỏ).
         if ($keepPng && $isPng) {
-            $img = @imagecreatefromstring($raw);
+            $img = studio_image_decode($raw);
             if (! $img) {
                 return ['', 'image/png'];
             }
@@ -633,7 +633,7 @@ class ImageAIService
             return [base64_encode($data), 'image/png'];
         }
 
-        $img = @imagecreatefromstring($raw);
+        $img = studio_image_decode($raw);
         if (! $img) {
             return ['', 'image/jpeg'];
         }
@@ -1100,7 +1100,7 @@ class ImageAIService
         if ($postprocess) {
             // Tăng nét cuối (unsharp mask nhẹ 0.22) + chuẩn hóa PNG LOSSLESS — cải thiện chất lượng
             // đầu ra, không blur/noise (chỉ sharpen chi tiết). Bỏ qua nếu ảnh quá lớn hoặc không đọc được.
-            $img = @imagecreatefromstring($contents);
+            $img = studio_image_decode($contents);
             if ($img) {
                 $w = imagesx($img); $h = imagesy($img);
                 if ($w * $h <= 24000000 && function_exists('imagefilter')) {
@@ -1146,8 +1146,8 @@ class ImageAIService
     protected function fitToSourceSize(string $editedUrl, string $sourceUrl): ?string
     {
         try {
-            $edited = @imagecreatefromstring((string) $this->resolveImageBinary($editedUrl));
-            $source = @imagecreatefromstring((string) $this->resolveImageBinary($sourceUrl));
+            $edited = studio_image_decode((string) $this->resolveImageBinary($editedUrl));
+            $source = studio_image_decode((string) $this->resolveImageBinary($sourceUrl));
             if (! $edited || ! $source) {
                 if ($edited) { imagedestroy($edited); }
                 if ($source) { imagedestroy($source); }
@@ -1195,9 +1195,9 @@ class ImageAIService
     protected function compositeMaskedEdit(string $editedUrl, string $sourceUrl, string $maskUrl, bool $eraseFallback = false): ?string
     {
         try {
-            $edited = @imagecreatefromstring((string) $this->resolveImageBinary($editedUrl));
-            $source = @imagecreatefromstring((string) $this->resolveImageBinary($sourceUrl));
-            $mask = @imagecreatefromstring((string) $this->resolveImageBinary($maskUrl));
+            $edited = studio_image_decode((string) $this->resolveImageBinary($editedUrl));
+            $source = studio_image_decode((string) $this->resolveImageBinary($sourceUrl));
+            $mask = studio_image_decode((string) $this->resolveImageBinary($maskUrl));
             if (! $edited || ! $source || ! $mask) {
                 if ($edited) { imagedestroy($edited); }
                 if ($source) { imagedestroy($source); }
@@ -1331,8 +1331,8 @@ class ImageAIService
     protected function pasteRegionEdit(string $editedCropUrl, array $meta): ?string
     {
         try {
-            $src = @imagecreatefromstring((string) $this->resolveImageBinary((string) ($meta['source'] ?? '')));
-            $crop = @imagecreatefromstring((string) $this->resolveImageBinary($editedCropUrl));
+            $src = studio_image_decode((string) $this->resolveImageBinary((string) ($meta['source'] ?? '')));
+            $crop = studio_image_decode((string) $this->resolveImageBinary($editedCropUrl));
             if (! $src || ! $crop) {
                 if ($src) { imagedestroy($src); }
                 if ($crop) { imagedestroy($crop); }
@@ -1386,8 +1386,8 @@ class ImageAIService
         $imgBin = $this->resolveImageBinary($imageUrl);
         $maskBin = $this->resolveImageBinary($maskUrl);
         if ($imgBin === null || $maskBin === null) return null;
-        $img = @imagecreatefromstring($imgBin);
-        $mask = @imagecreatefromstring($maskBin);
+        $img = studio_image_decode($imgBin);
+        $mask = studio_image_decode($maskBin);
         if (! $img || ! $mask) return null;
 
         $w = imagesx($img); $h = imagesy($img);
@@ -1439,7 +1439,7 @@ class ImageAIService
     {
         $imgBin = $this->resolveImageBinary($imageUrl);
         if ($imgBin === null) return null;
-        $img = @imagecreatefromstring($imgBin);
+        $img = studio_image_decode($imgBin);
         if (! $img) return null;
         $w = imagesx($img); $h = imagesy($img);
 
