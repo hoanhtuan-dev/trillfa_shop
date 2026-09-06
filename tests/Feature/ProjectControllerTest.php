@@ -432,6 +432,33 @@ class ProjectControllerTest extends TestCase
 
     // ── N+1 regression + endpoint legacy ─────────────────────────────────────
 
+    public function test_index_thumbnail_skips_latest_generation_without_media(): void
+    {
+        // Regression: generation MỚI NHẤT đang render (media_url NULL) không được
+        // che mất ảnh thành công gần nhất — cả eager (index) lẫn lazy (accessor fallback).
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $project = Project::factory()->create([
+            'user_id' => $admin->id,
+            'thumbnail_url' => null,
+        ]);
+        Generation::factory()->create([
+            'user_id' => $admin->id, 'project_id' => $project->id,
+            'media_url' => '/storage/old-success.png',
+        ]);
+        Generation::factory()->create([
+            'user_id' => $admin->id, 'project_id' => $project->id,
+            'media_url' => null, // mới nhất — đang xử lý
+        ]);
+        $this->actingAs($admin);
+
+        $res = $this->getJson('/studio/projects')->assertOk();
+        $item = collect($res->json('items'))->firstWhere('id', $project->id);
+        $this->assertSame('/storage/old-success.png', $item['thumbnail']);
+
+        // Lazy path (không eager-load) phải cho cùng kết quả.
+        $this->assertSame('/storage/old-success.png', $project->fresh()->thumbnail);
+    }
+
     public function test_index_avoids_n_plus_one_queries(): void
     {
         $admin = User::where('email', 'admin@trillfa.com')->first();

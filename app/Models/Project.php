@@ -89,12 +89,18 @@ class Project extends Model
     }
 
     /**
-     * Generation mới nhất có media_url — eager-load (`with('latestGeneration')`)
+     * Generation mới nhất CÓ media_url — eager-load (`with('latestGeneration')`)
      * cho accessor thumbnail để tránh N+1 khi serialize danh sách dự án.
+     *
+     * Constraint whereNotNull PHẢI truyền qua closure của ofMany() để nằm TRONG
+     * subquery MAX(id): chain ->whereNotNull() trước ->latestOfMany() bị Laravel
+     * bỏ qua khi build subquery tươi mới → thumbnail sẽ trả NULL sai mỗi khi
+     * generation mới nhất còn đang render / render fail (media_url NULL).
      */
     public function latestGeneration(): HasOne
     {
-        return $this->hasOne(Generation::class)->whereNotNull('media_url')->latestOfMany('id');
+        return $this->hasOne(Generation::class, 'project_id')
+            ->ofMany(['id' => 'MAX'], fn ($query) => $query->whereNotNull('media_url'));
     }
 
     public function prompts(): HasMany

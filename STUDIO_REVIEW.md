@@ -856,3 +856,74 @@ Pattern §8 playbook tái khẳng định lần 2: **2/12 medium sống sót** (
 4. Full-suite ProcessSignaledException (test runner bị kill — OOM/limit hạ tầng, không liên quan code): chạy
    theo nhóm file khi cần xác minh toàn bộ.
 5. Commit: working tree còn nhiều thay đổi (cả phiên song song + đợt vá này) — chưa commit, chờ quyết định.
+
+---
+
+# Phần K — Hoàn thiện khu vực "Quản lý dự án" (fix 11/11 finding + luồng duyệt chéo + UX/UI · 2 subagent · ĐÃ XÁC MINH)
+
+**Nguồn gốc:** yêu cầu người dùng — phân tích khu vực "Studio Project Management" (Phần A, dòng :144-169) → lên nhiệm vụ → fix lỗi → tối ưu UX/UI → điều phối đại lý phụ → tổng hợp.
+**Chính sách duyệt (người dùng chốt trực tiếp):** reviewer gate = **"thích ứng + chống lockout"** — owner không được approve/archive dự án của chính mình KHI hệ thống có ≥2 Super Admin; Super Admin DUY NHẤT vẫn được self-approve và bị ghi cờ `self_approved` vào `settings.status_history` để audit.
+
+## K.1 — 11/11 finding Phần A đã fix (verdict do subagent B xác minh độc lập)
+
+| # | Finding | Fix | Vị trí |
+|---|---|---|---|
+| F1 | [high] reviewer gate self-approval | Tách nhiệm vụ thích ứng + `isOnlySuperAdmin()` memoize per-request (không đẻ N+1 mới vì `availableTransitions` gọi gate theo từng trạng thái × project) + cờ audit `self_approved` | `ProjectWorkflowService` canTransition/transition |
+| F2 | [high] N+1 thumbnail accessor | Relation `latestGeneration()` (ofMany MAX(id), constraint trong subquery — xem K.4) eager-load ở index/pending; accessor ưu tiên `relationLoaded`, giữ lazy fallback | `Project.php` + `ProjectController::index` |
+| F3 | [high] N+1 generations_count | `withCount` ở index/pending; serialize chỉ `loadCount()` đúng 1 query khi attribute thiếu (bối cảnh 1 project: show/store/update/transition) | `serialize()` |
+| F4 | [medium] `user_id`+`status` trong `$fillable` | Rút cả hai; workflow dùng `forceFill` (service là thẩm quyền duy nhất của status); seeder bọc `Project::unguarded()`; factory Laravel vốn unguarded | `Project.php`, `StudioProjectSeeder.php` |
+| F5 | [medium] `transition.to` thiếu `in:` | `Rule::in(Project::STATUSES)` + message validation tiếng Việt | `ProjectController::transition` |
+| F6 | [medium] save 2 lần không transaction | Gộp status_history vào CÙNG một `forceFill+save`; unit test đếm đúng 1 câu UPDATE | `ProjectWorkflowService::transition` |
+| F7 | [medium] store() hardcode status vs fillable | Bỏ hardcode — dựa vào default `Project::$attributes['status']=draft` (nhất quán sau F4) | `store()` |
+| F8 | [medium] duplicate `StudioController::storeProject` | XÓA method; route `POST /studio/projects` (projects.store) → `ProjectController@store`. Shape cũ `{project_id,name}` có 0 caller: blade Alpine mồ côi đã xóa (Phần H), bundle chỉ gọi `/projects/new` | `routes/web.php`, `StudioController.php` |
+| F9 | [low] transition chỉ catch DomainException | Thêm `catch Throwable` → `report()` server-side + message 500 chung, không rò chi tiết kỹ thuật | `transition()` |
+| F10 | [low] race destroy() detach-then-delete | `DB::transaction` bọc detach+delete (FK generations vốn `nullOnDelete`, explicit detach giữ hành vi đồng nhất mọi DB) | `destroy()` |
+| F11 | [info] serialize query lại relation đã eager-load | `relationLoaded('generations'/'assets')` + map về shape ổn định (id/type/name/path) | `serialize(withRelations)` |
+
+## K.2 — Hành vi mới (điều kiện cần để F1 có ý nghĩa)
+
+Sự thật trước fix: `transition()`/`show()` là owner-only (`abort_unless`) → Super Admin KHÔNG THỂ duyệt dự án của Designer → reviewer gate chỉ còn đúng 1 đường sống là tự duyệt dự án của chính mình; luồng "Designer gửi duyệt → Super Admin duyệt" chết từ trong trứng.
+- `show`/`transition` mở cho Super Admin dự án bất kỳ; update/destroy/attachGeneration vẫn owner-only.
+- `GET /studio/projects?scope=pending` (chỉ Super Admin, 403 với non-super): hàng đợi duyệt toàn hệ thống (status=review, chưa archived), eager-load `user:id,name` → `owner_name`.
+- Response index thêm `scope`+`can_review`; item thêm `user_id`+`owner_name` — additive, không vỡ client cũ.
+
+## K.3 — Đợt UX/UI (subagent A — chỉ ProjectWorkspace.vue + vùng dự án của store.js)
+
+1. Fix leak: `clearTimeout(confirmTimer)` + gỡ keydown listener trong `onBeforeUnmount` (cùng họ finding LibraryApp Phần A).
+2. Chống double-click transition: `movingId` + disabled + spinner.
+3. Loading states thật: spinner board/list khi `projectLoading` (trước đây UI không dùng cờ này); spinner trên card/row khi mở chi tiết (`openingId`).
+4. ESC phân tầng (modal form → detail → workspace) + `role="dialog"` `aria-modal="true"` + aria-label nút icon.
+5. Ô ghi chú transition (`transNote` → `status_history`) — trước đây backend nhận `note` nhưng UI không bao giờ gửi.
+6. Hàng đợi "⏳ Chờ duyệt" cho Super Admin: loại trừ lẫn nhau với "📦 Đã lưu trữ"; 403 khi đang pending → tự hạ về scope own + toast (không đệ quy); badge `owner_name`; empty state riêng ("Không có dự án chờ duyệt 🎉" / "Không có dự án lưu trữ.").
+7. Countdown deadline "Còn N ngày / Quá hạn N ngày / Hôm nay đến hạn" + tooltip ngày đầy đủ.
+8. Transition thành công ở scope pending → refetch để dự án rời hàng đợi.
+9. `vite build` ✓ 9.46s; diff được coordinator review từng dòng trước build.
+
+## K.4 — 2 bug MỚI phát hiện qua xác minh (cả hai ✅ ĐÃ VÁ ngay trong đợt)
+
+- **[critical]** · Đệ quy vô hạn `studio_image_decode()` · app/Support/helpers.php:246 · ✅ ĐÃ VÁ — Đợt vá "gộp 41 site imagecreatefromstring" (J #23) đã thay thế cơ học NGAY LỜI GỌI `@imagecreatefromstring()` BÊN TRONG chính helper đó thành `studio_image_decode((string) $data)` → đệ quy vô hạn, tràn stack/OOM giết worker PHP. Hậu quả: mọi endpoint ảnh Studio chết runtime; full suite chết `ProcessSignaledException` signal 9 — **ĐÍNH CHÍNH chẩn đoán "OOM/timeout hạ tầng, không liên quan code" ở J.8 mục 4 + ledger dòng 25: thủ phạm là code, không phải hạ tầng**. Bằng chứng: fix 1 dòng về `@imagecreatefromstring` → 5 file test từng SIGKILL pass hết (ImageFallback 8/8 · Upscale 2/2 · Look 3/3 · Region 8/8 · RegionPaste 1/1) và full suite chạy trọn vẹn lần đầu kể từ J. Bài học: thay thế cơ học N site phải LOẠI TRỪ site nằm trong chính helper mới.
+- **[high]** · `latestOfMany()` rơi constraint chained · app/Models/Project.php `latestGeneration()` · ✅ ĐÃ VÁ — Fix F2 ban đầu dùng `hasOne()->whereNotNull('media_url')->latestOfMany('id')`: Laravel build subquery MAX(id) tươi mới, KHÔNG nạp constraint chained vào subquery → generation mới nhất còn đang render (`media_url` NULL — case PHỔ BIẾN vì generation gắn project_id ngay khi tạo) làm thumbnail eager trả NULL trong khi lazy fallback trả đúng ảnh thành công gần nhất (bất nhất eager/lazy). Subagent B bắt được bằng thực nghiệm sqlite. Fix: `ofMany(['id' => 'MAX'], fn ($q) => $q->whereNotNull('media_url'))` — constraint vào TRONG subquery; kèm test regression assert GIÁ TRỊ thumbnail trên cả 2 path (eager + lazy parity). Bài học: test đếm query chống N+1 là chưa đủ — phải assert giá trị; constraint của ofMany/latestOfMany PHẢI truyền qua closure.
+
+## K.5 — Kiểm chứng test (đo sau fix, không ước lượng)
+
+| Hạng mục | Kết quả |
+|---|---|
+| `--filter Project` (Unit+Feature) | **53 pass / 158 assertions** — mới: +6 unit (gate thích ứng, sole-super audit, cross-approve, single-save), +11 feature (duyệt chéo 403/200, self-approve khi có super thứ hai 422, scope=pending 200/403, can_review flag, Rule::in 422, legacy route 201), +1 regression giá trị thumbnail |
+| Unit suite | 52 pass (126 assertions) |
+| 5 file từng SIGKILL | pass toàn bộ (22 test sống lại) |
+| **Full suite** | **9 failed / 183 passed (843 assertions) · 25.9s — KHÔNG còn ProcessSignaledException**; 9 fail = đúng baseline có sẵn (J.8 #2: content storefront · guest_redirected_from_account · expectation `studio_qwen_text_models`) → **0 regression từ đợt này** |
+| vite build | ✓ 9.46s (bao gồm toàn bộ UX/UI K.3) |
+| php -l mọi file đụng | 0 lỗi |
+
+## K.6 — Delegation log (điều phối 2 subagent, đúng playbook: contract text, không schema)
+
+- **Subagent A** (implement frontend, 2 file được phép): bám đúng contract API (scope=pending/can_review/owner_name), tự verify bằng `@vue/compiler-sfc` + `node --check` trước khi báo cáo; coordinator review diff từng dòng rồi mới build. 0 vi phạm phạm vi.
+- **Subagent B** (verify read-only backend diff): 10/11 FIXED + bắt đúng F2 PARTIAL kèm repro thực nghiệm; phát hiện THÊM [critical] helpers.php ngoài phạm vi được giao nhưng cùng tree — cả 2 finding đều được coordinator tái xác minh độc lập trước khi vá (đúng nguyên tắc "finding của model con phải kiểm chứng").
+- **Race phiên song song (bài học MỚI, bổ sung cho ledger):** trong đợt, phiên song song commit 85b9f91/af5a86f/f35fd00 quét toàn tree — công việc đang làm của đợt này bị cuốn vào commit của họ. VÀ: worktree "baseline" symlink `vendor` KHÔNG hề sạch — PHP `__DIR__` resolve symlink về đường dẫn thật → class `App\` autoload từ tree CHÍNH; bằng chứng "crash cả trên baseline" đầu đợt bị nhiễm chính bởi điều này (root cause thật duy nhất = đệ quy helpers, xác nhận lại bằng fix-1-dòng). Muốn baseline thật: copy vendor hoặc `composer install` riêng trong worktree.
+
+## K.7 — Việc còn lại (ngoài phạm vi đợt này)
+
+1. 9 lỗi ShopFlowTest baseline (J.8 #2) — chưa ai sửa.
+2. 2 medium M6/M8 còn sống (I.4) — chưa vá.
+3. Tái xác minh ~15 high/critical còn lại (J.8 #1).
+4. Trạng thái commit: fix `helpers.php` đã vào HEAD qua **234d405** (phiên song song quét tree lúc 05:50 và tự kiểm chứng thêm bằng repro 500 `/studio/refgen` + 4/4 refgen test — hai phiên phát hiện độc lập cùng một bug, fix trùng khớp từng dòng). Phần lớn đợt này đã nằm trong af5a86f/f35fd00. **Chưa commit:** `app/Models/Project.php` (ofMany fix) · `tests/Feature/ProjectControllerTest.php` (test thumbnail parity) · 2 file báo cáo — chờ quyết định người dùng.
