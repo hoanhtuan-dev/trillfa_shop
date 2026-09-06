@@ -491,12 +491,12 @@ class VirtualTryOnService
         $base = dashscope_base_url($key).'/compatible-mode/v1/chat/completions';
 
         $instruction = 'You are a fashion virtual-try-on quality evaluator. '
-            .'The FIRST image is the GARMENT (the product — it must be worn exactly as-is).';
+            .'The FIRST image is the GARMENT (the product — it must be worn exactly as-is, including every accessory).';
         if ($poseUrl) {
             $instruction .= ' The SECOND image is the POSE reference (body stance to reproduce).';
         }
         $instruction .= ($poseUrl ? ' The LAST image' : ' The SECOND image').' is a try-on RESULT. Rate the result 1-10 for each criterion:'
-            .'\n1. garment_preservation: how identical is the garment in the result to the garment image (colors, patterns, prints, fabric, silhouette, length, details)'
+            .'\n1. garment_preservation: how identical is the garment AND every accessory in the result to the garment image (colors, patterns, prints, fabric, silhouette, length, neckline, sleeves, trims, and accessories like shoes/bag/belt/hat/jewelry — exact color and placement)'
             .($poseUrl ? '\n2. pose_accuracy: how accurately the result reproduces the pose reference (stance, arm/leg placement, facing direction)' : '\n2. pose_accuracy: how natural and correctly executed the pose is')
             .'\n3. face_quality: face sharp, natural, well-lit, photorealistic'
             .'\n4. overall_aesthetic: overall appeal, lighting, composition, fashion quality'
@@ -552,13 +552,23 @@ class VirtualTryOnService
     /**
      * Điểm tổng cho kết quả Thử đồ ảo: trang phục (đồ chính) nặng nhất, pose quan trọng thứ nhì,
      * mặt + thẩm mỹ chung bổ trợ — phản ánh đúng mục tiêu "mặc ĐÚNG đồ này, đúng dáng".
+     * Rào chặn: trang phục không được bảo toàn (< 4/10) bị phạt nặng — đúng trọng tâm "bám mẫu
+     * trang phục/phụ kiện của ảnh nguồn" (một bản dáng đẹp nhưng sai đồ vẫn phải xếp dưới).
      */
     protected function tryOnScore(array $s): float
     {
-        return ((float) ($s['garment_preservation'] ?? 5) * 0.45)
-            + ((float) ($s['pose_accuracy'] ?? 5) * 0.25)
+        $g = (float) ($s['garment_preservation'] ?? 5);
+        $score = ($g * 0.50)
+            + ((float) ($s['pose_accuracy'] ?? 5) * 0.20)
             + ((float) ($s['face_quality'] ?? 5) * 0.15)
             + ((float) ($s['overall_aesthetic'] ?? 5) * 0.15);
+
+        // Rào chặn "bám mẫu": mỗi điểm trang phục dưới 4/10 trừ thêm 0.5 điểm tổng.
+        if ($g < 4) {
+            $score -= (4 - $g) * 0.5;
+        }
+
+        return max(0.0, min(10.0, $score));
     }
 
     /**

@@ -430,6 +430,27 @@ class StudioController extends Controller
     }
 
     /**
+     * Đọc ảnh trang phục (@image1 trong "Thử đồ ảo") bằng vision → mô tả chi tiết trang phục +
+     * phụ kiện để chèn vào prompt PASS 1. Giúp model edit bám sát mẫu gốc (cổ áo, tay, dài ngắn,
+     * màu, họa tiết, chất liệu, phụ kiện) thay vì tự "thiết kế lại". Fail êm → null.
+     */
+    protected function garmentDescription(string $url): ?string
+    {
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        if (str_starts_with($path, 'studio/image/')) { $path = substr($path, strlen('studio/image/')); }
+        $file = null;
+        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
+            if (is_file($c)) { $file = $c; break; }
+        }
+        if (! $file) { return null; }
+        try {
+            return app(\App\Services\StyleSuggestService::class)->describeGarment($file);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation).
      * Dùng ảnh gốc làm base (không mask) + prompt → model edit tạo biến thể mới.
      */
@@ -638,10 +659,16 @@ class StudioController extends Controller
         $override = trim((string) ($data['final_prompt'] ?? ''));
         $finalPrompt = $override !== '' ? $override : $parts['prompt'];
 
-        $base = $this->downscaleSource((string) ($data['images'][0] ?? ''), 1600);
-        $cost = (int) studio_config('image_credits', 1);
         $mode = (string) ($data['mode'] ?? '');
         $isTryon = $mode === 'tryon';
+        // Thử đồ ảo: trang phục (@image1) là sản phẩm phải GIỮ NGUYÊN vân vải/đường may/họa tiết —
+        // dùng ngưỡng cao hơn (khớp edit_source_max) để không làm mờ chi tiết trước khi model edit
+        // kịp thấy. Các chế độ khác giữ ngưỡng 1600 (rẻ, nhanh, không cần chi tiết vải tối đa).
+        $base = $this->downscaleSource(
+            (string) ($data['images'][0] ?? ''),
+            $isTryon ? (int) studio_config('edit_source_max', 2560) : 1600
+        );
+        $cost = (int) studio_config('image_credits', 1);
         // Thử đồ ảo: best_of = số bản candidates (2-6, mặc định theo config); nếu chỉ gửi variants
         // (UI cũ) thì tôn trọng variants; biến thể cho chế độ thường giữ nguyên.
         $variants = $isTryon
@@ -751,12 +778,12 @@ class StudioController extends Controller
     private function tryonVariationDirective(int $i): string
     {
         return match ($i % 6) {
-            0 => ' Emphasis: reproduce the garment EXACTLY — identical colors, prints, fabric, silhouette and length; then match the pose.',
-            1 => ' Emphasis: copy the outfit details 100% faithfully while accurately reproducing the body stance and proportions.',
-            2 => ' Emphasis: photorealistic natural blend — sharp face, coherent lighting, seamless garment fit, exact pose.',
-            3 => ' Emphasis: balanced fashion composition — clean full-body framing, natural pose, flawless garment rendering.',
-            4 => ' Emphasis: preserve every accessory and detail — shoes, handbag, belt, earrings, hat — exactly as in the garment image.',
-            5 => ' Emphasis: natural skin texture and fabric drape — photorealistic material, wrinkles, folds, no airbrushed or plastic look.',
+            0 => ' Emphasis: reproduce the garment EXACTLY — identical colors, prints, fabric, silhouette and length; then match the pose. Do NOT redesign, recolor or simplify any part of the garment.',
+            1 => ' Emphasis: copy the outfit details 100% faithfully (neckline, sleeves, hemline, waistline, closures, trims) while accurately reproducing the body stance and proportions.',
+            2 => ' Emphasis: photorealistic natural blend — sharp face, coherent lighting, seamless garment fit, exact pose, NO ghosting or double-exposure of the original body.',
+            3 => ' Emphasis: balanced fashion composition — clean full-body framing, natural pose, flawless garment rendering with every accessory placed correctly.',
+            4 => ' Emphasis: preserve every accessory and detail — shoes, handbag, belt, earrings, hat, scarf, jewelry — exactly as in the garment image, correct color and placement.',
+            5 => ' Emphasis: natural skin texture and fabric drape — photorealistic material, wrinkles, folds, no airbrushed or plastic look; keep the garment color hue, saturation and brightness exact.',
             default => '',
         };
     }
@@ -870,10 +897,16 @@ class StudioController extends Controller
             // + câu tránh lỗi (cùng kỹ thuật đang dùng cho "Thay Đổi Người Mẫu").
             // Bối cảnh (@image3) được tách ra PASS 2 riêng (giống Click-to-Swap PASS 2) —
             // KHÔNG gộp vào PASS 1 vì model sẽ bỏ qua pose khi prompt có cả đổi nền.
+            // Đọc trang phục bằng vision → mô tả từng chi tiết (cổ áo, tay, dài, màu, họa tiết, chất
+            // liệu, phụ kiện) để model edit BÁM SÁT mẫu nguồn thay vì tự "thiết kế lại".
+            $garmentDesc = ((bool) studio_config('tryon_garment_vision', true))
+                ? $this->garmentDescription((string) ($imgs[0] ?? ''))
+                : null;
             $finalPrompt = 'Virtual try-on: dress the model in the EXACT garment and every accessory shown in @image1 — identical colors, prints, patterns, fabric, silhouette, length and details. '
                 .'CRITICAL — preserve the ORIGINAL GARMENT FIT (tight/loose/cropped/oversized/draped) exactly as it appears in @image1: if the garment is tight-fitting, it must be tight on the body; if it is loose or oversized, it must drape loosely; if it is cropped (shows midriff), keep the midriff exposed — do NOT stretch, shrink, tighten or loosen the garment. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'ANALYZE the garment image @image1 deeply and reproduce EVERY visible feature faithfully: neckline, sleeve length and shape, hemline, waistline, buttons, zippers, pockets, pleats, ruffles, collar, straps, length, and any accessory already on the garment (belt, bow, brooch) — keep them all identical, correctly positioned and proportioned. Do NOT add, remove, or invent any garment detail that is not in the source. '
+                .($garmentDesc ? 'GARMENT REFERENCE (verified visual analysis of @image1 — reproduce these EXACT features, do NOT invent or change anything): '.$garmentDesc.' ' : '')
                 .'REMOVE any text, watermark, logo, brand label, typography or printed graphics from the garment — render clean, plain fabric without any writing or marks. '
                 .'CRITICAL — single clean pose, no ghosting: completely REPLACE the original person/body in @image1 with a NEW model in the target pose; do NOT blend, superimpose, or leave any ghost, double-exposure, or faint overlapping outline of the original pose. The final image must show ONLY ONE crisp, clean body pose with no duplicated limbs, no translucent leftovers, no motion blur. '
                 .'Reproduce the EXACT body pose, stance, arm/leg placement, facing direction and posture from the pose reference in @image2 — do NOT copy the garment or the person from the pose image; keep the model\'s face, hairstyle and skin tone natural and consistent with @image2. '
