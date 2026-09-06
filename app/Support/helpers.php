@@ -243,7 +243,9 @@ if (! function_exists('studio_image_decode')) {
             return false;
         }
 
-        $gd = studio_image_decode((string) $data);
+        // Decode thật bằng GD. (Đã sửa lỗi [critical]: dòng này từng đệ quy vào
+        // chính studio_image_decode() → tràn stack/OOM giết worker tại 43 call-site.)
+        $gd = @imagecreatefromstring((string) $data);
         return $gd === false ? false : $gd;
     }
 }
