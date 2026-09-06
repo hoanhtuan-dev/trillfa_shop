@@ -23,7 +23,9 @@
                 'avatar' => $studioUser->avatar,
                 'credits_balance' => $studioUser->credits_balance,
                 'is_admin' => $studioUser->isAdmin(),
+                'is_super_admin' => $studioUser->isSuperAdmin(),
             ] : null,
+            'project_statuses' => app(\App\Services\ProjectWorkflowService::class)->states(),
         ];
     @endphp
     <script>

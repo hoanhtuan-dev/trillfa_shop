@@ -12,6 +12,8 @@ class StudioModuleServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/config.php', 'studio_module');
         $this->app->singleton('studio.stylist_catalog', fn () => new \App\Services\StylistCatalog());
+        // Designer project workflow — shared engine cho ProjectController + Studio UI.
+        $this->app->singleton('studio.project_workflow', fn () => new \App\Services\ProjectWorkflowService());
     }
 
     public function boot(): void

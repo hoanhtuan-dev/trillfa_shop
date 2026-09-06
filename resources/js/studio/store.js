@@ -9,6 +9,9 @@ function readBoot() {
 function bootUser() {
   return (readBoot() && readBoot().user) || null;
 }
+function bootProjectStatuses() {
+  return (readBoot() && readBoot().project_statuses) || null;
+}
 
 // Shared studio store — each card component reads/writes this so they can share data.
 export const useStudioStore = defineStore('studio', {
@@ -218,6 +221,15 @@ export const useStudioStore = defineStore('studio', {
     redoStack: [],   // lịch sử làm lại
     highlightLayerId: '',  // layer mới tạo cần viền nổi bật tạm thời
     imgTick: 0,            // tăng mỗi khi ảnh isolate load xong — overlay đo lại vị trí/kích thước
+    // ── Dự án thiết kế (Project Workspace) — quản lý dự án cho Designer ──
+    projects: [],                 // danh sách dự án (đã map)
+    projectStatuses: bootProjectStatuses() || {},  // metadata trạng thái workflow (từ studioBoot)
+    projectLoading: false,
+    projectLoaded: false,
+    activeProject: null,          // dự án đang xem chi tiết
+    activeProjectGenerations: [], // generations của dự án đang xem
+    projectView: 'board',         // 'board' (kanban) | 'list'
+    projectsArchived: false,      // lọc dự án đã lưu trữ
   }),
   getters: {
     upscaleSrc() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId && x.visible !== false); if (l && l.image) return l.image; } return (this.editSource && this.editSource.url) || (this.preview && this.preview.media_url) || ''; },
@@ -1079,6 +1091,81 @@ export const useStudioStore = defineStore('studio', {
         return true;
       } catch (e) { this.toast(e.message || 'Lỗi dọn dẹp.', 'error'); return false; }
       finally { this.uploadCleaning = false; }
+    },
+    // ═══════════════════════════════════════════════════════════════════
+    // Dự án thiết kế (Project Workspace) — CRUD + workflow cho Designer.
+    // ═══════════════════════════════════════════════════════════════════
+    async loadProjects() {
+      if (this.projectLoading) return this.projects;
+      this.projectLoading = true;
+      try {
+        const qs = new URLSearchParams({ archived: this.projectsArchived ? '1' : '0' });
+        const res = await fetch('/studio/projects?' + qs.toString(), { headers: { Accept: 'application/json' } });
+        if (res.status === 401 || res.status === 403) { this.needsLogin = true; return []; }
+        const d = await res.json();
+        this.projects = Array.isArray(d.items) ? d.items : [];
+        if (d.statuses) this.projectStatuses = d.statuses;
+        this.projectLoaded = true;
+        return this.projects;
+      } catch (e) {
+        this.toast(e.message || 'Không tải được dự án.', 'error');
+        return this.projects;
+      } finally { this.projectLoading = false; }
+    },
+    async loadProject(id) {
+      try {
+        const res = await fetch('/studio/projects/' + id, { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Không tải được dự án.');
+        const d = await res.json();
+        this.activeProject = d;
+        this.activeProjectGenerations = d.generations || [];
+        return d;
+      } catch (e) { this.toast(e.message || 'Lỗi tải dự án.', 'error'); return null; }
+    },
+    async createProject(payload) {
+      try {
+        const d = await this.api('/studio/projects/new', payload);
+        this.projects.unshift(d);
+        this.toast('Đã tạo dự án "' + d.name + '".');
+        return d;
+      } catch (e) { this.toast(e.message || 'Lỗi tạo dự án.', 'error'); return null; }
+    },
+    async updateProject(id, payload) {
+      try {
+        const d = await this.api('/studio/projects/' + id, { ...payload, _method: 'PUT' });
+        const i = this.projects.findIndex(p => p.id === id);
+        if (i >= 0) this.projects.splice(i, 1, d);
+        if (this.activeProject && this.activeProject.id === id) this.activeProject = d;
+        this.toast('Đã cập nhật dự án.');
+        return d;
+      } catch (e) { this.toast(e.message || 'Lỗi cập nhật.', 'error'); return null; }
+    },
+    async deleteProject(id) {
+      try {
+        await this.api('/studio/projects/' + id, { _method: 'DELETE' });
+        this.projects = this.projects.filter(p => p.id !== id);
+        if (this.activeProject && this.activeProject.id === id) { this.activeProject = null; this.activeProjectGenerations = []; }
+        this.toast('Đã xóa dự án (output được giữ lại).');
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi xóa dự án.', 'error'); return false; }
+    },
+    async transitionProject(id, to, note = '') {
+      try {
+        const d = await this.api('/studio/projects/' + id + '/transition', { to, note });
+        const i = this.projects.findIndex(p => p.id === id);
+        if (i >= 0) this.projects.splice(i, 1, d);
+        if (this.activeProject && this.activeProject.id === id) this.activeProject = d;
+        this.toast('Dự án → ' + (d.status_label || d.status) + '.');
+        return d;
+      } catch (e) { this.toast(e.message || 'Không thể chuyển trạng thái.', 'error'); return null; }
+    },
+    async attachGenerationToProject(projectId, generationId, action = 'attach') {
+      try {
+        await this.api('/studio/projects/' + projectId + '/generations', { generation_id: generationId, action });
+        if (action === 'attach') this.toast('Đã gắn ảnh vào dự án.');
+        else this.toast('Đã gỡ ảnh khỏi dự án.');
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi gắn ảnh.', 'error'); return false; }
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
     // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):

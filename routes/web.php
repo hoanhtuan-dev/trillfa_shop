@@ -29,6 +29,7 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\QuickCheckoutController;
+use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SitemapController;
@@ -93,6 +94,14 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.')->group(function
 Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.')->group(function () {
     Route::get('/vue', [StudioController::class, 'studioVue'])->name('vue');
     Route::post('/projects', [StudioController::class, 'storeProject'])->name('projects.store');
+    // Project workflow (Designer design board) — CRUD + transitions + attach generations.
+    Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
+    Route::post('/projects/new', [ProjectController::class, 'store'])->name('projects.create');
+    Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
+    Route::post('/projects/{project}/transition', [ProjectController::class, 'transition'])->name('projects.transition');
+    Route::post('/projects/{project}/generations', [ProjectController::class, 'attachGeneration'])->name('projects.attach');
     Route::get('/models', [StudioController::class, 'models'])->name('models');
     Route::post('/models', [StudioController::class, 'storeModel'])->name('models.store');
     Route::put('/models/{model}', [StudioController::class, 'updateModel'])->name('models.update');
