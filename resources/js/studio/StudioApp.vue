@@ -259,6 +259,10 @@ function onTouchEnd(e) {
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <button @click="projectsOpen = true" class="inline-flex items-center gap-1.5 rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-xs font-semibold text-cream-200 transition hover:border-brand-500 hover:bg-ink-700" title="Mở bảng quản lý dự án thiết kế">🗂️ Dự án</button>
+        <span v-if="store.appliedProjectId()" class="hidden max-w-[13rem] items-center gap-1 rounded-full border border-brand-500/50 bg-brand-600/20 px-2.5 py-1 text-xs font-semibold text-brand-100 md:inline-flex" :title="'Dự án hiện tại: ' + store.activeProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào dự án này'">
+          <button type="button" @click="projectsOpen = true" class="truncate hover:text-white">📌 {{ store.activeProject.name }}</button>
+          <button type="button" @click="store.clearActiveProject()" class="ml-0.5 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại">✕</button>
+        </span>
         <span v-if="store.user" class="hidden rounded-full bg-ink-800 px-2.5 py-1 text-xs font-semibold text-cream-200 md:inline-block">Credit {{ store.creditsLeft }}</span>
         <a v-if="store.user && store.user.is_admin" href="/admin" class="inline-flex items-center gap-1 rounded-full border border-brand-500/40 bg-brand-600/20 px-3 py-1 text-xs font-semibold text-brand-200 transition hover:bg-brand-600 hover:text-white" title="Đi tới trang quản trị (Dashboard Manager)">⚙️ Quản trị shop</a>
         <form v-if="store.user" method="POST" action="/dang-xuat" class="m-0">
@@ -275,7 +279,7 @@ function onTouchEnd(e) {
       <button @click="menuOpen = true" class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-cream-200">☰</button>
       <span class="font-display text-sm font-semibold">Studio</span>
       <div class="flex items-center gap-2">
-        <button @click="projectsOpen = true" class="rounded-lg bg-ink-700 px-2.5 py-1.5 text-xs font-semibold text-cream-200">🗂️</button>
+        <button @click="projectsOpen = true" class="rounded-lg bg-ink-700 px-2.5 py-1.5 text-xs font-semibold text-cream-200" :class="store.appliedProjectId() ? 'ring-2 ring-brand-500' : ''" :title="store.appliedProjectId() ? 'Dự án hiện tại: ' + store.activeProject.name : 'Dự án'">🗂️<span v-if="store.appliedProjectId()" class="ml-1">📌</span></button>
         <button @click="outputOpen = true" class="rounded-lg bg-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-200">Kết quả ({{ store.generations.length }})</button>
       </div>
     </div>

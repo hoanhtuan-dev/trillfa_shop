@@ -510,4 +510,25 @@ class ProjectControllerTest extends TestCase
         ]);
         $this->assertDatabaseHas('projects', ['name' => 'Tạo qua route legacy', 'user_id' => $admin->id]);
     }
+
+    // ── Backend hardening: project_id bắt buộc phải thuộc về user (Phần K.8) ──
+    public function test_generation_endpoints_reject_foreign_project_id(): void
+    {
+        $super = User::where('email', 'tuan.ho.designer@gmail.com')->first();
+        $admin = User::where('email', 'admin@trillfa.com')->first();
+        $foreign = Project::factory()->create(['user_id' => $super->id]);
+        $this->actingAs($admin);
+
+        $endpoints = [
+            ['/studio/generate', ['prompt' => 'test', 'project_id' => $foreign->id]],
+            ['/studio/video', ['prompt' => 'test', 'project_id' => $foreign->id]],
+            ['/studio/pattern', ['prompt' => 'test', 'project_id' => $foreign->id]],
+            ['/studio/tryon', ['prompt' => 'test', 'project_id' => $foreign->id]],
+        ];
+        foreach ($endpoints as [$url, $payload]) {
+            $res = $this->postJson($url, $payload);
+            $res->assertStatus(422);
+            $res->assertJsonValidationErrors('project_id');
+        }
+    }
 }

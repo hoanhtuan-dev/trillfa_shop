@@ -15,8 +15,8 @@
 
 ## Tổng kết
 
-- **30 area** đã được review · **208 findings** (A–F 16 · G 0 — đính chính · H 7 · I 7)
-- critical: **1** · high: **17** · medium: **51** · low: **96** · info: **43**
+- **30 area** đã được review · **210 findings** (A–F 16 · G 0 — đính chính · H 7 · I 7 · J/K 0 — đợt vá + fix, không thêm area)
+- critical: **2** · high: **18** · medium: **51** · low: **96** · info: **43** (+1 critical +1 high từ Phần K.4 — 2 bug mới phát hiện và vá trong đợt fix)
 - Lượt 1 (workflow): 6/10 area · 70 findings — 4 task thất bại
 - Lượt 2 (workflow, chia nhỏ): 2/6 area · 20 findings — cả 4 task `deepseek-official` thất bại
 - Lượt 3 (điều phối tự làm): 4/4 area · 23 findings (high 2 · medium 9 · low 6 · info 6)
@@ -26,6 +26,8 @@
 - Phần G (đính chính báo cáo — điều phối tự kiểm tra top-5, phiên song song): 0 area finding · **LOẠI 1 claim `[high]` cũ** (config `env()`, đã gạch tại chỗ finding gốc) · sửa top-5 (`imagecreatefromstring` = **41** vị trí chứ không phải ~10; thêm `getMessage()` 12 vị trí) · bảng 4 pattern lan rộng
 - Phần H (3 blade lớn còn lại — QUEUE A đợt 1: 6/6 task `qwen-token-plan`, điều phối xác minh 9/9 medium): **7 area · 42 findings** (low 30 · info 12 — **0/9 medium sống sót** sau xác minh) · phát hiện MỚI: `index.blade.php` là **file mồ côi** — 140 KB dead code (H.1) · bằng chứng bổ sung DB-first rotation (H.0)
 - Phần I (creative-dir + QUEUE B — round 2: 6/6 task `qwen3.8-max`, điều phối xác minh 12/12 medium): **7 area · 46 findings** (medium 2 · low 34 · info 10 — **2/12 medium sống sót** M6 CanvasMaskTools lifecycle + M8 Ctrl+Z hijack) · 1 claim `[medium]` bị LOẠI (I.8) · phát hiện 2 component Vue MỒ CÔI (SourceCard/PaletteTextureCard, I.1) · note chéo: phiên song song đã vá top-5 #1+#2 trong lúc round chạy → M9 hạ thêm
+- Phần J (đợt vá phase 2 — điều phối trực tiếp, đã xác minh): **0 area finding · 5 nhóm vá** — top-5 #4 fallback `studioImage()` (helper `studioServePath()`: containment `realpath()` + whitelist đuôi ảnh/video + chặn dotfile) · top-5 #3 41-site `imagecreatefromstring` (helper chung `studio_image_decode()`, cap 64 MiB) · P2 6-site `$e->getMessage()` trong 500 (helper `studio_fail()`) · P5/P6 22/26 catch rỗng · P7 17-site `res.ok` · kiểm chứng: unit 52 pass · feature 11 pass · vite build ✓ · danh sách việc còn lại trung thực (J.8)
+- Phần K (hoàn thiện khu vực Quản lý dự án — 2 subagent, đã xác minh): **11/11 finding Project vá xong** + luồng duyệt chéo (cross-approve) + UX/UI 9 hạng mục · **2 bug MỚI phát hiện + vá trong đợt: [critical] `studio_image_decode()` đệ quy vô hạn (K.4 — root cause mọi vụ SIGKILL test suite từ sau J; đính chính J.8 #4 "OOM hạ tầng") + [high] `latestOfMany()` rơi constraint `whereNotNull` (K.4)** · 53 test Project pass · full suite 183 pass / 9 fail baseline · **0 regression** · fix `helpers.php` đã commit `234d405` (phiên xử lý lỗi 500 `/studio/refgen` — hai phiên phát hiện độc lập cùng bug, fix trùng khớp từng dòng, K.7 #4)
 
 ## Vấn đề nghiêm trọng nhất (cần xử lý trước)
 
@@ -927,3 +929,32 @@ Sự thật trước fix: `transition()`/`show()` là owner-only (`abort_unless`
 2. 2 medium M6/M8 còn sống (I.4) — chưa vá.
 3. Tái xác minh ~15 high/critical còn lại (J.8 #1).
 4. Trạng thái commit: fix `helpers.php` đã vào HEAD qua **234d405** (phiên song song quét tree lúc 05:50 và tự kiểm chứng thêm bằng repro 500 `/studio/refgen` + 4/4 refgen test — hai phiên phát hiện độc lập cùng một bug, fix trùng khớp từng dòng). Phần lớn đợt này đã nằm trong af5a86f/f35fd00. **Chưa commit:** `app/Models/Project.php` (ofMany fix) · `tests/Feature/ProjectControllerTest.php` (test thumbnail parity) · 2 file báo cáo — chờ quyết định người dùng.
+
+---
+
+## K.8 — Addendum: "Dự án hiện tại" (current-project) + hardened project ownership
+
+**Nguồn gốc:** người dùng hỏi "làm cách nào để áp dụng 1 dự án / cách để biết về dự án hiện tại". Phân tích cho thấy luồng này đang **xây dở**: `activeProject` dùng để gắn project_id cho video, nhưng ảnh thì không; không có indicator nào trên UI chính; `attachGenerationToProject` là API mồ côi (0 caller). Đồng thời 4 endpoint backend chấp nhận `project_id` tuỳ ý không kiểm tra quyền sở hữu (IDOR-lite).
+
+### Đã làm (toàn bộ đã build + test)
+
+| Hạng mục | Chi tiết |
+|---|---|
+| **Chip "Dự án hiện tại"** | `StudioApp.vue` header: chip `[pin] <tên>` (chỉ hiện khi có applied project), click mở workspace, X để ngắt; mobile: ring `ring-brand-500` + pin khi áp dụng |
+| **Auto-attach cho ảnh** | `store.js` `generateImage` nay gửi `project_id: this.appliedProjectId()` — ảnh 2D tạo mới cũng được gắn tự động như video |
+| **Chế độ duyệt (review-only)** | `ProjectWorkspace` chi tiết: badge `[eye] Chế độ duyệt` (scope=pending, mở dự án người khác) — output KHÔNG gắn; badge `[pin] Đang áp dụng` (own scope) + nút "ngắt" |
+| **Backend hardening** | `StudioController` 4 site validation (`generate`, `renderVideo`, `pattern`, `tryon`) — `Rule::exists('projects','id')->where('user_id', $request->user()->id)`, chặn gắn output vào dự án người khác |
+| **Test** | `test_generation_endpoints_reject_foreign_project_id` — 4 endpoint POST project_id của người khác -> 422 validation error |
+| **vite build** | OK 739ms |
+
+### 2 finding mới từ đợt này (DA VÁ)
+
+- **[medium]** · IDOR-lite: `project_id` không kiểm tra ownership ở 4 endpoint studio · `StudioController` L65, L154, L4456, L4473 · DA VÁ — `Rule::exists` + `where('user_id', ...)` tại cả 4 site; test 4-endpoint 422.
+- **[medium]** · UX "current project" invisible + `generateImage` thiếu project_id + `attachGenerationToProject` mồ côi (0 UI caller) · `store.js` + `ProjectWorkspace.vue` + `StudioApp.vue` · DA VÁ (auto-attach ảnh + chip indicator + badge chế độ duyệt; orphan `attachGenerationToProject` giữ lại cho API tương lai, chưa có UI — documented gap).
+
+### Việc còn lại (mini — đều ngoài scope đợt này)
+
+1. `attachGenerationToProject` vẫn chưa có UI gọi (GalleryModal chưa có nút "Gắn vào dự án") — orphan API, không regression, chỉ là feature chưa build.
+2. pattern/tryon frontend stores (2 blade route riêng) chưa được cập nhật gửi `project_id` — backend đã cứng hoá, nhưng frontend không gửi -> không lỗi, chỉ là chưa tận dụng auto-attach ở 2 trang đó.
+
+

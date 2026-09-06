@@ -135,12 +135,12 @@ async function submitEdit() {
 async function openProject(p) {
   if (openingId.value) return;
   openingId.value = p.id;
-  try { await store.loadProject(p.id); }
+  // Mở dự án người khác (scope pending) → chế độ duyệt, KHÔNG áp dụng cho phiên tạo ảnh.
+  try { await store.loadProject(p.id, { reviewOnly: store.projectScope === 'pending' }); }
   finally { openingId.value = null; }
 }
 function closeProject() {
-  store.activeProject = null;
-  store.activeProjectGenerations = [];
+  store.clearActiveProject();
   transNote.value = '';
 }
 
@@ -319,6 +319,8 @@ watch(() => open.value, (v) => {
                 <div>
                   <p class="font-display text-sm font-semibold text-cream-50">{{ store.activeProject.name }}</p>
                   <p class="text-[11px] text-cream-300/60">{{ statusLabel(store.activeProject.status) }} · {{ store.activeProject.generations_count || 0 }} ảnh</p>
+                  <p v-if="store.activeProjectReviewOnly" class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-semibold text-amber-200" :title="'Bạn đang duyệt dự án của người khác — ảnh/video bạn tạo KHÔNG tự gắn vào đây'">👁 Chế độ duyệt — output bạn tạo không gắn vào dự án này</p>
+                  <p v-else class="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-600/20 px-2.5 py-1 text-[10px] font-semibold text-brand-200" :title="'Ảnh/video tạo mới sẽ tự gắn vào dự án này'">📌 Đang áp dụng — ảnh/video tạo mới sẽ tự gắn vào đây <button type="button" @click="store.clearActiveProject()" class="ml-1 underline decoration-dotted hover:text-white">ngắt</button></p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -429,7 +431,8 @@ watch(() => open.value, (v) => {
             </div>
             <div>
               <label class="mb-1 block text-[11px] font-semibold text-cream-300/70">Màu nhận diện</label>
-              <input v-model="form.color" type="color" class="h-10 w-full rounded-lg border border-ink-700 bg-ink-900 px-1 py-1 focus:border-brand-500 focus:outline-none">
+              <!-- input[type=color] không chấp nhận '' (warning "must be a valid CSS color") — fallback hiển thị, giữ nguyên '' trong model (dự án không màu) -->
+              <input :value="form.color || '#4a7a90'" @input="form.color = $event.target.value" type="color" class="h-10 w-full rounded-lg border border-ink-700 bg-ink-900 px-1 py-1 focus:border-brand-500 focus:outline-none">
             </div>
           </div>
           <div>

@@ -7,7 +7,7 @@
 
 ## Trạng thái hiện tại
 
-- Kết quả: `STUDIO_REVIEW.md` — **30 area**, **210 findings** (critical 2 · high 18 · medium 51 · low 96 · info 43), 8 claim dương tính giả đã gạch bỏ kèm bằng chứng (mới nhất: `[medium]` "ProjectWorkspace no user feedback" — Phần I.8, store.js bắt+toast). Đối chiếu `grep -cE '^- \*\*\[(critical|high|medium|low|info)\]\*\*'` = **210** ✓ (đo sau khi gộp Phần K). Cấu trúc file hiện: Phần A–K (J = đợt vá phase 2; **K = hoàn thiện khu vực Quản lý dự án: fix 11/11 finding + luồng duyệt chéo + UX/UI + 2 bug mới đã vá**, thêm 2026-09-07).
+- Kết quả: `STUDIO_REVIEW.md` — **30 area**, **212 findings** (critical 2 · high 18 · medium 53 · low 96 · info 43), 8 claim dương tính giả đã gạch bỏ kèm bằng chứng. Đối chiếu `grep -cE '^- \*\*\[(critical|high|medium|low|info)\]\*\*'` = **212** ✓ (đo sau khi gộp K.8). Cấu trúc file hiện: Phần A–K (K = hoàn thiện Quản lý dự án: fix 11+2 finding + luồng duyệt chéo + UX/UI + current-project + backend hardening, thêm 2026-09-07).
 - Footprint module studio: **1.338.134 bytes** = PHP 532.648 (24 file) + JS/Vue 562.602 (34 file) + blade 242.884 (11 file) ≈ 405k token → bắt buộc fan-out.
 - Provider dùng: **chỉ `qwen-token-plan`**. Model mặc định `qwen3.8-max`; `glm-5.2` khi cần suy luận liên file.
 - Đã phủ: `StudioController.php` (toàn bộ 4.732 dòng) · `store.js` · `ImageAIService` · `ProductAIService` · `GeminiService` · `VirtualTryOnService` · `StylistService` · `StyleSuggestService` · `StudioLibraryService` · `ProjectWorkflowService` · `StylistDataController` · `StylistCatalog` · models+config+migrations+wiring · 5 component lớn (StudioApp, ConceptCard, ComposeCard, RefImageCard, InpaintCard) · 13 component nhỏ + SettingsApp · 6 blade nhỏ · **TOÀN BỘ 11 file blade** (Phần H) → lớp blade 100% · **`CreativeDirectionService`** (Phần I, service cuối) · **19 component JS/Vue còn lại + 4 entry Vite + 2 console command + StylistQuestion** (Phần I) → **module phủ ~100% diện tích** (trừ 2 component mồ côi `SourceCard`/`PaletteTextureCard`, I.1).
@@ -30,7 +30,8 @@
 - **[note]** QUEUE A (7/7) + QUEUE B (5/5) ĐÃ HOÀN TẤT (Phần H + I) — không còn task review tồn đọng; findings tổng = 208; module phủ ~100% diện tích.
 - **[done]** `studio_image_decode()` đệ quy vô hạn (helpers.php:246) — **[critical]**, root cause của mọi vụ SIGKILL test suite từ sau J; fix 1 dòng `@imagecreatefromstring`; 5 file test từng chết nay pass (22 test sống lại). Chi tiết + bài học: Phần K.4.
 - **[done]** `latestGeneration()` dùng `latestOfMany()` rơi constraint `whereNotNull` — **[high]** regression tự phát hiện+tự vá trong Phần K (ofMany + closure); test regression assert GIÁ TRỊ thumbnail (eager/lazy parity).
-- **[note]** Race phiên song song: các commit 85b9f91/af5a86f/f35fd00/**234d405** quét toàn tree trong lúc phiên Project/* đang làm việc → phần lớn công việc Phần K đã nằm trong commit của phiên kia (kể cả fix helpers.php — 234d405, hai phiên phát hiện độc lập cùng bug, fix trùng khớp). **Chưa commit:** Project.php (ofMany) + ProjectControllerTest.php (test parity) + 2 file báo cáo. Bài học mới: worktree baseline symlink vendor KHÔNG sạch (`__DIR__` resolve về tree chính) — xem K.6.
+- **[note]** Race phiên song song: các commit 85b9f91/af5a86f/f35fd00/**234d405** quét toàn tree trong lúc phiên Project/* đang làm việc → phần lớn công việc Phần K đã nằm trong commit của phiên kia (kể cả fix helpers.php — 234d405, hai phiên phát hiện độc lập cùng bug, fix trùng khớp). ~~Chưa commit: Project.php (ofMany) + ProjectControllerTest.php (test parity) + 2 file báo cáo~~ → **ĐÃ commit hết qua f90c5e9 (05:55:09)** — working tree chỉ còn 2 sửa đổi báo cáo: đồng bộ Tổng kết (Phần J/K + số liệu 210) và chính ghi chú này. Bài học mới: worktree baseline symlink vendor KHÔNG sạch (`__DIR__` resolve về tree chính) — xem K.6.
+- **[note]** 2026-09-07 — Đồng bộ Tổng kết `STUDIO_REVIEW.md` (phiên xử lý 500 refgen): danh sách lượt còn thiếu Phần J + Phần K → đã thêm; số liệu đầu file 208→**210 findings** (critical 1→**2** · high 17→**18**, nguồn +2 = K.4). Xác nhận Phần I **đã ghi đầy đủ từ phiên song song** (I.1–I.9, gồm I.8 claim LOẠI + I.9 thống kê hiệu chỉnh) — không ghi đè. Đối chiếu `grep -cE` sau ghi = **210** ✓.
 
 ## CẬP NHẬT SAU ĐỢT CHẠY CỦA NGƯỜI DÙNG (Phần H)
 
@@ -101,5 +102,6 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 1. Đánh `[x]` task đã xong, kèm số finding đã xác minh.
 2. Cộng số liệu vào "Trạng thái hiện tại" và đối chiếu bằng `grep -c`.
 3. Ghi finding vào `STUDIO_REVIEW.md` Phần kế tiếp (**L**, …); gạch bỏ dương tính giả kèm bằng chứng.
+4. **K.8 addendum** (current-project chip + backend project_id ownership hardening): đã build + test (54/54 Project pass, vite 739ms). 2 finding mới [medium] DA VA. `attachGenerationToProject` vẫn orphan UI (documented gap).
 5. **Chống race phiên song song (bài học đợt Phần G/H):** trước khi ghi, `stat` mtime + đọc lại vùng sắp sửa; sau khi ghi, recount bằng `grep -c` và đối chiếu ledger. Không chạy 2 đợt workflow đồng thời trên cùng artifact.
 4. Task mới phát sinh → thêm vào QUEUE, kèm offset/limit đo bằng `wc -lc`.

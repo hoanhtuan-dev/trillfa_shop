@@ -226,8 +226,9 @@ export const useStudioStore = defineStore('studio', {
     projectStatuses: bootProjectStatuses() || {},  // metadata trạng thái workflow (từ studioBoot)
     projectLoading: false,
     projectLoaded: false,
-    activeProject: null,          // dự án đang xem chi tiết
+    activeProject: null,          // dự án đang xem chi tiết — cũng là "dự án hiện tại" được áp dụng cho phiên tạo ảnh/video
     activeProjectGenerations: [], // generations của dự án đang xem
+    activeProjectReviewOnly: false, // true khi mở dự án của NGƯỜI KHÁC (scope=pending, Super Admin duyệt) → KHÔNG áp dụng cho phiên tạo ảnh
     projectView: 'board',         // 'board' (kanban) | 'list'
     projectsArchived: false,      // lọc dự án đã lưu trữ
     projectScope: 'own',          // 'own' (dự án của mình) | 'pending' (hàng đợi duyệt — Super Admin)
@@ -395,6 +396,9 @@ export const useStudioStore = defineStore('studio', {
           body_hips: this.bodyHips,
           hair_style: this.hairStyle || '',
           hair_color: this.hairColor || '',
+          // "Dự án hiện tại": ảnh tạo ra sẽ tự gắn vào dự án đang áp dụng
+          // (null khi đang ở chế độ duyệt → không gắn vào dự án người khác).
+          project_id: this.appliedProjectId(),
         });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
@@ -623,7 +627,7 @@ export const useStudioStore = defineStore('studio', {
           model: this.videoModel,
           duration: this.videoDuration,
           resolution: this.videoRes,
-          project_id: this.activeProject?.id || null,
+          project_id: this.appliedProjectId(),
         });
         this.addGen({ id: d.generation_id, type: 'video', status: d.status || 'processing', model: d.model || this.videoModel, provider: d.provider || 'video', media_url: d.media_url || null, error: null, credits_cost: d.credits_cost || 10, created_at: 'Vừa gửi' });
       } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
@@ -1155,7 +1159,10 @@ export const useStudioStore = defineStore('studio', {
         return this.projects;
       } finally { this.projectLoading = false; }
     },
-    async loadProject(id) {
+    async loadProject(id, opts = {}) {
+      // reviewOnly: mở dự án người khác (scope=pending) → chỉ xem, KHÔNG áp dụng
+      // cho phiên tạo ảnh (tránh gắn output của reviewer vào dự án của designer).
+      this.activeProjectReviewOnly = !!opts.reviewOnly;
       try {
         const res = await fetch('/studio/projects/' + id, { headers: { Accept: 'application/json' } });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Không tải được dự án.');
@@ -1187,7 +1194,7 @@ export const useStudioStore = defineStore('studio', {
       try {
         await this.api('/studio/projects/' + id, { _method: 'DELETE' });
         this.projects = this.projects.filter(p => p.id !== id);
-        if (this.activeProject && this.activeProject.id === id) { this.activeProject = null; this.activeProjectGenerations = []; }
+        if (this.activeProject && this.activeProject.id === id) { this.activeProject = null; this.activeProjectGenerations = []; this.activeProjectReviewOnly = false; }
         this.toast('Đã xóa dự án (output được giữ lại).');
         return true;
       } catch (e) { this.toast(e.message || 'Lỗi xóa dự án.', 'error'); return false; }
@@ -1209,6 +1216,18 @@ export const useStudioStore = defineStore('studio', {
         else this.toast('Đã gỡ ảnh khỏi dự án.');
         return true;
       } catch (e) { this.toast(e.message || 'Lỗi gắn ảnh.', 'error'); return false; }
+    },
+    // id dự án đang được ÁP DỤNG cho phiên tạo ảnh/video (Dự án hiện tại).
+    // null khi không có activeProject, hoặc đang ở chế độ duyệt (reviewOnly) —
+    // tránh output của reviewer chạy vào dự án của designer khác.
+    appliedProjectId() {
+      return (!this.activeProject || this.activeProjectReviewOnly) ? null : (this.activeProject.id || null);
+    },
+    // Ngắt "Dự án hiện tại" — gỡ khỏi phiên tạo ảnh, quay về không áp dụng dự án nào.
+    clearActiveProject() {
+      this.activeProject = null;
+      this.activeProjectGenerations = [];
+      this.activeProjectReviewOnly = false;
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
     // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):

@@ -62,7 +62,7 @@ class StudioController extends Controller
             'prompt' => ['required', 'string', 'max:4000'],
             'resolution' => ['nullable', 'string', 'in:1K,2K'],
             'ratio' => ['nullable', 'string', 'in:1:1,4:3,3:4,16:9,9:16,4:5,21:9,19:6'],
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
             'base_image' => ['nullable', 'string', 'max:2048'],
@@ -151,7 +151,7 @@ class StudioController extends Controller
             'provenance' => ['nullable', 'string', 'max:20'],
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
             'duration' => ['nullable', 'string', 'in:5,8,10,15,20'],
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
 
@@ -4465,7 +4465,7 @@ RULES:
     {
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:2000'],
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
         $data['prompt'] = 'Seamless textile fabric pattern, '.$data['prompt'].', high detail, repeatable tile, premium fashion, 4k';
@@ -4482,7 +4482,7 @@ RULES:
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:2000'],
             'image' => ['nullable', 'image', 'max:8192'],
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'project_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('projects', 'id')->where('user_id', $request->user()->id)],
             'history_id' => ['nullable', 'integer', 'exists:prompts_history,id'],
         ]);
         $cost = (int) studio_config('image_credits', 1);
