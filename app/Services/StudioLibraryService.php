@@ -189,6 +189,113 @@ class StudioLibraryService
         };
     }
 
+    /**
+     * Danh sách file ĐÃ TẢI LÊN (ảnh nguồn studio/ref + tài nguyên tự thêm studio/assets),
+     * kèm trạng thái "đang dùng" và thống kê file mồ côi (không dùng).
+     */
+    public function uploadedFiles(): array
+    {
+        $referenced = $this->referencedPaths();
+        $dirs = ['studio/ref', 'studio/assets'];
+        $items = [];
+
+        foreach ($dirs as $dir) {
+            $abs = Storage::disk('public')->path($dir);
+            if (! is_dir($abs)) {
+                continue;
+            }
+            $files = glob($abs.'/*.{png,jpg,jpeg,webp,gif}', GLOB_BRACE) ?: [];
+            foreach ($files as $file) {
+                if (! is_file($file)) {
+                    continue;
+                }
+                $rel = $this->pathToRelative($file);
+                if ($rel === '') {
+                    continue;
+                }
+                $dims = @getimagesize($file);
+                $items[] = [
+                    'rel' => $rel,
+                    'name' => basename($file),
+                    'url' => '/storage/'.$rel,
+                    'kind' => str_contains($rel, 'studio/assets/') ? 'asset' : 'ref',
+                    'size' => (int) filesize($file),
+                    'mtime' => (int) filemtime($file),
+                    'used' => isset($referenced[$rel]),
+                    'width' => $dims[0] ?? 0,
+                    'height' => $dims[1] ?? 0,
+                ];
+            }
+        }
+
+        usort($items, fn ($a, $b) => ($b['mtime'] ?? 0) <=> ($a['mtime'] ?? 0));
+
+        $unused = array_values(array_filter($items, fn ($i) => ! $i['used']));
+
+        return [
+            'items' => array_values($items),
+            'stats' => [
+                'total' => count($items),
+                'total_bytes' => array_sum(array_column($items, 'size')),
+                'unused_count' => count($unused),
+                'unused_bytes' => array_sum(array_column($unused, 'size')),
+            ],
+        ];
+    }
+
+    /**
+     * Xóa hàng loạt file đã tải lên (chỉ cho phép xóa file KHÔNG còn được dùng).
+     */
+    public function deleteUploadedFiles(array $rels): array
+    {
+        $referenced = $this->referencedPaths();
+        $deleted = 0;
+        $freed = 0;
+
+        foreach ($rels as $rel) {
+            $rel = $this->normalizeUploadRel((string) $rel);
+            if ($rel === '' || isset($referenced[$rel])) {
+                continue; // bỏ qua file đang được dùng / đường dẫn không hợp lệ
+            }
+            $abs = Storage::disk('public')->path($rel);
+            if (! is_file($abs)) {
+                continue;
+            }
+            $size = (int) filesize($abs);
+            if ($this->safeUnlink($abs)) {
+                $deleted++;
+                $freed += $size;
+            }
+        }
+
+        return ['deleted' => $deleted, 'freed_bytes' => $freed];
+    }
+
+    /**
+     * Dọn toàn bộ file đã tải lên không còn được dùng (file mồ côi).
+     */
+    public function cleanupUploadedOrphans(): array
+    {
+        $data = $this->uploadedFiles();
+        $unused = array_values(array_filter($data['items'], fn ($i) => ! $i['used']));
+
+        return $this->deleteUploadedFiles(array_column($unused, 'rel'));
+    }
+
+    /**
+     * Chuẩn hoá + giới hạn đường dẫn tải lên về studio/ref hoặc studio/assets (chống traversal).
+     */
+    private function normalizeUploadRel(string $rel): string
+    {
+        $rel = ltrim(str_replace('\\', '/', trim($rel)), '/');
+        $rel = preg_replace('#^(storage/)+#', '', $rel) ?? $rel;
+        if (str_starts_with($rel, 'studio/ref/') || str_starts_with($rel, 'studio/assets/')) {
+            return $rel;
+        }
+
+        return '';
+    }
+
     private function cleanupOrphans(): array
     {
         $files = $this->scanOrphanFiles();

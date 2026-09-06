@@ -196,6 +196,13 @@ export const useStudioStore = defineStore('studio', {
     libraryScanning: false,
     libraryCleaning: false,
     libraryManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
+    // ── Files đã tải lên — quản lý file tải lên + dọn file mồ côi ──
+    libraryTab: 'generations', // 'generations' | 'uploads'
+    uploadItems: [],
+    uploadStats: null,
+    uploadLoading: false,
+    uploadSelection: [],    // danh sách rel đang được chọn
+    uploadCleaning: false,
     canvasLayers: [],
     activeLayerId: '',
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
@@ -1011,6 +1018,52 @@ export const useStudioStore = defineStore('studio', {
       if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
       if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
       return (n / 1073741824).toFixed(2) + ' GB';
+    },
+    // ── Files đã tải lên — quản lý + dọn file mồ côi ──
+    async loadUploads() {
+      if (this.uploadLoading) return;
+      this.uploadLoading = true;
+      try {
+        const d = await this._libraryFetch('/studio/uploads');
+        this.uploadItems = Array.isArray(d.items) ? d.items : [];
+        this.uploadStats = d.stats || null;
+      } catch (e) { this.toast(e.message || 'Không tải được danh sách file.', 'error'); }
+      finally { this.uploadLoading = false; }
+    },
+    toggleUploadSelect(rel) {
+      const i = this.uploadSelection.indexOf(rel);
+      if (i >= 0) this.uploadSelection.splice(i, 1);
+      else this.uploadSelection.push(rel);
+    },
+    uploadSelectUnused() {
+      this.uploadSelection = this.uploadItems.filter(f => !f.used).map(f => f.rel);
+    },
+    uploadSelectNone() { this.uploadSelection = []; },
+    async uploadBulkDelete() {
+      const rels = this.uploadSelection.filter(Boolean);
+      if (!rels.length) { this.toast('Chưa chọn file nào để xóa.', 'error'); return false; }
+      if (this.uploadCleaning) return false;
+      this.uploadCleaning = true;
+      try {
+        const d = await this._libraryFetch('/studio/uploads/delete', { rels });
+        this.uploadSelection = [];
+        this.toast('Đã xóa ' + (d.deleted || 0) + ' file · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
+        await this.loadUploads();
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi xóa file.', 'error'); return false; }
+      finally { this.uploadCleaning = false; }
+    },
+    async uploadCleanup() {
+      if (this.uploadCleaning) return false;
+      this.uploadCleaning = true;
+      try {
+        const d = await this._libraryFetch('/studio/uploads/cleanup', {});
+        this.uploadSelection = [];
+        this.toast('Đã dọn xong · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
+        await this.loadUploads();
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi dọn dẹp.', 'error'); return false; }
+      finally { this.uploadCleaning = false; }
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
     // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):

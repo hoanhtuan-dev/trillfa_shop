@@ -143,6 +143,9 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/library/scan', [StudioController::class, 'libraryScan'])->name('library.scan');
     Route::post('/library/bulk-delete', [StudioController::class, 'libraryBulkDelete'])->name('library.bulk-delete');
     Route::post('/library/cleanup', [StudioController::class, 'libraryCleanup'])->name('library.cleanup');
+    Route::get('/uploads', [StudioController::class, 'uploadedFiles'])->name('uploads');
+    Route::post('/uploads/delete', [StudioController::class, 'uploadedFilesDelete'])->name('uploads.delete');
+    Route::post('/uploads/cleanup', [StudioController::class, 'uploadedFilesCleanup'])->name('uploads.cleanup');
     Route::get('/generations/{generation}/download', [StudioController::class, 'download'])->name('generations.download');
     Route::get('/generations/{generation}/palette', [StudioController::class, 'palette'])->name('generations.palette');
     Route::get('/references', [StudioController::class, 'references'])->name('references');

@@ -3519,6 +3519,35 @@ RULES:
     }
 
     /**
+     * Uploaded-files management (JSON) — danh sách file đã tải lên + thống kê file mồ côi.
+     */
+    public function uploadedFiles(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json(app(\App\Services\StudioLibraryService::class)->uploadedFiles());
+    }
+
+    /**
+     * Xóa hàng loạt file đã tải lên không còn dùng.
+     */
+    public function uploadedFilesDelete(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $rels = (array) $request->input('rels', []);
+        $result = app(\App\Services\StudioLibraryService::class)->deleteUploadedFiles($rels);
+
+        return response()->json(['ok' => true, ...$result]);
+    }
+
+    /**
+     * Dọn toàn bộ file đã tải lên không còn dùng (file mồ côi).
+     */
+    public function uploadedFilesCleanup(): \Illuminate\Http\JsonResponse
+    {
+        $result = app(\App\Services\StudioLibraryService::class)->cleanupUploadedOrphans();
+
+        return response()->json(['ok' => true, ...$result]);
+    }
+
+    /**
      * Download a generated asset.
      */
     public function download(Generation $generation)
