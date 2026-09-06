@@ -146,11 +146,11 @@ async function runRefgen() {
   // Thử đồ: gửi tryon=true + body directive từ store + khuôn mặt mẫu (ảnh, mô tả do vision đọc).
   const isTryon = mode.value === 'tryon';
   const body = isTryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
-  // Nền Studio + Góc chụp chỉ dùng cho "Tạo ảnh mới" — gửi RIÊNG (không nối vào ô prompt).
+  // Nền Studio áp dụng cho cả 2 chế độ; Góc chụp chỉ cho "Tạo ảnh mới".
   const items = await store.refgen(
     img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body,
     isTryon ? faceModelId.value : '', isTryon ? poseId.value : '',
-    isTryon ? '' : activeBgPrompt.value, isTryon ? '' : activeAnglePrompt.value,
+    activeBgPrompt.value, isTryon ? '' : activeAnglePrompt.value,
   );
   busy.value = false;
   if (items && items.length) {

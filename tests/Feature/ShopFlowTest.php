@@ -972,6 +972,19 @@ class ShopFlowTest extends TestCase
         $pgen = Generation::find($pf->json('items.0.generation_id'));
         $this->assertStringContainsString('Model pose: standing with one hand on hip, full body head to toe', (string) $pgen->prompt);
 
+        // Tryon + Nền Studio: background_prompt được chuẩn hóa (bỏ "keep the subject unchanged;
+        // replace the background with") rồi chèn vào prompt tryon.
+        $tb = $this->postJson('/studio/refgen', [
+            'image' => '/storage/studio/garment.jpg',
+            'prompt' => 'mặc trang phục lên người mẫu',
+            'variants' => 1,
+            'tryon' => true,
+            'background_prompt' => 'keep the subject unchanged; replace the background with a pure-white seamless studio backdrop, even soft diffused lighting',
+        ])->assertOk();
+        $tbgen = Generation::find($tb->json('items.0.generation_id'));
+        $this->assertStringContainsString('Background: a pure-white seamless studio backdrop, even soft diffused lighting', (string) $tbgen->prompt);
+        $this->assertStringNotContainsString('keep the subject unchanged', (string) $tbgen->prompt);
+
         // Không gửi tryon → refgen thường (prompt "Create a brand-new image based on the provided reference image").
         // Nền studio + góc chụp gửi RIÊNG (không nối vào prompt người dùng) → chèn vào prompt cuối.
         $c = $this->postJson('/studio/refgen', [

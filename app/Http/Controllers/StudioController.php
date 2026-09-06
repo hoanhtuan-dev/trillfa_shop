@@ -659,6 +659,12 @@ class StudioController extends Controller
             // mẫu mặc đúng trang phục đó". Ngôn ngữ DƯƠNG (bám mẫu) — tránh model tự thiết kế lại đồ.
             // Kế thừa body directive (tạo ảnh 2D) + khuôn mặt mẫu (ảnh + mô tả vision) để kiểm soát người mẫu.
             $bodyDirective = $this->buildBodyDirective($data);
+            // Nền Studio (chip "Nền Studio" trong Thử đồ): chuẩn hóa mô tả nền cho model SINH ẢNH
+            // (bỏ "keep the subject unchanged; replace the background with" vì không có ảnh gốc để edit).
+            $bgTryonPrompt = trim((string) ($data['background_prompt'] ?? ''));
+            if ($bgTryonPrompt !== '') {
+                $bgTryonPrompt = trim((string) preg_replace('/^keep the subject unchanged;\s*replace the background with\s*/i', '', $bgTryonPrompt));
+            }
             $finalPrompt = 'Create a brand-new photorealistic fashion photo of a model WEARING THE EXACT GARMENT shown in the reference image. '
                 .'The reference image is a commercial product photo of a garment — reproduce this IDENTICAL garment on a new model: identical color, identical fabric, identical pattern/print, identical cut, identical length, identical neckline, identical sleeves, identical fit (tight stays tight, loose stays loose), identical buttons/zippers/belt/bow/brooch, identical stitching and seams. Copy the garment as-is from the reference photo; do not redesign, restyle, recolor, simplify, or invent any detail. '
                 .'Wear every accessory visible in the reference identically too — same shoes, bag, belt, hat, jewelry, scarf — identical color, size, placement. Do not add items not in the reference; do not drop items that are in it. '
@@ -669,6 +675,7 @@ class StudioController extends Controller
                 .($faceDesc !== null && $faceDesc !== '' ? ' Model face: '.$faceDesc.'. ' : '')
                 .($bodyDirective !== '' ? $bodyDirective : '')
                 .($poseDirective !== '' ? ' Model pose: '.$poseDirective.'. ' : '')
+                .($bgTryonPrompt !== '' ? ' Background: '.$bgTryonPrompt.'. ' : '')
                 .($userPrompt !== '' ? ' '.$userPrompt : '');
         } else {
             $bgPrompt = trim((string) ($data['background_prompt'] ?? ''));
