@@ -12,7 +12,7 @@ const variants = ref(1);
 // Thử đồ ảo best-of-N + chấm điểm: số bản candidates + tự chấm điểm từng bản (vision QA).
 // Giới hạn 1-2 bản: 1 bản trung thực tuyệt đối, 2 bản so sánh rồi chọn bản bám mẫu tốt hơn.
 const bestOf = ref(2);
-const scoring = ref(true);
+const scoring = ref(false); // chấm điểm QA tự động — mặc định TẮT (ưu tiên tốc độ/trung thực; bật khi cần so sánh nhiều bản)
 const creativeLevel = ref(8);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
 const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
 const ornamentLevel = ref(0);   // mức độ trang trí (0–10; 0 = tối giản, 10 = cầu kỳ) — dùng cho chế độ Ghép Trang Phục
@@ -457,7 +457,7 @@ function barLabel(k) {
                   :class="bestOf === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
                   class="h-8 rounded-full px-3 text-xs font-semibold transition-colors">{{ n }}</button>
         </div>
-        <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Tạo {{ bestOf }} bản rồi <b class="text-brand-300">tự chọn bản bám mẫu tốt nhất</b> (ưu tiên điểm "Giữ đồ"). {{ bestOf }} bản = {{ bestOf * store.imageCreditCost }} credits. Nhiều bản tăng chi phí mà không tăng độ trung thực — ưu tiên 1-2 bản.</p>
+        <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Tạo {{ bestOf }} bản để so sánh rồi <b class="text-brand-300">tự chọn bản bám mẫu tốt nhất</b>. Bật "Chấm điểm tự động" để AI xếp hạng theo điểm (Giữ đồ · Đúng dáng · Mặt · Thẩm mỹ). {{ bestOf }} bản = {{ bestOf * store.imageCreditCost }} credits.</p>
         <!-- Phom dáng trang phục (fit) — chỉ thị rõ ràng để model giữ đúng silhouette -->
         <div class="mt-2 flex items-center justify-between gap-2">
           <span class="text-xs text-cream-200">Phom dáng <span class="text-cream-300/50">(fit)</span></span>

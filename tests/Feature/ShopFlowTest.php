@@ -1061,6 +1061,17 @@ class ShopFlowTest extends TestCase
         $this->assertCount(2, $legacy->json('items'));
         $this->assertSame(2, $legacy->json('best_of'));
 
+        // Regression: KHÔNG gửi tryon_score → mặc định TẮT chấm điểm (tryon_score=false) — ưu tiên tốc độ/trung thực.
+        $noScore = $this->postJson('/studio/compose', [
+            'images' => ['/storage/studio/garment.jpg', '/storage/studio/pose.jpg'],
+            'prompt' => 'mặc trang phục lên người mẫu',
+            'mode' => 'tryon',
+            'best_of' => 2,
+        ])->assertOk();
+        $nsg = Generation::find($noScore->json('items.0.generation_id'));
+        $this->assertFalse((bool) ($nsg->meta['tryon_score'] ?? true));
+        $this->assertNull($noScore->json('tryon_score'));
+
         // tryon best_of = 1 tạo đúng 1 bản (không có batch, không candidate_idx).
         $single = $this->postJson('/studio/compose', [
             'images' => ['/storage/studio/garment.jpg', '/storage/studio/pose.jpg'],

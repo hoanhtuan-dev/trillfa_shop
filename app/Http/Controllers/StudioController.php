@@ -676,7 +676,7 @@ class StudioController extends Controller
         $variants = $isTryon
             ? max(1, min(2, (int) ($data['best_of'] ?? $data['variants'] ?? studio_config('tryon_best_of', 2))))
             : max(1, min(4, (int) ($data['variants'] ?? 1)));
-        $tryonScore = $isTryon && ($data['tryon_score'] ?? studio_config('tryon_score', true));
+        $tryonScore = $isTryon && ($data['tryon_score'] ?? studio_config('tryon_score', false));
         $isOutfit = $mode === 'outfit';
         // Nhóm batch: các generation cùng một lần "Thử đồ ảo N bản" nhận chung id để xếp hạng/best-of-N.
         $tryonBatch = $isTryon && $variants > 1 ? (string) Str::uuid() : null;

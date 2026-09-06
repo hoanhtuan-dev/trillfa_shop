@@ -441,8 +441,8 @@ export const useStudioStore = defineStore('studio', {
     },
     // i2i — Ghép 2–3 ảnh thành 1 (Compose / Blend).
     // Thử đồ ảo (mode='tryon'): bestOf = số bản candidates (best-of-N), scoring = chấm điểm tự động
-    // từng bản bằng vision QA — backend ghi meta.qa, ở đây xếp hạng và chọn bản đẹp nhất.
-    async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '', ornamentLevel = 3, overridePrompt = '', bestOf = 1, scoring = true) {
+    // từng bản bằng vision QA — mặc định TẮT (false); bật thì backend ghi meta.qa, ở đây xếp hạng và chọn bản đẹp nhất.
+    async compose(images, prompt, variants = 1, mode = 'compose', creativeLevel = 6, style = '', ornamentLevel = 3, overridePrompt = '', bestOf = 1, scoring = false) {
       if (!Array.isArray(images) || images.length < 2 || !(prompt || '').trim()) { this.toast('Chọn ít nhất 2 ảnh + nhập mô tả.', 'error'); return null; }
       this.composeStage = 'send';
       this.composeError = '';
