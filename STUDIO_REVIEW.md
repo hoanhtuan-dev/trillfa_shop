@@ -15,22 +15,26 @@
 
 ## Tổng kết
 
-- **16 area** đã được review · **121 findings**
-- critical: **1** · high: **18** · medium: **49** · low: **33** · info: **20**
+- **23 area** đã được review · **162 findings** (A–F 16 · G 0 — đính chính · H 7)
+- critical: **1** · high: **17** · medium: **49** · low: **63** · info: **32**
 - Lượt 1 (workflow): 6/10 area · 70 findings — 4 task thất bại
 - Lượt 2 (workflow, chia nhỏ): 2/6 area · 20 findings — cả 4 task `deepseek-official` thất bại
 - Lượt 3 (điều phối tự làm): 4/4 area · 23 findings (high 2 · medium 9 · low 6 · info 6)
 - Phần D (kiểm chứng template playbook, đã xác minh từng claim): 1 area · 2 findings medium + 1 claim bị loại là dương tính giả
 - Phần E (smoke-test `qwen3.8-max` + `glm-5.2`, đã xác minh): 1 area · 4 findings (medium 2, low 1, info 1) + 1 claim `[high]` bị loại là dương tính giả
 - Phần F (kiểm chứng định tuyến per-task model, đã xác minh): 2 area · 2 findings low + **4 claim bị loại** (3 XSS + 1 security) — kèm bảng so sánh thực nghiệm 2 model
+- Phần G (đính chính báo cáo — điều phối tự kiểm tra top-5, phiên song song): 0 area finding · **LOẠI 1 claim `[high]` cũ** (config `env()`, đã gạch tại chỗ finding gốc) · sửa top-5 (`imagecreatefromstring` = **41** vị trí chứ không phải ~10; thêm `getMessage()` 12 vị trí) · bảng 4 pattern lan rộng
+- Phần H (3 blade lớn còn lại — QUEUE A đợt 1: 6/6 task `qwen-token-plan`, điều phối xác minh 9/9 medium): **7 area · 42 findings** (low 30 · info 12 — **0/9 medium sống sót** sau xác minh) · phát hiện MỚI: `index.blade.php` là **file mồ côi** — 140 KB dead code (H.1) · bằng chứng bổ sung DB-first rotation (H.0)
 
 ## Vấn đề nghiêm trọng nhất (cần xử lý trước)
 
 1. **[high] Path traversal → đọc file cục bộ tùy ý** — `StudioController::buildMaskImage()` (:262-268) nhận `source_url` chỉ validate `string` (không rule `url`, không chặn `..`), và `faceDescription()`/`poseDescription()` (:416-450) cùng pattern, reachable từ `compose`/`composePreview` (:928). Nội dung file được đưa qua vision model rồi trả về trong prompt → tiết lộ nội dung file nội bộ.
 2. **[high] API key material gửi xuống trình duyệt** — `settingsData()` (:3857) và settings view (:3925) trả toàn bộ model `StudioApiKey`; model không có `$hidden` và `value` nằm trong `$fillable`. Mã hóa chỉ được gọi thủ công ở 3 chỗ trong controller (:3805, 4122, 4142) nên bất kỳ đường ghi nào khác sẽ lưu **plaintext**.
-3. **[high] `config/studio.php` đọc `env()` lúc parse** — sau `config:cache`, thay đổi `.env` (kể cả rotation API key) bị bỏ qua âm thầm.
+3. **[medium] Giải mã ảnh không giới hạn kích thước — 41 vị trí** (đã đếm lại bằng `grep`; báo cáo cũ ghi "~10" là **thiếu 4 lần**) — `imagecreatefromstring` xuất hiện 41 lần: `StudioController.php` 20 · `ImageAIService.php` 15 · `ProductAIService.php` 3 · `StyleSuggestService.php` 2 · `helpers.php` 1. Không kiểm tra size trước khi decode → dễ OOM worker.
 4. **[medium] Endpoint public `studioImage()` không giới hạn prefix** — fallback `base_path('public_html/'.$path)` cho phép phục vụ mọi file trong document root (`.htaccess`, bundle JS) không cần auth.
-5. **[medium] Giải mã ảnh không giới hạn kích thước** — ~10 vị trí `@imagecreatefromstring(file_get_contents(...))` không kiểm tra size trước, dễ OOM worker.
+5. **[medium] Trả nguyên văn `$e->getMessage()` cho client — 12 vị trí / 5 controller** — `StudioController.php` 5 · `StylistDataController.php` 4 · `CouponApiController.php` 1 · `CartApiController.php` 1 · `ProjectController.php` 1. Có thể lộ câu SQL, tên bảng/cột, đường dẫn framework.
+
+> **Đã LOẠI khỏi top-5:** item cũ số 3 (`[high]` "`config/studio.php` đọc `env()` lúc parse") là **DƯƠNG TÍNH GIẢ** — bằng chứng ở Phần G.
 
 ## Ghi chú điều phối (delegation log)
 
@@ -229,8 +233,7 @@ The Studio module has a well-designed cascading config system (DB → env → co
 
 - **[high]** security · `app/Models/StudioApiKey.php:10-12` — `value` (API key) is in `$fillable` with no cast/mutator for encryption. Encryption is applied manually in the controller (`StudioController.php:3805, 4122, 4142, 4365`), so a mass-assignment `StudioApiKey::create($data)` from any other path stores the key in plaintext.
   - Fix: add a `setValueAttribute()` mutator or `saving` listener calling `Crypt::encryptString()` so encryption is enforced at the model layer.
-- **[high]** correctness · `config/studio.php:12-15, 24-30, 42-44, 136-141` — every value is read with `env()` at file-parse time. After `php artisan config:cache`, later `.env` changes are silently ignored until the cache is cleared; especially dangerous for the API keys at 136-141 where rotation needs a cache clear.
-  - Fix: resolve `env()` at runtime behind a `config()` fallback, or document that config caching requires a cache clear after any env change.
+- ~~**[high]** correctness · `config/studio.php:12-15, 24-30, 42-44, 136-141` — every value is read with `env()` at file-parse time; after `config:cache` later `.env` changes are silently ignored~~ → **ĐÃ LOẠI, xem Phần G** (hành vi chuẩn của Laravel, không phải defect của module).
 - **[medium]** correctness · `app/Support/helpers.php:430` — `studio_api_key()` falls back to `config('studio.'.$key)`; an empty-string default resolves to `null` correctly, but a `false`/`0` value would also collapse to `null` via PHP falsy coalescing. Undocumented semantics.
   - Fix: use an explicit `!empty()` check or document the fallback contract.
 - **[medium]** performance · `app/Support/helpers.php:377-389` — `studio_api_keys_for()` loads ALL enabled keys for a provider then filters in memory by `scopes`/`model_id`/`group` on every lookup.
@@ -414,3 +417,175 @@ Chạy bằng template mới (per-task `model`): `app/Services/StylistCatalog.ph
 | `glm-5.2` | 23.076 in · 1.658 out · 6 step | TỰ đọc `routes/web.php` để xác minh middleware → mô tả authz đúng | 3/3 claim XSS đều sai; output 3-field (thiếu ` \| ` trước `fix:`) |
 
 → **Không model nào đáng tin tuyệt đối**: mỗi model sai ở đúng chỗ model kia đúng. Bước điều phối xác minh 100% finding `high`/`critical` là **bắt buộc bất kể model**. Chỉ dùng `glm-5.2` khi task thật sự cần suy luận liên file, vì đắt ~4,8× input.
+
+---
+
+# Phần G — ĐÍNH CHÍNH CHÍNH BÁO CÁO NÀY (điều phối tự kiểm tra lại top-5)
+
+Hai lỗi trong chính báo cáo, phát hiện khi đếm lại toàn module bằng `grep` để trả lời câu hỏi "121 finding là bao nhiêu pattern".
+
+## 1. LOẠI item top-5 cũ số 3 — `env()` trong config KHÔNG phải defect
+
+- Claim cũ: `[high] correctness` · `config/studio.php:12-15, 24-30, 42-44, 136-141` — "mọi giá trị đọc bằng `env()` lúc parse; sau `config:cache` thì thay đổi `.env` bị bỏ qua âm thầm".
+- **Bằng chứng bác bỏ:**
+  - `env()` bên trong `config/*.php` là **pattern chuẩn Laravel khuyến nghị**. Đếm thực tế: `database.php` 61 · `studio.php` 53 · `logging.php` 20 · `cache.php` 18 · `queue.php` 17 · `session.php` 13 · `mail.php` 12 · `app.php` 9 · `services.php`/`filesystems.php` 8 mỗi file · `auth.php` 5 — tổng **224 vị trí**. Nếu đây là lỗi thì toàn bộ framework Laravel là lỗi.
+  - Lỗi THẬT của họ này là gọi `env()` **NGOÀI** `config/` (sẽ trả `null` sau `config:cache`). Grep toàn `app/`, `routes/`, `resources/`, `database/` → chỉ **3 vị trí**: `app/Modules/Studio/config.php:3` và `app/Modules/Storefront/config.php:17,21`.
+  - Cả 3 đều **vô hại**: `app/Modules/Studio/config.php` được nạp qua `$this->mergeConfigFrom(__DIR__.'/config.php', 'studio_module')` tại `StudioModuleServiceProvider::register()` (`:13`) → đi vào config repository trước khi cache, cùng cơ chế với `config/*.php`. `routes/`, `resources/`, `database/` = **0 vị trí**.
+- **Phần hợp lệ duy nhất còn lại** (hạ xuống `[info]`, là ghi chú quy trình deploy chứ không phải lỗi code): sau khi đổi `.env` phải chạy lại `php artisan config:cache`/`config:clear`. Đây là yêu cầu của mọi app Laravel khi bật config cache.
+
+## 2. SỬA item top-5 số 5 — báo THIẾU 4 lần
+
+- Báo cáo cũ ghi "~10 vị trí `@imagecreatefromstring(file_get_contents(...))`".
+- **Đếm lại thực tế: 41 vị trí** — `StudioController.php` **20** · `ImageAIService.php` **15** · `ProductAIService.php` **3** · `StyleSuggestService.php` **2** · `helpers.php` **1**.
+- Nguyên nhân thiếu: con số cũ lấy từ một vùng của `StudioController.php`, chưa đếm các service. Hệ quả: mức độ ưu tiên bị đánh giá thấp hơn thực tế — đây là pattern lan rộng nhất module, nên sửa bằng **1 helper dùng chung** chứ không phải vá từng chỗ.
+
+## 3. ĐẾM LẠI TOÀN MODULE — 121 finding thực chất quy về 4 pattern
+
+| Pattern | Số vị trí (đo bằng grep) | Phân bố | Cách sửa đòn bẩy cao |
+|---|---|---|---|
+| Decode ảnh không giới hạn kích thước | **41** | 5 file PHP | 1 helper `studio_decode_image($src, $maxBytes)` + thay hàng loạt |
+| `res.json()` không check `res.ok` | **39** | JS/Vue studio | 1 fetch wrapper dùng chung |
+| `catch` rỗng | **26** | 18 Vue + 8 JS | CI check / ESLint rule chặn `catch {}` rỗng |
+| Trả `$e->getMessage()` cho client | **12** | 5 controller PHP | 1 helper `error_response()` chuẩn |
+
+→ **Kết luận vận hành:** sửa 4 pattern + thêm guard trong CI rẻ hơn và bền hơn sửa lẻ ~118 vị trí, vì guard ngăn lỗi tái phát. Chỉ 2 item top-5 còn lại (path traversal, API key xuống trình duyệt) là lỗi đơn lẻ cần vá trực tiếp.
+
+---
+
+# Phần H — 3 blade lớn còn lại (QUEUE A đợt 1: 6/6 task thành công · ĐÃ XÁC MINH TOÀN BỘ)
+
+Chạy 1 workflow (chỉ provider `qwen-token-plan`): 4 task `qwen3.8-max` (blade-idx-1/2/3, blade-misc) + 2 task `glm-5.2` (blade-set-1/2). **6/6 thành công, `failed = []`**. Parser bao dung parse đủ 41 finding (nguyên bản: 9 medium · 20 low · 12 info · **0 high/critical** → gate xác minh high/critical không kích hoạt).
+
+**Điều phối đã xác minh 9/9 medium** bằng `read` lại đúng dòng: **9/9 bị hạ mức hoặc hiệu chỉnh cơ chế** — 0 medium nguyên bản sống sót. Hai căn cứ hạ mức: (a) `index.blade.php` là file mồ côi (H.1) → 6 medium không có tác động runtime; (b) 3 medium còn lại sai cơ chế/phạm vi (route thực tế là GET, id là khóa chính int, form có nút submit thủ công).
+
+## H.0 — Bằng chứng BỔ SUNG cho Phần G: đường rotation key là DB-first, không qua env (điều phối tự xác minh độc lập)
+
+- ~~`[high]` "`config/studio.php` đọc `env()` lúc parse → sau `config:cache` việc rotation key bị bỏ qua âm thầm"~~ — **DƯƠNG TÍNH GIẢ**, 3 bằng chứng (điều phối tự xác minh):
+  1. `env()` bên trong `config/*.php` là pattern **chuẩn** của Laravel; `config:cache` tồn tại chính là để snapshot env một lần — hành vi documented, không phải khiếm khuyết.
+  2. Đường rotation của module **không đi qua env**: `studio_api_key()` ưu tiên registry DB mã hóa `StudioApiKey` (`app/Support/helpers.php:402-404`), rồi setting DB `api_<service>_key` (`:406-413`), cuối mới fallback config; `studio_config()` cũng ưu tiên setting DB trước config (`helpers.php:192-194`). Đổi key/cấu hình từ trang Settings có hiệu lực **ngay lập tức**, bất kể `config:cache`.
+  3. Comment `config/studio.php:20-22` nói rõ giá trị env chỉ là default, "You can override each on the Studio Settings page".
+  → Điều còn lại đúng duy nhất là hiển nhiên: sửa thẳng `.env` mà không chạy lại `config:cache` thì không thấy giá trị mới — đúng với MỌI app Laravel, không phải lỗi module này, càng không phải `high`.
+
+## H.1 — Phát hiện MỚI (điều phối tự xác minh): `index.blade.php` là FILE MỒ CÔI — 140 KB dead code
+
+- **[low]** dead-code · `resources/views/studio/index.blade.php` (1.626 dòng / 140 KB) — **không có đường code nào render view này**; toàn bộ UI Alpine `studioApp()` đã bị thay thế bởi Vue (`StudioApp.vue` + `store.js`).
+  - Bằng chứng: route `studio.index` (`routes/web.php:212`) → `StudioController::index()` (`:43-47`) render `studio.vue`; `studioVue()` (`:38`) cũng vậy; grep toàn repo **0** lời gọi `view('studio.index')` — controller có đúng 10 lời gọi `view('studio.*')` literal (api, library, library-vue, pattern, presets, settings, settings-vue, stylist-data, tryon, vue×2), không có `index`; 14 lần `route('studio.index')` đều là **tên route** (link/redirect); không có cơ chế động (`View::make`, `view($var)`, `'studio.'.$x`); các biến view đòi hỏi (`$presets`, `$latest`, `$projects`, `$stylistTypes`) không controller nào truyền vào.
+  - Hệ quả: 24 finding ở H.2–H.4 **không có tác động runtime**; rủi ro thật là bảo trì — ai đó có thể nối lại hoặc copy code từ file này.
+  - Fix: xóa file (bớt 140 KB diện bảo trì + 24 finding ma), hoặc giữ kèm comment đầu file `{{-- @deprecated replaced by resources/js/studio (Vue app) --}}`.
+
+## H.2 — `index.blade.php` chunk 1 (:1-560) · file mồ côi · 8 finding (2 medium gốc → low)
+
+> Mọi finding dưới đây KHÔNG có tác động runtime (lý do H.1); giữ lại làm hồ sơ nếu file được nối lại. Dòng đã được điều phối đọc xác nhận.
+
+- **[low]** (medium gốc — hạ do H.1) sensitive-data · `:7-14,:38` — `$gensJs` đưa `error` thô + `meta` thô của từng generation qua `Js::from` xuống trình duyệt; chuỗi lỗi provider có thể chứa endpoint/account id nội bộ.
+  - Fix: whitelist trường hiển thị an toàn; sanitize error thành message ngắn trước khi lưu.
+- **[low]** (medium gốc — hạ do H.1) correctness · `:262` — `x-model="stylistPromptLang==='vi' ? stylistPromptVi : stylistPromptEn"`: Alpine `x-model` cần biểu thức assignable; ternary ném "Invalid left-hand side in assignment" ngay khi gõ → không sửa được prompt stylist.
+  - Fix: `:value` + `@input` ghi vào property đúng, hoặc getter/setter.
+- **[low]** internal-config · `:6` — `$presetJs` gửi toàn bộ `prompt_injection` + `note` của từng preset (văn bản prompt-engineering nội bộ) xuống client, đọc được và sửa được phía client.
+  - Fix: chỉ gửi id/label/key; resolve `prompt_injection` server-side lúc generate, không tin giá trị client gửi lên.
+- **[low]** internal-config · `:17-24,:32` — `$aiStub`, `$imgProvider`, `$imgKeySet`, `$quotaResetsAt` disclose provider đang dùng, tình trạng key đã cấu hình, thời điểm reset quota vào state trang.
+  - Fix: tối đa một boolean `ai-configured` chung; giữ danh tính provider server-side.
+- **[low]** correctness · `:40` — `{{ auth()->user()->credits_balance }}` echo thô làm tham số `studioApp()` thay vì `Js::from`; null/non-numeric → biểu thức `x-data` invalid → cả component không khởi tạo.
+  - Fix: cast `(float)` hoặc bọc `Js::from`.
+- **[low]** csp · `:80,151,162,340,541` — handler inline `onerror=` tĩnh là inline script, bị CSP không có `unsafe-inline` chặn; `:151/:162` còn phụ thuộc cấu trúc `nextElementSibling`.
+  - Fix: thay bằng Alpine `@error` hoặc một handler image-error delegated.
+- **[info]** csrf · `:36-560` — phạm vi này không có `<form>` nào và không có CSRF token; các action mutating (generateImage, runSwap, surgery, renderVideo) gọi từ Alpine handler → phòng thủ CSRF phụ thuộc hoàn toàn fetch setup ngoài phạm vi.
+  - Fix: xác nhận `layouts.studio` emit csrf-token meta và mọi fetch gửi `X-CSRF-TOKEN`.
+- **[info]** markup-hygiene · `:62-67` — khối `<style>` keyframes nằm giữa body trong grid container thay vì head/asset pipeline → re-parse mỗi lần tải, không cache được.
+  - Fix: chuyển keyframes vào stylesheet compiled hoặc section head push.
+
+## H.3 — `index.blade.php` chunk 2 (:561-1120) · file mồ côi · 8 finding (1 medium gốc → low)
+
+> Xác nhận trong phạm vi KHÔNG có `v-html`/`innerHTML`/`document.write`/`eval`; `@json` duy nhất (`:808`, `$stylistTypes`) chứa nhãn garment-type.
+
+- **[low]** (medium gốc — hạ do H.1) correctness · `:808` — object literal khai báo **trùng key `stylistCustom`**: `''` trước, `{}` sau; giá trị sau thắng → logic chuỗi bind vào `stylistCustom` âm thầm nhận object (đồng phạm vi với confusion `:1302/:1334` ở H.4).
+  - Fix: xóa key trùng, giữ một `stylistCustom` đúng kiểu dự định.
+- **[low]** error-handling · `:826` (pattern tương tự `:879`) — `init()` fetch `/studio/models` với `catch(e){}` rỗng, không check `res.ok` trước `mres.json()`; fail thì âm thầm fallback `videoModels` hardcode → giấu outage của provider khỏi user lẫn log.
+  - Fix: check `res.ok`, log, hiện warning không chặn.
+- **[low]** error-handling · `:1027` — `openRefPicker` fetch `/studio/references` không check `res.ok`; lỗi HTTP/parse rơi vào catch → hiện empty-state "Không có sản phẩm nào có ảnh." → user tưởng hết dữ liệu trong khi nguyên nhân là lỗi server.
+  - Fix: branch theo `res.ok`, trạng thái load-failed riêng + retry.
+- **[low]** correctness · `:1119` — `surgery()` hardcode `credits_cost: 1` thay vì `it.credits_cost` từ response; fallback `[data]` có thể thêm item `generation_id` undefined → vỡ key `x-for` và hiển thị chi phí.
+  - Fix: dùng `credits_cost` server trả; skip item thiếu id.
+- **[low]** resource-leak · `:1059` (và `:1083`) — blob URL (`editSourceTmp`, `editFace`) không bao giờ revoke; `clearEditSource` (`:1073`), `clearEditFace` (`:1087`), `chooseEditProduct` (`:1066`) ghi đè không `revokeObjectURL` → rò bộ nhớ qua các lần upload lặp.
+  - Fix: revoke URL cũ trước khi xóa/thay.
+- **[info]** lifecycle · `:859` — `setInterval` 1s không lưu biến (không hủy được) + listener `hashchange` (`:830`)/`resize` (`:862`) không gỡ; biến chết `_trDeb` (`:867`). Ổn với component page-lifetime, rò nếu re-init.
+  - Fix: lưu handle, clear trong destroy hook, xóa biến chết.
+- **[info]** dom-sink · `:579` (lặp ở `:614,645,669,695,718`) — `onerror="this.src='/images/placeholder.svg'"` inline tĩnh, giá trị hằng → không có injection, nhưng đòi CSP `unsafe-inline` cho event handler.
+  - Fix: listener Alpine `@error` hoặc fallback dùng chung.
+- **[info]** csrf · `:994,1000,1006` — `api`/`upload`/`del` lấy `X-CSRF-TOKEN` từ meta với fallback chuỗi rỗng; meta thiếu thì request mutating vẫn bắn và chết 419 server-side với message chung "Có lỗi xảy ra.".
+  - Fix: fail fast client-side với thông báo session-expired khi token rỗng.
+
+## H.4 — `index.blade.php` chunk 3 (:1121-1626) · file mồ côi · 8 finding (3 medium gốc → low)
+
+- **[low]** (medium gốc — hạ do H.1) resource-leak · `:1414-1431` — `setInterval` của `pollSwap` chỉ clear khi `completed` (`:1420`) hoặc `failed` (`:1426`); status pending kéo dài, response non-ok (`d = {}` qua json catch `:1418`) hay fetch exception lặp lại (`catch(e){}` `:1430`) khiến interval 3s chạy **mãi mãi**; mỗi job `runSwap` sinh một interval riêng không giới hạn.
+  - Fix: cap số lần thử/deadline; clearInterval khi non-ok và terminal error; theo dõi interval id để dọn khi cancel/unload.
+- **[low]** (medium gốc — hạ do H.1) error-handling · `:1613,:1618` — `poll()` clear timer và **không retry** trên mọi lỗi thoáng qua (res non-ok `:1613` hoặc exception mạng `:1618`) → generation kẹt "đang xử lý" vĩnh viễn trong UI, **mâu thuẫn với comment** `:1607-1609` ("polling always resolves to a terminal status").
+  - Fix: retry backoff có cap; chỉ bỏ sau N lần fail liên tiếp và đánh dấu item stale/unknown.
+- **[low]** (medium gốc — hạ do H.1) correctness · `:1192-1205` — đăng ký `touchmove`/`touchend` (`:1192-1193`) nhưng `cropStart`/`cropMove` đọc `e.clientX/clientY` (undefined trên TouchEvent) → `sx/sy` và delta thành NaN → `cropBox` NaN trên thiết bị cảm ứng; `touchmove` là `passive:false` nhưng `cropMove` không gọi `preventDefault` → trang cuộn khi đang kéo.
+  - Fix: chuẩn hóa tọa độ qua `e.touches[0]`/`e.changedTouches[0]`; gọi `preventDefault` cho touch.
+- **[low]** correctness · `:1302-1336` — `stylistCustom` dùng 2 shape không tương thích: `submitStylist` coi là object keyed theo câu hỏi (`this.stylistCustom[k].trim()` `:1302`), `submitCustomStylist` coi là string (`:1334`, reset `''` `:1336`) → object thì TypeError tại `:1334`; string thì custom answer theo câu hỏi không bao giờ được merge. Khớp với duplicate key `:808` (`{}` thắng).
+  - Fix: chọn một shape (object keyed) + guard cả hai call site.
+- **[low]** error-handling · `:1372-1380` — `removeSwapAsset` gửi DELETE với catch rỗng, không check `res.ok`, vẫn vô điều kiện xóa khỏi `swapModels`/`swapPoses` và toast thành công → server fail (419/5xx) thì UI báo đã xóa trong khi asset vẫn còn.
+  - Fix: chỉ mutate local state + toast khi thành công; ngược lại hiện error toast.
+- **[low]** correctness · `:1393-1411` — `runSwap` toast "Đã tạo N phiên bản" theo `jobs.length` (`:1410`) kể cả khi từng job fail (`:1397`); network throw giữa loop hủy mọi job còn lại; sleep cố định 1,5s (`:1395`) nằm giữa fetch và parse body → chậm phản hồi lỗi.
+  - Fix: chỉ đếm job thành công; try/catch mỗi job để đi tiếp; dời sleep sau xử lý response.
+- **[low]** correctness · `:1497-1525` — `creditsLeft` được null-guard trong `generateImage` (`:1497`) nhưng `renderVideo` (`:1510`) và `refine` (`:1518`) gán thẳng từ `data.credits_left` → thiếu field là trắng hiển thị; `cancelGeneration` (`:1525`) tự cộng lại `g.credits_cost` client-side không có xác nhận server → lệch số dư thật tới lần reload.
+  - Fix: guard null mọi phép gán; chỉ tin balance server trả về sau cancel.
+- **[low]** error-handling · `:1146-1357` — catch rỗng nuốt lỗi ở `loadStylistTypes` (`:1146`), `openStylist` (`:1151`), `loadSwapAssets` (`:1357`), `pollSwap` (`:1430`), `syncLatest` (`:1556`); riêng `syncLatest` thay danh sách generations mà không re-arm poll cho item còn active phía server không có timer local → chúng trông như đứng yên.
+  - Fix: log lỗi bị nuốt; thêm retry affordance kín; gọi `maybePoll` cho item active sau merge.
+
+## H.5 — `settings.blade.php` chunk 1 (:1-400, glm-5.2) · 3 finding · không có giá trị key nào được render
+
+- **[low]** form-ux · `:225,:321` — khối lỗi `{{ $errors->first() }}` escape đúng (an toàn) nhưng nút "Lưu cài đặt"/"Lưu" không có guard chống double-submit phía client (UX thuần, không phải lỗ hổng).
+  - Fix: trạng thái disabled hoặc cờ `submitting` trong `x-data`.
+- **[info]** secret-exposure (xác nhận ÂM TÍNH) · `:1-400` — KHÔNG có giá trị API key (plaintext hay mã hóa), không `@json` payload, không `data-*` chứa secret, không inline script trong phạm vi; các chuỗi `sk-…` tại `:79,83,87` là placeholder ví dụ tĩnh.
+  - Fix: không cần; tab keys/models (`:445+`, `:704+`) xem H.6.
+- **[info]** csrf · `:20,:232,:328` — cả ba form POST trong phạm vi đều có `@csrf`; bảo vệ CSRF nguyên vẹn cho các endpoint này.
+
+## H.6 — `settings.blade.php` chunk 2 (:401-738, glm-5.2) · 7 finding (2 medium gốc → low) · tab key chỉ render metadata
+
+> **XÁC NHẬN ÂM TÍNH quan trọng (tinh chỉnh issue top-5 số 2):** tab keys/models **không render giá trị key thô** — chỉ metadata `provider`/`label`/`kind`/`api_key_ref` (`:458,:479`) và `key_prefix` từ response endpoint test (`:713`). Điều phối đã tự xác minh `StudioController.php`: diện rò rỉ của issue #2 nằm ở **JSON `settingsData()` `:3857`** (trả nguyên collection model `StudioApiKey` qua `->get()`, model không có `$hidden`) và **`settings()` `:3925`** (truyền nguyên model vào view — hôm nay blade không echo `value`, nhưng chỉ một `@json($api_keys)` là tràn ra HTML). Lớp blade KHÔNG phải nơi rò trực tiếp → issue #2 giữ nguyên `high` qua đường JSON, không nâng cấp.
+
+- **[low]** (medium gốc — HẠ sau xác minh) inline-js · `:461` — `onclick="studioTestModel(this, {{ $id }})"` nội suy id vào JS inline; Blade escape ngữ cảnh HTML chứ không escape ngữ cảnh JS. **Lý do hạ (đã xác minh):** `$id` là khóa chính registry — `data_get($m, 'id')` (`:454`) — int auto-increment từ DB, và onclick chỉ render khi `@if($id)` (bản default không có id, `:468`); breakout đòi id chứa quote/backslash → không thực tế với nguồn dữ liệu hiện tại. Vẫn đáng sửa như một pattern.
+  - Fix: `data-id="{{ $id }}"` + `addEventListener`, hoặc `@json($id)`.
+- **[low]** (medium gốc — HIỆU CHỈNH cơ chế) side-effectful-get · `:708` — `fetch('/studio/models/'+id+'/test')` không kèm `X-CSRF-TOKEN`. **Đã xác minh:** route là **GET** (`routes/web.php:108`) → CSRF-exempt, không có kịch bản 419 như claim gốc đoán. Vấn đề thật còn lại: **GET có side effect** (gọi live tới provider để kiểm tra key) → trang cross-origin có thể ép trình duyệt admin đốt quota provider qua `<img>`/fetch (không đọc được response), và vi phạm tính idempotent của GET.
+  - Fix: chuyển POST + CSRF nếu giữ live-check; hoặc rate-limit `testModel`; tối thiểu không gọi provider trong GET.
+- **[low]** sensitive-data · `:713` — response test render `key_prefix` (một phần key) + `base_url` vào DOM qua `textContent` — không XSS nhưng lộ thêm prefix key/endpoint nội bộ cho bất kỳ ai mở được trang settings.
+  - Fix: mask sâu hơn (vd 2 ký tự đầu) hoặc giới hạn theo vai trò.
+- **[low]** sensitive-data · `:458,:479,:510,:647` — `api_key_ref` + nhãn provider render vào span/option text hiển thị — không secret, nhưng ánh xạ định danh provider/key nội bộ ra UI.
+  - Fix: chấp nhận được; tuyệt đối không đưa `value` thật vào field của `$api_keys` truyền xuống view (hiện đúng — giữ nguyên).
+- **[low]** maintainability · `:504` — `onchange` inline dựng DOM query theo `this.options[...]` — mong manh, không test được.
+  - Fix: chuyển ra event listener ngoài.
+- **[info]** error-handling · `:716-717` — `.then` không guard `r.ok`; response 500 không phải JSON → `r.json()` throw xuống `.catch` với message chung.
+  - Fix: check `r.ok` trước khi parse JSON.
+- **[info]** form/inline-js · `:465,:546,:594,:659` — form DELETE `onsubmit="return confirm('Xóa model «{{ $name }}»?')"` nội suy tên vào JS string; escaping Blade không đảm bảo an toàn ngữ cảnh JS string — tên chứa `'` làm vỡ `confirm()` (handler throw → submit vẫn chạy, mất luôn bước xác nhận).
+  - Fix: `data-confirm` + JS, hoặc `@json`.
+
+## H.7 — `library.blade.php` + 2 Vue shell (qwen3.8-max) · 7 finding (1 medium gốc → low)
+
+- **[low]** (medium gốc — HIỆU CHỈNH phạm vi) inline-alpine · `library.blade.php:33,:41` — `@change="this.form.submit()"` **không hoạt động**: Alpine 3.17.1 (bản cài thực tế — đã xác minh `node_modules/alpinejs/package.json`) đánh giá biểu thức handler với `this` không phải element → `this.form` undefined → TypeError bị Alpine nuốt; select loại/dự án không auto-submit. **Lý do hạ (đã xác minh):** form vẫn có nút thủ công `<button type="submit">Lọc</button>` (`:52`) → lọc không chết hoàn toàn, chỉ mất UX auto-submit.
+  - Fix: `$el.form.submit()` hoặc `$event.target.form.submit()`.
+- **[low]** data-payload · `library.blade.php:18,:23` — toàn bộ blob `meta` được đưa xuống trình duyệt qua `Js::from` nhưng không biểu thức nào trong view tiêu thụ (`genMeta()` trong `x-data` `:23` chỉ dùng provider/model/duration/ratio/resolution/elapsed_ms/created_at) → phơi bày không cần thiết (`meta` có thể chứa chi tiết provider/model, URL ảnh nguồn, negative_prompt, điểm QA) + phình payload.
+  - Fix: bỏ `meta` hoặc whitelist đúng field UI render.
+- **[low]** ux/error-state · `library.blade.php:23,:57-62` — `del()` xóa item khỏi mảng Alpine nhưng empty-state là `@if` server-side (`:57`) → xóa item cuối của trang để lại vùng lưới trống không có message "Chưa có ảnh / video nào" trong khi đếm ở header về 0.
+  - Fix: `x-show="items.length===0"` cho empty-state hoặc reload sau khi xóa item cuối.
+- **[low]** robustness · `library.blade.php:67,:105` — `onerror="this.src='/images/placeholder.svg'"` không tự gỡ handler; nếu placeholder.svg thiếu → event error bắn lại, gán lặp cùng src thành vòng lặp spam console/mạng.
+  - Fix: `onerror="this.onerror=null;this.src='/images/placeholder.svg'"`.
+- **[info]** status-consistency · `library.blade.php:119` — badge trạng thái trong modal thiếu nhánh `cancelled` → generation đã hủy hiện badge vàng "Đang tạo" ở modal, trong khi lưới (`:74` — đã xác minh) và text thân modal (`:115`) hiện đúng "Đã hủy".
+  - Fix: thêm case `cancelled` mirror nhánh `:74`.
+- **[info]** maintainability · `library.blade.php:23,:134-135` — một dòng `x-data` ~1,5k ký tự giữ toàn bộ logic modal/zoom/xóa; endpoint hardcode ('/studio/generations/', '/studio?gen=') thay vì `route()` → vỡ khi deploy subdirectory hoặc đổi route; không có đóng modal bằng phím Escape.
+  - Fix: dời logic sang `resources/js`; inject URL bằng `route()`; thêm `@keydown.escape.window`.
+- **[info]** vue-shells · `library-vue.blade.php:3-6`, `settings-vue.blade.php:3-6` — cả hai sạch: không payload data inline, không secret, csrf-token meta là chuẩn SPA Laravel, bundle `@vite` đúng; gap duy nhất: phụ thuộc JS toàn phần — script bị chặn thì body chỉ còn root div rỗng.
+  - Fix (tùy chọn): notice `noscript`; không cần thay đổi bảo mật.
+
+## H.8 — Thống kê hiệu chỉnh round 1
+
+| Nguyên bản từ 6 subagent | Sau xác minh điều phối |
+|---|---|
+| high/critical 0 | — (gate không kích hoạt) |
+| medium 9 | **0 còn lại** — 6 hạ do file mồ côi (H.1); 3 hạ/hiệu chỉnh cơ chế (route GET `routes/web.php:108` · id int `:454` · nút submit `:52`) |
+| low 20 | 29 (+9 medium hạ bậc) + 1 mới (H.1 orphan) = **30** |
+| info 12 | **12** |
+| tổng 41 | **Phần H: 42 finding** (low 30 · info 12 · medium 0 · high 0 · critical 0) |
+
+Pattern §8 playbook tái khẳng định: **0/9 medium sống sót ở mức nguyên bản** — cả hai model đều sinh finding có dòng thật nhưng sai cơ chế/mức độ/phạm vi. Xác minh điều phối là bắt buộc bất kể model.

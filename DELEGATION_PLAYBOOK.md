@@ -1,8 +1,14 @@
 # DELEGATION PLAYBOOK — quy trình giao việc đa-agent (DSH workflow)
 
 > **Đọc file này trước khi điều phối. Đừng khảo sát lại từ đầu.**
+>
+> **Bộ ba file** — đọc theo thứ tự này:
+> 1. `STUDIO_REVIEW_PROGRESS.md` — **trạng thái + QUEUE** (~9 KB). Đọc ĐẦU TIÊN khi chạy bền bỉ.
+> 2. `DELEGATION_PLAYBOOK.md` — **quy trình** (file này, ~24 KB). Việc dài nhiều lượt → đọc thêm **mục 10**.
+> 3. `STUDIO_REVIEW.md` — **kết quả** (~106 KB). Chỉ đọc Phần cần trích dẫn, đừng đọc hết.
+>
 > Mọi con số/nguyên nhân dưới đây đã đo và kiểm chứng bằng smoke-test thật trên máy này.
-> Template ở mục 5 **đã chạy thành công 2 lần** (provider `qwen-token-plan`, 0 fail): smoke-test parse 6/6 finding, và chạy nguyên văn task `ctrl-1` parse 7/7 finding.
+> Template ở mục 5 **đã chạy 5 lần, 0 fail** (provider `qwen-token-plan`): smoke-test 6/6 · `ctrl-1` nguyên văn 7/7 · 2-model 8/8 + 8/8 · per-task model 8/8 + 7/7 · QUEUE A đợt 1 (Phần H) 6/6 task, 41 finding parse sạch.
 
 ---
 
@@ -203,6 +209,7 @@ for (const a of areas) for (const f of a.findings) { n++; bySeverity[f.severity]
 ## 7. Thủ tục gộp báo cáo
 
 - Mỗi area là một `##`; mỗi finding là `- **[severity]** category · file:line — mô tả`, dòng sau `  - Fix: ...`.
+- **Mỗi area PHẢI liệt kê danh sách file đã audit** (kèm `offset`/`limit` nếu là chunk) trong một dòng `Files audited:` ngay dưới heading. KHÔNG ghi gộp kiểu "đã audit 13 component nhỏ". Lý do (lỗi thật đã xảy ra): Phần B ghi số lượng mà không liệt kê → về sau **không thể xác minh** file nào đã phủ, phải dùng `grep` tên file làm proxy yếu và chấp nhận rủi ro review trùng 136 KB frontend.
 - Giữ báo cáo cũ: cắt từ `## ` đầu tiên, rồi nối header mới + thân cũ + section mới.
 - Đếm và đối chiếu:
 
@@ -229,6 +236,8 @@ grep -nE "^- \*\*\[(critical|high|medium|low|info)\]\*\*" STUDIO_REVIEW.md
 | `glm-5.2` báo XSS ở blade | **3/3 claim XSS là dương tính giả** — Blade `{{ }}` tự escape, `@json` có HEX flags, `$service` là mảng hardcode (`StudioController.php:4352`) | trước khi tin claim XSS: grep `{!!` và truy nguồn biến |
 | `qwen3.8-max` báo "DDL mỗi request" | `Schema::create` chỉ chạy khi `! $hasAll` (`StylistCatalog.php:30`); mỗi request chỉ tốn 3 lệnh `Schema::hasTable`, và là thiết kế có chủ đích (docblock :18-19) | đọc cả docblock ngay trên hàm trước khi kết luận |
 | Mỗi model sai đúng chỗ model kia đúng | `qwen3.8-max` sai authz/DDL, `glm-5.2` sai XSS | **không có model nào đáng tin tuyệt đối** — xác minh là bắt buộc bất kể model |
+| Xếp hàng đợi theo KÍCH THƯỚC mà không kiểm tra file có sống không | tốn **3 task cho `index.blade.php` 140 KB** rồi mới phát hiện nó là **dead code** — route `studio.index` render `studio.vue`, grep `view('studio.index')` = 0 → 24/41 finding không có tác động runtime | trước khi queue một view/blade: grep `view('<tên>')` và `View::make` để chắc nó được render. File mồ côi → đề xuất XÓA, đừng review |
+| Hai quy trình chạy song song trên cùng file | trùng heading `Phần G`, ledger không được cập nhật (0/12 dù 6 task đã xong), header lệch 120 vs 162 | trước khi chạy: đọc ledger; sau khi chạy: cập nhật ledger + recount bằng `grep`. Đừng chạy 2 đợt đồng thời trên cùng artifact |
 | Script dùng backtick hoặc Node API | throw, chết cả run | chỉ string concat; không `Date`, `fs`, `fetch`, `setTimeout` |
 | `meta` viết bên trong `script` | parse fail | `meta` là tham số riêng của tool call |
 | Quoting bash trong `run_code` | `${#${v}}` → `ReferenceError` | viết script ra file `/tmp/*.cjs` rồi chạy, tránh inline phức tạp |
@@ -242,14 +251,68 @@ grep -nE "^- \*\*\[(critical|high|medium|low|info)\]\*\*" STUDIO_REVIEW.md
 - Helper tập trung ở `app/Support/helpers.php` (`studio_config`, `studio_api_key`, `studio_model_candidates`, `studio_candidate_key`, `studio_qwen_*`).
 - Module wiring: `app/Modules/Studio/StudioModuleServiceProvider.php` + `StudioBridge.php`; config namespace `studio` và `studio_module` tách rời (đã ghi nhận là điểm gây nhầm).
 - Frontend: Pinia store đơn khối `resources/js/studio/store.js` (2.915 dòng) + ~25 component; 4 entry Vite (`app`, `settings`, `library`, `stylist-data`).
-- **Blade views — lớp TRƯỚC ĐÂY BỊ BỎ SÓT khi kiểm kê**: `resources/views/studio/` tổng **243 KB / 2.841 dòng**. `index.blade.php` 1.626 dòng/140 KB · `settings.blade.php` 738 dòng/68 KB (**liên quan trực tiếp issue top-5 số 2**) · `library.blade.php` 142/12 KB · `presets` 95 · `api` 72 · `tryon` 62 · `pattern` 47 · `vue` 35 · `stylist-data` 10 · 2 file `-vue` 7 dòng. Đã review 6 file nhỏ (~22 KB); **3 file lớn CHƯA review**. `settings.blade.php` 68 KB vượt trần 60 KB → chia 2 chunk.
+- **Blade views — lớp TRƯỚC ĐÂY BỊ BỎ SÓT khi kiểm kê**: `resources/views/studio/` tổng **243 KB / 2.841 dòng**. `index.blade.php` 1.626 dòng/140 KB · `settings.blade.php` 738 dòng/68 KB (**liên quan trực tiếp issue top-5 số 2**) · `library.blade.php` 142/12 KB · `presets` 95 · `api` 72 · `tryon` 62 · `pattern` 47 · `vue` 35 · `stylist-data` 10 · 2 file `-vue` 7 dòng. Đã review **TOÀN BỘ 11 file** (Phần F: 6 nhỏ; Phần H: `index` ×3 chunk, `settings` ×2 chunk, `library` + 2 shell). **PHÁT HIỆN PHẦN H: `index.blade.php` (140 KB) là FILE MỒ CÔI** — route `studio.index` render `studio.vue` (`StudioController.php:43-47`), grep toàn repo = 0 lời gọi `view('studio.index')` → 24 finding trên nó không có tác động runtime; đề xuất XÓA file. `settings.blade.php` KHÔNG render giá trị key thô (chỉ metadata `:458,:479` + `key_prefix` `:713`) → issue top-5 số 2 giữ `high` qua đường JSON `settingsData()` `:3857`.
 - Lớp blade **không có `{!!` nào** (grep = 0 kết quả), dùng `{{ }}` (escape mặc định) và `@json` (Laravel bật sẵn `JSON_HEX_TAG|HEX_APOS|HEX_AMP|HEX_QUOT`) → **lớp XSS-blade gần như bị loại**; đừng để subagent báo lại.
 - `app/Services/StylistCatalog.php` (287 dòng): `ensureTables()` tự tạo bảng + seed cho shared hosting không chạy được `artisan migrate`; `savePreset()` :248-264 có race check-then-act và nuốt lỗi.
 - **5 vấn đề nặng nhất đã tìm ra** (chi tiết trong `STUDIO_REVIEW.md`):
   1. Path traversal → đọc file cục bộ: `buildMaskImage()` :262-268 (`source_url` chỉ validate `string`, không rule `url`, không chặn `..`); cùng pattern ở `faceDescription()`/`poseDescription()` :416-450, reachable từ :928.
   2. API key material xuống trình duyệt: `settingsData()` :3857 + settings view :3925 trả nguyên model `StudioApiKey`; model không có `$hidden`, `value` nằm trong `$fillable`; mã hóa chỉ gọi thủ công ở :3805, :4122, :4142.
-  3. `config/studio.php` đọc `env()` lúc parse → sau `config:cache` việc rotation key bị bỏ qua âm thầm.
+  3. **[medium] Giải mã ảnh không giới hạn kích thước — 41 vị trí** (đính chính từ '~10', đếm lại bằng grep: `StudioController` 20 · `ImageAIService` 15 · `ProductAIService` 3 · `StyleSuggestService` 2 · `helpers` 1) → sửa bằng 1 helper dùng chung. *(Item cũ số 3 "`config/studio.php` đọc `env()`" = **DƯƠNG TÍNH GIẢ đã LOẠI** — bằng chứng: Phần G + H.0; rotation key là DB-first qua `helpers.php:402-413,192-194`.)*
   4. `studioImage()` :1739-1758 public, fallback `base_path(public_html/$path)` không giới hạn prefix `studio/`.
-  5. ~10 chỗ `@imagecreatefromstring(file_get_contents(...))` không kiểm tra kích thước → dễ OOM.
+  5. **[medium] Trả nguyên văn `$e->getMessage()` cho client — 12 vị trí / 5 controller** (`StudioController` 5 · `StylistDataController` 4 · `CouponApiController` 1 · `CartApiController` 1 · `ProjectController` 1).
 - Điểm tốt sẵn có để tái sử dụng: `assetDestroy()` :1722-1723 có containment check trước `@unlink()`; `studioImage()` :1741 có guard `..` + charset; mọi outbound `Http` đều set `timeout()`.
+
+## 10. Vận hành bền bỉ (goal rounds) — cơ chế ĐÃ XÁC MINH trong source DSH
+
+**Dùng khi:** mục tiêu dài cần tự chạy tiếp nhiều lượt (vd phủ hết 1,34 MB module studio). **Không dùng** cho việc 1 lượt.
+Nguồn xác minh: `dsh-goal-round-driver/README.md`, `dsh-tool-goal/README.md`, `dsh-goal/lib/index.js`.
+
+| Sự kiện | Hành vi THẬT (đọc từ source) |
+|---|---|
+| Agent idle + goal `active` & `armed` + còn capacity | driver checkpoint mutation đang chờ → reserve `roundsStarted + 1` → queue 1 prompt `<goal_round>` |
+| Round được tính | chỉ khi `user/message` thực sự đi vào; reservation bị stale **không** tốn round |
+| Tin nhắn của người | **không** tốn round cap; việc tự động **nhường** khi có việc của người |
+| `complete`/`blocked` trong round tự động | gọi `concludeTurn()` → turn dừng ngay sau step đó |
+| `blocked` | bị chặn cơ học tới `blockedAfterConsecutiveRounds = 3`; reason lưu code `model-reported` |
+| `resume` | **fail** nếu `roundsStarted >= maxGoalRounds` ("exhausted round budget") → phải `edit` nâng cap trước |
+| Session resume / fork / plugin load lại | activation **không** kế thừa → goal bị disarm; cần người yêu cầu rồi `update_goal action=resume` |
+| Cancel một round | driver **pause** goal để không tự chạy lại |
+| Lỗi provider/persistence tạm thời | **không tự retry** — cần người resume |
+| Round cap | **không** phải ngân sách tài nguyên: token/tiền/quota là chính sách độc lập, không map vào blocker code |
+| Evaluator độc lập | **không có** — model tự quyết định đã đủ bằng chứng chưa |
+
+### 4 hệ quả vận hành phải nhớ
+
+1. Round cộng dồn trong **cùng session** ("no fresh agent or copied conversation prefix"), compaction có thể shadow round cũ → **trạng thái phải nằm ở file**: `STUDIO_REVIEW_PROGRESS.md` (~4,6 KB). Đừng tin trí nhớ hội thoại.
+2. Goal **không tự dừng vì hết tiền/quota** → tự đặt ngân sách cứng: **mỗi round = 1 lượt workflow ≤ 6 task**.
+3. **Subagent KHÔNG có quyền** create/edit/pause/resume goal (chỉ root agent + human authority) → đừng giao việc quản lý goal cho child.
+4. "Còn việc hữu ích" **không** phải blocked. Chỉ blocked khi cùng một điều kiện chặn lặp lại **≥3 round liên tiếp**, và phải mô tả điều kiện cụ thể trong `blocked_reason`.
+
+### Quy trình 1 round chuẩn
+
+1. `read` `STUDIO_REVIEW_PROGRESS.md` (trạng thái + QUEUE) — chỉ ~1,4k token.
+2. Lấy **≤6 task ĐẦU TIÊN** còn `[ ]` ở QUEUE A.
+3. Chạy 1 workflow bằng template mục 5, gán `model` theo cột trong ledger.
+4. Parse bằng parser **bao dung** mục 5. `failed[]` → halve `limit`, retry đúng 1 lần.
+5. **Xác minh 100% finding `high`/`critical`** bằng `read` (mục 6 bước 6).
+6. Ghi finding đã xác minh vào `STUDIO_REVIEW.md` Phần kế tiếp; gạch bỏ dương tính giả kèm bằng chứng.
+7. Cập nhật ledger: đánh `[x]`, cộng số liệu (đối chiếu `grep -c`), thêm task mới phát sinh.
+8. Còn `[ ]` → **để goal active**, KHÔNG gọi `complete`.
+
+### Câu khởi động (người dán, một lần)
+
+```
+Đọc DELEGATION_PLAYBOOK.md và STUDIO_REVIEW_PROGRESS.md rồi tiếp tục quét module studio.
+Tạo goal chạy bền bỉ: mỗi round tối đa 1 lượt workflow ≤6 task, chỉ dùng provider qwen-token-plan,
+xác minh mọi finding high/critical trước khi ghi vào STUDIO_REVIEW.md.
+```
+
+`max_goal_rounds` gợi ý: **3** cho QUEUE A (8 task ÷ 6 = 2 round + 1 dự phòng). QUEUE B phải xác nhận trước nên đừng tính vào.
+
+### Goal rounds vs Ralph vs subagent thường
+
+- **Goal rounds** (mặc định): giữ nguyên ngữ cảnh tích luỹ trong session → hợp việc review cần đối chiếu phát hiện cũ.
+- **`ralph`**: mỗi round là child MỚI, không seed hội thoại, workspace làm bộ nhớ → hợp việc cần góc nhìn tươi. **Chỉ dùng khi người dùng yêu cầu rõ "Ralph".**
+- **`subagent` thường**: việc 1-2 lần delegate, có kết quả rồi thôi → đừng tạo goal.
+
 

@@ -261,10 +261,7 @@ class StudioController extends Controller
      */
     protected function buildMaskImage(string $sourceUrl, array $region, string $maskMode, ?string $brushData, int $feather = 0): ?string
     {
-        $file = null;
-        foreach ([public_path(ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($sourceUrl);
         if (! $file) return null;
         $src = @imagecreatefromstring((string) file_get_contents($file));
         if (! $src) return null;
@@ -360,10 +357,7 @@ class StudioController extends Controller
             return $url;
         }
 
-        $file = null;
-        foreach ([public_path(ltrim((string) parse_url($url, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($url, PHP_URL_PATH), '/')))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return $url; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return $url; }
@@ -415,12 +409,7 @@ class StudioController extends Controller
      */
     protected function faceDescription(string $url): ?string
     {
-        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        if (str_starts_with($path, 'studio/image/')) { $path = substr($path, strlen('studio/image/')); }
-        $file = null;
-        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
-            if (is_file($c)) { $file = $c; break; }
-        }
+        $file = $this->resolveLocalImage($url, true);
         if (! $file) { return null; }
         try {
             return app(\App\Services\StyleSuggestService::class)->describeFace($file);
@@ -435,12 +424,7 @@ class StudioController extends Controller
      */
     protected function poseDescription(string $url): ?string
     {
-        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        if (str_starts_with($path, 'studio/image/')) { $path = substr($path, strlen('studio/image/')); }
-        $file = null;
-        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
-            if (is_file($c)) { $file = $c; break; }
-        }
+        $file = $this->resolveLocalImage($url, true);
         if (! $file) { return null; }
         try {
             return app(\App\Services\StyleSuggestService::class)->describePose($file);
@@ -539,10 +523,7 @@ class StudioController extends Controller
      */
     protected function buildBackgroundMask(string $sourceUrl, string $brushData): ?string
     {
-        $file = null;
-        foreach ([public_path(ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($sourceUrl);
         if (! $file) return null;
         $src = @imagecreatefromstring((string) file_get_contents($file));
         if (! $src) return null;
@@ -1015,10 +996,7 @@ class StudioController extends Controller
             return response()->json(['message' => 'Ảnh nguồn chưa có kết quả.'], 422);
         }
 
-        $file = null;
-        foreach ([public_path(ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')), storage_path('app/public/'.str_replace('storage/', '', ltrim((string) parse_url($sourceUrl, PHP_URL_PATH), '/')))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($sourceUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
         $src = @imagecreatefromstring((string) file_get_contents($file));
         if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
@@ -1719,8 +1697,11 @@ RULES:
         // Xóa cả file vật lý để không để lại ảnh mồ côi trong studio/assets.
         if ($asset->path) {
             $rel = ltrim(str_replace('storage/', '', (string) parse_url($asset->path, PHP_URL_PATH)), '/');
-            $abs = storage_path('app/public/'.$rel);
-            if (is_file($abs) && str_starts_with(str_replace('\\', '/', $abs), str_replace('\\', '/', storage_path('app/public/')))) {
+            // realpath() containment — the previous str_starts_with() ran on the UNRESOLVED
+            // path, so a stored value containing ../ escaped the storage root before @unlink().
+            $root = realpath(storage_path('app/public'));
+            $abs = $root === false ? false : realpath(storage_path('app/public/'.$rel));
+            if ($abs !== false && is_file($abs) && str_starts_with($abs, $root.DIRECTORY_SEPARATOR)) {
                 @unlink($abs);
             }
         }
@@ -1937,11 +1918,7 @@ RULES:
         }
 
 
-        $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
 
         $src = @imagecreatefromstring((string) file_get_contents($file));
@@ -1982,9 +1959,7 @@ RULES:
         ]);
         $level = max(1, min(10, (int) ($data['level'] ?? 5)));
         $srcUrl = (string) $data['image'];
-        $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) { if (is_file($cand)) { $file = $cand; break; } }
+        $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
@@ -2030,9 +2005,7 @@ RULES:
 
     protected function processAndStore(string $srcUrl, callable $cb, string $prompt, string $model): \Illuminate\Http\JsonResponse
     {
-        $rel = ltrim((string) parse_url($srcUrl, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) { if (is_file($cand)) { $file = $cand; break; } }
+        $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
@@ -2448,11 +2421,7 @@ RULES:
         if (! $look || $look === 'none' || $level <= 0) {
             return null;
         }
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
@@ -2570,11 +2539,7 @@ RULES:
         if (! $cutout) { return null; }
 
         $load = function (string $url) {
-            $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-            $file = null;
-            foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $c) {
-                if (is_file($c)) { $file = $c; break; }
-            }
+            $file = $this->resolveLocalImage($url);
             return $file ? @imagecreatefromstring((string) file_get_contents($file)) : null;
         };
         $comp = $load($compositeUrl); $cut = $load($cutout);
@@ -2623,11 +2588,7 @@ RULES:
     {
         $key = (string) studio_config('removebg_key', '');
         if ($key === '') { return null; }
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $c) {
-            if (is_file($c)) { $file = $c; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
         try {
             $resp = \Illuminate\Support\Facades\Http::withHeaders(['X-Api-Key' => $key])->timeout(90)
@@ -2653,11 +2614,7 @@ RULES:
      */
     protected function applyScaleDown(string $url, float $scale = 0.90): ?string
     {
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
@@ -2710,11 +2667,7 @@ RULES:
         if (! $bgClean) { return null; }
 
         $load = function (string $url) {
-            $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-            $file = null;
-            foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $c) {
-                if (is_file($c)) { $file = $c; break; }
-            }
+            $file = $this->resolveLocalImage($url);
             return $file ? @imagecreatefromstring((string) file_get_contents($file)) : null;
         };
         $comp = $load($compositeUrl); $clean = $load($bgClean);
@@ -2801,11 +2754,7 @@ RULES:
      */
     protected function outpaintBackground(string $url): ?string
     {
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
@@ -2853,11 +2802,7 @@ RULES:
      */
     protected function applyPortraitDepth(string $url): ?string
     {
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
@@ -3011,11 +2956,7 @@ RULES:
      */
     protected function applySuperResolution(string $url, int $scale = 2): ?string
     {
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
 
         $key = studio_api_key('dashscope') ?: studio_api_key('qwen') ?: studio_api_key('qwen_edit');
@@ -3056,11 +2997,7 @@ RULES:
      */
     protected function applyFaceEnhance(string $url): ?string
     {
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
 
         $key = studio_api_key('dashscope') ?: studio_api_key('qwen') ?: studio_api_key('qwen_edit');
@@ -3099,11 +3036,7 @@ RULES:
      */
     protected function brightenDarkSubject(string $url): ?string
     {
-        $rel = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($rel), storage_path('app/public/'.str_replace('storage/', '', $rel))] as $cand) {
-            if (is_file($cand)) { $file = $cand; break; }
-        }
+        $file = $this->resolveLocalImage($url);
         if (! $file) { return null; }
         $img = @imagecreatefromstring((string) file_get_contents($file));
         if (! $img) { return null; }
@@ -3381,11 +3314,66 @@ RULES:
      */
     protected function resolveReferencePath(string $url): ?string
     {
+        return $this->resolveLocalImage($url);
+    }
+
+    /**
+     * Resolve a user-supplied image URL/path to a REAL local file, confined to
+     * public/ and storage/app/public.
+     *
+     * `source_url` / `reference_url` only carry `string|max:2048` validation, so a
+     * value like "/../../../../etc/passwd" used to reach public_path() unchecked and
+     * allowed reading arbitrary local files — the bytes were then handed to a vision
+     * model by faceDescription()/poseDescription() and echoed back inside the prompt.
+     * Every local resolution now goes through realpath() containment.
+     *
+     * @param  bool  $stripImageRoute  also accept the /studio/image/{path} route form
+     */
+    protected function resolveLocalImage(string $url, bool $stripImageRoute = false): ?string
+    {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
 
-        foreach ([public_path($path), storage_path('app/public/'.$path)] as $candidate) {
-            if (is_file($candidate)) {
-                return $candidate;
+        if ($stripImageRoute && str_starts_with($path, 'studio/image/')) {
+            $path = substr($path, strlen('studio/image/'));
+        }
+
+        return $this->safeLocalFile($path);
+    }
+
+    /**
+     * Containment-checked local file lookup: reject traversal segments and any
+     * character outside [A-Za-z0-9/_.-], then require the realpath() of the hit to
+     * sit inside public/ or storage/app/public (symlinks resolved, so a file served
+     * via public/storage/... is still validated against its true location).
+     */
+    protected function safeLocalFile(string $path): ?string
+    {
+        $path = ltrim($path, '/');
+
+        if ($path === '' || in_array('..', explode('/', $path), true)) {
+            return null;
+        }
+        if (! preg_match('#^[A-Za-z0-9/_.\-]+$#', $path)) {
+            return null;
+        }
+
+        $roots = [public_path(), storage_path('app/public')];
+        $candidates = [
+            public_path($path),
+            storage_path('app/public/'.$path),
+            storage_path('app/public/'.ltrim(str_replace('storage/', '', $path), '/')),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $real = realpath($candidate);
+            if ($real === false || ! is_file($real)) {
+                continue;
+            }
+            foreach ($roots as $root) {
+                $rootReal = realpath($root);
+                if ($rootReal !== false && str_starts_with($real, $rootReal.DIRECTORY_SEPARATOR)) {
+                    return $real;
+                }
             }
         }
 
@@ -3684,11 +3672,9 @@ RULES:
             abort(404);
         }
 
-        $path = ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/');
-        $path = str_replace('storage/', '', $path);
-        $abs = storage_path('app/public/'.$path);
+        $abs = $this->resolveLocalImage((string) $generation->media_url);
 
-        if (! is_file($abs)) {
+        if (! $abs) {
             abort(404);
         }
 
@@ -3721,11 +3707,9 @@ RULES:
             return response()->json(['colors' => []]);
         }
 
-        $rel = ltrim((string) parse_url($generation->media_url, PHP_URL_PATH), '/');
-        $rel = str_replace('storage/', '', $rel);
-        $abs = storage_path('app/public/'.$rel);
+        $abs = $this->resolveLocalImage((string) $generation->media_url);
 
-        if (! is_file($abs)) {
+        if (! $abs) {
             return response()->json(['colors' => []]);
         }
 
@@ -3802,7 +3786,7 @@ RULES:
             $k = new \App\Models\StudioApiKey();
             $k->provider = (string) ($d['key_provider'] ?? '');
             $k->label = (string) ($d['key_label'] ?? $k->provider);
-            $k->value = \Illuminate\Support\Facades\Crypt::encryptString((string) $d['key_value']);
+            $k->value = (string) $d['key_value']; // encryption is enforced by StudioApiKey::setValueAttribute()
             $k->kind = (string) ($d['key_kind'] ?? '');
             $k->scopes = ['*'];
             $k->priority = (int) ($d['key_priority'] ?? 5);
@@ -4119,7 +4103,7 @@ RULES:
         ]);
         $data['priority'] = (int) ($data['priority'] ?? 0);
         $data['enabled'] = true;
-        $data['value'] = \Illuminate\Support\Facades\Crypt::encryptString(trim($data['value']));
+        $data['value'] = trim($data['value']); // encryption is enforced by StudioApiKey::setValueAttribute()
         $data['scopes'] = ['*']; // key dùng chung (độc lập model)
         \App\Models\StudioApiKey::create($data);
         return redirect()->back()->with('success', 'Đã thêm API key.');
@@ -4139,7 +4123,7 @@ RULES:
         ]);
         $data['priority'] = (int) ($data['priority'] ?? 0);
         $data['scopes'] = ['*']; // key dùng chung (độc lập model)
-        if (! empty($data['value'])) $data['value'] = \Illuminate\Support\Facades\Crypt::encryptString(trim($data['value']));
+        if (! empty($data['value'])) $data['value'] = trim($data['value']); // encryption is enforced by StudioApiKey::setValueAttribute()
         else unset($data['value']);
         $key->update($data);
         return redirect()->back()->with('success', 'Đã cập nhật API key.');
