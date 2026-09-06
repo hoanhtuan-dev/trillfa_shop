@@ -294,7 +294,9 @@ if (! function_exists('studio_image_url')) {
         // Phục vụ ảnh qua route Laravel (không phụ thuộc symlink storage) — chống ảnh vỡ ở popup.
         if (! $image) { return null; }
         if (! str_starts_with($image, '/storage/')) { return $image; }
-        return url('/studio/image/'.substr($image, strlen('/storage/')));
+        // URL TƯƠNG ĐỐI (không dùng url() tuyệt đối) để ảnh luôn tải từ origin hiện tại —
+        // tránh 404 khi APP_URL (localhost:8000) khác domain/port người dùng đang truy cập.
+        return '/studio/image/'.substr($image, strlen('/storage/'));
     }
 }
 
