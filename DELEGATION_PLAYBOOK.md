@@ -1,54 +1,66 @@
 # DELEGATION PLAYBOOK — quy trình giao việc đa-agent (DSH workflow)
 
 > **Đọc file này trước khi điều phối. Đừng khảo sát lại từ đầu.**
-> Mọi con số dưới đây đã được đo/xác minh trực tiếp trên máy này (không phải ước đoán).
-> Sinh ra từ đợt review module `studio` ngày 2026-09 — kết quả ở `STUDIO_REVIEW.md`.
+> Mọi con số/nguyên nhân dưới đây đã đo và kiểm chứng bằng smoke-test thật trên máy này.
+> Template ở mục 5 **đã chạy thành công 2 lần** (provider `qwen-token-plan`, 0 fail): smoke-test parse 6/6 finding, và chạy nguyên văn task `ctrl-1` parse 7/7 finding.
 
 ---
 
-## 1. Chính sách provider HIỆN HÀNH
+## 0. Bài học số 1 (đọc trước tiên)
 
-| | Provider | Model | Context | Trạng thái |
+**KHÔNG dùng `schema` trong `agent()`.** Đây là nguyên nhân thật của 10/16 task fail ở đợt trước — KHÔNG phải hết hạn mức, KHÔNG phải task quá to.
+
+Bằng chứng (log session child `0804ddc5…`, giải nén bằng `zstd -dc`):
+- child `turn/end` = `completed`, provider `qwen-token-plan`, đã đọc file, đã sinh đủ findings;
+- nhưng model bọc JSON trong hàng rào ```` ```json ```` → engine không trích được `structured` → `agent()` trả về `null` **không kèm lý do**;
+- bỏ `schema`, đổi sang contract text thuần → `failed: []`, trả 1970 ký tự, parse sạch 6 finding.
+
+Task càng lớn → JSON output càng dài → xác suất model bọc fence càng cao. Đó là lý do task to fail nhiều hơn (tương quan, không phải nhân quả).
+
+## 1. Chính sách provider
+
+| Provider | Model | Context | Đo thực tế (cùng 1 task nhỏ) | Dùng khi |
 |---|---|---|---|---|
-| **Mặc định cho MỌI task** | `qwen-token-plan` | `deepseek-v4-pro` | 262.144 token | ✅ DÙNG |
-| Task nặng (đã tạm dừng) | `deepseek-official` | `deepseek-v4-pro` | 1.000.000 token | ⛔ TẠM DỪNG |
+| **`qwen-token-plan`** | **`qwen3.8-max`** | 262.144 | 4.817 input · 3.546 output · **2 step** | ✅ **MẶC ĐỊNH** — rẻ nhất, bám format chuẩn |
+| **`qwen-token-plan`** | **`glm-5.2`** | 262.144 | 23.076 input · 1.658 output · **6 step** | Task cần **suy luận liên file** (authz/route/config precedence) — tự xác minh, đắt ~4,8× input |
+| `qwen-token-plan` | `deepseek-v4-pro` | 262.144 | đã chạy tốt ở đợt trước | Dự phòng / task cần output dài |
+| `deepseek-official` | `deepseek-v4-pro` | 1.000.000 | — | ⏸ tạm dừng theo chính sách tiết kiệm hạn mức |
 
-**Chỉ giao việc cho `qwen-token-plan`.** Lý do (bằng chứng thực tế):
-- Cả hai route đều phục vụ cùng model `deepseek-v4-pro`, khác nhau ở jalur thanh toán:
-  `qwen-token-plan` = DashScope compatible-mode (`https://dashscope-intl.aliyuncs.com/compatible-mode/v1`, key `QWEN_TOKEN_PLAN_API_KEY`) → rẻ hơn.
-- Lượt 2 của đợt trước: **4/4 task `deepseek-official` thất bại, 2/2 task `qwen-token-plan` thành công**.
-- Máy có 8 CPU → workflow chạy **6 agent đồng thời**. Lượt 2 bắn 4 request `deepseek-official` cùng lúc → burst rate-limit / chạm trần hạn mức.
-- Toàn đợt: `qwen-token-plan` thành công 5/7 task; `deepseek-official` chỉ 3/9.
-
-Nguồn xác minh: `~/.dsh/settings.yaml` (`llm-pi-ai.providers`, `agent-default-model`).
-Context 262.144 là `DEFAULT_CONTEXT_WINDOW` của pi-ai — settings.yaml **không** khai `contextWindow` cho route này.
+- `agent-default-model` hiện là **`qwen-token-plan` / `qwen3.8-max`** → chính điều phối cũng chạy model này.
+- Cả 3 model của route `qwen-token-plan` đều **không khai `contextWindow`** → cùng resolve về `defaultContextWindow` = **262.144** → **cùng một ngân sách chia task (mục 3) áp dụng cho cả 3**.
+- **Bằng chứng chất lượng (đo được, cùng scope `StylistDataController`):** `qwen3.8-max` khẳng định SAI rằng "`page()` serves the admin UI to any visitor"; thực tế route `/stylist-data` (`routes/web.php:128`) và các route mutating (:192-196) nằm TRONG group `[auth, admin, nostore]`. `glm-5.2` tự đọc `routes/web.php` và mô tả đúng. → **finding `high`/`critical` của `qwen3.8-max` bắt buộc xác minh**; `glm-5.2` đáng tin hơn ở suy luận liên file.
+- `glm-5.2` hay thêm **đoạn dạo đầu** trước `AREA:` và **bỏ dấu ` | ` trước `fix:`** (chỉ 3 field) → parser PHẢI bao dung (mục 5). Đừng kết luận model "hỏng" khi parser trượt.
+- `qwen-token-plan` = DashScope compatible-mode `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`, key `QWEN_TOKEN_PLAN_API_KEY` (rẻ hơn).
+- **Đính chính:** đợt trước tôi quy kết `deepseek-official` bị rate-limit là SAI. Route đó không hỏng; thủ phạm là `schema` (mục 0).
+- Credential nằm ở `~/.dsh/.credentials.yaml` (mục `refs:`), KHÔNG nằm trong env của bash tool → đừng chẩn đoán provider bằng `env`.
+- Nguồn cấu hình: `~/.dsh/settings.yaml` → `llm-pi-ai.providers`, `agent-default-model`.
+- Context 262.144 = `DEFAULT_CONTEXT_WINDOW` của pi-ai, vì settings.yaml không khai `contextWindow` cho route này.
 
 ## 2. Trần của workflow engine (đã xác minh trong code)
 
 | Giới hạn | Giá trị | Ghi chú |
 |---|---|---|
-| `maxConcurrentAgents` | **6** trên máy này | `min(16, max(1, CPU-2))`, CPU=8 |
+| `maxConcurrentAgents` | **6** trên máy này | `min(16, max(1, CPU-2))`, máy có 8 CPU |
 | `maxTotalAgents` | 1000 | không phải rào cản thực tế |
 | `maxItemsPerCall` | 4096 | số item mỗi `parallel()`/`pipeline()` |
 
-→ **6 agent chạy song song**. Muốn tránh burst: giữ tổng số task mỗi lượt ≤ 6, hoặc chấp nhận xếp hàng.
+→ Chỉ **6 agent chạy song song**. Giữ mỗi lượt ≤ 6 task để kết quả về gọn và dễ quy lỗi.
 
 ## 3. Ngân sách ngữ cảnh & quy tắc chia task
 
-Quy đổi: **token ≈ bytes / 3.3** (code đặc, đã kiểm chứng trên các file của module).
+Quy đổi: **token ≈ bytes / 3.3** (đã kiểm chứng trên code của module).
 
-Mỗi child agent có 262.144 token, phải trừ đi:
-- system prompt + schema tool của child: ~15–25k
-- kết quả grep/read trung gian + reasoning + output JSON: ~20–40k
+Mỗi child có 262.144 token, phải trừ: system prompt + schema tool của child (~38 KB ≈ 12k, đo từ log: `request/header` 38.198 ký tự), cộng kết quả read/grep trung gian, reasoning và output.
 
-**QUY TẮC (bám sát để không bao giờ tràn ngữ cảnh):**
-- 🎯 Mục tiêu: **≤ 60 KB nguồn mỗi task (~18k token)**, tương đương **≤ 1.200 dòng**.
-- 🛑 Trần cứng: **≤ 150 KB (~45k token)** — chỉ khi thật cần, vẫn còn >200k headroom.
-- File > 60 KB → **BẮT BUỘC chia chunk theo `offset`/`limit`**, không giao nguyên file.
-- Không gộp quá 10 file vào một task dù tổng nhỏ (agent dễ lạc phạm vi).
-- Nếu chưa chắc kích thước: `stat -c%s <file>` và `wc -l <file>`.
+**QUY TẮC:**
+- 🎯 Mục tiêu: **≤ 60 KB nguồn/task (~18k token)** ≈ **≤ 1.200 dòng**.
+- 🛑 Trần cứng: **≤ 150 KB (~45k token)** — vẫn còn >200k headroom.
+- File > 60 KB → **chia chunk theo `offset`/`limit`**, không giao nguyên file.
+- ≤ 10 file mỗi task (nhiều hơn thì agent lạc phạm vi).
+- Giới hạn **≤ 8 finding/task** và ≤ 400 ký tự/finding → output ngắn, ít rủi ro, dễ parse.
+- Chưa chắc kích thước thì đo: `stat -c%s <file>`; `wc -l <file>`.
 
-### Bytes/dòng đã đo (dùng để ước lượng nhanh)
+### Bytes/dòng đã đo
 
 | File | Dòng | Bytes | B/dòng |
 |---|---|---|---|
@@ -60,24 +72,17 @@ Mỗi child agent có 262.144 token, phải trừ đi:
 | `resources/js/studio/StudioApp.vue` | 579 | 54.829 | 94 |
 | `resources/js/studio/components/ConceptCard.vue` | 744 | 50.060 | 67 |
 
-Toàn module studio: PHP 551.842 B + JS/Vue 559.228 B ≈ **1,11 MB ≈ 337k token** → không thể đọc trong 1 ngữ cảnh, bắt buộc fan-out.
+Toàn module: PHP 551.842 B + JS/Vue 559.228 B ≈ **1,11 MB ≈ 337k token** → vượt ngữ cảnh 1 model, bắt buộc fan-out.
 
 ## 4. Kế hoạch chia task ĐO SẴN cho module studio (22 task)
 
-### File lớn — chia chunk (offset/limit dùng ngay)
+### File lớn — chunk (offset/limit dùng ngay, mỗi chunk ~40-56 KB)
 
-| Task | File | offset | limit | ~KB | ~token |
-|---|---|---|---|---|---|
-| `ctrl-1` | StudioController.php | 1 | 950 | 49 | 15k |
-| `ctrl-2` | StudioController.php | 951 | 950 | 49 | 15k |
-| `ctrl-3` | StudioController.php | 1901 | 950 | 49 | 15k |
-| `ctrl-4` | StudioController.php | 2851 | 950 | 49 | 15k |
-| `ctrl-5` | StudioController.php | 3801 | 950 | 47 | 14k |
-| `store-1` | store.js | 1 | 972 | 56 | 17k |
-| `store-2` | store.js | 973 | 972 | 56 | 17k |
-| `store-3` | store.js | 1945 | 971 | 55 | 17k |
-| `imgai-1` | ImageAIService.php | 1 | 752 | 40 | 12k |
-| `imgai-2` | ImageAIService.php | 753 | 751 | 39 | 12k |
+| Task | File | offset | limit |
+|---|---|---|---|
+| `ctrl-1` … `ctrl-5` | StudioController.php | 1 / 951 / 1901 / 2851 / 3801 | 950 (chunk cuối 932) |
+| `store-1` … `store-3` | store.js | 1 / 973 / 1945 | 972 (chunk cuối 971) |
+| `imgai-1`, `imgai-2` | ImageAIService.php | 1 / 753 | 752 / 751 |
 
 ### File vừa — 1 task mỗi file (đều < 60 KB)
 
@@ -96,11 +101,11 @@ Toàn module studio: PHP 551.842 B + JS/Vue 559.228 B ≈ **1,11 MB ≈ 337k tok
 | `grp-config` | config/studio.php + app/Modules/Studio/* + Models (StudioApiKey, StudioModel, StudioAsset, StudioOutfitSetting) + StylistDataController (173) + SettingsApp.vue (72) |
 | `grp-misc` | migrations `*studio*` + UpscaleCard, OutputModule, StudioIcon, RegionTools, LoadingSpinner, CompareSlider, SourceCard, DirectorCard, BaseModal, PaletteTextureCard, StylistDataApp |
 
-**22 task / concurrency 6 → ~4 đợt.** Nên chạy 1 đợt (≤6 task) mỗi lần để dễ phát hiện lỗi, thay vì bắn cả 22.
+**22 task / concurrency 6 → chạy 4 đợt, mỗi đợt ≤ 6 task.**
 
-## 5. Template workflow — dán nguyên khối
+## 5. Template ĐÃ KIỂM CHỨNG — dán nguyên khối
 
-`meta` (tham số riêng, KHÔNG nằm trong script):
+`meta` (tham số riêng của tool call, KHÔNG nằm trong `script`):
 
 ```json
 {
@@ -110,117 +115,123 @@ Toàn module studio: PHP 551.842 B + JS/Vue 559.228 B ≈ **1,11 MB ≈ 337k tok
 }
 ```
 
-`script` (plain JS, KHÔNG dùng backtick, KHÔNG dùng Node API/Date/fs):
+`script` (plain JS; KHÔNG backtick, KHÔNG Node API/`Date`/`fs`; kết thúc bằng `return`):
 
 ```js
-const ROUTE = { provider: "qwen-token-plan", model: "deepseek-v4-pro" };
+const ROUTE = { provider: "qwen-token-plan", model: "qwen3.8-max" }; // mặc định: rẻ nhất
+const DEEP = "glm-5.2"; // task cần suy luận liên file: gán `model: DEEP` cho task đó
 const BASE = "/home/anhtuan/DEV/TrillfaShop";
 
-const schema = {
-  type: "object",
-  properties: {
-    area: { type: "string" },
-    summary: { type: "string" },
-    findings: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          severity: { type: "string" },
-          category: { type: "string" },
-          file: { type: "string" },
-          location: { type: "string" },
-          description: { type: "string" },
-          recommendation: { type: "string" }
-        },
-        required: ["severity", "description"]
-      }
-    }
-  },
-  required: ["area", "summary", "findings"]
-};
-
 function promptFor(t) {
-  return "READ-ONLY code review of part of the TrillfaShop Studio module (Laravel 11 + Vue 3 AI fashion image studio).\n\n" +
-    "Base path: " + BASE + "\n\n" +
-    "Read EXACTLY these files/ranges with the read tool (pass offset and limit for ranges):\n" +
+  return "READ-ONLY code review of part of the TrillfaShop Studio module (Laravel 11 + Vue 3 AI fashion image studio).\n" +
+    "Base path: " + BASE + "\n\nRead EXACTLY these files/ranges with the read tool (pass offset and limit for ranges):\n" +
     t.files.map(function (f) { return "  - " + f; }).join("\n") + "\n\n" +
     "FOCUS: " + t.focus + "\n\n" +
     "Prioritize: security (SQLi, XSS, path traversal, SSRF, IDOR/authz, secret leakage, mass assignment), correctness, performance (N+1, unbounded image decode), error handling.\n\n" +
-    "Rules: cite real line numbers; AT MOST 8 findings ordered by severity; 1-2 short sentences each; never modify any file.\n\n" +
-    "Output ONLY a JSON object: { area, summary, findings: [ { severity (critical|high|medium|low|info), category, file, location, description, recommendation } ] }";
+    "OUTPUT FORMAT - plain text, NO markdown fences, NO code blocks, exactly these lines:\n" +
+    "AREA: <short label>\n" +
+    "SUMMARY: <2-3 sentences>\n" +
+    "FINDING: [severity] category | file:location | description | fix: recommendation\n" +
+    "Rules: one FINDING line per finding; severity in critical|high|medium|low|info; AT MOST 8, ordered by severity; each line under 400 chars; never use the | character inside a field; cite real line numbers; never modify any file.";
 }
 
 const tasks = [
   { id: "ctrl-1", phase: "review",
     files: ["app/Http/Controllers/StudioController.php  (offset 1, limit 950)"],
     focus: "generation/edit endpoints in this range: validation, URL-to-file resolution, credit handling" }
-  // ... thêm task theo bảng mục 4, giữ mỗi lượt <= 6 task
+  // task cần kiểm tra authz/route/config liên file thì thêm: , model: DEEP
+  // ... thêm task theo bảng mục 4; giữ mỗi lượt <= 6 task
 ];
 
 const results = await parallel(tasks.map(function (t) {
   return function () {
-    return agent(promptFor(t), { label: t.id, phase: t.phase, schema: schema, provider: ROUTE.provider, model: ROUTE.model });
+    return agent(promptFor(t), { label: t.id, phase: t.phase, provider: ROUTE.provider, model: t.model || ROUTE.model });
   };
 }));
 
-const failed = tasks.filter(function (t, i) { return !results[i]; }).map(function (t) { return t.id; });
-const ok = results.filter(Boolean);
-const bySeverity = {};
-let n = 0;
-for (const r of ok) {
-  const l = Array.isArray(r.findings) ? r.findings : [];
-  n += l.length;
-  for (const f of l) { const s = typeof f.severity === "string" ? f.severity : "info"; bySeverity[s] = (bySeverity[s] || 0) + 1; }
-}
-
+const items = tasks.map(function (t, i) { return { id: t.id, text: results[i] || null }; });
 return {
-  areasReviewed: ok.length, areasRequested: tasks.length, failed: failed,
-  totalFindings: n, bySeverity: bySeverity,
-  areas: ok.map(function (r) { return { area: r.area, summary: r.summary, findings: Array.isArray(r.findings) ? r.findings : [] }; })
+  areasRequested: tasks.length,
+  failed: items.filter(function (x) { return !x.text; }).map(function (x) { return x.id; }),
+  items: items
 };
 ```
 
-**Chỉ được dùng các opt của `agent()`:** `label`, `phase`, `schema`, `provider`, `model`.
+**Chỉ dùng các opt của `agent()`:** `label`, `phase`, `provider`, `model` (và `schema` — nhưng xem mục 0: đừng dùng).
 Opt khác (`effort`, `isolation`, `agentType`) → throw `UNSUPPORTED_OPTION` và **giết cả workflow**.
-Schema chỉ hỗ trợ: `type`, `properties`, `required`, `additionalProperties`, `items`, `enum`, `const`, `oneOf`.
+
+### Parser host-side (chạy trong `run_code`, SAU khi workflow trả về)
+
+```ts
+const r = wf.result;
+// BAO DUNG: chấp nhận cả 4-field (qwen3.8-max) lẫn 3-field (glm-5.2 bỏ dấu | trước fix:)
+// Đã kiểm chứng: parse 8/8 finding kèm fix trên raw output của CẢ HAI model.
+const parse = (text: string) => {
+  const area = (text.match(/^AREA:\s*(.+)$/m) || [])[1] || "(unknown)";
+  const summary = (text.match(/^SUMMARY:\s*(.+)$/m) || [])[1] || "";
+  const findings: any[] = [];
+  for (const m of text.matchAll(/^FINDING:\s*\[(\w+)\]\s*(.*)$/gm)) {
+    const parts = m[2].split("|").map(s => s.trim());
+    const rest = parts.slice(2).join(" | ");
+    const split = rest.split(/\s*\bfix:\s*/i);
+    findings.push({
+      severity: m[1],
+      category: parts[0] || "",
+      file: parts[1] || "",
+      description: (split[0] || "").replace(/\s+/g, " ").trim(),
+      recommendation: (split[1] || "").replace(/\s+/g, " ").trim(),
+    });
+  }
+  return { area, summary, findings };
+};
+const areas = r.items.filter(i => i.text).map(i => ({ id: i.id, ...parse(i.text) }));
+const bySeverity = {}; let n = 0;
+for (const a of areas) for (const f of a.findings) { n++; bySeverity[f.severity] = (bySeverity[f.severity]||0)+1; }
+```
 
 ## 6. Quy trình điều phối (checklist)
 
-1. Đọc file này. Không khảo sát lại cấu trúc module — đã có ở mục 4.
-2. Chọn phạm vi cần làm → lấy task tương ứng trong bảng mục 4 (hoặc tự chia theo quy tắc mục 3).
-3. **Giữ ≤ 6 task mỗi lượt** (bằng `maxConcurrentAgents`) để tránh burst.
-4. Chạy workflow với `ROUTE` = `qwen-token-plan` / `deepseek-v4-pro`.
-5. Kiểm tra `failed[]` trong kết quả. Với mỗi task fail:
-   - chia nhỏ hơn nữa (giảm `limit` một nửa) rồi chạy lại **1 lần**;
-   - nếu vẫn fail → **điều phối tự làm** bằng `read`/`grep` có chủ đích (đừng delegate lại vô hạn).
-6. Gộp kết quả vào báo cáo (mục 7).
-7. Xác minh số liệu bằng `grep`, KHÔNG bằng `read` (xem bẫy mục 8).
+1. Đọc file này. Không khảo sát lại cấu trúc module — đã có ở mục 4 và 9.
+2. Chọn phạm vi → lấy task trong bảng mục 4 (hoặc chia theo quy tắc mục 3).
+3. **≤ 6 task mỗi lượt.**
+4. Chạy workflow với template mục 5 (KHÔNG `schema`).
+5. Parse host-side bằng snippet mục 5. Kiểm tra `failed[]`:
+   - task fail → chia `limit` giảm một nửa, chạy lại **1 lần**;
+   - vẫn fail → **điều phối tự làm** bằng `read`/`grep` có chủ đích; không delegate lại vô hạn.
+6. **XÁC MINH từng finding `high`/`critical` trước khi công bố — BẮT BUỘC, không tùy chọn.** Đọc lại đúng dòng bằng `read`. Lý do (đo được ở đợt kiểm chứng): 3/3 claim high-medium MỚI đều không đúng nguyên văn — 1 phóng đại mức độ, 1 sai cơ chế (lỗi thật nằm ở chỗ khác), 1 dương tính giả. Đồng thời agent hay trích dẫn dòng **ngoài** phạm vi `offset`/`limit` được giao.
 
 ## 7. Thủ tục gộp báo cáo
 
-- Ghi markdown: mỗi area là một `##`, mỗi finding là `- **[severity]** category · file:line — mô tả`, dòng sau `  - Fix: ...`.
-- Giữ phần thân báo cáo cũ bằng cách cắt từ `## ` đầu tiên, rồi nối header mới + thân cũ + section mới.
-- Đếm severity để đối chiếu:
+- Mỗi area là một `##`; mỗi finding là `- **[severity]** category · file:line — mô tả`, dòng sau `  - Fix: ...`.
+- Giữ báo cáo cũ: cắt từ `## ` đầu tiên, rồi nối header mới + thân cũ + section mới.
+- Đếm và đối chiếu:
 
 ```
 grep -nE "^- \*\*\[(critical|high|medium|low|info)\]\*\*" STUDIO_REVIEW.md
 ```
 
-- Phân vùng theo số dòng heading (`# Phần A/B/C`) để đếm riêng từng nguồn thực hiện.
-- **Đối chiếu tổng**: tổng đếm được phải bằng `totalFindings` do workflow trả về. Lệch → có finding bị rớt/label sai.
+- Tổng đếm được PHẢI bằng tổng finding đã parse. Lệch → có finding rớt hoặc label sai.
 
-## 8. Bẫy đã gặp (tránh lặp lại)
+## 8. Bẫy đã gặp (đã kiểm chứng)
 
 | Bẫy | Biểu hiện | Cách tránh |
 |---|---|---|
-| `read()` trần cắt theo dung lượng | file 66 KB / 337 dòng chỉ trả **233 dòng** dù limit mặc định 2000 | đọc `offset`/`limit` tường minh; đếm & xác minh bằng `grep` |
-| `agent()` fail trả về `null` **không kèm lý do** | `failed[]` có tên task nhưng không biết vì sao | luôn log `failed[]`; dùng `read`/`grep` tự kiểm tra phạm vi đó |
-| Schema validation fail → mất TRỌNG vẹn area | `structured === undefined` → `null` | để `severity` là `string` thường (KHÔNG dùng `enum`); chỉ `required` tối thiểu |
-| Phạm vi task quá lớn | 2 task 4.732 dòng + 1 task 21 file fail ở lượt 1 | bám quy tắc ≤60 KB / ≤1.200 dòng / ≤10 file |
-| Burst rate-limit | 4 task đồng thời cùng provider fail hết | ≤6 task/lượt; cân nhắc chạy tuần tự khi cần ổn định |
-| Script workflow dùng backtick / Node API | throw, chết cả run | chỉ dùng string concat; không `Date`, `fs`, `fetch`, `setTimeout` |
-| `meta` viết trong `script` | parse fail | `meta` là tham số riêng của tool call |
+| **`schema` + model bọc fence JSON** | child `completed` nhưng `agent()` trả `null`, 10/16 task fail | **bỏ `schema`**, dùng contract text `AREA:/SUMMARY:/FINDING:` + parse host-side |
+| `agent()` fail không kèm lý do | chỉ thấy tên task trong `failed[]` | đọc log child bằng `zstd -dc` (mục 6.6) |
+| `read()` trần cắt theo DUNG LƯỢNG | file 66 KB/337 dòng chỉ trả **233 dòng** dù limit mặc định 2000 | đọc `offset`/`limit` tường minh; đếm & xác minh bằng `grep` |
+| Chẩn đoán provider bằng `env` | key báo NOT SET dù route vẫn chạy | credential ở `~/.dsh/.credentials.yaml`, không phải env của bash tool |
+| Phạm vi task quá lớn | output dài → dễ bọc fence, dễ lạc phạm vi | ≤60 KB / ≤1.200 dòng / ≤10 file / ≤8 finding |
+| Agent vượt phạm vi `offset`/`limit` | finding trích dẫn dòng ngoài chunk được giao (vd giao 1-950, trích 3186) | luôn `read` lại đúng dòng trước khi tin |
+| Finding của subagent sai/phóng đại | 0/3 claim high-medium mới đúng nguyên văn | xác minh 100% finding high/critical; ghi rõ mức độ đã hiệu chỉnh và lý do |
+| Tin chẩn đoán của subagent về "credit/auth" | subagent bỏ qua comment nghiệp vụ ngay cạnh code (vd `:1499` "never hard-block on credits") | đọc cả comment/docblock quanh dòng bị chỉ ra |
+| Parser quá chặt → tưởng model hỏng | `glm-5.2` bỏ dấu ` | ` trước `fix:` → 0 finding khớp, dù nó vẫn trả đủ 8 finding | dùng parser bao dung mục 5; khi parse ra 0 finding hãy đọc RAW text trước khi kết luận |
+| Model khẳng định sai về authz | `qwen3.8-max` bảo route public, thực tế nằm trong group `[auth,admin,nostore]` | giao task authz/route cho `glm-5.2`, hoặc luôn tự đọc `routes/web.php` để xác minh |
+| `glm-5.2` báo XSS ở blade | **3/3 claim XSS là dương tính giả** — Blade `{{ }}` tự escape, `@json` có HEX flags, `$service` là mảng hardcode (`StudioController.php:4352`) | trước khi tin claim XSS: grep `{!!` và truy nguồn biến |
+| `qwen3.8-max` báo "DDL mỗi request" | `Schema::create` chỉ chạy khi `! $hasAll` (`StylistCatalog.php:30`); mỗi request chỉ tốn 3 lệnh `Schema::hasTable`, và là thiết kế có chủ đích (docblock :18-19) | đọc cả docblock ngay trên hàm trước khi kết luận |
+| Mỗi model sai đúng chỗ model kia đúng | `qwen3.8-max` sai authz/DDL, `glm-5.2` sai XSS | **không có model nào đáng tin tuyệt đối** — xác minh là bắt buộc bất kể model |
+| Script dùng backtick hoặc Node API | throw, chết cả run | chỉ string concat; không `Date`, `fs`, `fetch`, `setTimeout` |
+| `meta` viết bên trong `script` | parse fail | `meta` là tham số riêng của tool call |
+| Quoting bash trong `run_code` | `${#${v}}` → `ReferenceError` | viết script ra file `/tmp/*.cjs` rồi chạy, tránh inline phức tạp |
 
 ## 9. Ngữ cảnh module studio (khỏi phải tìm lại)
 
@@ -229,8 +240,11 @@ grep -nE "^- \*\*\[(critical|high|medium|low|info)\]\*\*" STUDIO_REVIEW.md
 - ~90 route, gần như tất cả vào **một** `StudioController` (4.732 dòng).
 - Services: `ImageAIService`, `ProductAIService`, `VirtualTryOnService`, `StyleSuggestService`, `StudioLibraryService`, `StylistService`, `GeminiService`, `ProjectWorkflowService`, `CreativeDirectionService`.
 - Helper tập trung ở `app/Support/helpers.php` (`studio_config`, `studio_api_key`, `studio_model_candidates`, `studio_candidate_key`, `studio_qwen_*`).
-- Module wiring: `app/Modules/Studio/StudioModuleServiceProvider.php` + `StudioBridge.php`; config namespace `studio` và `studio_module` (tách rời — đã ghi nhận là điểm gây nhầm).
+- Module wiring: `app/Modules/Studio/StudioModuleServiceProvider.php` + `StudioBridge.php`; config namespace `studio` và `studio_module` tách rời (đã ghi nhận là điểm gây nhầm).
 - Frontend: Pinia store đơn khối `resources/js/studio/store.js` (2.915 dòng) + ~25 component; 4 entry Vite (`app`, `settings`, `library`, `stylist-data`).
+- **Blade views — lớp TRƯỚC ĐÂY BỊ BỎ SÓT khi kiểm kê**: `resources/views/studio/` tổng **243 KB / 2.841 dòng**. `index.blade.php` 1.626 dòng/140 KB · `settings.blade.php` 738 dòng/68 KB (**liên quan trực tiếp issue top-5 số 2**) · `library.blade.php` 142/12 KB · `presets` 95 · `api` 72 · `tryon` 62 · `pattern` 47 · `vue` 35 · `stylist-data` 10 · 2 file `-vue` 7 dòng. Đã review 6 file nhỏ (~22 KB); **3 file lớn CHƯA review**. `settings.blade.php` 68 KB vượt trần 60 KB → chia 2 chunk.
+- Lớp blade **không có `{!!` nào** (grep = 0 kết quả), dùng `{{ }}` (escape mặc định) và `@json` (Laravel bật sẵn `JSON_HEX_TAG|HEX_APOS|HEX_AMP|HEX_QUOT`) → **lớp XSS-blade gần như bị loại**; đừng để subagent báo lại.
+- `app/Services/StylistCatalog.php` (287 dòng): `ensureTables()` tự tạo bảng + seed cho shared hosting không chạy được `artisan migrate`; `savePreset()` :248-264 có race check-then-act và nuốt lỗi.
 - **5 vấn đề nặng nhất đã tìm ra** (chi tiết trong `STUDIO_REVIEW.md`):
   1. Path traversal → đọc file cục bộ: `buildMaskImage()` :262-268 (`source_url` chỉ validate `string`, không rule `url`, không chặn `..`); cùng pattern ở `faceDescription()`/`poseDescription()` :416-450, reachable từ :928.
   2. API key material xuống trình duyệt: `settingsData()` :3857 + settings view :3925 trả nguyên model `StudioApiKey`; model không có `$hidden`, `value` nằm trong `$fillable`; mã hóa chỉ gọi thủ công ở :3805, :4122, :4142.

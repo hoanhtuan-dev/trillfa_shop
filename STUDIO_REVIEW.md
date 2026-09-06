@@ -15,11 +15,14 @@
 
 ## Tổng kết
 
-- **12/12 area** đã được review · **113 findings**
-- critical: **1** · high: **18** · medium: **45** · low: **30** · info: **19**
+- **16 area** đã được review · **121 findings**
+- critical: **1** · high: **18** · medium: **49** · low: **33** · info: **20**
 - Lượt 1 (workflow): 6/10 area · 70 findings — 4 task thất bại
 - Lượt 2 (workflow, chia nhỏ): 2/6 area · 20 findings — cả 4 task `deepseek-official` thất bại
 - Lượt 3 (điều phối tự làm): 4/4 area · 23 findings (high 2 · medium 9 · low 6 · info 6)
+- Phần D (kiểm chứng template playbook, đã xác minh từng claim): 1 area · 2 findings medium + 1 claim bị loại là dương tính giả
+- Phần E (smoke-test `qwen3.8-max` + `glm-5.2`, đã xác minh): 1 area · 4 findings (medium 2, low 1, info 1) + 1 claim `[high]` bị loại là dương tính giả
+- Phần F (kiểm chứng định tuyến per-task model, đã xác minh): 2 area · 2 findings low + **4 claim bị loại** (3 XSS + 1 security) — kèm bảng so sánh thực nghiệm 2 model
 
 ## Vấn đề nghiêm trọng nhất (cần xử lý trước)
 
@@ -32,9 +35,9 @@
 ## Ghi chú điều phối (delegation log)
 
 - Lượt 1: 10 agent (5 `deepseek-official` + 5 `qwen-token-plan`). Thành công: `image-ai-service`, `product-ai-service`, `frontend-store` (expensive) và `project-management`, `tryon-style`, `library-assets` (cheap). Thất bại: 2 task `StudioController.php` (phạm vi 4732 dòng quá lớn), `config-settings`, `frontend-components` (21 file).
-- Lượt 2: chia nhỏ thành 6 task. **Cả 4 task `deepseek-official` đều thất bại trong khi 2 task `qwen-token-plan` thành công** → nhiều khả năng provider `deepseek-official` đã chạm trần hạn mức / rate-limit sau lượt 1.
+- Lượt 2: chia nhỏ thành 6 task. Cả 4 task `deepseek-official` thất bại trong khi 2 task `qwen-token-plan` thành công. **(ĐÍNH CHÍNH — xem `DELEGATION_PLAYBOOK.md` mục 0):** nguyên nhân thật KHÔNG phải rate-limit/hết hạn mức. Log session child (`zstd -dc ~/.dsh/sessions/…/0804ddc5…/session.jsonl.zstd`) cho thấy child `turn/end = completed` và đã sinh đủ findings, nhưng model bọc JSON trong hàng rào ```json → engine không trích được `structured` → `agent()` trả `null`. Cả hai provider đều bị; task càng lớn thì output JSON càng dài nên xác suất bị bọc fence càng cao. Đã kiểm chứng: bỏ `schema`, dùng contract text thuần → 0 fail.
 - Lượt 3: điều phối tự tiếp quản 4 phạm vi còn lại (3 chunk `StudioController.php` + 5 component Vue lớn) và review trực tiếp bằng read/grep.
-- **Khuyến nghị vận hành:** với các đợt review lớn, mặc định dùng `qwen-token-plan` cho phần lớn task và chỉ dành `deepseek-official` cho vài task thật sự nặng; hoặc chạy expensive task **tuần tự** thay vì song song để tránh burst rate-limit.
+- **Khuyến nghị vận hành (đã sửa):** KHÔNG dùng `schema` trong `agent()` — dùng contract text `AREA:/SUMMARY:/FINDING:` rồi parse ở host. Giữ ≤ 6 task/lượt (= `maxConcurrentAgents` trên máy 8 CPU), ≤ 60 KB và ≤ 1.200 dòng mỗi task. Quy trình đầy đủ + template đã kiểm chứng: `DELEGATION_PLAYBOOK.md`.
 
 ---
 
@@ -335,3 +338,79 @@ No exploitable XSS was found in these five components: the single `v-html` sink 
   - Fix: `if (!res.ok) throw new Error(res.status)` before parsing, and surface the status.
 - **[info]** good practice · CSRF is read from the meta tag and sent as `X-CSRF-TOKEN` (`ComposeCard.vue:42,148-153`; `ConceptCard.vue:312`), and `StudioApp.vue:22-23,265` uses a hidden `_token` for the logout form. `InpaintCard.vue` produced zero direct fetch/localStorage/`v-html` risk hits — it delegates entirely to the store.
 - **[info]** cross-layer note · `ComposeCard.vue:151` posts `images: urls` (client-controlled), which the backend feeds into the un-guarded `faceDescription()` resolver. The fix belongs server-side.
+
+---
+
+# Phần D — Addendum ĐÃ XÁC MINH (kiểm chứng template của playbook)
+
+Nguồn: 1 task `ctrl-1` (StudioController.php, offset 1 limit 950) chạy bằng đúng template trong `DELEGATION_PLAYBOOK.md`, provider `qwen-token-plan` / `deepseek-v4-pro` → 0 fail, parse 7/7 finding. Điều phối đã đọc lại source để xác minh từng claim trước khi ghi vào đây.
+
+## Finding mới ĐÃ xác nhận
+
+- **[medium]** accounting/credit · `app/Http/Controllers/StudioController.php:3186-3203` + `:3298-3302` — `swapModel()` tạo Generation với `credits_cost => 1` rồi dispatch `SwapModelJob`; `executeSwapFromGeneration()` sau đó nâng `credits_cost` lên `max(1, $svc->calls())` (2-3). **Không hề trừ `credits_balance`.** Trong toàn controller, `decrement('credits_balance', …)` chỉ xuất hiện đúng một lần tại `:1501` (trong `queueGeneration()`), nên mọi endpoint tạo Generation ngoài đường đó đều không trừ credit.
+  - Fix: cho `swapModel()` đi qua `queueGeneration()`, hoặc thêm `decrement` tường minh ngay khi tạo Generation.
+  - Hiệu chỉnh mức độ: agent báo `[high]`. Điều phối hạ xuống **medium** vì comment tại `:1499` nêu rõ đây là công cụ nội bộ — "never hard-block on credits. Track usage (balance may go negative)" → credit là số liệu theo dõi, không phải cơ chế chặn. Ảnh hưởng thật: `credits_left` và `studio_usage()` báo sai.
+
+- **[medium]** concurrency/double-refund · `:1409-1422` `reconcileStuckCredits()` — SELECT các generation `status='processing'` quá 30 phút, rồi với mỗi dòng `update(status='failed')` + `increment('credits_balance', $g->credits_cost)`; **không transaction, không `lockForUpdate`, không update có điều kiện**. Hàm này được gọi ở đầu mỗi `queueGeneration()` (`:1500`), nên hai request đồng thời có thể cùng chọn một generation và **hoàn credit hai lần**.
+  - Fix: chỉ hoàn tiền khi update thực sự đổi trạng thái, ví dụ kiểm tra số dòng ảnh hưởng của `where('status','processing')->update([...]) === 1`, hoặc bọc `DB::transaction()` + `lockForUpdate()`.
+  - Hiệu chỉnh cơ chế: agent mô tả "decrement không có transaction → double-spend" là **sai** — `decrement()` sinh SQL `SET credits_balance = credits_balance - ?` vốn atomic. Lỗi thật nằm ở nhánh refund.
+
+## Claim bị LOẠI (dương tính giả)
+
+- ~~`[medium] csrf-mass-assignment` · `storeProject()` :56~~ — `$request->validate(['name'=>…,'base_concept'=>…])` (`:51-54`) chỉ trả về đúng hai key đó, còn `user_id` do relation `projects()` gán. Không có bề mặt mass-assignment. (Riêng `StudioOutfitSetting::$fillable` chứa `user_id` vẫn là vấn đề hợp lệ — đã ghi ở Phần B.)
+
+## Bài học quy trình (đã đưa vào playbook mục 6 và 8)
+
+- Agent **vượt phạm vi được giao**: task chỉ cấp `offset 1, limit 950` nhưng finding trích dẫn dòng 1497, 3186, 4409, 4543 → số dòng của subagent không đáng tin cậy tuyệt đối.
+- Trong 3 claim high/medium MỚI được spot-check: 1 đúng nhưng phóng đại mức độ, 1 sai cơ chế (lỗi thật ở chỗ khác), 1 dương tính giả → **0/3 đúng nguyên văn**. Bước điều phối đọc lại source là **bắt buộc**.
+
+---
+
+# Phần E — StylistDataController + StylistDataApp (smoke-test 2 model mới, ĐÃ XÁC MINH)
+
+Phạm vi: `app/Http/Controllers/StylistDataController.php` (173 dòng) + `resources/js/studio/StylistDataApp.vue` (15 dòng) — chưa từng review ở Phần A-D. Chạy song song 2 model trên **cùng scope, cùng prompt** để kiểm chứng `qwen3.8-max` và `glm-5.2`; cả hai đều trả 8 finding. Điều phối đã đọc lại source để xác minh.
+
+- **[medium]** secret-leakage · `app/Http/Controllers/StylistDataController.php:110,121,159,170` — mỗi nhánh `catch (\Throwable $e)` trả nguyên văn exception cho client: `response()->json(['ok' => false, 'message' => 'Lỗi lưu: '.$e->getMessage()], 500)`. Có thể lộ câu SQL, tên bảng/cột, đường dẫn framework. **Cả 2 model phát hiện độc lập.**
+  - Fix: `report($e)` rồi trả message chung (vd "Lỗi hệ thống"); chỉ lộ chi tiết khi `app()->hasDebugModeEnabled()`.
+- **[medium]** correctness/race · `:88-104` và `:138-153` — check-then-act không atomic: `exists()` kiểm tra trùng `slug`/`key` rồi mới `save()`, nên hai request đồng thời vẫn tạo được bản ghi trùng. Kèm `$m->sort_order = (int) StylistGarmentType::max('sort_order') + 1` (`:97`, và tương đương ở `:147`) cũng race → trùng `sort_order`.
+  - Fix: thêm unique index trên `slug`/`key` rồi bắt lỗi constraint trả 422; tính `sort_order` trong `DB::transaction()`.
+- **[low]** performance · `:17-22` — `catalog()` gọi `$catalog->ensureTables()` và được **mọi** method CRUD gọi (vd `:116`), nên `Schema::hasTable` + seed check chạy trên mỗi request.
+  - Fix: gate `ensureTables()` sau một cờ static/cache để chạy tối đa một lần mỗi process.
+- **[info]** phạm vi · `resources/js/studio/StylistDataApp.vue` (15 dòng) là shell tĩnh mount `StylistDataManager`, không có binding động → không có rủi ro client-side riêng; logic thật nằm ở `StylistDataManager.vue` (đã review ở Phần B).
+
+## Claim bị LOẠI (dương tính giả) — kèm bằng chứng
+
+- ~~`[high] authz` · `StylistDataController.php:14-27` — "không có middleware nào; `page()` phục vụ trang admin cho bất kỳ khách nào"~~ — **SAI.** `routes/web.php:128` (`/stylist-data`) và các route mutating `:192-196` nằm TRONG group `Route::middleware(['auth','admin','nostore'])` mở tại `:94`. Group public mở tại `:202` chỉ chứa 2 endpoint read-only `:206-207` (`data`, `presets`). Việc thiếu guard ở tầng controller chỉ là defense-in-depth, không phải lỗ hổng.
+- Ghi chú quy trình: `glm-5.2` **tự đọc `routes/web.php`** và mô tả đúng bản chất; `qwen3.8-max` khẳng định sai. Đây là căn cứ thực nghiệm cho việc định tuyến model ở `DELEGATION_PLAYBOOK.md` mục 1.
+
+---
+
+# Phần F — Blade views + StylistCatalog (kiểm chứng định tuyến per-task model, ĐÃ XÁC MINH)
+
+Chạy bằng template mới (per-task `model`): `app/Services/StylistCatalog.php` (287 dòng, model `qwen3.8-max`) và 6 blade view nhỏ (~22 KB, model `glm-5.2`). Cả 2 task thành công, parse đủ finding kèm fix.
+
+> **Lưu ý phạm vi — CHƯA phủ hết:** lớp blade tổng cộng **243 KB**; đợt này mới review ~22 KB. Còn **CHƯA review**: `index.blade.php` (1.626 dòng/140 KB), `settings.blade.php` (738 dòng/68 KB — liên quan trực tiếp tới issue top-5 số 2 về rò rỉ API key), `library.blade.php` (142 dòng/12 KB).
+
+## Finding ĐÃ xác nhận
+
+- **[low]** correctness/race · `app/Services/StylistCatalog.php:252-259` — `savePreset()` dùng check-then-act: `StylistPreset::where('prompt', $prompt)->exists()` (`:252`) rồi mới `create()` (`:255`), kèm `'sort_order' => (int) StylistPreset::max('sort_order') + 1` (`:259`). Cả hai không atomic → request đồng thời tạo được preset trùng và trùng `sort_order`. Dedup quét trên cột TEXT `prompt` không index; `catch` (`:261-263`) nuốt mọi lỗi ("bỏ qua lỗi lưu preset").
+  - Fix: thêm unique index (vd cột hash của `prompt`, hoặc (`name`,`type`)); tính `sort_order` trong `DB::transaction()`; log lỗi thay vì nuốt.
+- **[low]** performance · `:21-30` (gọi từ `StylistDataController.php:17-22`) — `ensureTables()` chạy **3 lệnh `Schema::hasTable`** mỗi request vì mọi method CRUD đều đi qua `catalog()`. Đây là đánh đổi **có chủ đích** cho shared hosting không chạy được `php artisan migrate` (docblock `:18-19` nêu rõ), và DDL `Schema::create` **chỉ** chạy khi thiếu bảng (`:30`).
+  - Fix (tùy chọn): gate sau cờ `static`/cache để còn 0 query sau lần đầu.
+
+## Claim bị LOẠI — 4/4 claim XSS/security đều sai
+
+- ~~`[high] XSS` · `presets.blade.php:76-77` "render raw, không escape"~~ — **SAI**: cả hai dòng dùng `{{ $p->prompt_injection }}` / `{{ $p->note }}`; Blade `{{ }}` escape mặc định qua `e()`/`htmlspecialchars`, an toàn kể cả trong `<textarea>`.
+- ~~`[medium] XSS` · `vue.blade.php:32` `@json($studioBoot)`~~ — **SAI**: `@json` của Laravel mặc định dùng `JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT` nên `< > & ' "` đều bị hex-escape → không breakout được `</script>`.
+- ~~`[medium] XSS` · `api.blade.php:22-24` "`$service` nội suy thô vào JS"~~ — **SAI**: `$service` đến từ **mảng hardcode** `['gemini','fal','replicate','wan','veo','qwen','qwen_edit','dashscope']` tại `StudioController.php:4352`, không phải input người dùng.
+- ~~`[medium] security` · `StylistCatalog.php:21-70` "DDL chạy mỗi request, unauthenticated"~~ — **SAI cả hai vế**: `Schema::create` chỉ chạy khi `! $hasAll` (`:30`), và các route liên quan nằm trong group `[auth, admin, nostore]`.
+- **Bằng chốt:** grep `{!!` trên toàn bộ `resources/views/studio/` → **0 kết quả**. Lớp blade không có echo nào không escape → cả lớp XSS-blade gần như bị loại.
+
+## Kết luận thực nghiệm về 2 model (căn cứ định tuyến)
+
+| Model | Chi phí đo được | Điểm mạnh quan sát được | Điểm yếu quan sát được |
+|---|---|---|---|
+| `qwen3.8-max` | 4.817 in · 3.546 out · 2 step | rẻ nhất; bám format 4-field chuẩn; nhiều finding | khẳng định SAI về authz ("page() public"), SAI về "DDL mỗi request"; bỏ qua docblock ngay trên hàm |
+| `glm-5.2` | 23.076 in · 1.658 out · 6 step | TỰ đọc `routes/web.php` để xác minh middleware → mô tả authz đúng | 3/3 claim XSS đều sai; output 3-field (thiếu ` \| ` trước `fix:`) |
+
+→ **Không model nào đáng tin tuyệt đối**: mỗi model sai ở đúng chỗ model kia đúng. Bước điều phối xác minh 100% finding `high`/`critical` là **bắt buộc bất kể model**. Chỉ dùng `glm-5.2` khi task thật sự cần suy luận liên file, vì đắt ~4,8× input.
