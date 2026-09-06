@@ -305,13 +305,17 @@ if (! function_exists('studio_image_thumb_url')) {
     {
         // URL thumbnail (160px WebP) cho HIỂN THỊ selector — giảm ~50x dung lượng so với ảnh gốc.
         // Ảnh gốc vẫn dùng studio_image_url() cho AI vision / face_ref / pose_ref.
+        // CHỈ tạo thumbnail cho path AN TOÀN (chữ-số / _ . -); path đặc biệt → fallback ảnh gốc,
+        // tránh 500 do ValidatePathEncoding khi URL chứa ký tự không hợp lệ.
         if (! $image) { return null; }
         if (str_starts_with($image, '/storage/')) {
-            return '/studio/image-thumb/'.substr($image, strlen('/storage/'));
+            $path = substr($image, strlen('/storage/'));
+            return preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path) ? '/studio/image-thumb/'.$path : studio_image_url($image);
         }
         $path = ltrim((string) parse_url($image, PHP_URL_PATH), '/');
         if (str_starts_with($path, 'studio/image/')) {
-            return '/studio/image-thumb/'.substr($path, strlen('studio/image/'));
+            $p = substr($path, strlen('studio/image/'));
+            return preg_match('#^[a-zA-Z0-9/_.\-]+$#', $p) ? '/studio/image-thumb/'.$p : ($image ?: null);
         }
         return null;
     }

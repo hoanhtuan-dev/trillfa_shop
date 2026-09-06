@@ -5,10 +5,20 @@ function openGallery() { store.viewer = store.preview || store.generations[0] ||
 function goLibrary() { window.location.href = '/studio/library'; }
 // Thumbnail URL cho ảnh hiển thị lưới Outputs (giảm ~50x dung lượng so với full-size 2K).
 // Ảnh gốc full-size vẫn được dùng khi mở viewer (store.viewer = g → media_url gốc).
+// CHỈ tạo thumbnail cho path AN TOÀN (chữ-số / _ . -); path đặc biệt (space/unicode/%...) → giữ ảnh gốc,
+// tránh lỗi 500 do middleware ValidatePathEncoding khi URL chứa ký tự không hợp lệ.
 function thumbUrl(url) {
   if (!url) return url;
-  if (url.startsWith('/storage/')) return '/studio/image-thumb/' + url.slice(9);
-  if (url.startsWith('/studio/image/')) return '/studio/image-thumb/' + url.slice(14);
+  const SAFE = /^[a-zA-Z0-9/_.-]+$/;
+  const clean = String(url).split(/[?#]/)[0]; // bỏ query string / fragment
+  if (clean.startsWith('/storage/')) {
+    const p = clean.slice(9);
+    return SAFE.test(p) ? '/studio/image-thumb/' + p : url;
+  }
+  if (clean.startsWith('/studio/image/')) {
+    const p = clean.slice(14);
+    return SAFE.test(p) ? '/studio/image-thumb/' + p : url;
+  }
   return url; // URL ngoài hoặc data:URL → giữ nguyên
 }
 </script>
