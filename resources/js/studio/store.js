@@ -389,8 +389,8 @@ export const useStudioStore = defineStore('studio', {
     // KHÁC reimagine/edit: dùng model SINH ẢNH (mặc định qwen-image-3.0-pro) + ảnh tham chiếu
     // làm base → tạo bức ảnh mới giống mẫu theo % tương đồng, không sửa trên ảnh gốc.
     // tryon=true (chip "Thử đồ"): gửi 1 ảnh trang phục → sinh ảnh người mẫu mặc đúng đồ đó
-    // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body/hair directive + khuôn mặt mẫu (faceModelId).
-    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, hair = null, faceModelId = '') {
+    // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body directive + khuôn mặt mẫu (faceModelId).
+    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, faceModelId = '') {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {
         const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
@@ -398,17 +398,13 @@ export const useStudioStore = defineStore('studio', {
         if (tryon) {
           payload.tryon = true;
           if (faceModelId) payload.face_model_id = faceModelId;
-          // Kế thừa body/hair directive (tạo ảnh 2D) — chỉ gửi khi người dùng đã chỉnh (khác default 5).
+          // Kế thừa body directive (tạo ảnh 2D) — chỉ gửi khi người dùng đã chỉnh (khác default 5).
           if (body) {
             if (body.height != null) payload.body_height = Number(body.height);
             if (body.build != null) payload.body_build = Number(body.build);
             if (body.waist != null) payload.body_waist = Number(body.waist);
             if (body.shoulders != null) payload.body_shoulders = Number(body.shoulders);
             if (body.hips != null) payload.body_hips = Number(body.hips);
-          }
-          if (hair) {
-            if (hair.style) payload.hair_style = hair.style;
-            if (hair.color) payload.hair_color = hair.color;
           }
         }
         const d = await this.api('/studio/refgen', payload);

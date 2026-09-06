@@ -914,14 +914,13 @@ class ShopFlowTest extends TestCase
 
         // Chip "Thử đồ" trong card Ảnh mới từ ảnh mẫu: gửi 1 ảnh trang phục + tryon=true →
         // 1 generation mode='refgen' (model sinh ảnh, KHÔNG edit), prompt chứa "WEAR THE EXACT GARMENT"
-        // (bám mẫu trang phục). Kế thừa body/hair directive khi có.
+        // (bám mẫu trang phục). Kế thừa body directive khi có.
         $r = $this->postJson('/studio/refgen', [
             'image' => '/storage/studio/garment.jpg',
             'prompt' => 'mặc trang phục lên người mẫu, pose đứng',
             'variants' => 1,
             'tryon' => true,
             'body_height' => 8,
-            'hair_color' => 'black',
         ])->assertOk();
 
         $items = $r->json('items');
@@ -933,15 +932,17 @@ class ShopFlowTest extends TestCase
         // Prompt tryon phải là ngôn ngữ dương "WEARING THE EXACT GARMENT" (bám mẫu, không phải liệt kê "đừng đổi").
         $this->assertStringContainsString('WEARING THE EXACT GARMENT', (string) $gen->prompt);
         $this->assertStringContainsString('IDENTICAL garment', (string) $gen->prompt);
-        // Kế thừa body/hair directive: body_height=8 → "tall statuesque model", hair_color=black → "black hair color".
+        // Kế thừa body directive: body_height=8 → "tall statuesque model".
         $this->assertStringContainsString('tall statuesque model', (string) $gen->prompt);
-        $this->assertStringContainsString('black hair color', (string) $gen->prompt);
+        // Hair directive đã bị LOẠI BỎ — prompt KHÔNG chứa "hair color".
+        $this->assertStringNotContainsString('hair color', (string) $gen->prompt);
         // Chi phí = 1 credit (model sinh ảnh, không edit).
         $this->assertSame(1, $gen->credits_cost);
         // Generation được tạo đúng mode=refgen (poll không 500; stub offline có thể failed nhưng không nằm trong scope test này).
         $this->getJson('/studio/generations/'.$gen->id)->assertOk();
 
-        // Kế thừa khuôn mặt mẫu (FacePreset): tạo preset → gửi face_model_id → prompt chứa mô tả khuôn mặt.
+        // Kế thừa khuôn mặt mẫu (FacePreset): tạo preset KHÔNG có ảnh → vision không đọc được →
+        // fallback về description trong DB (mô tả khuôn mặt vẫn được chèn vào prompt).
         $fp = \App\Models\FacePreset::create([
             'name' => 'Test Face', 'description' => 'young woman with round face and wispy bangs', 'ethnicity' => 'Vietnamese', 'image' => null, 'sort' => 0, 'enabled' => true,
         ]);

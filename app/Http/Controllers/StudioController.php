@@ -585,11 +585,8 @@ class StudioController extends Controller
             'body_waist' => ['nullable', 'integer', 'min:1', 'max:10'],
             'body_shoulders' => ['nullable', 'integer', 'min:1', 'max:10'],
             'body_hips' => ['nullable', 'integer', 'min:1', 'max:10'],
-            'hair_style' => ['nullable', 'string', 'max:100'],
-            'hair_color' => ['nullable', 'string', 'max:100'],
-            // Kế thừa khuôn mặt mẫu (FacePreset) từ cài đặt — khi tryon chọn khuôn mặt, backend
-            // resolve qua VirtualTryOnService::pickModel() → chèn mô tả khuôn mặt + ảnh khuôn mặt
-            // (face_ref) vào prompt refgen để kiểm soát khuôn mặt người mẫu.
+            // Kế thừa khuôn mặt mẫu (FacePreset) từ cài đặt — ẢNH tải lên được gửi kèm như face_ref,
+            // còn MÔ TẢ khuôn mặt do VISION model đọc từ chính ảnh đó (không lấy description trong DB).
             'face_model_id' => ['nullable', 'string', 'max:80'],
         ]);
 
@@ -597,14 +594,21 @@ class StudioController extends Controller
         $userPrompt = trim((string) ($data['prompt'] ?? ''));
         $isTryon = ! empty($data['tryon']);
 
-        // Resolve khuôn mặt mẫu (nếu tryon + chọn face) — kế thừa từ cài đặt FacePreset.
+        // Resolve khuôn mặt mẫu: dùng ẢNH (face_ref) + VISION đọc mô tả từ ảnh thay vì description trong DB.
         $faceDesc = null;
         $faceImageUrl = null;
         if ($isTryon && ! empty($data['face_model_id'])) {
             $face = app(\App\Services\VirtualTryOnService::class)->pickModel((string) $data['face_model_id']);
             if ($face) {
-                $faceDesc = trim((string) ($face['desc'] ?? ''));
                 $faceImageUrl = ! empty($face['image']) ? (string) $face['image'] : null;
+                // Vision model đọc ảnh khuôn mặt → mô tả chính xác (tóc/mặt/tỷ lệ) thay vì dùng text DB.
+                if ($faceImageUrl) {
+                    $faceDesc = $this->faceDescription($faceImageUrl);
+                }
+                // Fallback êm: vision không đọc được (thiếu key vision) → dùng mô tả text trong DB.
+                if (! $faceDesc) {
+                    $faceDesc = trim((string) ($face['desc'] ?? ''));
+                }
             }
         }
 
@@ -612,9 +616,8 @@ class StudioController extends Controller
             // Tryon bằng model SINH ẢNH (qwen-image-3.0-pro): không edit ảnh gốc mà sinh ảnh mới
             // dựa ảnh tham chiếu. Prompt nêu rõ "dựa trang phục trong ảnh tham chiếu, tạo ảnh người
             // mẫu mặc đúng trang phục đó". Ngôn ngữ DƯƠNG (bám mẫu) — tránh model tự thiết kế lại đồ.
-            // Kế thừa body/hair directive (tạo ảnh 2D) + khuôn mặt mẫu (FacePreset) để kiểm soát người mẫu.
+            // Kế thừa body directive (tạo ảnh 2D) + khuôn mặt mẫu (ảnh + mô tả vision) để kiểm soát người mẫu.
             $bodyDirective = $this->buildBodyDirective($data);
-            $hairDirective = $this->buildHairDirective($data);
             $finalPrompt = 'Create a brand-new photorealistic fashion photo of a model WEARING THE EXACT GARMENT shown in the reference image. '
                 .'The reference image is a commercial product photo of a garment — reproduce this IDENTICAL garment on a new model: identical color, identical fabric, identical pattern/print, identical cut, identical length, identical neckline, identical sleeves, identical fit (tight stays tight, loose stays loose), identical buttons/zippers/belt/bow/brooch, identical stitching and seams. Copy the garment as-is from the reference photo; do not redesign, restyle, recolor, simplify, or invent any detail. '
                 .'Wear every accessory visible in the reference identically too — same shoes, bag, belt, hat, jewelry, scarf — identical color, size, placement. Do not add items not in the reference; do not drop items that are in it. '
@@ -624,7 +627,6 @@ class StudioController extends Controller
                 .'Sharp, in-focus, photorealistic, clean high-resolution fashion photo, even studio lighting. No blur, no noise, no banding, no artifacts, no text, no watermark.'
                 .($faceDesc !== null && $faceDesc !== '' ? ' Model face: '.$faceDesc.'. ' : '')
                 .($bodyDirective !== '' ? $bodyDirective : '')
-                .($hairDirective !== '' ? $hairDirective : '')
                 .($userPrompt !== '' ? ' '.$userPrompt : '');
         } else {
             $finalPrompt = 'Create a brand-new image based on the provided reference image. '

@@ -25,6 +25,7 @@ const busy = ref(false);
 // ── Khuôn mặt mẫu (FacePreset từ cài đặt) ──
 const faces = ref([]);
 const faceModelId = ref('');
+const bodyOpen = ref(false); // thu gọn khối Phom dáng để card gọn
 onMounted(async () => {
   try {
     const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
@@ -117,11 +118,10 @@ async function runRefgen() {
   busy.value = true;
   // Ảnh tham chiếu có thể là data:URL (canvas flattened) → backend downscaleSource xử lý.
   // Không truyền selectedModel → backend dùng model sinh ảnh đã cấu hình trong Cài đặt.
-  // Thử đồ: gửi tryon=true + body/hair từ store + khuôn mặt mẫu (kế thừa cài đặt).
+  // Thử đồ: gửi tryon=true + body directive từ store + khuôn mặt mẫu (ảnh, mô tả do vision đọc).
   const isTryon = mode.value === 'tryon';
   const body = isTryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
-  const hair = isTryon ? { style: store.hairStyle, color: store.hairColor } : null;
-  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body, hair, isTryon ? faceModelId.value : '');
+  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body, isTryon ? faceModelId.value : '');
   busy.value = false;
   if (items && items.length) {
     store.toast('Đã gửi ' + items.length + ' ảnh mới — đang tạo…');
@@ -209,7 +209,7 @@ async function runRefgen() {
       <!-- Khuôn mặt mẫu (kế thừa từ cài đặt FacePreset) -->
       <div class="mt-4">
         <div class="flex items-center justify-between">
-          <p class="label mb-0">Khuôn mặt mẫu <span class="text-cream-300/40">(kế thừa cài đặt)</span></p>
+          <p class="label mb-0">Khuôn mặt mẫu <span class="text-cream-300/40">(dùng ảnh — AI tự đọc mặt + tóc)</span></p>
           <button v-if="faceModelId" @click="faceModelId = ''" class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ chọn</button>
         </div>
         <div class="mt-1.5 flex flex-wrap gap-1.5">
@@ -229,47 +229,38 @@ async function runRefgen() {
       <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: pose đứng tự nhiên, tay chống hông, ánh sáng studio…"></textarea>
       <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
 
-      <!-- Body directive (kế thừa từ "Tạo ảnh 2D") -->
-      <div class="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
-        <p class="flex items-center gap-1.5 text-xs font-semibold text-emerald-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Phom dáng người mẫu <span class="font-normal text-emerald-300/50">(kế thừa Tạo ảnh 2D)</span></p>
-        <div class="mt-2 space-y-2">
-          <div>
-            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Chiều cao</span><span class="font-semibold text-emerald-300">{{ bodyHeightLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHeight" class="h-1.5 w-full cursor-pointer accent-emerald-400">
-          </div>
-          <div>
-            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vóc dáng</span><span class="font-semibold text-emerald-300">{{ bodyBuildLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyBuild" class="h-1.5 w-full cursor-pointer accent-emerald-400">
-          </div>
-          <div>
-            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Eo</span><span class="font-semibold text-emerald-300">{{ bodyWaistLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyWaist" class="h-1.5 w-full cursor-pointer accent-emerald-400">
-          </div>
-          <div>
-            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vai</span><span class="font-semibold text-emerald-300">{{ bodyShouldersLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyShoulders" class="h-1.5 w-full cursor-pointer accent-emerald-400">
-          </div>
-          <div>
-            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Hông</span><span class="font-semibold text-emerald-300">{{ bodyHipsLabel }}</span></p>
-            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHips" class="h-1.5 w-full cursor-pointer accent-emerald-400">
-          </div>
+      <!-- Body directive (kế thừa từ "Tạo ảnh 2D") — thu gọn -->
+      <button @click="bodyOpen = !bodyOpen"
+              class="mt-3 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-emerald-400">
+        <span class="flex items-center gap-1.5"><StudioIcon name="body" size="h-3.5 w-3.5" /> Phom dáng người mẫu <span class="font-normal text-cream-300/50">(kế thừa Tạo ảnh 2D)</span></span>
+        <span class="text-emerald-300">{{ bodyOpen ? '▲' : '▼' }}</span>
+      </button>
+      <div v-if="bodyOpen" class="mt-2 space-y-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
+        <div>
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Chiều cao</span><span class="font-semibold text-emerald-300">{{ bodyHeightLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHeight" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+        </div>
+        <div>
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vóc dáng</span><span class="font-semibold text-emerald-300">{{ bodyBuildLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyBuild" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+        </div>
+        <div>
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Eo</span><span class="font-semibold text-emerald-300">{{ bodyWaistLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyWaist" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+        </div>
+        <div>
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vai</span><span class="font-semibold text-emerald-300">{{ bodyShouldersLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyShoulders" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+        </div>
+        <div>
+          <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Hông</span><span class="font-semibold text-emerald-300">{{ bodyHipsLabel }}</span></p>
+          <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHips" class="h-1.5 w-full cursor-pointer accent-emerald-400">
         </div>
       </div>
 
-      <!-- Tóc (kế thừa store) -->
-      <div class="mt-2 grid grid-cols-2 gap-2">
-        <div>
-          <label class="label mb-1">Kiểu tóc</label>
-          <input v-model="store.hairStyle" type="text" maxlength="60" class="input !py-1.5 !text-xs" placeholder="vd: long straight (bỏ trống = tự do)">
-        </div>
-        <div>
-          <label class="label mb-1">Màu tóc</label>
-          <input v-model="store.hairColor" type="text" maxlength="60" class="input !py-1.5 !text-xs" placeholder="vd: jet black (bỏ trống = tự do)">
-        </div>
-      </div>
-
-      <p class="mt-2 rounded-xl border border-emerald-400/30 bg-emerald-900/15 px-2.5 py-1.5 text-[10px] leading-relaxed text-emerald-100/80">
-        Dùng model <b>sinh ảnh</b> (qwen-image-3.0-pro) tạo người mẫu mặc đúng trang phục — <b>rẻ hơn</b> Thử đồ ảo (edit). Bám mẫu có thể kém hơn edit một chút.
+      <!-- Khuôn mặt dùng ảnh, AI tự đọc mặt + tóc -->
+      <p class="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-900/15 px-2.5 py-1.5 text-[10px] leading-relaxed text-emerald-100/80">
+        Khuôn mặt dùng <b>ảnh mẫu</b> — AI tự đọc <b>mặt + tóc</b> từ ảnh. Dùng model <b>sinh ảnh</b> (qwen-image-3.0-pro) — <b>rẻ hơn</b> Thử đồ ảo (edit).
       </p>
     </template>
 
