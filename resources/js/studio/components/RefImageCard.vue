@@ -32,6 +32,8 @@ const openPanel = ref('');
 function togglePanel(name) {
   openPanel.value = openPanel.value === name ? '' : name;
 }
+// Chip Nền Studio (chế độ "Tạo ảnh mới") — giống chip "Thử đồ": bấm mở lưới 2x
+const bgOpenRefgen = ref(false);
 onMounted(async () => {
   try {
     const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
@@ -183,8 +185,17 @@ async function runRefgen() {
 
     <!-- ============ CHẾ ĐỘ: TẠO ẢNH MỚI (refgen) ============ -->
     <template v-if="mode === 'refgen'">
-      <!-- Nền Studio (lưới 2x, không title) -->
-      <div class="mt-4 grid grid-cols-2 gap-1.5">
+      <!-- Nền Studio (chip toggle giống Thử đồ) -->
+      <button @click="bgOpenRefgen = !bgOpenRefgen"
+              class="mt-4 flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-xs font-semibold transition"
+              :class="bgOpenRefgen ? 'border-brand-400 bg-brand-600/20 text-brand-100' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50'">
+        <span class="flex items-center gap-2"><StudioIcon name="background" size="h-4 w-4" class="text-brand-300" /> Nền Studio</span>
+        <span class="flex items-center gap-2">
+          <span class="text-[10px] font-medium text-cream-300/60">{{ activePreset ? 'Đã chọn' : 'Mặc định' }}</span>
+          <span class="text-brand-300">{{ bgOpenRefgen ? '▲' : '▼' }}</span>
+        </span>
+      </button>
+      <div v-if="bgOpenRefgen" class="mt-2 grid grid-cols-2 gap-1.5">
         <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
                 class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
                 :class="activePreset === p.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
