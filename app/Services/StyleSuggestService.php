@@ -390,51 +390,6 @@ class StyleSuggestService
         return null;
     }
 
-    /**
-     * Đọc ảnh trang phục/phụ kiện bằng vision model → trả mô tả chi tiết (tiếng Anh) để hỗ trợ
-     * "Thử đồ ảo" (card Ghép ảnh). Mô tả sát từng chi tiết (cổ áo, tay, độ dài, màu, họa tiết,
-     * chất liệu, phụ kiện đi kèm) giúp model edit tái tạo đúng trang phục gốc thay vì "thiết kế lại".
-     * Trả null khi không có key vision hoặc model lỗi (thử đồ vẫn chạy, chỉ thiếu mô tả).
-     */
-    public function describeGarment(string $imagePath): ?string
-    {
-        try {
-            [$b64, $mime] = $this->downscaleBase64($imagePath, 1400);
-            if ($b64 === '') { return null; }
-            $prompt = 'You are a fashion garment cataloger for a virtual try-on pipeline. '
-                .'Describe the garment and EVERY visible accessory in this image as a precise, factual English description (plain text only, no JSON, no labels, no opinions). '
-                .'Cover, in this order: (1) garment category and silhouette/fit (tight, loose, cropped, oversized, draped, A-line…); '
-                .'(2) color(s) with exact tone; (3) fabric/material texture; (4) neckline, sleeves (length + shape), hemline length, waistline; '
-                .'(5) prints, patterns, embroidery, appliqué, buttons, zippers, pockets, pleats, ruffles, collar, straps, belt, bow, brooch; '
-                .'(6) every accessory worn or held (shoes, handbag, belt, hat, scarf, watch, earrings, necklace, sunglasses) with color and placement. '
-                .'Be exhaustive and literal; do NOT invent details that are not visible. Keep it under 180 words.';
-            foreach (studio_suggest_qwen_models() as $model) {
-                foreach (studio_qwen_credentials('vision') as $key) {
-                    $base = dashscope_base_url($key).'/compatible-mode/v1';
-                    try {
-                        $resp = Http::withToken($key)->timeout(60)
-                            ->post($base.'/chat/completions', [
-                                'model' => $model,
-                                'messages' => [['role' => 'user', 'content' => [
-                                    ['type' => 'text', 'text' => $prompt],
-                                    ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
-                                ]]],
-                            ]);
-                        if ($resp->successful()) {
-                            $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
-                            if ($text !== '' && mb_strlen($text) < 1200) { return $text; }
-                        }
-                    } catch (\Throwable $e) {
-                        continue;
-                    }
-                }
-            }
-        } catch (\Throwable $e) {
-            logger()->warning('describeGarment failed: '.$e->getMessage());
-        }
-        return null;
-    }
-
     protected function suggestViaColor(string $imagePath, int $creativeLevel = 6, int $adherence = 8, int $detailLevel = 8): array
     {
         $styles = Preset::category('style')->get();

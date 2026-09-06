@@ -55,7 +55,7 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = [], ?string $mode = null, ?string $tryonBgText = null): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = [], ?string $mode = null): string
     {
         $dashscopeKey = studio_api_key('dashscope');
 
@@ -81,18 +81,7 @@ class ImageAIService
                 ? $modelOverride
                 : $configuredEdit;
             $triedModels = [$editModel];
-            // Thử đồ ảo (mode='tryon'): pose ref (ref_images[0]) được tách ra làm tham số riêng
-            // poseRefUrl thay vì nằm gộp trong refImages — nhờ đó pose được hưởng retry 3 bậc
-            // (face+pose+source → face+source → source) giống "Thay Đổi Người Mẫu", không bị vứt
-            // sớm chung với compose refs khi model từ chối nhiều ảnh. Còn lại ref_images[1..] (bối cảnh)
-            // vẫn gửi qua $refImages.
-            $tryonPose = null;
-            $tryonRefs = $refImages;
-            if ($mode === 'tryon' && ! empty($refImages)) {
-                $tryonPose = (string) $refImages[0];
-                $tryonRefs = array_slice($refImages, 1);
-            }
-            $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, $tryonPose, $maskImage, $tryonRefs);
+            $edited = $this->editImage($prompt, $baseImage, $editModel, $faceRef, null, $maskImage, $refImages);
             // Model được chọn (vd qwen-image-3.0-pro) thất bại ở MỌI key (hết hạn mức, 403/404…) →
             // tự fallback sang model Qwen Edit cấu hình — đúng cơ chế "tự chuyển sang model kế tiếp"
             // của Tạo ảnh 2D. Hạn mức DashScope tính THEO MODEL nên model edit chuyên dụng
@@ -100,7 +89,7 @@ class ImageAIService
             if (! $edited && $editModel !== $configuredEdit && $this->isImageEditCapableModel($configuredEdit)) {
                 logger()->info('Inpaint: selected edit model failed, falling back to configured Qwen Edit model', ['from' => $editModel, 'to' => $configuredEdit]);
                 $triedModels[] = $configuredEdit;
-                $edited = $this->editImage($prompt, $baseImage, $configuredEdit, $faceRef, $tryonPose, $maskImage, $tryonRefs);
+                $edited = $this->editImage($prompt, $baseImage, $configuredEdit, $faceRef, null, $maskImage, $refImages);
             }
             if ($edited) {
                 // Model edit đôi khi trả ảnh tỷ lệ/kích thước hơi khác ảnh gốc — chuẩn hóa
@@ -114,47 +103,6 @@ class ImageAIService
                     // smear khi AI no-op (giữ nguyên để user biết AI chưa tạo).
                     $eraseFallback = str_contains($prompt, 'REMOVAL');
                     $edited = $this->compositeMaskedEdit($edited, $baseImage, $maskImage, $eraseFallback) ?: $edited;
-                }
-                // Thử đồ ảo PASS 2 — đổi NỀN (bối cảnh @image3) khi có bối cảnh riêng.
-                // Tách pass nền ra khỏi PASS 1 (mặc đồ + pose) vì gộp chung khiến model bỏ qua
-                // tư thế (đã verified trong "Thay Đổi Người Mẫu" PASS 2). Giữ nguyên người
-                // + trang phục + pose, chỉ đổi hậu cảnh.
-                // Hỗ trợ 2 nguồn nền: (1) ảnh bối cảnh từ slot 3, (2) text mô tả nền từ chip "Nền Studio"
-                // (truyền riêng qua $tryonBgText — KHÔNG nằm trong $prompt để PASS 1 không nhiễm màu nền).
-                $bgUrl = null;
-                $bgText = $tryonBgText ? trim((string) $tryonBgText) : null;
-                if (! empty($tryonRefs)) {
-                    $bgUrl = (string) $tryonRefs[0];
-                    $bgText = null; // ưu tiên ảnh bối cảnh nếu có
-                }
-                if ($bgUrl || $bgText) {
-                    if ($bgUrl) {
-                        $bgPrompt = 'Replace the ENTIRE background of the scene with the background from the FIRST image. '
-                            .'Keep the person, their pose, the garment, body shape and GARMENT COLOR 100% unchanged. '
-                            .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look and stay clearly visible; do NOT darken or shade them into a silhouette. '
-                            .'Frame the person at about 75-80% of the image height, with the background clearly visible all around them. '
-                            .'Blend the person into the scene: the HAIR and its edges, the clothing silhouette and the body outline must merge naturally with the background — NO hard cut-out outline, halo, white fringe or aliasing around the hair. '
-                            .'Unify the color grading, warmth and lighting of the person and the new background so they blend into ONE cohesive photograph with no visible seam. '
-                            .'Do NOT tint, recolor or reflect the background color onto the garment — keep the garment its original colors. '
-                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, garment color changed, deformed hands, blurry, low quality. Photorealistic.';
-                        $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, $bgUrl, null, []);
-                    } else {
-                        // Text nền (chip "Nền Studio"): model edit tự sinh nền từ text description.
-                        $bgPrompt = 'Replace ONLY the background of the scene with: '.$bgText.'. '
-                            .'Keep the person, their pose, the garment, body shape and GARMENT COLOR 100% unchanged — the background color must NOT be applied to, tinted onto, or reflected on the garment. '
-                            .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look. '
-                            .'Frame the person at about 75-80% of the image height. '
-                            .'Blend the person naturally into the background — NO hard outline, halo, white fringe. '
-                            .'Unify the color grading, warmth and lighting so the person and background blend into ONE cohesive photograph. '
-                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, garment color changed, deformed hands, blurry, low quality. Photorealistic.';
-                        $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, null, null, []);
-                    }
-                    if ($bgResult) {
-                        $edited = $bgResult;
-                        logger()->info('Try-on PASS 2 (background) succeeded', ['has_bg_image' => (bool) $bgUrl]);
-                    } else {
-                        logger()->warning('Try-on PASS 2 (background) failed; keeping PASS 1 result');
-                    }
                 }
                 return $edited;
             }

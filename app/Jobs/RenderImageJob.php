@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\Generation;
 use App\Services\ImageAIService;
-use App\Services\VirtualTryOnService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -55,8 +54,6 @@ class RenderImageJob implements ShouldQueue
                 $refImages,
                 // mode='refgen' (card "Tạo ảnh mới từ ảnh mẫu"): i2i qua model sinh ảnh, KHÔNG edit.
                 $generation->meta['mode'] ?? null,
-                // Thử đồ ảo: text nền (chip "Nền Studio") — xử lý riêng ở PASS 2, không nhiễm PASS 1.
-                $generation->meta['tryon_bg_text'] ?? null,
             );
 
             // DEEP REDESIGN (region): AI đã sửa trên CROP — paste lại vào ẢNH GỐC đúng vị trí
@@ -92,20 +89,6 @@ class RenderImageJob implements ShouldQueue
             $usedProvider = $images->lastProvider() ?: $generation->provider;
             $usedModel = $images->lastModel() ?: $generation->model;
 
-            // Thử đồ ảo best-of-N + chấm điểm: sau khi tạo xong, chấm điểm candidate bằng vision QA
-            // (so với trang phục gốc @image1 = base_image và pose @image2 = ref_images[0]).
-            // Fail êm — không có key/rate-limit ⇒ giữ ảnh gốc, chỉ thiếu điểm.
-            $qa = null;
-            if (($genMeta['mode'] ?? '') === 'tryon' && ! empty($genMeta['tryon_score'])) {
-                try {
-                    $poseUrl = isset($genMeta['ref_images'][0]) ? (string) $genMeta['ref_images'][0] : '';
-                    $qa = app(VirtualTryOnService::class)
-                        ->scoreTryOnResult($url, (string) ($generation->base_image ?? ''), $poseUrl);
-                } catch (\Throwable $e) {
-                    logger()->warning('Try-on QA scoring skipped', ['generation_id' => $generation->id, 'error' => $e->getMessage()]);
-                }
-            }
-
             $generation->update([
                 'status' => 'completed',
                 'media_url' => $url,
@@ -123,7 +106,6 @@ class RenderImageJob implements ShouldQueue
                     'creative_level' => $pr['creative_level'] ?? null,
                     'adherence' => $pr['adherence'] ?? null,
                     'negative_prompt' => $pr['negative_prompt'] ?? null,
-                    'qa' => $qa,
                 ]),
             ]);
             logger()->info('Image generation completed', [

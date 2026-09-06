@@ -27,10 +27,6 @@ return [
     'qwen_max_model' => env('STUDIO_QWEN_MAX_MODEL', 'qwen3.8-max'), // chất lượng cao hơn cho vision/chat
     'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-2.5-flash'),
     'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen multimodal trước)
-    'tryon_model' => env('STUDIO_TRYON_MODEL', ''), // DEPRECATED — wanx-virtualmodel không khả dụng trên host intl; tryon thực tế chạy qua qwen-image-edit*
-    'tryon_best_of' => (int) env('STUDIO_TRYON_BEST_OF', 2), // best-of-N mặc định cho Thử đồ ảo: 1-2 bản (2 = so sánh + chọn bản bám mẫu tốt hơn bằng QA)
-    'tryon_score' => (bool) env('STUDIO_TRYON_SCORE', false),  // chấm điểm QA tự động cho từng bản thử đồ (qwen vision, fail êm khi rate-limit) — mặc định TẮT (ưu tiên tốc độ/trung thực)
-    'tryon_garment_vision' => (bool) env('STUDIO_TRYON_GARMENT_VISION', true), // đọc trang phục @image1 bằng vision → mô tả chi tiết → chèn vào prompt (bám mẫu tốt hơn)
     'swap_model' => env('STUDIO_SWAP_MODEL', ''), // '' = dùng chung qwen_edit_model (giống Inpaint: qwen-image-edit-max)
     'swap_candidates' => (int) env('STUDIO_SWAP_CANDIDATES', 1), // 1 = nhanh; 2-3 = chọn bản đẹp nhất (chậm hơn)
     'swap_superres_scale' => (int) env('STUDIO_SWAP_SUPERRES_SCALE', 2), // upscale 2x/4x trước khi trả kết quả
@@ -43,7 +39,6 @@ return [
     'swap_enabled' => (bool) env('STUDIO_SWAP_ENABLED', false),          // TẠM ẨN tính năng Thay Đổi Người Mẫu (chưa hiệu quả, tốn nguồn lực)
     'faceswap_prompt' => env('STUDIO_FACESWAP_PROMPT', 'Face swap (NOT a photo overlay): replace the face of @image1 with the face in @image2. Generate a NEW natural face matching @image2 identity, hairstyle, facial features, ears and head proportions — do NOT paste/overlay the photo. Make the new head about 80% the size of the original head — smaller and naturally proportionate, never enlarged or distorted. Blend skin tone, hairline and lighting seamlessly. Keep garment, pose, body, background unchanged.'),
     'swap_brighten' => (bool) env('STUDIO_SWAP_BRIGHTEN', false),          // kéo sáng chủ thể tối (có thể lệch màu đồ) → mặc định TẮT
-    'tryon_category' => env('STUDIO_TRYON_CATEGORY', 'dress'), // top / bottom / dress
     'image_model' => env('STUDIO_IMAGE_MODEL', 'flux-1.1-schnell'),
     'wan_model' => env('STUDIO_WAN_MODEL', 'wan2.7-image-pro'),
     'qwen_model' => env('STUDIO_QWEN_MODEL', 'qwen-image-3.0-pro'),

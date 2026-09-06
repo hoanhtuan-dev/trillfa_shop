@@ -9,39 +9,9 @@ const store = useStudioStore();
 
 const prompt = ref('');
 const variants = ref(1);
-// Thử đồ ảo best-of-N + chấm điểm: số bản candidates + tự chấm điểm từng bản (vision QA).
-// Giới hạn 1-2 bản: 1 bản trung thực tuyệt đối, 2 bản so sánh rồi chọn bản bám mẫu tốt hơn.
-const bestOf = ref(2);
-const scoring = ref(false); // chấm điểm QA tự động — mặc định TẮT (ưu tiên tốc độ/trung thực; bật khi cần so sánh nhiều bản)
 const creativeLevel = ref(8);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
 const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
 const ornamentLevel = ref(0);   // mức độ trang trí (0–10; 0 = tối giản, 10 = cầu kỳ) — dùng cho chế độ Ghép Trang Phục
-const garmentFit = ref('auto'); // phom dáng trang phục: 'auto' | 'tight' | 'loose' | 'crop' | 'oversized'
-// ── Nền Studio: kế thừa từ RefImageCard — 8 màu nền studio thông dụng. Bấm chip → chèn mô tả
-// nền vào prompt; PASS 2 backend sẽ đọc và đổi nền. Bấm lại chip đang active → bỏ.
-const studioBgPresets = [
-  { id: 'bg-white',  label: 'Trắng',   color: '#ffffff', prompt: 'nền trắng studio sạch, ánh sáng khuếch tán đều' },
-  { id: 'bg-cream',  label: 'Kem',     color: '#f2e7d5', prompt: 'nền kem/beige studio ấm, ánh sáng dịu' },
-  { id: 'bg-lgray',  label: 'Xám nhạt', color: '#e8e8e8', prompt: 'nền xám nhạt studio, ánh sáng softbox từ trên' },
-  { id: 'bg-mgray',  label: 'Xám trung', color: '#9a9a9a', prompt: 'nền xám trung studio 18%, tương phản cân bằng' },
-  { id: 'bg-storm',  label: 'Xám đậm', color: '#4a4a4a', prompt: 'nền xám đậm studio, rim light mềm, mood thời trang' },
-  { id: 'bg-black',  label: 'Đen',     color: '#0a0a0a', prompt: 'nền đen studio, key light đơn, tương phản cao' },
-  { id: 'bg-blue',   label: 'Xanh phấn', color: '#c9d8e0', prompt: 'nền xanh pastel studio, ánh sáng mát dịu' },
-  { id: 'bg-blush',  label: 'Hồng phấn', color: '#ead3d5', prompt: 'nền hồng phấn studio, ánh sáng ấm khuếch tán' },
-];
-const activeBg = ref(null);
-function applyBgChip(bg) {
-  if (activeBg.value === bg.id) {
-    // Bấm lại → bỏ
-    activeBg.value = null;
-    prompt.value = prompt.value.replace(/;\s*nền\s+[^;]+/i, '').trim();
-    return;
-  }
-  activeBg.value = bg.id;
-  // Gỡ segment nền cũ (nếu có) rồi nối segment mới
-  prompt.value = prompt.value.replace(/;\s*nền\s+[^;]+/i, '').trim();
-  prompt.value = (prompt.value ? prompt.value + '; ' : '') + bg.prompt;
-}
 const busy = ref(false);
 const previewOpen = ref(false);
 const previewPrompt = ref('');
@@ -50,12 +20,11 @@ const previewDirty = ref(false);
 const previewAxes = ref([]);
 const stylePresets = ref([]);   // preset phong cách (lưu database theo tài khoản)
 const presetName = ref('');
-const mode = ref('compose'); // 'compose' | 'tryon' | 'faceswap' | 'outfit'
+const mode = ref('compose'); // 'compose' | 'faceswap' | 'outfit'
 const open = ref(false);
 const selected = ref([null, null, null]); // 3 slot cố định: image object hoặc null
 const targetSlot = ref(0);  // slot đang chọn trong popup
 const slotImgError = ref([false, false, false]); // ảnh slot bị lỗi (404/broken) — vẫn cho xóa
-const advancedOpen = ref(false); // tùy chỉnh nâng cao Thử đồ ảo (best-of / chấm điểm / phom dáng)
 
 const baseUrl = ref('');
 const lastIds = ref([]);
@@ -71,22 +40,6 @@ const running = computed(() => store.composeStage === 'send' || store.composeSta
 const doneCount = computed(() => store.composeGenIds.filter(id => store.generations.find(g => g.id === Number(id))?.status === 'completed').length);
 
 const CSRF = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-
-// Thử đồ ảo best-of-N: thông tin bản được chọn (điểm + từng tiêu chí) để hiển thị sau khi xong.
-const bestGen = computed(() => store.composeBestId ? store.generations.find(g => g.id === store.composeBestId) : null);
-const bestScore = computed(() => store.genScore(bestGen.value));
-const bestQa = computed(() => (bestGen.value && bestGen.value.meta && bestGen.value.meta.qa) || {});
-const bestUrl = computed(() => bestGen.value?.media_url || '');
-const garmentUrl = computed(() => selected.value[0]?.url || '');
-
-// Các bản candidate hoàn tất (Thử đồ ảo) — xếp theo điểm QA giảm dần, dùng cho leaderboard.
-const tryonCandidates = computed(() => store.composeGenIds
-  .map(id => store.generations.find(g => g.id === Number(id)))
-  .filter(g => g && g.status === 'completed' && g.media_url)
-  .map(g => ({ g, score: store.genScore(g), qa: (g.meta && g.meta.qa) || {} }))
-  .sort((a, b) => (b.score ?? -1) - (a.score ?? -1)));
-
-function previewCandidate(g) { store.select({ id: g.id, media_url: g.media_url, type: 'image', status: 'completed' }); }
 
 const selectedImgs = computed(() => selected.value.filter(Boolean));
 const selectedCount = computed(() => selectedImgs.value.length);
@@ -124,44 +77,32 @@ function makeBase(i) {
 function roleLabel(i) { return '@image' + (i + 1); }
 
 // Vai trò slot theo chế độ
-const slotRoles = computed(() => mode.value === 'tryon'
-  ? ['Trang phục', 'Pose', 'Bối cảnh (tùy chọn)']
-  : mode.value === 'faceswap'
-    ? ['Người mẫu', 'Khuôn mặt', 'Ảnh ghép (tùy chọn)']
-    : mode.value === 'outfit'
-      ? ['Trang phục 1', 'Trang phục 2', 'Bối cảnh (tùy chọn)']
-      : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
+const slotRoles = computed(() => mode.value === 'faceswap'
+  ? ['Người mẫu', 'Khuôn mặt', 'Ảnh ghép (tùy chọn)']
+  : mode.value === 'outfit'
+    ? ['Trang phục 1', 'Trang phục 2', 'Bối cảnh (tùy chọn)']
+    : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
-// Vòng viền màu theo vai trò slot (chế độ Thử đồ ảo: trang phục nổi bật nhất)
-function slotRing(i) {
-  if (mode.value !== 'tryon') return 'border-brand-500';
-  return i === 0 ? 'border-brand-400 ring-1 ring-brand-400/40' : (i === 1 ? 'border-sky-400' : 'border-ink-600');
+// Vòng viền màu theo vai trò slot
+function slotRing() {
+  return 'border-brand-500';
 }
-function slotRingEmpty(i) {
-  if (mode.value !== 'tryon') return 'border-dashed border-ink-700 hover:border-brand-400';
-  return i === 2 ? 'border-dashed border-ink-600 hover:border-brand-400' : 'border-dashed border-ink-700 hover:border-brand-400';
+function slotRingEmpty() {
+  return 'border-dashed border-ink-700 hover:border-brand-400';
 }
 
 const promptPlaceholder = computed(() => mode.value === 'outfit'
   ? 'VD: lai tạo trang phục từ phom dáng của @image1 và màu sắc của @image2…'
-  : mode.value === 'tryon'
-    ? 'VD: mặc @image1 lên người mẫu theo dáng @image2, giữ nguyên màu + họa tiết + phụ kiện…'
-    : mode.value === 'faceswap'
-      ? 'VD: thay khuôn mặt @image2 vào người mẫu @image1…'
-      : 'VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…');
+  : mode.value === 'faceswap'
+    ? 'VD: thay khuôn mặt @image2 vào người mẫu @image1…'
+    : 'VD: giữ nguyên @image1, đặt cô gái trong @image2 vào nền studio…');
 
 function setMode(m) {
-  if (m === 'tryon') setTryon();
-  else if (m === 'faceswap') setFaceSwap();
+  if (m === 'faceswap') setFaceSwap();
   else if (m === 'outfit') setOutfit();
   else setCompose();
 }
 
-function setTryon() {
-  mode.value = 'tryon';
-  prompt.value = 'mặc trang phục @image1 lên người mẫu theo dáng @image2, giữ đúng dáng, màu, họa tiết và phụ kiện';
-  store.toast('Thử đồ ảo: @image1 = trang phục, @image2 = pose, @image3 = bối cảnh (tùy chọn).');
-}
 function setFaceSwap() {
   mode.value = 'faceswap';
   prompt.value = 'thay khuôn mặt của @image1 bằng khuôn mặt trong @image2, giữ nguyên dáng, trang phục, bối cảnh';
@@ -190,18 +131,9 @@ async function run() {
   if (selectedCount.value < 2 || busy.value) return;
   const urls = selectedImgs.value.map(g => g.url).filter(Boolean);
   baseUrl.value = urls[0] || '';
-  // Thử đồ ảo: tự chèn mô tả tư thế (skeleton) của pose để model hiểu dáng chính xác
-  let finalPrompt = prompt.value;
-  if (mode.value === 'tryon' && selected.value[1]?.skeleton) {
-    finalPrompt += '. Pose detail: ' + selected.value[1].skeleton;
-  }
-  // Thử đồ ảo: chèn directive phom dáng (fit) để model giữ đúng silhouette gốc
-  if (mode.value === 'tryon' && garmentFit.value !== 'auto') {
-    finalPrompt += '. The garment fit must be: ' + garmentFit.value + ' — reproduce this exact fit on the model body.';
-  }
   busy.value = true;
   const override = previewDirty.value ? previewPrompt.value : '';
-  const items = await store.compose(urls, finalPrompt, variants.value, mode.value, creativeLevel.value, style.value, ornamentLevel.value, override, mode.value === 'tryon' ? bestOf.value : 1, mode.value === 'tryon' ? scoring.value : false);
+  const items = await store.compose(urls, prompt.value, variants.value, mode.value, creativeLevel.value, style.value, ornamentLevel.value, override);
   if (items) lastIds.value = items.map(it => it.generation_id).filter(Boolean);
   busy.value = false;
 }
@@ -291,31 +223,17 @@ function deletePreset(p) {
 function saveSettings() {
   persistOutfitSettings().then((ok) => { if (ok) store.toast('Đã lưu cài đặt Ghép Trang Phục.'); });
 }
-
-// ── Leaderboard: thanh điểm tiêu chí ──
-function qaVal(qa, k) { const v = qa && qa[k]; return (v != null && !Number.isNaN(Number(v))) ? Number(v) : null; }
-function barColor(k) {
-  return k === 'garment_preservation' ? 'bg-brand-500' : k === 'pose_accuracy' ? 'bg-sky-500' : k === 'face_quality' ? 'bg-emerald-500' : 'bg-amber-500';
-}
-function barLabel(k) {
-  return k === 'garment_preservation' ? 'Giữ đồ' : k === 'pose_accuracy' ? 'Đúng dáng' : k === 'face_quality' ? 'Mặt' : 'Thẩm mỹ';
-}
 </script>
 <template>
   <div class="card p-4" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
 
     <!-- Chọn chế độ: segmented tabs 1 hàng (lean) -->
-    <div class="mt-3 grid grid-cols-4 gap-1 rounded-2xl border border-white/10 bg-ink-900/60 p-1">
+    <div class="mt-3 grid grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-ink-900/60 p-1">
       <button @click="setMode('compose')" title="Ghép tự do: hòa trộn nhiều ảnh"
               :class="mode === 'compose' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
               class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
         <StudioIcon name="layers" size="h-4 w-4" /> Ghép tự do
-      </button>
-      <button @click="setMode('tryon')" title="Thử đồ ảo: mặc trang phục lên người mẫu"
-              :class="mode === 'tryon' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
-              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
-        <StudioIcon name="pose" size="h-4 w-4" /> Thử đồ
       </button>
       <button @click="setMode('faceswap')" title="Thay khuôn mặt người mẫu"
               :class="mode === 'faceswap' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
@@ -330,9 +248,6 @@ function barLabel(k) {
     </div>
 
     <!-- Hướng dẫn slot theo chế độ -->
-    <p v-if="mode === 'tryon'" class="mt-2 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
-      <b>@image1</b> = trang phục (bắt buộc) · <b>@image2</b> = pose (bắt buộc) · <b>@image3</b> = bối cảnh (tùy chọn). Kết quả sẽ <b>bám đúng mẫu trang phục + phụ kiện</b> của ảnh nguồn.
-    </p>
     <p v-if="mode === 'faceswap'" class="mt-2 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = người mẫu · @image2 = khuôn mặt · @image3 = ảnh ghép (tùy chọn)
     </p>
@@ -359,24 +274,6 @@ function barLabel(k) {
           <span class="px-1 text-center text-[9px] text-cream-300/40">@image{{ i }}</span>
         </template>
       </button>
-    </div>
-
-    <!-- Nền Studio: chip nhanh cho slot bối cảnh (chỉ Thử đồ ảo) -->
-    <div v-if="mode === 'tryon'" class="mt-3">
-      <div class="mb-1.5 flex items-center justify-between">
-        <p class="text-[10px] font-semibold text-cream-200">🎨 Nền Studio <span class="font-normal text-cream-300/50">(thay cho bối cảnh @image3)</span></p>
-        <button v-if="activeBg" @click="activeBg = null; prompt.value = prompt.value.replace(/;\s*nền\s+[^;]+/i, '').trim();"
-                class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ nền</button>
-      </div>
-      <div class="flex flex-wrap gap-1.5">
-        <button v-for="bg in studioBgPresets" :key="bg.id" @click="applyBgChip(bg)"
-                :class="activeBg === bg.id ? 'bg-brand-600 text-white ring-2 ring-brand-400/50' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors"
-                :title="bg.label">
-          <span class="inline-block h-3 w-3 rounded-full border border-white/20" :style="{ background: bg.color }"></span>
-          {{ bg.label }}
-        </button>
-      </div>
     </div>
 
     <label class="label mt-4">Mô tả ghép</label>
@@ -424,8 +321,8 @@ function barLabel(k) {
       </div>
     </div>
 
-    <!-- Các chế độ khác: số biến thể -->
-    <div v-if="mode !== 'tryon' && mode !== 'outfit'" class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
+    <!-- Số biến thể -->
+    <div v-if="mode !== 'outfit'" class="mt-3 flex items-center gap-1.5 text-xs text-cream-200">
       <span class="mr-1">Số biến thể:</span>
       <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
               :class="variants === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
@@ -438,38 +335,6 @@ function barLabel(k) {
               class="h-7 w-7 rounded-full font-semibold transition-colors">{{ n }}</button>
     </div>
     <p v-if="mode === 'outfit' && variants > 1" class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Biến thể đi theo trục khác nhau để không trùng lặp: Classic · Modern · Bold · Fluid.</p>
-
-    <!-- Thử đồ ảo: tùy chỉnh nâng cao (best-of-N + chấm điểm + phom dáng) -->
-    <div v-if="mode === 'tryon'" class="mt-3">
-      <button @click="advancedOpen = !advancedOpen" class="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 hover:border-brand-400">
-        <span class="flex items-center gap-1.5"><StudioIcon name="sliders" size="h-3.5 w-3.5" /> Tùy chỉnh chất lượng</span>
-        <span class="text-brand-300">{{ bestOf }} bản{{ scoring ? ' · chấm điểm' : '' }}</span>
-      </button>
-      <div v-if="advancedOpen" class="mt-2 rounded-xl border border-white/10 bg-ink-900/40 p-2.5">
-        <div class="flex items-center justify-between gap-2">
-          <span class="text-xs text-cream-200">Số bản thử <span class="text-cream-300/50">(best-of-<b class="text-brand-300">{{ bestOf }}</b>)</span></span>
-          <label class="flex cursor-pointer items-center gap-1.5 text-[10px] font-medium text-cream-200" title="Chấm điểm từng bản bằng AI (trang phục + dáng + chất lượng mặt + thẩm mỹ), tự chọn bản cao nhất">
-            <input type="checkbox" v-model="scoring" class="h-3.5 w-3.5 accent-brand-500"> Chấm điểm tự động
-          </label>
-        </div>
-        <div class="mt-1.5 flex items-center gap-1.5">
-          <button v-for="n in [1,2]" :key="n" @click="bestOf = n"
-                  :class="bestOf === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                  class="h-8 rounded-full px-3 text-xs font-semibold transition-colors">{{ n }}</button>
-        </div>
-        <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Tạo {{ bestOf }} bản để so sánh rồi <b class="text-brand-300">tự chọn bản bám mẫu tốt nhất</b>. Bật "Chấm điểm tự động" để AI xếp hạng theo điểm (Giữ đồ · Đúng dáng · Mặt · Thẩm mỹ). {{ bestOf }} bản = {{ bestOf * store.imageCreditCost }} credits.</p>
-        <!-- Phom dáng trang phục (fit) — chỉ thị rõ ràng để model giữ đúng silhouette -->
-        <div class="mt-2 flex items-center justify-between gap-2">
-          <span class="text-xs text-cream-200">Phom dáng <span class="text-cream-300/50">(fit)</span></span>
-        </div>
-        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <button v-for="f in [{v:'auto',l:'🤖 Tự động'},{v:'tight',l:'👗 Ôm sát'},{v:'loose',l:'👘 Suông rộng'},{v:'crop',l:'✂️ Crop-top'},{v:'oversized',l:'🦺 Oversized'}]" :key="f.v" @click="garmentFit = f.v"
-                  :class="garmentFit === f.v ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-                  class="rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">{{ f.l }}</button>
-        </div>
-        <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Chọn phom dáng để AI giữ đúng độ ôm/buông của trang phục gốc. "Tự động" = AI tự nhận diện.</p>
-      </div>
-    </div>
 
     <!-- Xem trước / chỉnh tay prompt -->
     <button @click="togglePreview" type="button" class="btn-outline mt-3 w-full whitespace-nowrap">
@@ -492,14 +357,14 @@ function barLabel(k) {
     </div>
 
     <button @click="run" :disabled="busy || selectedCount < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
-      {{ busy ? 'Đang ghép…' : (mode === 'tryon' ? 'Thử đồ ' + bestOf + ' bản' : (variants > 1 ? 'Ghép ' + variants + ' biến thể' : 'Ghép ảnh')) }} <span v-if="!busy" class="opacity-70">· {{ (mode === 'tryon' ? bestOf : variants) * store.imageCreditCost }} credit</span>
+      {{ busy ? 'Đang ghép…' : (variants > 1 ? 'Ghép ' + variants + ' biến thể' : 'Ghép ảnh') }} <span v-if="!busy" class="opacity-70">· {{ variants * store.imageCreditCost }} credit</span>
     </button>
 
     <!-- Tiến độ (LoadingSpinner dùng chung) -->
     <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
       <LoadingSpinner
         :text="store.composeStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang ghép ảnh…'"
-        :subtext="fmt(elapsedSec) + ' · ' + doneCount + '/' + store.composeGenIds.length + ' ' + (mode === 'tryon' ? 'bản' : 'biến thể')"
+        :subtext="fmt(elapsedSec) + ' · ' + doneCount + '/' + store.composeGenIds.length + ' biến thể'"
         :progress="doneCount / Math.max(1, store.composeGenIds.length) * 100" />
       <div class="mt-2 flex justify-end">
         <button @click="store.cancelCompose()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">Hủy</button>
@@ -508,56 +373,7 @@ function barLabel(k) {
 
     <!-- Thành công -->
     <div v-if="store.composeStage === 'done'" class="mt-3 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
-      <template v-if="mode === 'tryon' && store.composeBestId">
-        <p class="font-semibold">✔ Đã thử đồ xong {{ store.composeGenIds.length }} bản — chọn bản tốt nhất<span v-if="bestScore"> ({{ bestScore.toFixed(1) }}/10)</span>.</p>
-        <!-- So sánh trực quan: trang phục gốc → kết quả tốt nhất -->
-        <div v-if="garmentUrl && bestUrl" class="mt-2 flex items-stretch gap-2">
-          <div class="flex min-w-0 flex-1 flex-col">
-            <div class="relative aspect-[3/4] overflow-hidden rounded-lg border border-white/15 bg-ink-900">
-              <img :src="garmentUrl" class="h-full w-full object-cover" loading="lazy">
-              <span class="absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[9px] font-semibold">Trang phục gốc</span>
-            </div>
-          </div>
-          <div class="grid shrink-0 place-items-center text-brand-300"><StudioIcon name="arrowRight" size="h-4 w-4" /></div>
-          <div class="flex min-w-0 flex-1 flex-col">
-            <div class="relative aspect-[3/4] overflow-hidden rounded-lg border border-emerald-400/70 bg-ink-900">
-              <img :src="bestUrl" class="h-full w-full object-cover" loading="lazy">
-              <span class="absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[9px] font-semibold text-emerald-200">★ Kết quả tốt nhất</span>
-            </div>
-          </div>
-        </div>
-        <button @click="compareOpen = true" class="btn-outline btn-sm mt-2 w-full whitespace-nowrap">🔍 So sánh Trước/Sau toàn màn hình</button>
-
-        <!-- Leaderboard candidates: điểm từng tiêu chí, bấm để xem -->
-        <div v-if="tryonCandidates.length > 1" class="mt-2 space-y-1.5">
-          <p class="text-[10px] font-semibold text-emerald-200/90">Bảng xếp hạng các bản (bấm để xem):</p>
-          <button v-for="(c, idx) in tryonCandidates" :key="c.g.id" @click="previewCandidate(c.g)"
-                  class="flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition"
-                  :class="c.g.id === store.composeBestId ? 'border-emerald-400/60 bg-emerald-500/10' : 'border-white/10 bg-ink-900/40 hover:border-brand-400'">
-            <img :src="c.g.media_url" class="h-8 w-8 shrink-0 rounded object-cover" loading="lazy">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center justify-between gap-2">
-                <span class="truncate text-[10px] font-semibold text-cream-100">Bản {{ idx + 1 }} <span v-if="c.g.id === store.composeBestId" class="text-emerald-300">★</span></span>
-                <span v-if="c.score != null" class="shrink-0 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-200">{{ c.score.toFixed(1) }}/10</span>
-                <span v-else class="shrink-0 text-[9px] text-cream-300/50">chưa chấm</span>
-              </div>
-              <div v-if="c.score != null" class="mt-1 grid grid-cols-4 gap-1">
-                <div v-for="k in ['garment_preservation','pose_accuracy','face_quality','overall_aesthetic']" :key="k" :title="barLabel(k)">
-                  <div class="h-1 w-full overflow-hidden rounded-full bg-ink-700">
-                    <div class="h-full rounded-full" :class="barColor(k)" :style="{ width: Math.min(100, Math.max(0, (qaVal(c.qa, k) ?? 0) * 10)) + '%' }"></div>
-                  </div>
-                  <span class="mt-0.5 block truncate text-[8px] leading-none text-cream-300/60">{{ barLabel(k) }} {{ qaVal(c.qa, k) != null ? qaVal(c.qa, k) : '–' }}</span>
-                </div>
-              </div>
-            </div>
-          </button>
-        </div>
-        <p v-if="bestScore" class="mt-2 text-[10px] leading-relaxed text-emerald-200/80">Điểm theo tiêu chí: Giữ đồ {{ bestQa.garment_preservation }} · Đúng dáng {{ bestQa.pose_accuracy }} · Mặt {{ bestQa.face_quality }} · Thẩm mỹ {{ bestQa.overall_aesthetic }}. Bản tốt nhất đã được chọn trong Outputs.</p>
-        <p v-else class="mt-1 text-[10px] leading-relaxed text-emerald-200/80">Bản tốt nhất đã được chọn trong Outputs.</p>
-      </template>
-      <template v-else>
-        Đã ghép xong — kết quả đã được chọn trong Outputs.
-      </template>
+      Đã ghép xong — kết quả đã được chọn trong Outputs.
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
@@ -577,18 +393,17 @@ function barLabel(k) {
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
-    <!-- So sánh Trước/Sau (các chế độ khác tryon — tryon đã có nút so sánh trong panel thành công) -->
-    <button v-if="mode !== 'tryon' && baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
+    <!-- So sánh Trước/Sau -->
+    <button v-if="baseUrl && afterUrl" @click="compareOpen = true" class="btn-outline mt-1.5 w-full whitespace-nowrap">🔍 So sánh Trước/Sau</button>
 
     <!-- Popup chọn/tải ảnh cho slot (dùng chung Thư viện ảnh nguồn) -->
     <SourceLibraryPicker
       v-model="open"
       :title="'Tải ảnh cho ' + roleLabel(targetSlot) + ' · ' + slotRoles[targetSlot]"
       mode="pick"
-      :include-poses="mode === 'tryon'"
       @pick="onPick" />
 
     <!-- So sánh Trước/Sau -->
-    <CompareSlider v-model="compareOpen" :before="garmentUrl || baseUrl" :after="bestUrl || afterUrl" title="So sánh Trước/Sau khi ghép" />
+    <CompareSlider v-model="compareOpen" :before="baseUrl" :after="afterUrl" title="So sánh Trước/Sau khi ghép" />
   </div>
 </template>

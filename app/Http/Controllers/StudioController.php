@@ -430,27 +430,6 @@ class StudioController extends Controller
     }
 
     /**
-     * Đọc ảnh trang phục (@image1 trong "Thử đồ ảo") bằng vision → mô tả chi tiết trang phục +
-     * phụ kiện để chèn vào prompt PASS 1. Giúp model edit bám sát mẫu gốc (cổ áo, tay, dài ngắn,
-     * màu, họa tiết, chất liệu, phụ kiện) thay vì tự "thiết kế lại". Fail êm → null.
-     */
-    protected function garmentDescription(string $url): ?string
-    {
-        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        if (str_starts_with($path, 'studio/image/')) { $path = substr($path, strlen('studio/image/')); }
-        $file = null;
-        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
-            if (is_file($c)) { $file = $c; break; }
-        }
-        if (! $file) { return null; }
-        try {
-            return app(\App\Services\StyleSuggestService::class)->describeGarment($file);
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
-    /**
      * i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation).
      * Dùng ảnh gốc làm base (không mask) + prompt → model edit tạo biến thể mới.
      */
@@ -678,14 +657,10 @@ class StudioController extends Controller
             'final_prompt' => ['nullable', 'string', 'max:4000'],
             'layout' => ['nullable', 'string', 'max:100'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
-            'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap,outfit'],
+            'mode' => ['nullable', 'string', 'in:compose,faceswap,outfit'],
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'style' => ['nullable', 'string', 'max:400'],
             'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
-            // Thử đồ ảo (best-of-N + chấm điểm): số bản candidates tạo ra, chọn bản đẹp nhất.
-            // Tối đa 2 bản — 1 bản trung thực tuyệt đối, 2 bản để so sánh + chọn bản đẹp hơn bằng QA.
-            'best_of' => ['nullable', 'integer', 'min:1', 'max:2'],
-            'tryon_score' => ['nullable', 'boolean'],
         ]);
 
         $parts = $this->assembleComposePrompt($data);
@@ -695,27 +670,12 @@ class StudioController extends Controller
         $finalPrompt = $override !== '' ? $override : $parts['prompt'];
 
         $mode = (string) ($data['mode'] ?? '');
-        $isTryon = $mode === 'tryon';
-        // Thử đồ ảo: trang phục (@image1) là sản phẩm phải GIỮ NGUYÊN vân vải/đường may/họa tiết —
-        // dùng ngưỡng cao hơn (khớp edit_source_max) để không làm mờ chi tiết trước khi model edit
-        // kịp thấy. Các chế độ khác giữ ngưỡng 1600 (rẻ, nhanh, không cần chi tiết vải tối đa).
-        $base = $this->downscaleSource(
-            (string) ($data['images'][0] ?? ''),
-            $isTryon ? (int) studio_config('edit_source_max', 2560) : 1600
-        );
+        $base = $this->downscaleSource((string) ($data['images'][0] ?? ''), 1600);
         $cost = (int) studio_config('image_credits', 1);
-        // Thử đồ ảo: best_of = số bản candidates (1-2, mặc định theo config). Giới hạn 2 để
-        // kiểm soát chi phí + ưu tiên độ trung thực: 1 bản hoặc 2 bản so sánh rồi chọn bản tốt nhất.
-        // Nếu chỉ gửi variants (UI cũ) thì tôn trọng variants; biến thể cho chế độ thường giữ nguyên.
-        $variants = $isTryon
-            ? max(1, min(2, (int) ($data['best_of'] ?? $data['variants'] ?? studio_config('tryon_best_of', 2))))
-            : max(1, min(4, (int) ($data['variants'] ?? 1)));
-        $tryonScore = $isTryon && ($data['tryon_score'] ?? studio_config('tryon_score', false));
+        $variants = max(1, min(4, (int) ($data['variants'] ?? 1)));
         $isOutfit = $mode === 'outfit';
-        // Nhóm batch: các generation cùng một lần "Thử đồ ảo N bản" nhận chung id để xếp hạng/best-of-N.
-        $tryonBatch = $isTryon && $variants > 1 ? (string) Str::uuid() : null;
 
-        logger()->info('Compose mode', ['mode' => $mode, 'is_faceswap' => $parts['is_faceswap'], 'face_ref' => (bool) $parts['face_ref'], 'images' => count($data['images']), 'variants' => $variants, 'best_of' => $isTryon ? $variants : null, 'tryon_score' => $tryonScore]);
+        logger()->info('Compose mode', ['mode' => $mode, 'is_faceswap' => $parts['is_faceswap'], 'face_ref' => (bool) $parts['face_ref'], 'images' => count($data['images']), 'variants' => $variants]);
 
         $items = [];
         for ($i = 0; $i < $variants; $i++) {
@@ -725,9 +685,6 @@ class StudioController extends Controller
             if ($isOutfit && $override === '' && $variants > 1) {
                 $variantPrompt .= ' '.$this->outfitVariationDirective($i);
             }
-            // Thử đồ ảo: 2 bản dùng CHÍNH XÁC cùng một prompt (không thêm directive đa dạng) —
-            // mục tiêu là độ TRUNG THỰC tuyệt đối, không phải khám phá đa dạng; 2 bản chỉ để vision
-            // QA chấm rồi chọn bản bám mẫu trang phục/phụ kiện tốt hơn.
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $variantPrompt,
                 'base_image' => $base,
@@ -739,19 +696,12 @@ class StudioController extends Controller
                 'creative_level' => $parts['creative_level'],
                 'style' => $parts['style'],
                 'ornament_level' => $parts['ornament_level'],
-                'best_of' => $isTryon ? $variants : null,
-                'candidate_idx' => $isTryon && $variants > 1 ? $i : null,
-                'tryon_batch' => $tryonBatch,
-                'tryon_score' => $tryonScore,
-                'tryon_bg_text' => $parts['tryon_bg_text'] ?? null,
             ], $cost)->getData(true);
         }
 
         return response()->json([
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
-            'best_of' => $isTryon ? $variants : null,
-            'tryon_score' => $tryonScore ? true : null,
         ]);
     }
 
@@ -766,7 +716,7 @@ class StudioController extends Controller
             'images.*' => ['string', 'max:2048'],
             'prompt' => ['required', 'string', 'max:4000'],
             'variants' => ['nullable', 'integer', 'min:1', 'max:4'],
-            'mode' => ['nullable', 'string', 'in:compose,tryon,faceswap,outfit'],
+            'mode' => ['nullable', 'string', 'in:compose,faceswap,outfit'],
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'style' => ['nullable', 'string', 'max:400'],
             'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
@@ -890,46 +840,13 @@ class StudioController extends Controller
         $imgs = array_values(array_slice($data['images'], 0, 3));
         $refs = array_slice($imgs, 1);
         $userPrompt = trim((string) $data['prompt']);
-        $isTryon = ($data['mode'] ?? '') === 'tryon';
         $isFaceSwap = ($data['mode'] ?? '') === 'faceswap';
         $isOutfit = ($data['mode'] ?? '') === 'outfit';
         $creativeLevel = (int) ($data['creative_level'] ?? 8);
         $style = trim((string) ($data['style'] ?? ''));
         $ornamentLevel = (int) ($data['ornament_level'] ?? 0);
-        // Thử đồ ảo: tách text "nền ..." (chip Nền Studio) ra khỏi prompt PASS 1 để model KHÔNG
-        // hiểu nhầm màu nền thành màu trang phục. Text nền được xử lý RIÊNG ở PASS 2 (đổi hậu cảnh).
-        $tryonBgText = null;
-        if ($isTryon && preg_match('/nền\s+([^;]+)/u', $userPrompt, $bm)) {
-            $tryonBgText = trim($bm[1]);
-            $userPrompt = trim((string) preg_replace('/;\s*nền\s+[^;]+/u', '', $userPrompt));
-            $userPrompt = trim((string) preg_replace('/^nền\s+[^;]+/u', '', $userPrompt));
-        }
 
-        if ($isTryon) {
-            // Thử đồ ảo: @image1 = trang phục (base/source), @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
-            // Chất lượng cao: khóa nguyên vẹn trang phục + tái tạo chính xác tư thế + tỷ lệ người mẫu
-            // + câu tránh lỗi (cùng kỹ thuật đang dùng cho "Thay Đổi Người Mẫu").
-            // Bối cảnh (@image3) được tách ra PASS 2 riêng (giống Click-to-Swap PASS 2) —
-            // KHÔNG gộp vào PASS 1 vì model sẽ bỏ qua pose khi prompt có cả đổi nền.
-            // Đọc trang phục bằng vision → mô tả từng chi tiết (cổ áo, tay, dài, màu, họa tiết, chất
-            // liệu, phụ kiện) để model edit BÁM SÁT mẫu nguồn thay vì tự "thiết kế lại".
-            $garmentDesc = ((bool) studio_config('tryon_garment_vision', true))
-                ? $this->garmentDescription((string) ($imgs[0] ?? ''))
-                : null;
-            // Virtual try-on bằng model edit: ngôn ngữ DƯƠNG, ngắn, nhấn "WEAR THE SAME GARMENT UNCHANGED".
-            // Tránh liệt kê dài các thuộc tính trang phục (màu/nút/đường may...) kèm chữ "không đổi" —
-            // model ảnh dễ hiểu ngược, tưởng phải tái tạo/sinh lại trang phục theo checklist → bị thay đổi đồ.
-            // Garment (@image1) là Ảnh Sản Phẩm Thương Mại: mặc NGUYÊN XI lên người mẫu, KHÔNG sinh lại.
-            $finalPrompt = 'Virtual try-on. The FIRST image is a commercial product photo of a garment. WEAR THIS EXACT GARMENT UNCHANGED on a new model — treat the garment as a fixed, finished product: do not recreate, redraw, restyle, or redesign it, just put the exact same garment onto the body. The garment on the model must be the IDENTICAL garment: identical color, identical fabric, identical pattern/print, identical cut, identical length, identical neckline, identical sleeves, identical fit (tight stays tight, loose stays loose), identical buttons/zippers/belt/bow/brooch, identical stitching and seams. Copy the garment from the product photo as-is, pixel for pixel, onto the model. '
-                .'Wear every accessory visible in the product photo identically too — same shoes, same bag, same belt, same hat, same jewelry, same scarf — identical color, identical size, identical placement (shoes on feet, bag in hand or on shoulder, belt at waist, hat on head). Do not add any item not in the product photo; do not drop any item that is in it. '
-                .'The garment IS the deliverable — it must match the source product photo perfectly. If in doubt, copy it verbatim rather than improve it. '
-                .($garmentDesc ? 'Confirmed garment features (match these exactly, do not invent): '.$garmentDesc.' ' : '')
-                .'Keep the background of the product photo unchanged. '
-                .'Place the model in the EXACT pose, stance, facing direction, arm and leg position, and posture shown in the SECOND image (pose reference). Wear the garment on that exact pose. The face, hairstyle and skin tone of the new model should look natural and consistent with the pose reference. '
-                .'Single clean body — one model, one pose, no double exposure, no ghost, no overlapping or duplicated limbs, no faint leftover of any other figure. '
-                .'Full body head to toe, not cropped. Standard, anatomically correct human proportions: head-to-body about 1:7.5, shoulders and hips symmetric, spine aligned, arms reaching mid-thigh, 5 fingers per hand, correct shoulders/elbows/wrists/hips/knees/ankles. The model fills about 75-80% of the frame height with small headroom and footroom. '
-                .'Output: sharp, in-focus, photorealistic, clean high-resolution fashion photo, even studio lighting. No blur, no noise, no banding, no artifacts. '.$userPrompt;
-        } elseif ($isFaceSwap) {
+        if ($isFaceSwap) {
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.
             // Prompt kiểm soát tại Settings → Studio → "Prompt thay khuôn mặt".
             $finalPrompt = (string) studio_config('faceswap_prompt', 'Face swap: replace the face of @image1 with the face in @image2, matching identity, hairstyle, ears and proportions. Keep garment, pose, body, background unchanged.').' '.$userPrompt;
@@ -982,7 +899,6 @@ class StudioController extends Controller
             'style' => $style,
             'ornament_level' => $ornamentLevel,
             'is_faceswap' => $isFaceSwap,
-            'tryon_bg_text' => $tryonBgText,
         ];
     }
 
@@ -1564,12 +1480,6 @@ RULES:
                 'creative_level' => $data['creative_level'] ?? null,
                 'style' => $data['style'] ?? null,
                 'ornament_level' => $data['ornament_level'] ?? null,
-                // Thử đồ ảo best-of-N + chấm điểm: meta để RenderImageJob chấm điểm sau khi tạo xong.
-                'best_of' => $data['best_of'] ?? null,
-                'candidate_idx' => $data['candidate_idx'] ?? null,
-                'tryon_batch' => $data['tryon_batch'] ?? null,
-                'tryon_score' => $data['tryon_score'] ?? null,
-                'tryon_bg_text' => $data['tryon_bg_text'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 
