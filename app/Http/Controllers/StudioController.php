@@ -588,6 +588,8 @@ class StudioController extends Controller
             // Kế thừa khuôn mặt mẫu (FacePreset) từ cài đặt — ẢNH tải lên được gửi kèm như face_ref,
             // còn MÔ TẢ khuôn mặt do VISION model đọc từ chính ảnh đó (không lấy description trong DB).
             'face_model_id' => ['nullable', 'string', 'max:80'],
+            // Pose mẫu (PosePreset) — chỉ gửi MÔ TẢ (skeleton) dưới dạng văn bản, KHÔNG gửi ảnh pose.
+            'pose_id' => ['nullable', 'string', 'max:80'],
         ]);
 
         $similarity = (int) ($data['similarity'] ?? 70);
@@ -612,6 +614,15 @@ class StudioController extends Controller
             }
         }
 
+        // Resolve pose mẫu: chỉ dùng MÔ TẢ (skeleton/name) làm văn bản — không gửi ảnh pose.
+        $poseDirective = '';
+        if ($isTryon && ! empty($data['pose_id'])) {
+            $pose = app(\App\Services\VirtualTryOnService::class)->pickPose((string) $data['pose_id']);
+            if ($pose) {
+                $poseDirective = trim((string) ($pose['skeleton'] ?? $pose['name'] ?? ''));
+            }
+        }
+
         if ($isTryon) {
             // Tryon bằng model SINH ẢNH (qwen-image-3.0-pro): không edit ảnh gốc mà sinh ảnh mới
             // dựa ảnh tham chiếu. Prompt nêu rõ "dựa trang phục trong ảnh tham chiếu, tạo ảnh người
@@ -627,6 +638,7 @@ class StudioController extends Controller
                 .'Sharp, in-focus, photorealistic, clean high-resolution fashion photo, even studio lighting. No blur, no noise, no banding, no artifacts, no text, no watermark.'
                 .($faceDesc !== null && $faceDesc !== '' ? ' Model face: '.$faceDesc.'. ' : '')
                 .($bodyDirective !== '' ? $bodyDirective : '')
+                .($poseDirective !== '' ? ' Model pose: '.$poseDirective.'. ' : '')
                 .($userPrompt !== '' ? ' '.$userPrompt : '');
         } else {
             $finalPrompt = 'Create a brand-new image based on the provided reference image. '
@@ -1343,6 +1355,7 @@ RULES:
     {
         abort_unless($generation->user_id === auth()->id(), 403);
 
+        app(\App\Services\StudioLibraryService::class)->deleteGenerationFiles($generation);
         $generation->delete();
 
         return response()->json(['message' => 'Đã xóa nhiệm vụ.']);
@@ -1662,6 +1675,14 @@ RULES:
 
     public function assetDestroy(\App\Models\StudioAsset $asset)
     {
+        // Xóa cả file vật lý để không để lại ảnh mồ côi trong studio/assets.
+        if ($asset->path) {
+            $rel = ltrim(str_replace('storage/', '', (string) parse_url($asset->path, PHP_URL_PATH)), '/');
+            $abs = storage_path('app/public/'.$rel);
+            if (is_file($abs) && str_starts_with(str_replace('\\', '/', $abs), str_replace('\\', '/', storage_path('app/public/')))) {
+                @unlink($abs);
+            }
+        }
         $asset->delete();
         return response()->json(['ok' => true]);
     }
@@ -3451,6 +3472,50 @@ RULES:
         $projects = auth()->user()->projects()->orderBy('name')->get();
 
         return view('studio.library', compact('generations', 'projects'));
+    }
+
+    /**
+     * Library data (JSON) — danh sách có lọc + phân trang + thống kê, dùng cho Vue /studio/library.
+     */
+    public function libraryData(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $filters = $request->only(['type', 'status', 'project_id', 'q', 'page', 'per_page']);
+        $filters['old_days'] = max(1, min(365, (int) ($request->input('old_days', 30))));
+
+        return response()->json(app(\App\Services\StudioLibraryService::class)->list(auth()->user(), $filters));
+    }
+
+    /**
+     * Library scan (JSON) — báo cáo ảnh rác / ảnh cũ / file mồ côi kèm byte.
+     */
+    public function libraryScan(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $oldDays = max(1, min(365, (int) ($request->input('old_days', 30))));
+
+        return response()->json(app(\App\Services\StudioLibraryService::class)->scan(auth()->user(), $oldDays));
+    }
+
+    /**
+     * Library bulk delete (JSON) — xóa nhiều generation + file media.
+     */
+    public function libraryBulkDelete(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $ids = (array) $request->input('ids', []);
+        $result = app(\App\Services\StudioLibraryService::class)->bulkDelete(auth()->user(), $ids);
+
+        return response()->json(['ok' => true, ...$result]);
+    }
+
+    /**
+     * Library cleanup (JSON) — dọn ảnh rác / ảnh cũ / file mồ côi theo phạm vi.
+     */
+    public function libraryCleanup(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $scope = (string) $request->input('scope', '');
+        $oldDays = max(1, min(365, (int) ($request->input('old_days', 30))));
+        $result = app(\App\Services\StudioLibraryService::class)->cleanup(auth()->user(), $scope, $oldDays);
+
+        return response()->json(['ok' => true, 'scope' => $scope, ...$result]);
     }
 
     /**

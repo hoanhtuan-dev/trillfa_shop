@@ -4,7 +4,7 @@ import { useStudioStore } from '../store.js';
 
 const store = useStudioStore();
 
-const items = computed(() => store.generations.filter(g => g.media_url));
+const items = computed(() => store.viewerItems);
 const idx = computed(() => items.value.findIndex(g => g.id === store.viewer?.id));
 const current = computed(() => items.value[idx.value] || store.viewer);
 const isVideo = computed(() => current.value?.type === 'video');

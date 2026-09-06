@@ -185,6 +185,17 @@ export const useStudioStore = defineStore('studio', {
     upscalePresets: [],
     lastBatch: [],
     showBatch: false,
+    // ── Thư viện (/studio/library) — quản lý + xóa ảnh cũ / ảnh rác ──
+    libraryItems: [],
+    libraryTotal: 0,
+    libraryStats: null,
+    libraryFilters: { type: '', status: '', q: '', page: 1, per_page: 48, old_days: 30 },
+    libraryHasMore: false,
+    libraryLoading: false,
+    librarySelection: [],   // danh sách id đang được chọn (checkbox)
+    libraryScanning: false,
+    libraryCleaning: false,
+    libraryManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
     canvasLayers: [],
     activeLayerId: '',
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
@@ -197,6 +208,8 @@ export const useStudioStore = defineStore('studio', {
     upscaleName() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; } return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
 
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
+    // Nguồn ảnh cho GalleryModal: ưu tiên danh sách thư viện (nếu đang ở /studio/library).
+    viewerItems() { return (this.libraryItems && this.libraryItems.length) ? this.libraryItems.filter(g => g.media_url) : this.generations.filter(g => g.media_url); },
     activeLayer() { return this.canvasLayers.find(x => x.id === this.activeLayerId) || null; },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
     // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
@@ -389,8 +402,9 @@ export const useStudioStore = defineStore('studio', {
     // KHÁC reimagine/edit: dùng model SINH ẢNH (mặc định qwen-image-3.0-pro) + ảnh tham chiếu
     // làm base → tạo bức ảnh mới giống mẫu theo % tương đồng, không sửa trên ảnh gốc.
     // tryon=true (chip "Thử đồ"): gửi 1 ảnh trang phục → sinh ảnh người mẫu mặc đúng đồ đó
-    // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body directive + khuôn mặt mẫu (faceModelId).
-    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, faceModelId = '') {
+    // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body directive + khuôn mặt mẫu (faceModelId)
+    // + pose mẫu (poseId — chỉ gửi MÔ TẢ văn bản, không gửi ảnh pose).
+    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, faceModelId = '', poseId = '') {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {
         const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
@@ -398,6 +412,7 @@ export const useStudioStore = defineStore('studio', {
         if (tryon) {
           payload.tryon = true;
           if (faceModelId) payload.face_model_id = faceModelId;
+          if (poseId) payload.pose_id = poseId;
           // Kế thừa body directive (tạo ảnh 2D) — chỉ gửi khi người dùng đã chỉnh (khác default 5).
           if (body) {
             if (body.height != null) payload.body_height = Number(body.height);
@@ -869,6 +884,11 @@ export const useStudioStore = defineStore('studio', {
     // Gỡ generation khỏi store + layer canvas liên quan (dùng chung cho xóa server & xóa cục bộ).
     _removeGenLocal(g) {
       this.generations = this.generations.filter(x => x.id !== g.id);
+      if (this.libraryItems && this.libraryItems.some(x => x.id === g.id)) {
+        this.libraryItems = this.libraryItems.filter(x => x.id !== g.id);
+        this.libraryTotal = Math.max(0, this.libraryTotal - 1);
+      }
+      this.librarySelection = (this.librarySelection || []).filter(id => id !== g.id);
       const lid = String(g.id);
       if (this.canvasLayers.some((l) => l.id === lid)) this.canvasLayers = this.canvasLayers.filter((l) => l.id !== lid);
       const orphanSource = g.media_url ? this.canvasLayers.find((l) => l.kind === 'source' && l.image === g.media_url) : null;
@@ -879,6 +899,118 @@ export const useStudioStore = defineStore('studio', {
         else { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; }
       }
       this.saveLayerLayout();
+    },
+    // ── Thư viện (/studio/library) — quản lý + xóa ảnh cũ / ảnh rác ──
+    async _libraryFetch(url, body = null) {
+      const opts = body == null
+        ? { method: 'GET', headers: { Accept: 'application/json' } }
+        : { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) };
+      const res = await fetch(url, opts);
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || res.redirected || !(res.headers.get('content-type') || '').includes('application/json')) {
+        throw new Error(d.message || 'Có lỗi xảy ra.');
+      }
+      return d;
+    },
+    async loadLibrary(reset = true) {
+      if (this.libraryLoading) return;
+      this.libraryLoading = true;
+      if (reset) { this.libraryItems = []; this.librarySelection = []; this.libraryFilters.page = 1; }
+      try {
+        const qs = new URLSearchParams();
+        if (this.libraryFilters.type) qs.set('type', this.libraryFilters.type);
+        if (this.libraryFilters.status) qs.set('status', this.libraryFilters.status);
+        if (this.libraryFilters.q) qs.set('q', this.libraryFilters.q);
+        qs.set('page', String(this.libraryFilters.page || 1));
+        qs.set('per_page', String(this.libraryFilters.per_page || 48));
+        qs.set('old_days', String(this.libraryFilters.old_days || 30));
+        const d = await this._libraryFetch('/studio/library/data?' + qs.toString());
+        const items = Array.isArray(d.items) ? d.items : [];
+        this.libraryItems = reset ? items : this.libraryItems.concat(items.filter(x => !this.libraryItems.some(y => y.id === x.id)));
+        this.libraryTotal = d.total ?? items.length;
+        this.libraryStats = { ...(this.libraryStats || {}), ...(d.stats || {}) };
+        this.libraryHasMore = !!d.has_more;
+        this.libraryFilters.page = d.current_page || (this.libraryFilters.page + 1);
+      } catch (e) { this.toast(e.message || 'Không tải được thư viện.', 'error'); }
+      finally { this.libraryLoading = false; }
+    },
+    async loadMoreLibrary() {
+      if (!this.libraryHasMore || this.libraryLoading) return;
+      this.libraryFilters.page = (this.libraryFilters.page || 1) + 1;
+      await this.loadLibrary(false);
+    },
+    setLibraryFilter(key, value) {
+      this.libraryFilters[key] = value;
+      this.loadLibrary(true);
+    },
+    async refreshLibraryScan() {
+      if (this.libraryScanning) return;
+      this.libraryScanning = true;
+      try {
+        const d = await this._libraryFetch('/studio/library/scan', { old_days: this.libraryFilters.old_days || 30 });
+        this.libraryStats = {
+          ...(this.libraryStats || {}),
+          junk_count: d.junk?.count ?? 0,
+          junk_bytes: d.junk?.bytes ?? 0,
+          old_count: d.old?.count ?? 0,
+          old_bytes: d.old?.bytes ?? 0,
+          orphan_count: d.orphans?.count ?? 0,
+          orphan_bytes: d.orphans?.bytes ?? 0,
+        };
+        return d;
+      } catch (e) { this.toast(e.message || 'Không quét được thư viện.', 'error'); return null; }
+      finally { this.libraryScanning = false; }
+    },
+    toggleLibrarySelect(id) {
+      const i = this.librarySelection.indexOf(id);
+      if (i >= 0) this.librarySelection.splice(i, 1);
+      else this.librarySelection.push(id);
+    },
+    librarySelectAll() {
+      this.librarySelection = this.libraryItems.map(g => g.id);
+    },
+    librarySelectNone() { this.librarySelection = []; },
+    librarySelectJunk() {
+      this.librarySelection = this.libraryItems.filter(g => g.status === 'failed' || g.status === 'cancelled').map(g => g.id);
+    },
+    librarySelectOld() {
+      const days = Number(this.libraryFilters.old_days) || 30;
+      const cutoff = Date.now() - days * 86400000;
+      this.librarySelection = this.libraryItems.filter(g => g.status === 'completed' && g.media_url && (g.created_ts ? (g.created_ts * 1000) < cutoff : false)).map(g => g.id);
+    },
+    async libraryBulkDelete() {
+      const ids = this.librarySelection.filter(Boolean);
+      if (!ids.length) { this.toast('Chưa chọn ảnh nào để xóa.', 'error'); return false; }
+      if (this.libraryCleaning) return false;
+      this.libraryCleaning = true;
+      try {
+        const d = await this._libraryFetch('/studio/library/bulk-delete', { ids });
+        this.librarySelection = [];
+        this.toast('Đã xóa ' + (d.deleted || 0) + ' mục · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
+        await this.loadLibrary(true);
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi xóa hàng loạt.', 'error'); return false; }
+      finally { this.libraryCleaning = false; }
+    },
+    async libraryCleanup(scope) {
+      if (this.libraryCleaning) return false;
+      this.libraryCleaning = true;
+      try {
+        const d = await this._libraryFetch('/studio/library/cleanup', { scope, old_days: this.libraryFilters.old_days || 30 });
+        this.librarySelection = [];
+        this.toast('Đã dọn xong · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
+        await this.loadLibrary(true);
+        await this.refreshLibraryScan();
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi dọn dẹp.', 'error'); return false; }
+      finally { this.libraryCleaning = false; }
+    },
+    formatBytes(bytes) {
+      const n = Number(bytes) || 0;
+      if (n < 1024) return n + ' B';
+      if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+      if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+      return (n / 1073741824).toFixed(2) + ' GB';
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
     // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):

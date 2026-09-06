@@ -11,7 +11,7 @@ const store = useStudioStore();
 // 2 chế độ chip (giống Card Ghép ảnh):
 //   - "Tạo ảnh mới" (refgen thường): giữ chủ thể/phong cách theo % tương đồng + nền/góc chụp.
 //   - "Thử đồ" (tryon sinh ảnh): dùng ảnh đang chọn làm TRANG PHỤC → sinh người mẫu mặc đúng đồ
-//     (rẻ hơn Thử đồ ảo edit). Kế thừa body/hair directive (Tạo ảnh 2D) + khuôn mặt mẫu (cài đặt).
+//     (rẻ hơn Thử đồ ảo edit). Kế thừa body/hair directive (Tạo ảnh 2D) + khuôn mặt mẫu + pose mẫu.
 
 const img = computed(() => store.upscaleSrc || store.preview?.media_url || '');
 const imgName = computed(() => store.upscaleName || (store.preview ? 'Ảnh kết quả #' + store.preview.id : 'Ảnh đang chọn'));
@@ -22,9 +22,13 @@ const similarity = ref(70);
 const variants = ref(1);
 const busy = ref(false);
 
-// ── Khuôn mặt mẫu (FacePreset từ cài đặt) ──
+// ── Khuôn mặt mẫu + Pose mẫu (FacePreset / PosePreset từ cài đặt) ──
 const faces = ref([]);
 const faceModelId = ref('');
+const poses = ref([]);
+const poseId = ref('');
+const faceOpen = ref(false); // thu gọn khối Khuôn mặt mẫu để card gọn
+const poseOpen = ref(false); // thu gọn khối Pose mẫu để card gọn
 const bodyOpen = ref(false); // thu gọn khối Phom dáng để card gọn
 onMounted(async () => {
   try {
@@ -32,8 +36,14 @@ onMounted(async () => {
     const d = await r.json();
     if (Array.isArray(d.items)) faces.value = d.items;
   } catch (e) { /* giữ mặc định */ }
+  try {
+    const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } });
+    const d = await r.json();
+    if (Array.isArray(d.items)) poses.value = d.items;
+  } catch (e) { /* giữ mặc định */ }
 });
 const selectedFace = computed(() => faces.value.find(f => String(f.id) === String(faceModelId.value)) || null);
+const selectedPose = computed(() => poses.value.find(p => String(p.id) === String(poseId.value)) || null);
 
 function setMode(m) {
   mode.value = m;
@@ -112,6 +122,7 @@ const bodyBuildLabel = computed(() => { const v = store.bodyBuild; if (v <= 2) r
 const bodyWaistLabel = computed(() => { const v = store.bodyWaist; if (v <= 2) return 'Thẳng'; if (v <= 4) return 'Ít eo'; if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Eo thon'; return 'Đồng hồ cát'; });
 const bodyShouldersLabel = computed(() => { const v = store.bodyShoulders; if (v <= 2) return 'Rất hẹp'; if (v <= 4) return 'Hẹp'; if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Rộng'; return 'Rất rộng'; });
 const bodyHipsLabel = computed(() => { const v = store.bodyHips; if (v <= 2) return 'Rất hẹp'; if (v <= 4) return 'Hẹp'; if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Nở'; return 'Rất nở'; });
+const bodyTouched = computed(() => store.bodyHeight !== 5 || store.bodyBuild !== 5 || store.bodyWaist !== 5 || store.bodyShoulders !== 5 || store.bodyHips !== 5);
 
 async function runRefgen() {
   if (!canSubmit.value) return;
@@ -121,7 +132,7 @@ async function runRefgen() {
   // Thử đồ: gửi tryon=true + body directive từ store + khuôn mặt mẫu (ảnh, mô tả do vision đọc).
   const isTryon = mode.value === 'tryon';
   const body = isTryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
-  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body, isTryon ? faceModelId.value : '');
+  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body, isTryon ? faceModelId.value : '', isTryon ? poseId.value : '');
   busy.value = false;
   if (items && items.length) {
     store.toast('Đã gửi ' + items.length + ' ảnh mới — đang tạo…');
@@ -206,13 +217,38 @@ async function runRefgen() {
 
     <!-- ============ CHẾ ĐỘ: THỬ ĐỒ (tryon sinh ảnh) ============ -->
     <template v-else>
-      <!-- Khuôn mặt mẫu (kế thừa từ cài đặt FacePreset) -->
-      <div class="mt-4">
-        <div class="flex items-center justify-between">
-          <p class="label mb-0">Khuôn mặt mẫu <span class="text-cream-300/40">(dùng ảnh — AI tự đọc mặt + tóc)</span></p>
+      <!-- 3 chip điều khiển cùng hàng: Khuôn mặt · Phom dáng · Pose -->
+      <div class="mt-4 grid grid-cols-3 gap-1.5">
+        <button @click="faceOpen = !faceOpen"
+                :class="faceOpen || faceModelId ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+                class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
+          <StudioIcon name="user" size="h-5 w-5" class="text-emerald-300" />
+          <span class="text-[11px] font-semibold leading-none text-cream-100">Khuôn mặt</span>
+          <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ selectedFace ? selectedFace.name : 'Mặc định' }}</span>
+        </button>
+        <button @click="bodyOpen = !bodyOpen"
+                :class="bodyOpen || bodyTouched ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+                class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
+          <StudioIcon name="body" size="h-5 w-5" class="text-emerald-300" />
+          <span class="text-[11px] font-semibold leading-none text-cream-100">Phom dáng</span>
+          <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ bodyTouched ? bodyBuildLabel : 'Mặc định' }}</span>
+        </button>
+        <button @click="poseOpen = !poseOpen"
+                :class="poseOpen || poseId ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+                class="flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-center transition">
+          <StudioIcon name="pose" size="h-5 w-5" class="text-emerald-300" />
+          <span class="text-[11px] font-semibold leading-none text-cream-100">Pose</span>
+          <span class="max-w-full truncate text-[9px] leading-none text-cream-300/60">{{ selectedPose ? selectedPose.name : 'Tự do' }}</span>
+        </button>
+      </div>
+
+      <!-- Khuôn mặt mẫu (dropdown) -->
+      <div v-if="faceOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
+        <div class="mb-1.5 flex items-center justify-between">
+          <p class="text-[11px] font-semibold text-cream-200">Khuôn mặt mẫu</p>
           <button v-if="faceModelId" @click="faceModelId = ''" class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ chọn</button>
         </div>
-        <div class="mt-1.5 flex flex-wrap gap-1.5">
+        <div class="flex flex-wrap gap-1.5">
           <button v-for="f in faces" :key="f.id" @click="faceModelId = String(f.id)"
                   :class="String(faceModelId) === String(f.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                   class="flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
@@ -224,17 +260,7 @@ async function runRefgen() {
         </div>
       </div>
 
-      <!-- Mô tả pose -->
-      <label class="label mt-4">Mô tả pose / thêm yêu cầu</label>
-      <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: pose đứng tự nhiên, tay chống hông, ánh sáng studio…"></textarea>
-      <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
-
-      <!-- Body directive (kế thừa từ "Tạo ảnh 2D") — thu gọn -->
-      <button @click="bodyOpen = !bodyOpen"
-              class="mt-3 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-emerald-400">
-        <span class="flex items-center gap-1.5"><StudioIcon name="body" size="h-3.5 w-3.5" /> Phom dáng người mẫu <span class="font-normal text-cream-300/50">(kế thừa Tạo ảnh 2D)</span></span>
-        <span class="text-emerald-300">{{ bodyOpen ? '▲' : '▼' }}</span>
-      </button>
+      <!-- Phom dáng người mẫu (dropdown) -->
       <div v-if="bodyOpen" class="mt-2 space-y-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
         <div>
           <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Chiều cao</span><span class="font-semibold text-emerald-300">{{ bodyHeightLabel }}</span></p>
@@ -258,10 +284,28 @@ async function runRefgen() {
         </div>
       </div>
 
-      <!-- Khuôn mặt dùng ảnh, AI tự đọc mặt + tóc -->
-      <p class="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-900/15 px-2.5 py-1.5 text-[10px] leading-relaxed text-emerald-100/80">
-        Khuôn mặt dùng <b>ảnh mẫu</b> — AI tự đọc <b>mặt + tóc</b> từ ảnh. Dùng model <b>sinh ảnh</b> (qwen-image-3.0-pro) — <b>rẻ hơn</b> Thử đồ ảo (edit).
-      </p>
+      <!-- Pose mẫu (dropdown) — chỉ dùng MÔ TẢ, không gửi ảnh pose -->
+      <div v-if="poseOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
+        <div class="mb-1.5 flex items-center justify-between">
+          <p class="text-[11px] font-semibold text-cream-200">Pose mẫu <span class="text-cream-300/50">(AI dùng mô tả, không gửi ảnh)</span></p>
+          <button v-if="poseId" @click="poseId = ''" class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ chọn</button>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="p in poses" :key="p.id" @click="poseId = String(p.id)"
+                  :class="String(poseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+                  class="flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
+            <img v-if="p.image" :src="p.image" class="h-9 w-9 rounded-lg object-cover ring-1 ring-white/20">
+            <span v-else class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-sm">🧍</span>
+            <span class="truncate">{{ p.name }}</span>
+          </button>
+          <span v-if="!poses.length" class="text-[10px] text-cream-300/50">Chưa có pose mẫu — để trống để AI tự chọn.</span>
+        </div>
+      </div>
+
+      <!-- Mô tả pose / thêm yêu cầu -->
+      <label class="label mt-4">Mô tả pose / thêm yêu cầu</label>
+      <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: pose đứng tự nhiên, tay chống hông, ánh sáng studio…"></textarea>
+      <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
     </template>
 
     <!-- Số ảnh -->
