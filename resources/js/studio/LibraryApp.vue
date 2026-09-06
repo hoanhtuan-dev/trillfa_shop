@@ -30,6 +30,12 @@ const selectedBytes = computed(() => {
   return bytes;
 });
 
+// ── Files đã tải lên ──
+const uploadStats = computed(() => store.uploadStats || {});
+const uploadSelectedCount = computed(() => store.uploadSelection.length);
+const uploadUnusedCount = computed(() => store.uploadItems.filter(f => !f.used).length);
+function isUploadSelected(rel) { return store.uploadSelection.includes(rel); }
+
 function statusLabel(s) { const f = statuses.find(x => x.value === s); return f ? f.label : (s || '—'); }
 function fmtBytes(n) { return store.formatBytes(n); }
 function fmtNum(n) { const v = Number(n) || 0; return v >= 1000 ? v.toLocaleString('vi-VN') : String(v); }
@@ -38,12 +44,12 @@ function toggleAll() { allSelected.value ? store.librarySelectNone() : store.lib
 function isSelected(id) { return store.librarySelection.includes(id); }
 
 // ── Xác nhận 2 bước cho các hành động nguy hiểm ──
-const confirmAction = ref(''); // '' | 'bulk' | 'junk' | 'old' | 'orphans'
+const confirmAction = ref(''); // '' | 'bulk' | 'junk' | 'old' | 'orphans' | 'ubulk' | 'uclean'
 let confirmTimer = null;
 function ask(action) {
   if (!action) return;
-  // Xóa đã chọn cần có lựa chọn; dọn ảnh rác/cũ/mồ côi luôn cho phép.
   if (action === 'bulk' && !selectedCount.value) { store.toast('Chưa chọn ảnh nào để xóa.', 'error'); return; }
+  if (action === 'ubulk' && !uploadSelectedCount.value) { store.toast('Chưa chọn file nào để xóa.', 'error'); return; }
   confirmAction.value = action;
   clearTimeout(confirmTimer);
   confirmTimer = setTimeout(() => { confirmAction.value = ''; }, 5000);
@@ -57,6 +63,8 @@ async function runConfirm() {
   else if (a === 'junk') await store.libraryCleanup('junk');
   else if (a === 'old') await store.libraryCleanup('old');
   else if (a === 'orphans') await store.libraryCleanup('orphans');
+  else if (a === 'ubulk') await store.uploadBulkDelete();
+  else if (a === 'uclean') await store.uploadCleanup();
 }
 
 function onChangeType(e) { store.setLibraryFilter('type', e.target.value); }
@@ -71,10 +79,20 @@ function onSearchInput(e) {
 
 function openViewer(g) { store.viewer = g; }
 
+function switchTab(tab) {
+  store.libraryTab = tab;
+  if (tab === 'uploads' && !store.uploadItems.length) store.loadUploads();
+}
+function refresh() {
+  if (store.libraryTab === 'uploads') store.loadUploads();
+  else { store.loadLibrary(true); store.refreshLibraryScan(); }
+}
+
 onMounted(async () => {
   store.libraryManage = false;
   await store.loadLibrary(true);
   await store.refreshLibraryScan();
+  store.loadUploads();
 });
 </script>
 
@@ -84,11 +102,11 @@ onMounted(async () => {
       <!-- ══ Header ══ -->
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <h1 class="font-display text-xl font-semibold sm:text-2xl">🖼 Thư viện <span class="text-cream-300/50">({{ fmtNum(store.libraryTotal) }})</span></h1>
+          <h1 class="font-display text-xl font-semibold sm:text-2xl">🖼 Thư viện <span class="text-cream-300/50">({{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTotal) }})</span></h1>
           <a href="/studio" class="rounded-xl bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-700">← Về Studio</a>
         </div>
         <div class="flex items-center gap-2">
-          <button @click="store.loadLibrary(true)" :disabled="store.libraryLoading"
+          <button @click="refresh" :disabled="store.libraryLoading || store.uploadLoading"
                   class="rounded-xl bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
             ⟳ Làm mới
           </button>
@@ -100,6 +118,21 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- ══ Tab: Ảnh đã tạo / File tải lên ══ -->
+      <div class="mb-4 flex gap-1 rounded-2xl border border-ink-700 bg-ink-800 p-1">
+        <button @click="switchTab('generations')"
+                :class="store.libraryTab === 'generations' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-700'"
+                class="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition">
+          🖼 Ảnh đã tạo
+        </button>
+        <button @click="switchTab('uploads')"
+                :class="store.libraryTab === 'uploads' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-700'"
+                class="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition">
+          📁 File tải lên <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-[10px] text-red-100">{{ uploadStats.unused_count }}</span>
+        </button>
+      </div>
+
+      <template v-if="store.libraryTab === 'generations'">
       <!-- ══ Thống kê ══ -->
       <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
@@ -244,6 +277,84 @@ onMounted(async () => {
           {{ store.libraryLoading ? 'Đang tải…' : 'Xem thêm' }}
         </button>
       </div>
+      </template>
+
+      <!-- ══ Tab: FILE TẢI LÊN ══ -->
+      <template v-else>
+        <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+            <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Tổng file</p>
+            <p class="text-lg font-semibold text-cream-100">{{ fmtNum(uploadStats.total ?? store.uploadItems.length) }}</p>
+          </div>
+          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+            <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Dung lượng</p>
+            <p class="text-lg font-semibold text-cream-100">{{ fmtBytes(uploadStats.total_bytes ?? 0) }}</p>
+          </div>
+          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+            <p class="text-[10px] uppercase tracking-wide text-cream-300/50">File mồ côi (chưa dùng)</p>
+            <p class="text-lg font-semibold text-red-300">{{ fmtNum(uploadUnusedCount) }}</p>
+            <p v-if="uploadStats.unused_bytes" class="text-[10px] text-cream-300/50">{{ fmtBytes(uploadStats.unused_bytes) }}</p>
+          </div>
+          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+            <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Đang dùng</p>
+            <p class="text-lg font-semibold text-emerald-300">{{ fmtNum((uploadStats.total ?? 0) - (uploadStats.unused_count ?? 0)) }}</p>
+          </div>
+        </div>
+
+        <!-- Thanh quản lý uploads -->
+        <div v-if="store.libraryManage" class="mb-4 space-y-2 rounded-2xl border border-brand-600/40 bg-brand-900/30 p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ uploadSelectedCount }}</span> file</span>
+            <button @click="store.uploadSelectUnused" class="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs text-red-200 hover:bg-red-500/20">Chọn file mồ côi</button>
+            <button @click="store.uploadSelectNone" class="rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">Bỏ chọn</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
+            <template v-if="confirmAction === ''">
+              <button @click="ask('ubulk')" :disabled="!uploadSelectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40">🗑 Xóa đã chọn ({{ uploadSelectedCount }})</button>
+              <button @click="ask('uclean')" :disabled="!uploadUnusedCount" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/15">🧾 Dọn file mồ côi ({{ uploadUnusedCount }})</button>
+            </template>
+            <template v-else>
+              <p class="text-xs font-semibold text-red-200">
+                ⚠
+                <span v-if="confirmAction === 'ubulk'">Xóa vĩnh viễn {{ uploadSelectedCount }} file đã chọn?</span>
+                <span v-else>Dọn toàn bộ file đã tải lên không còn dùng?</span>
+              </p>
+              <div class="flex gap-2">
+                <button @click="cancelConfirm" class="rounded-lg border border-ink-600 bg-ink-800 px-3 py-1.5 text-xs text-cream-200 hover:bg-ink-700">Hủy</button>
+                <button @click="runConfirm" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">Xác nhận xóa</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Lưới file tải lên -->
+        <div v-if="store.uploadLoading && !store.uploadItems.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div v-for="i in 10" :key="i" class="aspect-square animate-pulse rounded-2xl border-2 border-ink-700 bg-ink-800"></div>
+        </div>
+        <div v-else-if="!store.uploadItems.length" class="rounded-2xl border border-ink-700 bg-ink-800 py-16 text-center">
+          <p class="text-sm text-cream-300/50">Chưa có file nào được tải lên.</p>
+        </div>
+        <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div v-for="f in store.uploadItems" :key="f.rel"
+               class="group relative overflow-hidden rounded-2xl border-2 transition"
+               :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
+            <div class="relative cursor-pointer">
+              <img :src="f.url" class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="$event.target.src='/images/placeholder.svg'">
+              <span v-if="f.used" class="absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold text-emerald-200">đang dùng</span>
+              <span v-else class="absolute left-2 top-2 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[9px] font-semibold text-red-200">chưa dùng</span>
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2 pb-1.5 pt-6">
+                <p class="truncate text-[10px] font-medium text-cream-100">{{ f.name }}</p>
+                <p class="truncate text-[9px] text-cream-300/75">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
+              </div>
+            </div>
+            <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
+                    class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
+                    :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+              ✓
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
 
     <GalleryModal v-if="store.viewer" />
