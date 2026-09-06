@@ -410,7 +410,7 @@ export const useStudioStore = defineStore('studio', {
     // làm base → tạo bức ảnh mới giống mẫu theo % tương đồng, không sửa trên ảnh gốc.
     // tryon=true (chip "Thử đồ"): gửi 1 ảnh trang phục → sinh ảnh người mẫu mặc đúng đồ đó
     // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body directive + khuôn mặt mẫu (faceModelId)
-    // + pose mẫu (poseId — chỉ gửi MÔ TẢ văn bản, không gửi ảnh pose).
+    // + pose mẫu (poseId — AI đọc ẢNH pose để tạo mô tả tư thế, không gửi ảnh pose vào model).
     async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, faceModelId = '', poseId = '') {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {

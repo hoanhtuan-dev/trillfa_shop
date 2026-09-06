@@ -430,6 +430,26 @@ class StudioController extends Controller
     }
 
     /**
+     * Đọc ảnh pose bằng vision model → mô tả tư thế chi tiết (hỗ trợ tryon).
+     * Resolve URL (route/studio/image hoặc /storage) → file cục bộ → gọi StyleSuggestService::describePose.
+     */
+    protected function poseDescription(string $url): ?string
+    {
+        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        if (str_starts_with($path, 'studio/image/')) { $path = substr($path, strlen('studio/image/')); }
+        $file = null;
+        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
+            if (is_file($c)) { $file = $c; break; }
+        }
+        if (! $file) { return null; }
+        try {
+            return app(\App\Services\StyleSuggestService::class)->describePose($file);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * i2i — Tạo lại ảnh từ ảnh cho trước (Reimagine / Variation).
      * Dùng ảnh gốc làm base (không mask) + prompt → model edit tạo biến thể mới.
      */
@@ -588,7 +608,7 @@ class StudioController extends Controller
             // Kế thừa khuôn mặt mẫu (FacePreset) từ cài đặt — ẢNH tải lên được gửi kèm như face_ref,
             // còn MÔ TẢ khuôn mặt do VISION model đọc từ chính ảnh đó (không lấy description trong DB).
             'face_model_id' => ['nullable', 'string', 'max:80'],
-            // Pose mẫu (PosePreset) — chỉ gửi MÔ TẢ (skeleton) dưới dạng văn bản, KHÔNG gửi ảnh pose.
+            // Pose mẫu (PosePreset) — MÔ TẢ tư thế do VISION đọc từ ảnh pose (không gửi ảnh pose vào model).
             'pose_id' => ['nullable', 'string', 'max:80'],
         ]);
 
@@ -614,12 +634,19 @@ class StudioController extends Controller
             }
         }
 
-        // Resolve pose mẫu: chỉ dùng MÔ TẢ (skeleton/name) làm văn bản — không gửi ảnh pose.
+        // Resolve pose mẫu: dùng VISION đọc ẢNH pose → mô tả tư thế (thay vì skeleton text trong DB).
         $poseDirective = '';
         if ($isTryon && ! empty($data['pose_id'])) {
             $pose = app(\App\Services\VirtualTryOnService::class)->pickPose((string) $data['pose_id']);
             if ($pose) {
-                $poseDirective = trim((string) ($pose['skeleton'] ?? $pose['name'] ?? ''));
+                $poseImage = ! empty($pose['image']) ? (string) $pose['image'] : null;
+                if ($poseImage) {
+                    $poseDirective = $this->poseDescription($poseImage);
+                }
+                // Fallback êm: vision không đọc được (thiếu key vision) → dùng skeleton text trong DB.
+                if (! $poseDirective) {
+                    $poseDirective = trim((string) ($pose['skeleton'] ?? $pose['name'] ?? ''));
+                }
             }
         }
 

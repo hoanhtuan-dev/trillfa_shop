@@ -284,10 +284,10 @@ async function runRefgen() {
         </div>
       </div>
 
-      <!-- Pose mẫu (dropdown) — chỉ dùng MÔ TẢ, không gửi ảnh pose -->
+      <!-- Pose mẫu (dropdown) — AI đọc ẢNH pose để tạo mô tả tư thế (không gửi ảnh pose vào model) -->
       <div v-if="poseOpen" class="mt-2 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
         <div class="mb-1.5 flex items-center justify-between">
-          <p class="text-[11px] font-semibold text-cream-200">Pose mẫu <span class="text-cream-300/50">(AI dùng mô tả, không gửi ảnh)</span></p>
+          <p class="text-[11px] font-semibold text-cream-200">Pose mẫu <span class="text-cream-300/50">(AI đọc ảnh → mô tả tư thế)</span></p>
           <button v-if="poseId" @click="poseId = ''" class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ chọn</button>
         </div>
         <div class="flex flex-wrap gap-1.5">

@@ -957,6 +957,21 @@ class ShopFlowTest extends TestCase
         $this->assertStringContainsString('Model face: young woman with round face and wispy bangs', (string) $fgen->prompt);
         $this->assertSame('fp'.$fp->id, $f->json('face_model_id'));
 
+        // Kế thừa pose mẫu (PosePreset): tạo preset KHÔNG có ảnh → vision không đọc được →
+        // fallback về skeleton (description) trong DB — mô tả tư thế vẫn được chèn vào prompt.
+        $pp = \App\Models\PosePreset::create([
+            'name' => 'Test Pose', 'description' => 'standing with one hand on hip, full body head to toe', 'image' => null, 'sort' => 0, 'enabled' => true,
+        ]);
+        $pf = $this->postJson('/studio/refgen', [
+            'image' => '/storage/studio/garment.jpg',
+            'prompt' => 'mặc trang phục lên người mẫu',
+            'variants' => 1,
+            'tryon' => true,
+            'pose_id' => 'pp'.$pp->id,
+        ])->assertOk();
+        $pgen = Generation::find($pf->json('items.0.generation_id'));
+        $this->assertStringContainsString('Model pose: standing with one hand on hip, full body head to toe', (string) $pgen->prompt);
+
         // Không gửi tryon → refgen thường (prompt "Create a brand-new image based on the provided reference image").
         $c = $this->postJson('/studio/refgen', [
             'image' => '/storage/studio/sample.jpg',

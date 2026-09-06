@@ -390,6 +390,44 @@ class StyleSuggestService
         return null;
     }
 
+    /**
+     * Đọc ảnh pose bằng vision model → trả mô tả TƯ THẾ chi tiết (tiếng Anh) để hỗ trợ tryon.
+     * Dùng cho chip "Thử đồ": mô tả hướng người, tay/chân, trọng tâm từ ẢNH pose (thay vì text DB).
+     * Trả null khi không có key vision hoặc model lỗi (vẫn chạy, chỉ thiếu mô tả pose).
+     */
+    public function describePose(string $imagePath): ?string
+    {
+        try {
+            [$b64, $mime] = $this->downscaleBase64($imagePath, 1024);
+            if ($b64 === '') { return null; }
+            $prompt = 'Describe the full-body pose in this image for a virtual try-on task. Return a short English description (1-2 sentences, plain text only, no JSON, no labels) covering: body orientation (front/back/side/three-quarter), stance, arm position, hand placement, leg position, weight distribution, head/gaze direction, and any prop (chair/wall/stool). Focus ONLY on the body posture — ignore clothing, face and background.';
+            foreach (studio_suggest_qwen_models() as $model) {
+                foreach (studio_qwen_credentials('vision') as $key) {
+                    $base = dashscope_base_url($key).'/compatible-mode/v1';
+                    try {
+                        $resp = Http::withToken($key)->timeout(60)
+                            ->post($base.'/chat/completions', [
+                                'model' => $model,
+                                'messages' => [['role' => 'user', 'content' => [
+                                    ['type' => 'text', 'text' => $prompt],
+                                    ['type' => 'image_url', 'image_url' => ['url' => 'data:'.$mime.';base64,'.$b64]],
+                                ]]],
+                            ]);
+                        if ($resp->successful()) {
+                            $text = trim((string) data_get($resp->json(), 'choices.0.message.content'));
+                            if ($text !== '' && mb_strlen($text) < 800) { return $text; }
+                        }
+                    } catch (\Throwable $e) {
+                        continue;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->warning('describePose failed: '.$e->getMessage());
+        }
+        return null;
+    }
+
     protected function suggestViaColor(string $imagePath, int $creativeLevel = 6, int $adherence = 8, int $detailLevel = 8): array
     {
         $styles = Preset::category('style')->get();
