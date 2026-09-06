@@ -18,6 +18,9 @@ const imgName = computed(() => store.upscaleName || (store.preview ? 'Ảnh kế
 
 const mode = ref('refgen'); // 'refgen' | 'tryon'
 const prompt = ref('');
+// Prompt riêng cho từng chế độ — chuyển chip sẽ tự khôi phục/giữ prompt của chế độ đó.
+const refgenPrompt = ref('');
+const tryonPrompt = ref('mặc trang phục trong ảnh lên người mẫu thời trang, giữ nguyên màu sắc, chất liệu, họa tiết và phụ kiện, pose đứng tự nhiên, ánh sáng studio');
 const similarity = ref(70);
 const variants = ref(1);
 const busy = ref(false);
@@ -50,12 +53,17 @@ const selectedFace = computed(() => faces.value.find(f => String(f.id) === Strin
 const selectedPose = computed(() => poses.value.find(p => String(p.id) === String(poseId.value)) || null);
 
 function setMode(m) {
+  if (m === mode.value) return;
+  // Lưu prompt hiện tại về chế độ cũ trước khi chuyển.
+  if (mode.value === 'refgen') refgenPrompt.value = prompt.value;
+  else if (mode.value === 'tryon') tryonPrompt.value = prompt.value;
+
   mode.value = m;
   if (m === 'tryon') {
-    if (!prompt.value.trim()) {
-      prompt.value = 'mặc trang phục trong ảnh lên người mẫu thời trang, giữ nguyên màu sắc, chất liệu, họa tiết và phụ kiện, pose đứng tự nhiên, ánh sáng studio';
-    }
+    prompt.value = tryonPrompt.value;
     similarity.value = 85; // tryon cần độ giống cao (bám mẫu trang phục)
+  } else {
+    prompt.value = refgenPrompt.value;
   }
 }
 
@@ -86,26 +94,19 @@ const presets = [
   { id: 'studio-lilac',  label: 'Tím nhạt',     color: '#e3d9f0', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a pale lilac seamless studio backdrop, soft dreamy lighting, delicate fashion mood' },
 ];
 const activePreset = ref(null);
-function segmentList() {
-  return String(prompt.value || '').split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean);
-}
-function setSegments(list) {
-  const seen = new Set();
-  const uniq = list.filter((s) => s && !seen.has(s) && seen.add(s));
-  prompt.value = uniq.join('; ');
-}
+// Chỉ lưu lựa chọn + thông báo cho người dùng — KHÔNG nối text nền vào ô prompt.
 function applyPreset(p) {
-  const list = segmentList();
   if (activePreset.value === p.id) {
-    setSegments(list.filter((s) => s !== p.prompt));
     activePreset.value = null;
+    store.toast('Đã bỏ chọn nền studio.');
     return;
   }
-  if (!list.includes(p.prompt)) list.push(p.prompt);
-  setSegments(list);
   activePreset.value = p.id;
   similarity.value = p.similarity;
+  store.toast('Đã chọn nền: ' + p.label);
 }
+const activeBgLabel = computed(() => { const p = presets.find(x => x.id === activePreset.value); return p ? p.label : ''; });
+const activeBgPrompt = computed(() => { const p = presets.find(x => x.id === activePreset.value); return p ? p.prompt : ''; });
 
 // ── Góc chụp: 4 hướng camera (chỉ chế độ "Tạo ảnh mới") ──
 const anglePresets = [
@@ -115,18 +116,19 @@ const anglePresets = [
   { id: 'angle-right45',  label: 'Nghiêng 45° phải', similarity: 62, prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-right angle, camera slightly to the right and slightly above eye level, same lighting and framing', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M18 6l-4 4"/><path d="M18 10h-4V6"/>' },
 ];
 const activeAngle = ref(null);
+// Chỉ lưu lựa chọn + thông báo cho người dùng — KHÔNG nối text góc chụp vào ô prompt.
 function applyAngle(a) {
-  const list = segmentList();
   if (activeAngle.value === a.id) {
-    setSegments(list.filter((s) => s !== a.prompt));
     activeAngle.value = null;
+    store.toast('Đã bỏ chọn góc chụp.');
     return;
   }
-  if (!list.includes(a.prompt)) list.push(a.prompt);
-  setSegments(list);
   activeAngle.value = a.id;
   similarity.value = a.similarity;
+  store.toast('Đã chọn góc chụp: ' + a.label);
 }
+const activeAngleLabel = computed(() => { const a = anglePresets.find(x => x.id === activeAngle.value); return a ? a.label : ''; });
+const activeAnglePrompt = computed(() => { const a = anglePresets.find(x => x.id === activeAngle.value); return a ? a.prompt : ''; });
 
 // ── Body directive labels (kế thừa từ "Tạo ảnh 2D") ──
 const bodyHeightLabel = computed(() => { const v = store.bodyHeight; if (v <= 2) return 'Rất thấp'; if (v <= 4) return 'Hơi thấp'; if (v <= 6) return 'Trung bình'; if (v <= 8) return 'Cao'; return 'Siêu cao'; });
@@ -144,7 +146,12 @@ async function runRefgen() {
   // Thử đồ: gửi tryon=true + body directive từ store + khuôn mặt mẫu (ảnh, mô tả do vision đọc).
   const isTryon = mode.value === 'tryon';
   const body = isTryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
-  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body, isTryon ? faceModelId.value : '', isTryon ? poseId.value : '');
+  // Nền Studio + Góc chụp chỉ dùng cho "Tạo ảnh mới" — gửi RIÊNG (không nối vào ô prompt).
+  const items = await store.refgen(
+    img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body,
+    isTryon ? faceModelId.value : '', isTryon ? poseId.value : '',
+    isTryon ? '' : activeBgPrompt.value, isTryon ? '' : activeAnglePrompt.value,
+  );
   busy.value = false;
   if (items && items.length) {
     store.toast('Đã gửi ' + items.length + ' ảnh mới — đang tạo…');
@@ -191,7 +198,7 @@ async function runRefgen() {
               :class="bgOpenRefgen ? 'border-brand-400 bg-brand-600/20 text-brand-100' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50'">
         <span class="flex items-center gap-2"><StudioIcon name="background" size="h-4 w-4" class="text-brand-300" /> Nền Studio</span>
         <span class="flex items-center gap-2">
-          <span class="text-[10px] font-medium text-cream-300/60">{{ activePreset ? 'Đã chọn' : 'Mặc định' }}</span>
+          <span class="text-[10px] font-medium text-cream-300/60">{{ activeBgLabel || 'Mặc định' }}</span>
           <span class="text-brand-300">{{ bgOpenRefgen ? '▲' : '▼' }}</span>
         </span>
       </button>
@@ -206,8 +213,8 @@ async function runRefgen() {
 
       <!-- Góc chụp -->
       <div class="mt-4 flex items-center justify-between">
-        <p class="label">Góc chụp</p>
-        <span class="text-[9px] font-medium text-cream-300/40">{{ anglePresets.length }} góc</span>
+        <p class="label">Góc chụp <span v-if="activeAngleLabel" class="font-semibold text-brand-300">· {{ activeAngleLabel }}</span></p>
+        <span class="text-[9px] font-medium text-cream-300/40">{{ activeAngleLabel ? 'Đã chọn' : anglePresets.length + ' góc' }}</span>
       </div>
       <div class="mt-1 grid grid-cols-2 gap-1.5">
         <button v-for="a in anglePresets" :key="a.id" @click="applyAngle(a)"

@@ -973,15 +973,20 @@ class ShopFlowTest extends TestCase
         $this->assertStringContainsString('Model pose: standing with one hand on hip, full body head to toe', (string) $pgen->prompt);
 
         // Không gửi tryon → refgen thường (prompt "Create a brand-new image based on the provided reference image").
+        // Nền studio + góc chụp gửi RIÊNG (không nối vào prompt người dùng) → chèn vào prompt cuối.
         $c = $this->postJson('/studio/refgen', [
             'image' => '/storage/studio/sample.jpg',
             'prompt' => '',
             'variants' => 1,
+            'background_prompt' => 'replace the background with a pure-white seamless studio backdrop',
+            'angle_prompt' => 'shoot from a straight-on front view, eye-level camera',
         ])->assertOk();
         $this->assertNull($c->json('tryon'));
         $cg = Generation::find($c->json('items.0.generation_id'));
         $this->assertSame('refgen', $cg->meta['mode'] ?? null);
         $this->assertStringContainsString('Create a brand-new image based on the provided reference image', (string) $cg->prompt);
+        $this->assertStringContainsString('Background: replace the background with a pure-white seamless studio backdrop', (string) $cg->prompt);
+        $this->assertStringContainsString('Camera angle: shoot from a straight-on front view, eye-level camera', (string) $cg->prompt);
         $this->assertStringNotContainsString('WEARING THE EXACT GARMENT', (string) $cg->prompt);
     }
 

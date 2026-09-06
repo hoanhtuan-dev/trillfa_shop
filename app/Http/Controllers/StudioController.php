@@ -610,6 +610,9 @@ class StudioController extends Controller
             'face_model_id' => ['nullable', 'string', 'max:80'],
             // Pose mẫu (PosePreset) — MÔ TẢ tư thế do VISION đọc từ ảnh pose (không gửi ảnh pose vào model).
             'pose_id' => ['nullable', 'string', 'max:80'],
+            // Chế độ "Tạo ảnh mới": nền studio + góc chụp — gửi RIÊNG (không nối vào prompt người dùng).
+            'background_prompt' => ['nullable', 'string', 'max:1200'],
+            'angle_prompt' => ['nullable', 'string', 'max:1200'],
         ]);
 
         $similarity = (int) ($data['similarity'] ?? 70);
@@ -668,11 +671,15 @@ class StudioController extends Controller
                 .($poseDirective !== '' ? ' Model pose: '.$poseDirective.'. ' : '')
                 .($userPrompt !== '' ? ' '.$userPrompt : '');
         } else {
+            $bgPrompt = trim((string) ($data['background_prompt'] ?? ''));
+            $anglePrompt = trim((string) ($data['angle_prompt'] ?? ''));
             $finalPrompt = 'Create a brand-new image based on the provided reference image. '
                 .'Keep about '.$similarity.'% similarity to the reference: preserve the same subject, style, '
                 .'color palette, composition and proportions, but produce a fresh, original rendering — '
                 .'not an edit of the reference. '
                 .($userPrompt !== '' ? 'Additionally: '.$userPrompt.' ' : 'Produce a clean, refined variation of the reference itself. ')
+                .($bgPrompt !== '' ? ' Background: '.$bgPrompt.' ' : '')
+                .($anglePrompt !== '' ? ' Camera angle: '.$anglePrompt.' ' : '')
                 .'High quality, photorealistic, sharp details, professional studio lighting, no text, no watermark.';
         }
 

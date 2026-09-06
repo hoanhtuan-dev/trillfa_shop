@@ -411,11 +411,16 @@ export const useStudioStore = defineStore('studio', {
     // tryon=true (chip "Thử đồ"): gửi 1 ảnh trang phục → sinh ảnh người mẫu mặc đúng đồ đó
     // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body directive + khuôn mặt mẫu (faceModelId)
     // + pose mẫu (poseId — AI đọc ẢNH pose để tạo mô tả tư thế, không gửi ảnh pose vào model).
-    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, faceModelId = '', poseId = '') {
+    // background/angle (chỉ chế độ "Tạo ảnh mới"): mô tả nền studio + góc chụp — gửi RIÊNG, không nối vào prompt.
+    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, faceModelId = '', poseId = '', background = '', angle = '') {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {
         const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
         if (model && model.provider && model.model) { payload.provider = model.provider; payload.model = model.model; }
+        if (!tryon) {
+          if (background) payload.background_prompt = background;
+          if (angle) payload.angle_prompt = angle;
+        }
         if (tryon) {
           payload.tryon = true;
           if (faceModelId) payload.face_model_id = faceModelId;
