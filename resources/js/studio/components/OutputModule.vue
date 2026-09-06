@@ -1,26 +1,12 @@
 <script setup>
 import { useStudioStore } from '../store.js';
+import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 const store = useStudioStore();
 function openGallery() { store.viewer = store.preview || store.generations[0] || null; }
 function goLibrary() { window.location.href = '/studio/library'; }
-// Thumbnail URL cho ảnh hiển thị lưới Outputs (giảm ~50x dung lượng so với full-size 2K).
-// Ảnh gốc full-size vẫn được dùng khi mở viewer (store.viewer = g → media_url gốc).
-// CHỈ tạo thumbnail cho path AN TOÀN (chữ-số / _ . -); path đặc biệt (space/unicode/%...) → giữ ảnh gốc,
-// tránh lỗi 500 do middleware ValidatePathEncoding khi URL chứa ký tự không hợp lệ.
-function thumbUrl(url) {
-  if (!url) return url;
-  const SAFE = /^[a-zA-Z0-9/_.-]+$/;
-  const clean = String(url).split(/[?#]/)[0]; // bỏ query string / fragment
-  if (clean.startsWith('/storage/')) {
-    const p = clean.slice(9);
-    return SAFE.test(p) ? '/studio/image-thumb/' + p : url;
-  }
-  if (clean.startsWith('/studio/image/')) {
-    const p = clean.slice(14);
-    return SAFE.test(p) ? '/studio/image-thumb/' + p : url;
-  }
-  return url; // URL ngoài hoặc data:URL → giữ nguyên
-}
+// Thumbnail URL lấy từ composable dùng chung (useStudioThumb) — cùng logic với PHP helper
+// studio_image_thumb_url(): giảm ~50x dung lượng so với ảnh gốc 2K; path đặc biệt → fallback ảnh gốc.
+// Ảnh gốc full-size vẫn dùng khi mở viewer (store.viewer = g → media_url gốc).
 </script>
 <template>
   <div class="card flex flex-1 flex-col p-3" style="min-height:0">
