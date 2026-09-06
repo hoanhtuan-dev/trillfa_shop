@@ -13,9 +13,7 @@
     <div id="studio-root" class="absolute inset-0"></div>
     @php
         $studioUser = auth()->user();
-    @endphp
-    <script>
-        window.__STUDIO_BOOT__ = @json([
+        $studioBoot = [
             'user' => $studioUser ? [
                 'id' => $studioUser->id,
                 'name' => $studioUser->name,
@@ -26,7 +24,10 @@
                 'credits_balance' => $studioUser->credits_balance,
                 'is_admin' => $studioUser->isAdmin(),
             ] : null,
-        ]);
+        ];
+    @endphp
+    <script>
+        window.__STUDIO_BOOT__ = @json($studioBoot);
     </script>
 </body>
 </html>
