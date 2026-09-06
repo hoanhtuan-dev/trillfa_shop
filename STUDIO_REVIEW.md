@@ -751,3 +751,108 @@ Chạy 1 workflow (chỉ `qwen-token-plan`/`qwen3.8-max`, 6 task): `creative-dir
 Pattern §8 playbook tái khẳng định lần 2: **2/12 medium sống sót** (tỷ lệ ~17%, cao hơn round 1's 0/9 — vì lần này file đều sống và cơ chế đa số đúng, chỉ sai mức độ). Xác minh điều phối vẫn bắt buộc: 10/12 medium cần điều chỉnh.
 
 > **Cập nhật chéo:** phiên song song đã vá top-5 #1 (path traversal) + #2 (API key) trong lúc round này chạy — xem ledger section "ĐÃ VÁ phase 2". Khi round 3 tái xác minh 18 high/critical, 2 high này giờ **đã vá** (có test 17+5 assert, baseline 9 fail/145 pass → 9 fail/167 pass, 0 regression) → high cần tái xác minh còn ~15.
+
+---
+
+# Phần J — ĐỢT VÁ PHASE 2 HOÀN TẤT + RÀ SOÁT KHÔNG BỎ SÓT (điều phối trực tiếp, đã xác minh)
+
+> Viết bởi điều phối tiếp quản sau khi hoàn tất 'làm nốt #4, #5 và 4 pattern còn lại' (R6 phần 2).
+> Bổ sung cho Phần G (đính chính) + H (blade) + I (creative-dir + QUEUE B). Phần I đã tồn tại từ phiên
+> song song nên tổng kết đợt vá này ghi là **Phần J** — không đè, không trùng tên.
+
+## J.1 — Rà soát toàn bộ nhiệm vụ (checklist, không còn sót)
+
+| Nhiệm vụ | Trạng thái | Bằng chứng |
+|---|---|---|
+| R6 'Việc còn lại đáng làm': xóa dead code + 2 lỗi bảo mật | ✅ xong | index.blade.php đã xóa (commit 85b9f91); #1 path traversal + #2 API key đã vá (Phần G) |
+| R6 phần 2 'làm nốt #4, #5 và 4 pattern còn lại' | ✅ xong (phần này) | J.2–J.6 dưới đây |
+| QUEUE A (7 task) | ✅ hoàn tất | Phần H + I.2 |
+| QUEUE B (5 task) | ✅ hoàn tất | Phần I.3–I.7 |
+| Tái xác minh ~15 high/critical còn lại | ⏳ còn mở | việc tiếp theo đề xuất (J.8) |
+| 9 lỗi ShopFlowTest (có sẵn baseline) | ⏳ còn mở | J.8.2 |
+
+→ **QUEUE A+B hết [ ], module phủ ~100% diện tích.** Không còn task review tồn đọng; 4 pattern còn lại đều đã vá xong.
+
+## J.2 — Top-5 #4: studioImage()/studioImageThumb() phục vụ file không giới hạn → ĐÃ VÁ
+
+- **Trước:** /studio/image/{path} + /studio/image-thumb/{path} (public, không auth) chỉ chặn '..' + charset;
+  fallback base_path('public_html/'.$path) phục vụ **file bất kỳ trong document root** — gồm .htaccess, .env,
+  bundle JS (regex [a-zA-Z0-9/_.\-]+ cho phép .htaccess khớp vì '.' nằm trong charset, không '..').
+- **Sau:** helper studioServePath() (StudioController ~:3313) — containment realpath() so với 3 root
+  (storage/app/public, public_html/storage, public_html) + **chặn dotfile segment** (.htaccess/.env/.git*)
+  + **whitelist đuôi** image/video (.jpg .jpeg .png .webp .gif .svg .avif .mp4 .webm .mov). Cả 2 endpoint chỉ
+  gọi helper; file ngoài phạm vi → 404 json.
+- **Vì sao giữ root public_html:** Hostinger deploy web root khác; bỏ hẳn sẽ 404 trên host. Whitelist đuôi +
+  chặn dotfile đủ ngăn lộ file nhạy cảm, không phá luồng phục vụ ảnh hợp lệ.
+
+## J.3 — Top-5 #3: 41 site @imagecreatefromstring không giới hạn kích thước → ĐÃ VÁ
+
+- **Trước:** 41 site (StudioController 20 · ImageAIService 15 · ProductAIService 3 · StyleSuggestService 2 ·
+  helpers 1) gọi @imagecreatefromstring((string) file_get_contents($x)) hoặc raw bytes — không check kích thước
+  → ảnh hợp lệ khổng lồ (hoặc file rác GD vẫn cố allocate) có thể OOM worker.
+- **Sau:** helper toàn cục studio_image_decode($dataOrPath, int $maxBytes = 0) (helpers.php) — mặc định **64 MiB**,
+  tự nhận diện file path (is_file) hay raw bytes, check filesize/strlen trước khi gọi GD, trả false khi vượt
+  giới hạn. Thay toàn bộ 41 site bằng studio_image_decode(...); pattern lồng ngoặc cuối (ImageAIService:1334 —
+  resolveImageBinary((string) ($meta['source'] ?? ''))) vá tay sau khi regex chung không bắt.
+  Kiểm chứng: grep -rn '@imagecreatefromstring' app/ chỉ còn docstring + function_exists.
+- **Lưu ý:** giá trị trả về cũ là @imagecreatefromstring() (resource/GdImage|false); code gọi đều kiểm tra
+  falsy nên false tương thích hoàn toàn.
+
+## J.4 — P2: rò rỉ $e->getMessage() trong response 5xx → ĐÃ VÁ 6/9 site
+
+- **Đã vá (6 site response 500):** helper studio_fail(\Throwable $e, string $context, int $status = 500, ?string $safeMessage = null)
+  (helpers.php) — Log::warning chi tiết ở server, trả message chung ('{context} thất bại.' / 'Lỗi hệ thống, vui
+  lòng thử lại.'), chỉ lộ $e->getMessage() khi APP_DEBUG qua key debug.
+  - StudioController :3420 (test API key) + :3481 (bỏ luôn phần (...) trong message 'chưa có phản hồi').
+  - StylistDataController :110 :121 :159 :170 (lưu/xóa mục stylist).
+- **Cố ý KHÔNG vá (3 site response 422):** ProjectController:175, Api/CartApiController:37, Api/CouponApiController:28
+  — 422 thường ném exception có message thân thiện người dùng (validation/business); che lại mất thông tin cho
+  UI; rò rỉ gì xảy ra là qua APP_DEBUG (phạm vi kiểm soát khác).
+- Dòng :1282/:1295 (ghi error vào DB khi lazy fail) giữ nguyên — không phải response ra trình duyệt.
+
+## J.5 — P5/P6: 26 catch rỗng frontend → ĐÃ VÁ 22, giữ 4 cố ý
+
+- **22 site nuốt lỗi** (fetch/parse/localStorage) → thay bằng catch (...) { console.error('studio ... failed', e); }
+  — SettingsApp 2 · ConceptCard 5 · SwapCard 6 · GalleryModal 2 · SourceCard 1 · SourcePanel 1 · StylistCard 1 · store.js 8.
+- **4 site catch (err) {} giữ nguyên (cố ý):** store.js:1532/1632 + GalleryModal.vue:91/107 —
+  setPointerCapture() ném khi pointer đã release; bắt-lặng là pattern chuẩn, log chỉ tạo tiếng ồn.
+- Kiểm chứng: grep catch rỗng còn đúng 4 (đều pointer-capture); Vite build OK.
+
+## J.6 — P7: fetch không kiểm tra res.ok → ĐÃ VÁ 17 site
+
+- **17 site đọc .json() trong try/catch** giờ có if (!r.ok) throw new Error('HTTP ' + r.status) trước — lỗi server
+  (500/419/302→HTML) rơi vào catch hiện có thay vì nuốt thành dữ liệu rỗng / mất feedback.
+  File: SettingsApp.vue (2) · RefImageCard.vue (2) · ConceptCard.vue (3: prompt-history + stylist types/presets)
+  · SourceCard/StylistCard/SourcePanel/SourceLibraryPicker (1 mỗi file) · SwapCard.vue (4: swap-models/poses/
+  backgrounds/assets) · store.js (1: loadPalette).
+- **1 site KHÔNG guard + không try/catch:** SwapCard.vue reload assets sau upload (assets.value = (await r.json()).items
+  — trước đây unhandled rejection khi server trả HTML) → bọc riêng: if (!r.ok) { store.toast('Lỗi tải thư viện.', 'error'); return; }.
+- **Không đổi hành vi OK-path**; wrapper tập trung đã check từ trước giữ nguyên (store.api(), _libraryFetch(),
+  upload paths). Vite build OK 3.9 s.
+
+## J.7 — Kiểm chứng tổng hợp đợt vá
+
+| Hạng mục | Kết quả |
+|---|---|
+| php -l 6 file PHP đụng | 0 lỗi |
+| Unit toàn bộ | 52 passed (126 assertions) — gồm 2 bộ test mới (traversal 17 + api-key 5) |
+| Studio feature (StylistData + Inpaint) | 11 passed (40 assertions) |
+| Vite build | OK (~3.9 s) — 17+22 edit JS/Vue không lỗi |
+| grep -rn '@imagecreatefromstring' app/ | 0 site thực |
+| getMessage trong response 500 | 0 site (6 đã vá, 3 422 cố ý giữ) |
+| Empty catch không log | đúng 4 (pointer-capture cố ý) |
+| Findings tổng trong file | 208 (A–I gộp) |
+| index.blade.php | đã xóa (commit 85b9f91), không còn trong working tree |
+
+## J.8 — Việc CÒN LẠI (trung thực, không giấu)
+
+1. **Tái xác minh ~15 high/critical còn lại** (sau khi loại 2 high #1/#2 đã vá + các medium hạ) — review,
+   không phải vá; là đề xuất tiếp theo.
+2. **9 lỗi ShopFlowTest có sẵn** từ baseline (không phải regression của đợt vá; 3 nhóm: content storefront,
+   test_guest_redirected_from_account, test_studio_qwen_multimodal_model_resolution — ShopFlowTest.php:1318
+   expect 'qwen3.8-flash' nhưng model hiện là 'qwen3.8-max').
+3. **2 medium còn sống Phần I** (M6 CanvasMaskTools lifecycle · M8 Ctrl+Z hijack) — chưa vá; đánh giá tác động
+   thực + phương án sửa là việc tiếp theo nếu muốn.
+4. Full-suite ProcessSignaledException (test runner bị kill — OOM/limit hạ tầng, không liên quan code): chạy
+   theo nhóm file khi cần xác minh toàn bộ.
+5. Commit: working tree còn nhiều thay đổi (cả phiên song song + đợt vá này) — chưa commit, chờ quyết định.

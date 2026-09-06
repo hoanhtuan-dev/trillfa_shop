@@ -7,7 +7,7 @@
 
 ## Trạng thái hiện tại
 
-- Kết quả: `STUDIO_REVIEW.md` — **30 area**, **208 findings** (critical 1 · high 17 · medium 51 · low 96 · info 43), 8 claim dương tính giả đã gạch bỏ kèm bằng chứng (mới nhất: `[medium]` "ProjectWorkspace no user feedback" — Phần I.8, store.js bắt+toast). Đối chiếu `grep -cE '^- \*\*\[(critical|high|medium|low|info)\]\*\*'` = **208** ✓ (đo sau khi gộp Phần I).
+- Kết quả: `STUDIO_REVIEW.md` — **30 area**, **208 findings** (critical 1 · high 17 · medium 51 · low 96 · info 43), 8 claim dương tính giả đã gạch bỏ kèm bằng chứng (mới nhất: `[medium]` "ProjectWorkspace no user feedback" — Phần I.8, store.js bắt+toast). Đối chiếu `grep -cE '^- \*\*\[(critical|high|medium|low|info)\]\*\*'` = **208** ✓ (đo sau khi gộp Phần I). Cấu trúc file hiện: Phần A–J (J = đợt vá phase 2 hoàn tất + rà soát không bỏ sót, thêm 2026-09-07).
 - Footprint module studio: **1.338.134 bytes** = PHP 532.648 (24 file) + JS/Vue 562.602 (34 file) + blade 242.884 (11 file) ≈ 405k token → bắt buộc fan-out.
 - Provider dùng: **chỉ `qwen-token-plan`**. Model mặc định `qwen3.8-max`; `glm-5.2` khi cần suy luận liên file.
 - Đã phủ: `StudioController.php` (toàn bộ 4.732 dòng) · `store.js` · `ImageAIService` · `ProductAIService` · `GeminiService` · `VirtualTryOnService` · `StylistService` · `StyleSuggestService` · `StudioLibraryService` · `ProjectWorkflowService` · `StylistDataController` · `StylistCatalog` · models+config+migrations+wiring · 5 component lớn (StudioApp, ConceptCard, ComposeCard, RefImageCard, InpaintCard) · 13 component nhỏ + SettingsApp · 6 blade nhỏ · **TOÀN BỘ 11 file blade** (Phần H) → lớp blade 100% · **`CreativeDirectionService`** (Phần I, service cuối) · **19 component JS/Vue còn lại + 4 entry Vite + 2 console command + StylistQuestion** (Phần I) → **module phủ ~100% diện tích** (trừ 2 component mồ côi `SourceCard`/`PaletteTextureCard`, I.1).
@@ -26,6 +26,9 @@
 - **[done]** P5/P6 (26 catch rỗng frontend) — 22 site nuốt lỗi fetch/parse/localStorage đã thay bằng catch + console.error('studio ... failed', e); giữ nguyên 4 site catch (err) {} của setPointerCapture (pattern chuẩn, cố ý im lặng). Vite build OK.
 - **[done]** P7 (fetch không check res.ok) — thêm if (!r.ok) throw trước 17 site .json() nằm trong try/catch (SettingsApp, RefImageCardx2, SourceCard, StylistCard, SourcePanel, SourceLibraryPicker, SwapCardx4, ConceptCardx3, store.js palette); site duy nhất không guard (SwapCard reload assets sau upload) bọc riêng bằng toast lỗi + return. Không đổi hành vi OK-path; lỗi server giờ rơi vào catch hiện có thay vì nuốt thành dữ liệu rỗng. Vite build OK 3.9s.
 - **[note]** Session song song đang sửa Project/* (ProjectController, ProjectWorkflowService, ProjectWorkspace.vue, seeder, ProjectControllerTest, ProjectWorkflowServiceTest) — KHÔNG đụng vào; git diff hiện gộp cả công việc của họ.
+- **[done]** Toàn bộ đợt vá phase 2 đã ghi vào STUDIO_REVIEW.md **Phần J** (J.1–J.8): checklist rà soát không bỏ sót, chi tiết từng vá (#4 studioImage, #3 imagecreatefromstring, P2 getMessage, P5/P6 catch rỗng, P7 res.ok), bảng kiểm chứng, và mục việc còn lại trung thực (15 high/critical chờ tái xác minh + 9 lỗi ShopFlowTest baseline + 2 medium M6/M8 + full-suite ProcessSignaledException + chưa commit).
+- **[note]** QUEUE A (7/7) + QUEUE B (5/5) ĐÃ HOÀN TẤT (Phần H + I) — không còn task review tồn đọng; findings tổng = 208; module phủ ~100% diện tích.
+- **[note]** Session song song vẫn đang sửa Project/* — KHÔNG đụng vào; git diff gộp cả công việc của họ.
 
 ## CẬP NHẬT SAU ĐỢT CHẠY CỦA NGƯỜI DÙNG (Phần H)
 
