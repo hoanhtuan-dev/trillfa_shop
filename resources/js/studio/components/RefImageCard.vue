@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
@@ -8,42 +8,50 @@ const store = useStudioStore();
 
 // Card "Ảnh mới từ ảnh mẫu" (i2i): model SINH ẢNH (qwen-image-3.0-pro) nhận ảnh tham chiếu
 // làm base và tạo 1 bức ảnh HOÀN TOÀN MỚI giống ảnh mẫu theo % tương đồng — KHÔNG phải edit.
+// 2 chế độ chip (giống Card Ghép ảnh):
+//   - "Tạo ảnh mới" (refgen thường): giữ chủ thể/phong cách theo % tương đồng + nền/góc chụp.
+//   - "Thử đồ" (tryon sinh ảnh): dùng ảnh đang chọn làm TRANG PHỤC → sinh người mẫu mặc đúng đồ
+//     (rẻ hơn Thử đồ ảo edit). Kế thừa body/hair directive (Tạo ảnh 2D) + khuôn mặt mẫu (cài đặt).
 
 const img = computed(() => store.upscaleSrc || store.preview?.media_url || '');
 const imgName = computed(() => store.upscaleName || (store.preview ? 'Ảnh kết quả #' + store.preview.id : 'Ảnh đang chọn'));
 
+const mode = ref('refgen'); // 'refgen' | 'tryon'
 const prompt = ref('');
 const similarity = ref(70);
 const variants = ref(1);
 const busy = ref(false);
 
-// Chip "Thử đồ": gửi 1 ảnh trang phục (ảnh đang chọn) → model SINH ẢNH (qwen-image-3.0-pro,
-// rẻ hơn tryon-by-edit) tạo ảnh người mẫu mặc đúng đồ đó. Không cần ảnh pose — pose do prompt
-// mô tả. Kế thừa body/hair directive (tạo ảnh 2D) để kiểm soát người mẫu.
-const tryon = ref(false);
-function toggleTryon() {
-  tryon.value = !tryon.value;
-  if (tryon.value) {
-    // Đặt prompt mẫu tiếng Việt cho Thử đồ
+// ── Khuôn mặt mẫu (FacePreset từ cài đặt) ──
+const faces = ref([]);
+const faceModelId = ref('');
+onMounted(async () => {
+  try {
+    const r = await fetch('/studio/swap-models', { headers: { Accept: 'application/json' } });
+    const d = await r.json();
+    if (Array.isArray(d.items)) faces.value = d.items;
+  } catch (e) { /* giữ mặc định */ }
+});
+const selectedFace = computed(() => faces.value.find(f => String(f.id) === String(faceModelId.value)) || null);
+
+function setMode(m) {
+  mode.value = m;
+  if (m === 'tryon') {
     if (!prompt.value.trim()) {
       prompt.value = 'mặc trang phục trong ảnh lên người mẫu thời trang, giữ nguyên màu sắc, chất liệu, họa tiết và phụ kiện, pose đứng tự nhiên, ánh sáng studio';
     }
     similarity.value = 85; // tryon cần độ giống cao (bám mẫu trang phục)
-    store.toast('Thử đồ (sinh ảnh): dùng ảnh làm trang phục, tạo người mẫu mặc đúng đồ. Rẻ hơn Thử đồ ảo (edit).');
   }
 }
 
 // Không còn dropdown chọn model trên card này: backend refgen đã mặc định dùng model
 // sinh ảnh (qwen-image-3.0-pro / qwen_model trong Cài đặt) và tự fallback đúng model
-// sinh ảnh — không cần người dùng chọn. Danh sách trước đây lấy từ store.inpaintModels
-// (model EDIT) nên sai ngữ cảnh. Việc xoá tránh nhận nhầm "phải chọn mới có model".
-// selectedModel = null → refgen gửi không kèm provider/model → backend dùng default settings.
+// sinh ảnh — không cần người dùng chọn. selectedModel = null → backend dùng default settings.
 
 // Cho phép tạo ngay cả khi chưa nhập mô tả — backend tự dựng prompt "create a fresh variation".
 const canSubmit = computed(() => !!img.value && !busy.value);
 
-// ── Nền Studio: 8 màu nền studio thông dụng trong chụp ảnh thời trang. Bấm để điền
-// mô tả + độ giống; bấm lại để bỏ. Mỗi chip có 1 swatch màu đại diện cho nền.
+// ── Nền Studio: 8 màu nền studio thông dụng (chỉ chế độ "Tạo ảnh mới") ──
 const presets = [
   { id: 'studio-white',  label: 'Trắng thuần',  color: '#ffffff', similarity: 82, prompt: 'keep the subject unchanged; replace the background with a pure-white seamless studio backdrop, even soft diffused lighting, no harsh shadows, clean editorial fashion look' },
   { id: 'studio-lgray',  label: 'Xám nhạt',     color: '#e8e8e8', similarity: 80, prompt: 'keep the subject unchanged; replace the background with a light neutral gray seamless studio backdrop, soft top-down diffused lighting, subtle gradient' },
@@ -51,17 +59,14 @@ const presets = [
   { id: 'studio-storm',  label: 'Xám đậm',      color: '#4a4a4a', similarity: 76, prompt: 'keep the subject unchanged; replace the background with a dark storm-gray studio backdrop with a soft rim light and subtle gradient, dramatic fashion mood' },
   { id: 'studio-black',  label: 'Đen tuyền',    color: '#0a0a0a', similarity: 75, prompt: 'keep the subject unchanged; replace the background with a jet-black seamless studio backdrop, deep shadow, single soft key light, high-contrast editorial mood' },
   { id: 'studio-cream',  label: 'Kem',          color: '#f2e7d5', similarity: 80, prompt: 'keep the subject unchanged; replace the background with a warm cream/beige seamless studio backdrop, soft warm diffuse lighting, clean catalog look' },
-  { id: 'studio-blue',   label: 'Xanh phấn',   color: '#c9d8e0', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a soft powder-blue seamless studio backdrop, cool soft lighting, calm editorial mood' },
-  { id: 'studio-blush',  label: 'Hồng phấn',   color: '#ead3d5', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a dusty blush-pink seamless studio backdrop, soft warm diffuse lighting, fashion lookbook mood' },
+  { id: 'studio-blue',   label: 'Xanh phấn',    color: '#c9d8e0', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a soft powder-blue seamless studio backdrop, cool soft lighting, calm editorial mood' },
+  { id: 'studio-blush',  label: 'Hồng phấn',    color: '#ead3d5', similarity: 78, prompt: 'keep the subject unchanged; replace the background with a dusty blush-pink seamless studio backdrop, soft warm diffuse lighting, fashion lookbook mood' },
 ];
 const activePreset = ref(null);
-// Tách prompt hiện tại thành mảng segment theo dấu chấm phẩy — giữ cả text do user tự gõ.
-// Mỗi chip thêm 1 segment; "bấm lại" sẽ gỡ segment đó ra. Nhiều chip có thể cùng active.
 function segmentList() {
   return String(prompt.value || '').split(/\s*;\s*/).map((s) => s.trim()).filter(Boolean);
 }
 function setSegments(list) {
-  // Ghép lại — loại segment rỗng + trùng lặp để prompt luôn sạch.
   const seen = new Set();
   const uniq = list.filter((s) => s && !seen.has(s) && seen.add(s));
   prompt.value = uniq.join('; ');
@@ -69,77 +74,54 @@ function setSegments(list) {
 function applyPreset(p) {
   const list = segmentList();
   if (activePreset.value === p.id) {
-    // Bấm lại → gỡ segment nền studio này khỏi prompt (text/góc chụp khác còn nguyên).
     setSegments(list.filter((s) => s !== p.prompt));
     activePreset.value = null;
     return;
   }
-  if (!list.includes(p.prompt)) list.push(p.prompt); // chưa có → nối (không ghi đè)
+  if (!list.includes(p.prompt)) list.push(p.prompt);
   setSegments(list);
   activePreset.value = p.id;
   similarity.value = p.similarity;
 }
 
-// ── Góc chụp: 4 hướng camera cơ bản. Mỗi chip có icon SVG camera xoay theo hướng đó.
-// Bấm để điền prompt góc; bấm lại để bỏ. Nhóm này độc lập (loại trừ) với Nền Studio.
+// ── Góc chụp: 4 hướng camera (chỉ chế độ "Tạo ảnh mới") ──
 const anglePresets = [
-  {
-    id: 'angle-front',
-    label: 'Chính diện',
-    similarity: 70,
-    prompt: 'keep the subject, garment and styling unchanged; shoot from a straight-on front view, eye-level camera, symmetrical framing, flat even studio lighting',
-    // camera nhìn thẳng: body + lens giữa + chấm nhỏ trên (flash/viewfinder phía trước)
-    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><circle cx="17" cy="10" r="0.6"/>',
-  },
-  {
-    id: 'angle-back',
-    label: 'Mặt sau',
-    similarity: 65,
-    prompt: 'keep the subject, garment and styling unchanged; shoot from directly behind the subject (back view), eye-level camera, same lighting, full back of garment visible',
-    // camera quay về phía sau: body + lens có 2 nét chéo qua (X) → "back side"
-    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M10 11l4 4"/><path d="M14 11l-4 4"/>',
-  },
-  {
-    id: 'angle-left45',
-    label: 'Nghiêng 45° trái',
-    similarity: 62,
-    prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-left angle, camera slightly to the left and slightly above eye level, same lighting and framing',
-    // camera xoay chéo trái: body + lens + dấu mũi tên chéo sang trái
-    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M6 6l4 4"/><path d="M6 10h4V6"/>',
-  },
-  {
-    id: 'angle-right45',
-    label: 'Nghiêng 45° phải',
-    similarity: 62,
-    prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-right angle, camera slightly to the right and slightly above eye level, same lighting and framing',
-    // camera xoay chéo phải: body + lens + dấu mũi tên chéo sang phải
-    svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M18 6l-4 4"/><path d="M18 10h-4V6"/>',
-  },
+  { id: 'angle-front',  label: 'Chính diện', similarity: 70, prompt: 'keep the subject, garment and styling unchanged; shoot from a straight-on front view, eye-level camera, symmetrical framing, flat even studio lighting', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><circle cx="17" cy="10" r="0.6"/>' },
+  { id: 'angle-back',  label: 'Mặt sau', similarity: 65, prompt: 'keep the subject, garment and styling unchanged; shoot from directly behind the subject (back view), eye-level camera, same lighting, full back of garment visible', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M10 11l4 4"/><path d="M14 11l-4 4"/>' },
+  { id: 'angle-left45',  label: 'Nghiêng 45° trái', similarity: 62, prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-left angle, camera slightly to the left and slightly above eye level, same lighting and framing', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M6 6l4 4"/><path d="M6 10h4V6"/>' },
+  { id: 'angle-right45',  label: 'Nghiêng 45° phải', similarity: 62, prompt: 'keep the subject, garment and styling unchanged; shoot from a 45-degree three-quarter front-right angle, camera slightly to the right and slightly above eye level, same lighting and framing', svg: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="M18 6l-4 4"/><path d="M18 10h-4V6"/>' },
 ];
 const activeAngle = ref(null);
 function applyAngle(a) {
   const list = segmentList();
   if (activeAngle.value === a.id) {
-    // Bấm lại → gỡ segment góc chụp này khỏi prompt (text/nền studio khác còn nguyên).
     setSegments(list.filter((s) => s !== a.prompt));
     activeAngle.value = null;
     return;
   }
-  if (!list.includes(a.prompt)) list.push(a.prompt); // chưa có → nối (không ghi đè)
+  if (!list.includes(a.prompt)) list.push(a.prompt);
   setSegments(list);
   activeAngle.value = a.id;
   similarity.value = a.similarity;
 }
+
+// ── Body directive labels (kế thừa từ "Tạo ảnh 2D") ──
+const bodyHeightLabel = computed(() => { const v = store.bodyHeight; if (v <= 2) return 'Rất thấp'; if (v <= 4) return 'Hơi thấp'; if (v <= 6) return 'Trung bình'; if (v <= 8) return 'Cao'; return 'Siêu cao'; });
+const bodyBuildLabel = computed(() => { const v = store.bodyBuild; if (v <= 2) return 'Siêu gầy'; if (v <= 4) return 'Thon gọn'; if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Đầy đặn'; return 'Curvy'; });
+const bodyWaistLabel = computed(() => { const v = store.bodyWaist; if (v <= 2) return 'Thẳng'; if (v <= 4) return 'Ít eo'; if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Eo thon'; return 'Đồng hồ cát'; });
+const bodyShouldersLabel = computed(() => { const v = store.bodyShoulders; if (v <= 2) return 'Rất hẹp'; if (v <= 4) return 'Hẹp'; if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Rộng'; return 'Rất rộng'; });
+const bodyHipsLabel = computed(() => { const v = store.bodyHips; if (v <= 2) return 'Rất hẹp'; if (v <= 4) return 'Hẹp'; if (v <= 6) return 'Cân đối'; if (v <= 8) return 'Nở'; return 'Rất nở'; });
 
 async function runRefgen() {
   if (!canSubmit.value) return;
   busy.value = true;
   // Ảnh tham chiếu có thể là data:URL (canvas flattened) → backend downscaleSource xử lý.
   // Không truyền selectedModel → backend dùng model sinh ảnh đã cấu hình trong Cài đặt.
-  // Thử đồ: gửi tryon=true + body/hair từ store (kế thừa tạo ảnh 2D) để kiểm soát người mẫu.
-  const body = tryon.value ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
-  const hair = tryon.value ? { style: store.hairStyle, color: store.hairColor } : null;
-  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, tryon.value, body, hair);
+  // Thử đồ: gửi tryon=true + body/hair từ store + khuôn mặt mẫu (kế thừa cài đặt).
+  const isTryon = mode.value === 'tryon';
+  const body = isTryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
+  const hair = isTryon ? { style: store.hairStyle, color: store.hairColor } : null;
+  const items = await store.refgen(img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body, hair, isTryon ? faceModelId.value : '');
   busy.value = false;
   if (items && items.length) {
     store.toast('Đã gửi ' + items.length + ' ảnh mới — đang tạo…');
@@ -154,73 +136,142 @@ async function runRefgen() {
       <span class="rounded-full bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">i2i</span>
     </h2>
 
+    <!-- Chọn chế độ: segmented tabs (giống Card Ghép ảnh) -->
+    <div class="mt-3 grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-ink-900/60 p-1">
+      <button @click="setMode('refgen')" title="Tạo ảnh mới giống ảnh mẫu"
+              :class="mode === 'refgen' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
+              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
+        <StudioIcon name="image" size="h-4 w-4" /> Tạo ảnh mới
+      </button>
+      <button @click="setMode('tryon')" title="Dùng ảnh làm trang phục → sinh người mẫu mặc đúng đồ (rẻ hơn edit)"
+              :class="mode === 'tryon' ? 'bg-emerald-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
+              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
+        <StudioIcon name="shirt" size="h-4 w-4" /> Thử đồ
+      </button>
+    </div>
+
     <!-- Ảnh tham chiếu -->
     <div v-if="img" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
       <img :src="img" class="h-14 w-14 rounded-xl bg-ink-900 object-cover">
       <div class="min-w-0 text-xs text-cream-200">
         <p class="truncate font-semibold">{{ imgName }}</p>
-        <p class="text-cream-300/60">Ảnh tham chiếu — giữ chủ thể/phong cách/bố cục</p>
+        <p class="text-cream-300/60">{{ mode === 'tryon' ? 'Ảnh trang phục — sinh người mẫu mặc đúng đồ này' : 'Ảnh tham chiếu — giữ chủ thể/phong cách/bố cục' }}</p>
       </div>
     </div>
-    <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trong <b>Outputs</b> để làm ảnh tham chiếu.</div>
+    <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trong <b>Outputs</b> để làm {{ mode === 'tryon' ? 'trang phục' : 'ảnh tham chiếu' }}.</div>
 
-    <!-- Chip Thử đồ: dùng ảnh đang chọn làm trang phục → model sinh ảnh (rẻ hơn edit) tạo người mẫu mặc đúng đồ -->
-    <div class="mt-3">
-      <button @click="toggleTryon"
-              class="flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors"
-              :class="tryon ? 'border-emerald-400 bg-emerald-600/20 text-emerald-100' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
-        <span class="flex items-center gap-1.5"><StudioIcon name="shirt" size="h-3.5 w-3.5" /> Thử đồ (sinh ảnh mới)</span>
-        <span v-if="tryon" class="text-[10px] text-emerald-200/80">✔ Bật</span>
-        <span v-else class="text-[10px] text-cream-300/50">Rẻ hơn edit</span>
-      </button>
-      <p v-if="tryon" class="mt-1.5 rounded-xl border border-emerald-400/30 bg-emerald-900/15 px-2.5 py-1.5 text-[10px] leading-relaxed text-emerald-100/80">
-        Ảnh đang chọn sẽ làm <b>trang phục</b>. AI dùng model <b>sinh ảnh</b> (qwen-image-3.0-pro) tạo người mẫu mặc đúng đồ — <b>rẻ hơn</b> Thử đồ ảo (edit). Độ bám mẫu có thể kém hơn edit một chút.
+    <!-- ============ CHẾ ĐỘ: TẠO ẢNH MỚI (refgen) ============ -->
+    <template v-if="mode === 'refgen'">
+      <!-- Nền Studio -->
+      <div class="mt-4 flex items-center justify-between">
+        <p class="label">Nền Studio</p>
+        <span class="text-[9px] font-medium text-cream-300/40">{{ presets.length }} nền</span>
+      </div>
+      <div class="mt-1 grid grid-cols-2 gap-1.5">
+        <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
+                class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+                :class="activePreset === p.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+          <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }" :title="'Mã màu ' + p.color"></span>
+          <span class="truncate">{{ p.label }}</span>
+        </button>
+      </div>
+
+      <!-- Góc chụp -->
+      <div class="mt-4 flex items-center justify-between">
+        <p class="label">Góc chụp</p>
+        <span class="text-[9px] font-medium text-cream-300/40">{{ anglePresets.length }} góc</span>
+      </div>
+      <div class="mt-1 grid grid-cols-2 gap-1.5">
+        <button v-for="a in anglePresets" :key="a.id" @click="applyAngle(a)"
+                class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
+                :class="activeAngle === a.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+          <svg class="h-4 w-4 shrink-0 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="a.svg"></svg>
+          <span class="truncate">{{ a.label }}</span>
+        </button>
+      </div>
+
+      <!-- Mô tả -->
+      <label class="label mt-4">Mô tả ảnh mới <span class="text-cream-300/40">(để trống = tạo biến thể giống ảnh mẫu)</span></label>
+      <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ chủ thể, đổi sang nền studio tối, góc máy chếch…"></textarea>
+      <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
+
+      <!-- Độ giống ảnh mẫu -->
+      <label class="label mt-3">Độ giống ảnh mẫu</label>
+      <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+        <span class="shrink-0 font-medium text-cream-200">Giống</span>
+        <input type="range" min="0" max="100" step="5" v-model.number="similarity" class="h-2 w-full cursor-pointer accent-brand-500">
+        <span class="shrink-0 font-semibold text-cream-50">{{ similarity }}%</span>
+      </div>
+    </template>
+
+    <!-- ============ CHẾ ĐỘ: THỬ ĐỒ (tryon sinh ảnh) ============ -->
+    <template v-else>
+      <!-- Khuôn mặt mẫu (kế thừa từ cài đặt FacePreset) -->
+      <div class="mt-4">
+        <div class="flex items-center justify-between">
+          <p class="label mb-0">Khuôn mặt mẫu <span class="text-cream-300/40">(kế thừa cài đặt)</span></p>
+          <button v-if="faceModelId" @click="faceModelId = ''" class="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600/40">✕ Bỏ chọn</button>
+        </div>
+        <div class="mt-1.5 flex flex-wrap gap-1.5">
+          <button v-for="f in faces" :key="f.id" @click="faceModelId = String(f.id)"
+                  :class="String(faceModelId) === String(f.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+                  class="flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
+            <img v-if="f.image" :src="f.image" class="h-7 w-7 rounded-full object-cover ring-1 ring-white/20">
+            <span v-else class="grid h-7 w-7 place-items-center rounded-full bg-ink-700 text-[11px]">👩</span>
+            <span class="truncate">{{ f.name }}</span>
+          </button>
+          <span v-if="!faces.length" class="text-[10px] text-cream-300/50">Chưa có khuôn mặt mẫu — để trống để AI tự chọn.</span>
+        </div>
+      </div>
+
+      <!-- Mô tả pose -->
+      <label class="label mt-4">Mô tả pose / thêm yêu cầu</label>
+      <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: pose đứng tự nhiên, tay chống hông, ánh sáng studio…"></textarea>
+      <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
+
+      <!-- Body directive (kế thừa từ "Tạo ảnh 2D") -->
+      <div class="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-900/10 p-3">
+        <p class="flex items-center gap-1.5 text-xs font-semibold text-emerald-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Phom dáng người mẫu <span class="font-normal text-emerald-300/50">(kế thừa Tạo ảnh 2D)</span></p>
+        <div class="mt-2 space-y-2">
+          <div>
+            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Chiều cao</span><span class="font-semibold text-emerald-300">{{ bodyHeightLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHeight" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          </div>
+          <div>
+            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vóc dáng</span><span class="font-semibold text-emerald-300">{{ bodyBuildLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyBuild" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          </div>
+          <div>
+            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Eo</span><span class="font-semibold text-emerald-300">{{ bodyWaistLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyWaist" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          </div>
+          <div>
+            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Vai</span><span class="font-semibold text-emerald-300">{{ bodyShouldersLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyShoulders" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          </div>
+          <div>
+            <p class="mb-0.5 flex items-center justify-between text-[11px]"><span class="text-cream-200">Hông</span><span class="font-semibold text-emerald-300">{{ bodyHipsLabel }}</span></p>
+            <input type="range" min="1" max="10" step="1" v-model.number="store.bodyHips" class="h-1.5 w-full cursor-pointer accent-emerald-400">
+          </div>
+        </div>
+      </div>
+
+      <!-- Tóc (kế thừa store) -->
+      <div class="mt-2 grid grid-cols-2 gap-2">
+        <div>
+          <label class="label mb-1">Kiểu tóc</label>
+          <input v-model="store.hairStyle" type="text" maxlength="60" class="input !py-1.5 !text-xs" placeholder="vd: long straight (bỏ trống = tự do)">
+        </div>
+        <div>
+          <label class="label mb-1">Màu tóc</label>
+          <input v-model="store.hairColor" type="text" maxlength="60" class="input !py-1.5 !text-xs" placeholder="vd: jet black (bỏ trống = tự do)">
+        </div>
+      </div>
+
+      <p class="mt-2 rounded-xl border border-emerald-400/30 bg-emerald-900/15 px-2.5 py-1.5 text-[10px] leading-relaxed text-emerald-100/80">
+        Dùng model <b>sinh ảnh</b> (qwen-image-3.0-pro) tạo người mẫu mặc đúng trang phục — <b>rẻ hơn</b> Thử đồ ảo (edit). Bám mẫu có thể kém hơn edit một chút.
       </p>
-    </div>
-
-    <!-- Nền Studio -->
-    <div class="mt-4 flex items-center justify-between">
-      <p class="label">Nền Studio</p>
-      <span class="text-[9px] font-medium text-cream-300/40">{{ presets.length }} nền</span>
-    </div>
-    <div class="mt-1 grid grid-cols-2 gap-1.5">
-      <button v-for="p in presets" :key="p.id" @click="applyPreset(p)"
-              class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
-              :class="activePreset === p.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
-        <span class="h-4 w-4 shrink-0 rounded-full border border-white/25 shadow-inner ring-1 ring-black/30" :style="{ background: p.color }" :title="'Mã màu ' + p.color"></span>
-        <span class="truncate">{{ p.label }}</span>
-      </button>
-    </div>
-
-    <!-- Góc chụp -->
-    <div class="mt-4 flex items-center justify-between">
-      <p class="label">Góc chụp</p>
-      <span class="text-[9px] font-medium text-cream-300/40">{{ anglePresets.length }} góc</span>
-    </div>
-    <div class="mt-1 grid grid-cols-2 gap-1.5">
-      <button v-for="a in anglePresets" :key="a.id" @click="applyAngle(a)"
-              class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
-              :class="activeAngle === a.id ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
-        <svg class="h-4 w-4 shrink-0 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="a.svg"></svg>
-        <span class="truncate">{{ a.label }}</span>
-      </button>
-    </div>
-
-    <!-- Mô tả -->
-    <label class="label mt-4">Mô tả ảnh mới <span class="text-cream-300/40">(để trống = tạo biến thể giống ảnh mẫu)</span></label>
-    <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ chủ thể, đổi sang nền studio tối, góc máy chếch…"></textarea>
-    <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
-
-    <!-- Độ giống ảnh mẫu (ẩn khi Thử đồ — tryon cần trung thực tuyệt đối, không phải biến thể) -->
-    <label class="label mt-3">Độ giống ảnh mẫu</label>
-    <div v-if="tryon" class="rounded-2xl border border-emerald-400/30 bg-emerald-900/15 px-3 py-2.5 text-xs text-emerald-100/80">
-      <b>Trung thực tuyệt đối</b> — bám chính xác trang phục/Phụ kiện trong ảnh gốc.
-    </div>
-    <div v-else class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
-      <span class="shrink-0 font-medium text-cream-200">Giống</span>
-      <input type="range" min="0" max="100" step="5" v-model.number="similarity" class="h-2 w-full cursor-pointer accent-brand-500">
-      <span class="shrink-0 font-semibold text-cream-50">{{ similarity }}%</span>
-    </div>
+    </template>
 
     <!-- Số ảnh -->
     <label class="label mt-3">Số ảnh</label>
@@ -232,9 +283,9 @@ async function runRefgen() {
 
     <button @click="runRefgen" :disabled="!canSubmit" class="btn-brand mt-4 w-full whitespace-nowrap">
       <span v-if="busy">Đang tạo {{ variants }} ảnh…</span>
-      <span v-else>Tạo {{ variants }} ảnh mới <span class="opacity-70">· {{ store.imageCreditCost * variants }} credit</span></span>
+      <span v-else>{{ mode === 'tryon' ? 'Thử đồ ' + variants + ' bản' : 'Tạo ' + variants + ' ảnh mới' }} <span class="opacity-70">· {{ store.imageCreditCost * variants }} credit</span></span>
     </button>
-    <LoadingSpinner v-if="busy" text="AI đang tạo ảnh từ ảnh mẫu…" subtext="Quá trình này có thể mất vài giây" size="sm" />
+    <LoadingSpinner v-if="busy" :text="mode === 'tryon' ? 'AI đang tạo người mẫu mặc đồ…' : 'AI đang tạo ảnh từ ảnh mẫu…'" subtext="Quá trình này có thể mất vài giây" size="sm" />
     <p class="mt-2 text-[10px] leading-relaxed text-cream-300/40">Kết quả xuất hiện trong <b>Outputs</b> — chọn ảnh nào cũng được để xem lớn / làm ảnh gốc tiếp theo.</p>
   </div>
 </template>

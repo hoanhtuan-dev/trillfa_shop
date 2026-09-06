@@ -63,7 +63,7 @@ class ImageAIService
         // KHÔNG phải edit — model sinh ảnh (vd qwen-image-3.0-pro) nhận ảnh tham chiếu + prompt
         // và tạo một bức ảnh HOÀN TOÀN MỚI giống ảnh mẫu (không ép về kích thước nguồn, không mask).
         if ($mode === 'refgen' && $baseImage) {
-            $refUrl = $this->generateFromReference($prompt, $baseImage, $providerOverride, $modelOverride);
+            $refUrl = $this->generateFromReference($prompt, $baseImage, $providerOverride, $modelOverride, $faceRef);
             if ($refUrl) {
                 return $refUrl;
             }
@@ -859,7 +859,7 @@ class ImageAIService
      * (vd qwen-image-3.0-pro) nhận ảnh tham chiếu + prompt và tạo một bức ảnh mới giống mẫu.
      * Ưu tiên đúng model người dùng chọn (qwen-image-3.0-pro), fallback theo candidates image.
      */
-    protected function generateFromReference(string $prompt, string $imageUrl, ?string $providerOverride = null, ?string $modelOverride = null): ?string
+    protected function generateFromReference(string $prompt, string $imageUrl, ?string $providerOverride = null, ?string $modelOverride = null, ?string $faceRefUrl = null): ?string
     {
         $source = $this->imageDataUri($imageUrl);
         if (! $source) {
@@ -867,6 +867,10 @@ class ImageAIService
 
             return null;
         }
+
+        // Kế thừa khuôn mặt mẫu (FacePreset): nếu có ảnh khuôn mặt, gửi nó làm ảnh tham chiếu ĐẦU TIÊN
+        // (trước ảnh trang phục) để model sinh ảnh tạo khuôn mặt người mẫu giống mẫu đã chọn.
+        $faceUri = $faceRefUrl ? $this->imageDataUri($faceRefUrl) : null;
 
         $candidates = collect(studio_model_candidates('image'))->values();
         if ($providerOverride && $modelOverride) {
@@ -886,9 +890,15 @@ class ImageAIService
 
             foreach (studio_candidate_key($c, 'image') as $key) {
                 $base = dashscope_base_url($key).'/api/v1';
-                logger()->info('RefGen attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base]);
+                logger()->info('RefGen attempt', ['model' => $model, 'key_prefix' => substr($key, 0, 8), 'base' => $base, 'face_ref' => (bool) $faceUri]);
 
-                $url = $this->postMultimodalEdit($model, $base, $key, [['image' => $source], ['text' => $prompt]]);
+                // Content: face ref (nếu có) trước, rồi ảnh trang phục (source), rồi prompt.
+                $content = [];
+                if ($faceUri) { $content[] = ['image' => $faceUri]; }
+                $content[] = ['image' => $source];
+                $content[] = ['text' => $prompt];
+
+                $url = $this->postMultimodalEdit($model, $base, $key, $content);
                 if ($url) {
                     $this->lastProvider = $provider;
                     $this->lastModel = $model;
@@ -904,6 +914,17 @@ class ImageAIService
                 }
                 if ($status === 401) {
                     continue; // key lỗi → thử key kế tiếp
+                }
+                // Model không nhận nhiều ảnh (face+source) → thử lại chỉ với ảnh trang phục.
+                if ($faceUri && $this->editModelRejectsMultiImage()) {
+                    logger()->info('RefGen retry without face ref', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                    $url = $this->postMultimodalEdit($model, $base, $key, [['image' => $source], ['text' => $prompt]]);
+                    if ($url) {
+                        $this->lastProvider = $provider;
+                        $this->lastModel = $model;
+                        logger()->info('RefGen succeeded (no face ref)', ['model' => $model, 'key_prefix' => substr($key, 0, 8)]);
+                        return $this->storeRemoteImage($url);
+                    }
                 }
                 break; // 404/403/khác → không đập các key còn lại
             }

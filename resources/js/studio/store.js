@@ -389,14 +389,15 @@ export const useStudioStore = defineStore('studio', {
     // KHÁC reimagine/edit: dùng model SINH ẢNH (mặc định qwen-image-3.0-pro) + ảnh tham chiếu
     // làm base → tạo bức ảnh mới giống mẫu theo % tương đồng, không sửa trên ảnh gốc.
     // tryon=true (chip "Thử đồ"): gửi 1 ảnh trang phục → sinh ảnh người mẫu mặc đúng đồ đó
-    // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body/hair directive kiểm soát người mẫu.
-    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, hair = null) {
+    // (rẻ hơn tryon-by-edit, dùng model sinh ảnh). Kế thừa body/hair directive + khuôn mặt mẫu (faceModelId).
+    async refgen(image, prompt = '', similarity = 70, variants = 1, model = null, tryon = false, body = null, hair = null, faceModelId = '') {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {
         const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
         if (model && model.provider && model.model) { payload.provider = model.provider; payload.model = model.model; }
         if (tryon) {
           payload.tryon = true;
+          if (faceModelId) payload.face_model_id = faceModelId;
           // Kế thừa body/hair directive (tạo ảnh 2D) — chỉ gửi khi người dùng đã chỉnh (khác default 5).
           if (body) {
             if (body.height != null) payload.body_height = Number(body.height);

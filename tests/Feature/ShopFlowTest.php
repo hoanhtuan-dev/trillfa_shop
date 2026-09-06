@@ -941,6 +941,21 @@ class ShopFlowTest extends TestCase
         // Generation được tạo đúng mode=refgen (poll không 500; stub offline có thể failed nhưng không nằm trong scope test này).
         $this->getJson('/studio/generations/'.$gen->id)->assertOk();
 
+        // Kế thừa khuôn mặt mẫu (FacePreset): tạo preset → gửi face_model_id → prompt chứa mô tả khuôn mặt.
+        $fp = \App\Models\FacePreset::create([
+            'name' => 'Test Face', 'description' => 'young woman with round face and wispy bangs', 'ethnicity' => 'Vietnamese', 'image' => null, 'sort' => 0, 'enabled' => true,
+        ]);
+        $f = $this->postJson('/studio/refgen', [
+            'image' => '/storage/studio/garment.jpg',
+            'prompt' => 'pose đứng tự nhiên',
+            'variants' => 1,
+            'tryon' => true,
+            'face_model_id' => 'fp'.$fp->id,
+        ])->assertOk();
+        $fgen = Generation::find($f->json('items.0.generation_id'));
+        $this->assertStringContainsString('Model face: young woman with round face and wispy bangs', (string) $fgen->prompt);
+        $this->assertSame('fp'.$fp->id, $f->json('face_model_id'));
+
         // Không gửi tryon → refgen thường (prompt "Create a brand-new image based on the provided reference image").
         $c = $this->postJson('/studio/refgen', [
             'image' => '/storage/studio/sample.jpg',

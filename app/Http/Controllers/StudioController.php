@@ -587,17 +587,32 @@ class StudioController extends Controller
             'body_hips' => ['nullable', 'integer', 'min:1', 'max:10'],
             'hair_style' => ['nullable', 'string', 'max:100'],
             'hair_color' => ['nullable', 'string', 'max:100'],
+            // Kế thừa khuôn mặt mẫu (FacePreset) từ cài đặt — khi tryon chọn khuôn mặt, backend
+            // resolve qua VirtualTryOnService::pickModel() → chèn mô tả khuôn mặt + ảnh khuôn mặt
+            // (face_ref) vào prompt refgen để kiểm soát khuôn mặt người mẫu.
+            'face_model_id' => ['nullable', 'string', 'max:80'],
         ]);
 
         $similarity = (int) ($data['similarity'] ?? 70);
         $userPrompt = trim((string) ($data['prompt'] ?? ''));
         $isTryon = ! empty($data['tryon']);
 
+        // Resolve khuôn mặt mẫu (nếu tryon + chọn face) — kế thừa từ cài đặt FacePreset.
+        $faceDesc = null;
+        $faceImageUrl = null;
+        if ($isTryon && ! empty($data['face_model_id'])) {
+            $face = app(\App\Services\VirtualTryOnService::class)->pickModel((string) $data['face_model_id']);
+            if ($face) {
+                $faceDesc = trim((string) ($face['desc'] ?? ''));
+                $faceImageUrl = ! empty($face['image']) ? (string) $face['image'] : null;
+            }
+        }
+
         if ($isTryon) {
             // Tryon bằng model SINH ẢNH (qwen-image-3.0-pro): không edit ảnh gốc mà sinh ảnh mới
             // dựa ảnh tham chiếu. Prompt nêu rõ "dựa trang phục trong ảnh tham chiếu, tạo ảnh người
             // mẫu mặc đúng trang phục đó". Ngôn ngữ DƯƠNG (bám mẫu) — tránh model tự thiết kế lại đồ.
-            // Kế thừa body/hair directive (tạo ảnh 2D) để kiểm soát người mẫu.
+            // Kế thừa body/hair directive (tạo ảnh 2D) + khuôn mặt mẫu (FacePreset) để kiểm soát người mẫu.
             $bodyDirective = $this->buildBodyDirective($data);
             $hairDirective = $this->buildHairDirective($data);
             $finalPrompt = 'Create a brand-new photorealistic fashion photo of a model WEARING THE EXACT GARMENT shown in the reference image. '
@@ -607,6 +622,7 @@ class StudioController extends Controller
                 .'Single clean body — one model, one pose, no double exposure, no ghost, no overlapping or duplicated limbs. '
                 .'The model fills about 75-80% of the frame height with small headroom and footroom. '
                 .'Sharp, in-focus, photorealistic, clean high-resolution fashion photo, even studio lighting. No blur, no noise, no banding, no artifacts, no text, no watermark.'
+                .($faceDesc !== null && $faceDesc !== '' ? ' Model face: '.$faceDesc.'. ' : '')
                 .($bodyDirective !== '' ? $bodyDirective : '')
                 .($hairDirective !== '' ? $hairDirective : '')
                 .($userPrompt !== '' ? ' '.$userPrompt : '');
@@ -634,6 +650,8 @@ class StudioController extends Controller
                 'mode' => 'refgen',    // RenderImageJob → generate(mode='refgen') → nhánh i2i.
                 'provider' => $provider !== '' ? $provider : null,
                 'model' => $model !== '' ? $model : null,
+                // Kế thừa khuôn mặt mẫu: ảnh khuôn mặt (nếu có) được gửi kèm như face_ref → generateFromReference.
+                'face_ref' => $faceImageUrl,
             ], $cost)->getData(true);
         }
 
@@ -641,6 +659,7 @@ class StudioController extends Controller
             'items' => $items,
             'credits_left' => auth()->user()->fresh()->credits_balance,
             'tryon' => $isTryon ? true : null,
+            'face_model_id' => $isTryon && ! empty($data['face_model_id']) ? $data['face_model_id'] : null,
         ]);
     }
 
