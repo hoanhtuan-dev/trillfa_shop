@@ -28,7 +28,7 @@ return [
     'translate_model' => env('STUDIO_TRANSLATE_MODEL', 'gemini-2.5-flash'),
     'stylist_model' => env('STUDIO_STYLIST_MODEL', 'qwen3.8-flash'), // Model ✨ Thuật sỹ ảo (Qwen multimodal trước)
     'tryon_model' => env('STUDIO_TRYON_MODEL', ''), // DEPRECATED — wanx-virtualmodel không khả dụng trên host intl; tryon thực tế chạy qua qwen-image-edit*
-    'tryon_best_of' => (int) env('STUDIO_TRYON_BEST_OF', 3), // best-of-N mặc định cho Thử đồ ảo: 2-6 bản, chọn bản đẹp nhất
+    'tryon_best_of' => (int) env('STUDIO_TRYON_BEST_OF', 2), // best-of-N mặc định cho Thử đồ ảo: 1-2 bản (2 = so sánh + chọn bản bám mẫu tốt hơn bằng QA)
     'tryon_score' => (bool) env('STUDIO_TRYON_SCORE', true),  // chấm điểm QA tự động cho từng bản thử đồ (qwen vision, fail êm khi rate-limit)
     'tryon_garment_vision' => (bool) env('STUDIO_TRYON_GARMENT_VISION', true), // đọc trang phục @image1 bằng vision → mô tả chi tiết → chèn vào prompt (bám mẫu tốt hơn)
     'swap_model' => env('STUDIO_SWAP_MODEL', ''), // '' = dùng chung qwen_edit_model (giống Inpaint: qwen-image-edit-max)

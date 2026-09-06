@@ -649,7 +649,8 @@ class StudioController extends Controller
             'style' => ['nullable', 'string', 'max:400'],
             'ornament_level' => ['nullable', 'integer', 'min:0', 'max:10'],
             // Thử đồ ảo (best-of-N + chấm điểm): số bản candidates tạo ra, chọn bản đẹp nhất.
-            'best_of' => ['nullable', 'integer', 'min:1', 'max:6'],
+            // Tối đa 2 bản — 1 bản trung thực tuyệt đối, 2 bản để so sánh + chọn bản đẹp hơn bằng QA.
+            'best_of' => ['nullable', 'integer', 'min:1', 'max:2'],
             'tryon_score' => ['nullable', 'boolean'],
         ]);
 
@@ -669,10 +670,11 @@ class StudioController extends Controller
             $isTryon ? (int) studio_config('edit_source_max', 2560) : 1600
         );
         $cost = (int) studio_config('image_credits', 1);
-        // Thử đồ ảo: best_of = số bản candidates (2-6, mặc định theo config); nếu chỉ gửi variants
-        // (UI cũ) thì tôn trọng variants; biến thể cho chế độ thường giữ nguyên.
+        // Thử đồ ảo: best_of = số bản candidates (1-2, mặc định theo config). Giới hạn 2 để
+        // kiểm soát chi phí + ưu tiên độ trung thực: 1 bản hoặc 2 bản so sánh rồi chọn bản tốt nhất.
+        // Nếu chỉ gửi variants (UI cũ) thì tôn trọng variants; biến thể cho chế độ thường giữ nguyên.
         $variants = $isTryon
-            ? max(1, min(6, (int) ($data['best_of'] ?? $data['variants'] ?? studio_config('tryon_best_of', 3))))
+            ? max(1, min(2, (int) ($data['best_of'] ?? $data['variants'] ?? studio_config('tryon_best_of', 2))))
             : max(1, min(4, (int) ($data['variants'] ?? 1)));
         $tryonScore = $isTryon && ($data['tryon_score'] ?? studio_config('tryon_score', true));
         $isOutfit = $mode === 'outfit';
@@ -689,12 +691,9 @@ class StudioController extends Controller
             if ($isOutfit && $override === '' && $variants > 1) {
                 $variantPrompt .= ' '.$this->outfitVariationDirective($i);
             }
-            // Thử đồ ảo best-of-N: mỗi candidate một trọng tâm diễn đạt khác để tăng độ đa dạng
-            // (model edit không deterministic — cùng prompt vẫn ra bản khác, nhưng variant giúp
-            // tránh trường hợp model "mắc kẹt" ở một kiểu lỗi chung). KHÔNG gợi ý thay đổi thiết kế.
-            if ($isTryon && $variants > 1 && $override === '') {
-                $variantPrompt .= ' '.$this->tryonVariationDirective($i);
-            }
+            // Thử đồ ảo: 2 bản dùng CHÍNH XÁC cùng một prompt (không thêm directive đa dạng) —
+            // mục tiêu là độ TRUNG THỰC tuyệt đối, không phải khám phá đa dạng; 2 bản chỉ để vision
+            // QA chấm rồi chọn bản bám mẫu trang phục/phụ kiện tốt hơn.
             $items[] = $this->queueGeneration('image', [
                 'prompt' => $variantPrompt,
                 'base_image' => $base,
@@ -765,25 +764,6 @@ class StudioController extends Controller
             1 => 'Variation B — modern relaxed: softer drape, relaxed contemporary proportions, effortless chic.',
             2 => 'Variation C — bold structured: sharp tailoring, architectural volume, high-impact editorial stance.',
             3 => 'Variation D — soft fluid: draped flowing lines, graceful movement, romantic fluidity.',
-            default => '',
-        };
-    }
-
-    /**
-     * Chỉ thị biến thể cho Thử đồ ảo best-of-N: mỗi candidate nhấn một trọng tâm khác nhau
-     * (giữ đồ / đúng dáng / chân thực / bố cục) để model không "mắc kẹt" ở một kiểu lỗi chung —
-     * NHƯNG tuyệt đối KHÔNG gợi ý thay đổi thiết kế trang phục. Không dùng @imageN (đã đi qua
-     * tagMap) — chỉ nói chung chung bằng từ mô tả.
-     */
-    private function tryonVariationDirective(int $i): string
-    {
-        return match ($i % 6) {
-            0 => ' Emphasis: reproduce the garment EXACTLY — identical colors, prints, fabric, silhouette and length; then match the pose. Do NOT redesign, recolor or simplify any part of the garment.',
-            1 => ' Emphasis: copy the outfit details 100% faithfully (neckline, sleeves, hemline, waistline, closures, trims) while accurately reproducing the body stance and proportions.',
-            2 => ' Emphasis: photorealistic natural blend — sharp face, coherent lighting, seamless garment fit, exact pose, NO ghosting or double-exposure of the original body.',
-            3 => ' Emphasis: balanced fashion composition — clean full-body framing, natural pose, flawless garment rendering with every accessory placed correctly.',
-            4 => ' Emphasis: preserve every accessory and detail — shoes, handbag, belt, earrings, hat, scarf, jewelry — exactly as in the garment image, correct color and placement.',
-            5 => ' Emphasis: natural skin texture and fabric drape — photorealistic material, wrinkles, folds, no airbrushed or plastic look; keep the garment color hue, saturation and brightness exact.',
             default => '',
         };
     }
@@ -902,18 +882,20 @@ class StudioController extends Controller
             $garmentDesc = ((bool) studio_config('tryon_garment_vision', true))
                 ? $this->garmentDescription((string) ($imgs[0] ?? ''))
                 : null;
-            $finalPrompt = 'Virtual try-on: dress the model in the EXACT garment and every accessory shown in @image1 — identical colors, prints, patterns, fabric, silhouette, length and details. '
+            $finalPrompt = 'Virtual try-on: dress the model in the EXACT garment and every accessory shown in @image1 — this is a commercial product photo, the garment IS the product and must be reproduced with pixel-level fidelity. '
+                .'FORBIDDEN — do NOT add, remove, invent, simplify, restyle, recolor, re-tint, re-shade or change ANY garment, accessory or detail: same colors (exact hue, saturation, brightness, no color shift), same prints, same patterns, same fabric, same texture, same seams, same buttons/zippers, same length, same neckline, same sleeve length/shape, same hemline, same waistline, same collar, same straps, same pockets, same pleats, same ruffles, same belt, same bow, same brooch, same stitching. '
                 .'CRITICAL — preserve the ORIGINAL GARMENT FIT (tight/loose/cropped/oversized/draped) exactly as it appears in @image1: if the garment is tight-fitting, it must be tight on the body; if it is loose or oversized, it must drape loosely; if it is cropped (shows midriff), keep the midriff exposed — do NOT stretch, shrink, tighten or loosen the garment. '
+                .'Every accessory worn or held in @image1 (shoes, handbag, belt, hat, scarf, watch, earrings, necklace, sunglasses, hair accessories) must appear on the model in the SAME color, SAME size and SAME placement (shoes on feet, handbag on shoulder or in hand, watch on wrist, earrings on ears, belt at waist, hat on head). Do NOT omit ANY accessory, do NOT add any accessory not in @image1, do NOT recolor any accessory. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'ANALYZE the garment image @image1 deeply and reproduce EVERY visible feature faithfully: neckline, sleeve length and shape, hemline, waistline, buttons, zippers, pockets, pleats, ruffles, collar, straps, length, and any accessory already on the garment (belt, bow, brooch) — keep them all identical, correctly positioned and proportioned. Do NOT add, remove, or invent any garment detail that is not in the source. '
                 .($garmentDesc ? 'GARMENT REFERENCE (verified visual analysis of @image1 — reproduce these EXACT features, do NOT invent or change anything): '.$garmentDesc.' ' : '')
                 .'REMOVE any text, watermark, logo, brand label, typography or printed graphics from the garment — render clean, plain fabric without any writing or marks. '
                 .'CRITICAL — single clean pose, no ghosting: completely REPLACE the original person/body in @image1 with a NEW model in the target pose; do NOT blend, superimpose, or leave any ghost, double-exposure, or faint overlapping outline of the original pose. The final image must show ONLY ONE crisp, clean body pose with no duplicated limbs, no translucent leftovers, no motion blur. '
                 .'Reproduce the EXACT body pose, stance, arm/leg placement, facing direction and posture from the pose reference in @image2 — do NOT copy the garment or the person from the pose image; keep the model\'s face, hairstyle and skin tone natural and consistent with @image2. '
-                .'Render a vertically-balanced FULL BODY from head to toe (not cropped), with natural elongated fashion-model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat or stubby. '
+                .'Render a FULL BODY from head to toe (not cropped) with anatomically CORRECT, standard human body proportions — head-to-body ratio about 1:7.5, symmetrical shoulders and hips, natural spine alignment, straight limb length (arms reach mid-thigh), correct joint placement (shoulders/elbows/wrists/hips/knees/ankles), fingers fully formed (5 per hand, no merged/extra/missing fingers), feet plantar-grade and correctly posed. Do NOT elongate, shorten, compress or distort any body segment; do NOT make the figure short, squat, stubby or unnaturally stretched. Avoid deformed hands, extra/missing fingers, twisted limbs, fused joints, dislocated shoulders, or unnatural spine curvature. '
                 .'The model should occupy about 75-80% of the frame height with headroom above and footroom below. '
                 .'Keep the original background of @image1 UNCHANGED — do NOT modify, replace or redraw the background.';
-            $finalPrompt .= ' Avoid: cropped body, wrong pose, deformed hands, extra garments or accessories not in @image1, wrong colors, wrong fit (garment tighter or looser than original), blurry, low quality, double exposure, ghosting, overlapping limbs, duplicated body parts, motion blur, text, watermark, logo, brand label. '
+            $finalPrompt .= ' Avoid: cropped body, wrong pose, deformed hands, extra/missing/merged fingers, wrong number of limbs, twisted or fused joints, dislocated shoulders, unnaturally elongated or shortened limbs, extra garments or accessories not in @image1, missing accessories from @image1, wrong colors (any hue/saturation/brightness shift), recolored garment, recolored accessories, wrong fit (garment tighter or looser than original), redesigned details, invented prints/patterns, blurry, low quality, double exposure, ghosting, overlapping limbs, duplicated body parts, motion blur, text, watermark, logo, brand label. '
                 .'Photorealistic, full body, studio quality, high fashion, consistent lighting. '.$userPrompt;
         } elseif ($isFaceSwap) {
             // Thay khuôn mặt: @image1 = người mẫu (base), @image2 = khuôn mặt tham chiếu.

@@ -10,7 +10,8 @@ const store = useStudioStore();
 const prompt = ref('');
 const variants = ref(1);
 // Thử đồ ảo best-of-N + chấm điểm: số bản candidates + tự chấm điểm từng bản (vision QA).
-const bestOf = ref(3);
+// Giới hạn 1-2 bản: 1 bản trung thực tuyệt đối, 2 bản so sánh rồi chọn bản bám mẫu tốt hơn.
+const bestOf = ref(2);
 const scoring = ref(true);
 const creativeLevel = ref(8);   // mức độ sáng tạo (1–10) — dùng cho chế độ Ghép Trang Phục
 const style = ref('');          // phong cách thiết kế (nhập tự do) — dùng cho chế độ Ghép Trang Phục
@@ -452,11 +453,11 @@ function barLabel(k) {
           </label>
         </div>
         <div class="mt-1.5 flex items-center gap-1.5">
-          <button v-for="n in [2,3,4,6]" :key="n" @click="bestOf = n"
+          <button v-for="n in [1,2]" :key="n" @click="bestOf = n"
                   :class="bestOf === n ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
                   class="h-8 rounded-full px-3 text-xs font-semibold transition-colors">{{ n }}</button>
         </div>
-        <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Tạo N bản khác nhau rồi <b class="text-brand-300">tự chọn bản đẹp nhất</b> (ưu tiên điểm "Giữ đồ"). N lớn = tốn {{ store.imageCreditCost }} credit/bản ({{ bestOf }} bản = {{ bestOf * store.imageCreditCost }} credits).</p>
+        <p class="mt-1 text-[10px] leading-relaxed text-cream-300/50">Tạo {{ bestOf }} bản rồi <b class="text-brand-300">tự chọn bản bám mẫu tốt nhất</b> (ưu tiên điểm "Giữ đồ"). {{ bestOf }} bản = {{ bestOf * store.imageCreditCost }} credits. Nhiều bản tăng chi phí mà không tăng độ trung thực — ưu tiên 1-2 bản.</p>
         <!-- Phom dáng trang phục (fit) — chỉ thị rõ ràng để model giữ đúng silhouette -->
         <div class="mt-2 flex items-center justify-between gap-2">
           <span class="text-xs text-cream-200">Phom dáng <span class="text-cream-300/50">(fit)</span></span>

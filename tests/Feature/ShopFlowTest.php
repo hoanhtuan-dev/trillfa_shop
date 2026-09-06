@@ -988,19 +988,20 @@ class ShopFlowTest extends TestCase
         $admin = User::where('email', 'admin@trillfa.com')->first();
         $this->actingAs($admin);
 
-        // Thử đồ ảo best-of-N: best_of=3 phải tạo 3 generation (mỗi bản 1 meta riêng: mode=tryon,
-        // tryon_batch chung, candidate_idx 0..2, tryon_score=true — để RenderImageJob chấm điểm sau khi tạo).
+        // Thử đồ ảo best-of-N: best_of=2 phải tạo 2 generation (mỗi bản 1 meta riêng: mode=tryon,
+        // tryon_batch chung, candidate_idx 0..1, tryon_score=true — để RenderImageJob chấm điểm sau khi tạo).
+        // Giới hạn 2 bản để ưu tiên độ trung thực tuyệt đối (không thêm directive đa dạng).
         $r = $this->postJson('/studio/compose', [
             'images' => ['/storage/studio/garment.jpg', '/storage/studio/pose.jpg'],
             'prompt' => 'mặc trang phục lên người mẫu',
             'mode' => 'tryon',
-            'best_of' => 3,
+            'best_of' => 2,
             'tryon_score' => true,
         ])->assertOk();
 
         $items = $r->json('items');
-        $this->assertCount(3, $items);
-        $this->assertSame(3, $r->json('best_of'));
+        $this->assertCount(2, $items);
+        $this->assertSame(2, $r->json('best_of'));
 
         $batchIds = [];
         foreach ($items as $i => $item) {
@@ -1008,7 +1009,7 @@ class ShopFlowTest extends TestCase
             $this->assertNotNull($gen);
             $meta = $gen->meta ?? [];
             $this->assertSame('tryon', $meta['mode'] ?? null);
-            $this->assertSame(3, $meta['best_of'] ?? null);
+            $this->assertSame(2, $meta['best_of'] ?? null);
             $this->assertSame($i, $meta['candidate_idx'] ?? null);
             $this->assertTrue((bool) ($meta['tryon_score'] ?? false));
             $this->assertNotEmpty($meta['tryon_batch'] ?? '');
@@ -1039,6 +1040,40 @@ class ShopFlowTest extends TestCase
             'variants' => 3,
         ])->assertOk();
         $this->assertCount(3, $c3->json('items'));
+
+        // Regression: tryon best_of vượt giới hạn 1-2 bị TỪ CHỐI (422) — khống chế số bản.
+        $this->postJson('/studio/compose', [
+            'images' => ['/storage/studio/garment.jpg', '/storage/studio/pose.jpg'],
+            'prompt' => 'mặc trang phục lên người mẫu',
+            'mode' => 'tryon',
+            'best_of' => 6,
+            'tryon_score' => true,
+        ])->assertStatus(422);
+
+        // UI cũ gửi variants=4 (không gửi best_of) → clamp về 2 bản (giới hạn 1-2).
+        $legacy = $this->postJson('/studio/compose', [
+            'images' => ['/storage/studio/garment.jpg', '/storage/studio/pose.jpg'],
+            'prompt' => 'mặc trang phục lên người mẫu',
+            'mode' => 'tryon',
+            'variants' => 4,
+            'tryon_score' => true,
+        ])->assertOk();
+        $this->assertCount(2, $legacy->json('items'));
+        $this->assertSame(2, $legacy->json('best_of'));
+
+        // tryon best_of = 1 tạo đúng 1 bản (không có batch, không candidate_idx).
+        $single = $this->postJson('/studio/compose', [
+            'images' => ['/storage/studio/garment.jpg', '/storage/studio/pose.jpg'],
+            'prompt' => 'mặc trang phục lên người mẫu',
+            'mode' => 'tryon',
+            'best_of' => 1,
+            'tryon_score' => true,
+        ])->assertOk();
+        $this->assertCount(1, $single->json('items'));
+        $this->assertSame(1, $single->json('best_of'));
+        $sg = Generation::find($single->json('items.0.generation_id'));
+        $this->assertArrayNotHasKey('tryon_batch', $sg->meta ?? []);
+        $this->assertArrayNotHasKey('candidate_idx', $sg->meta ?? []);
     }
 
     public function test_studio_outfit_settings_save_and_reload(): void
