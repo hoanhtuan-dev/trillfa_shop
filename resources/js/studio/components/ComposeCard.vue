@@ -84,12 +84,8 @@ const slotRoles = computed(() => mode.value === 'faceswap'
     : ['Nền chính', 'Ảnh ghép', 'Ảnh ghép']);
 
 // Vòng viền màu theo vai trò slot
-function slotRing() {
-  return 'border-brand-500';
-}
-function slotRingEmpty() {
-  return 'border-dashed border-ink-700 hover:border-brand-400';
-}
+const slotRingClass = 'border-brand-500';
+const slotRingEmptyClass = 'border-dashed border-ink-700 hover:border-brand-400';
 
 const promptPlaceholder = computed(() => mode.value === 'outfit'
   ? 'VD: lai tạo trang phục từ phom dáng của @image1 và màu sắc của @image2…'
@@ -259,7 +255,7 @@ function saveSettings() {
     <div class="mt-3 grid grid-cols-3 gap-2">
       <button v-for="i in 3" :key="i" @click="openSlot(i - 1)" title="Bấm để tải/chọn ảnh"
               class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-xl border transition"
-              :class="selected[i-1] ? slotRing(i-1) + ' bg-ink-900' : slotRingEmpty(i-1) + ' bg-ink-900/40'">
+              :class="selected[i-1] ? slotRingClass + ' bg-ink-900' : slotRingEmptyClass + ' bg-ink-900/40'">
         <template v-if="selected[i-1]">
           <img :src="selected[i-1].url" class="h-full w-full object-cover" @error="onSlotImgError(i-1)">
           <span v-if="slotImgError[i-1]" class="absolute inset-0 grid place-items-center bg-ink-900 text-2xl" title="Ảnh không tải được — bấm × để bỏ">🖼️</span>

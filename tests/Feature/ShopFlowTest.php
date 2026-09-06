@@ -1057,7 +1057,7 @@ class ShopFlowTest extends TestCase
             'mode' => 'tryon',
         ])->assertStatus(422);
 
-        // Chế độ thường vẫn giữ hành vi biến thể cũ (không best_of, không tryon metadata).
+        // Chế độ thường vẫn giữ hành vi biến thể cũ.
         $c = $this->postJson('/studio/compose', [
             'images' => ['/storage/studio/a.jpg', '/storage/studio/b.jpg'],
             'prompt' => 'giữ nền, đặt cô gái vào studio',

@@ -7,21 +7,16 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   title: { type: String, default: 'Thư viện ảnh nguồn' },
   mode: { type: String, default: 'multi' }, // 'multi' | 'pick'
-  includePoses: { type: Boolean, default: false },
   includeOutput: { type: Boolean, default: true },
 });
 const emit = defineEmits(['update:modelValue', 'pick', 'add']);
 
 const refs = ref([]);
-const poses = ref([]);
-const posesLoading = ref(false);
-const poseImgError = ref({}); // pose ảnh bị lỗi (404) → hiện icon fallback
 const query = ref('');
 const sortKey = ref('newest');
 const gridCols = ref(4);
 const selRefs = ref([]);
 const selOutput = ref([]);
-const selPoses = ref([]);
 const fileRef = ref(null);
 const uploading = ref(false);
 
@@ -33,20 +28,12 @@ function close() { emit('update:modelValue', false); }
 async function loadRefs() {
   try { const r = await fetch('/studio/ref-images?_=' + Date.now(), { headers: { Accept: 'application/json' } }); const d = await r.json(); refs.value = d.items || []; } catch (e) { refs.value = []; }
 }
-async function loadPoses() {
-  if (!props.includePoses) { poses.value = []; return; }
-  posesLoading.value = true;
-  poseImgError.value = {};
-  try { const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } }); const d = await r.json(); poses.value = d.items || []; } catch (e) { poses.value = []; } finally { posesLoading.value = false; }
-}
-
 watch(() => props.modelValue, (open) => {
   if (open) {
     query.value = '';
     sortKey.value = 'newest';
-    selRefs.value = []; selOutput.value = []; selPoses.value = [];
+    selRefs.value = []; selOutput.value = [];
     loadRefs();
-    loadPoses();
   }
 });
 
@@ -99,20 +86,20 @@ function clickItem(item) {
 
 function toggle(item) {
   const key = item.key || item.name || item.url;
-  const list = item.kind === 'pose' ? selPoses : item.kind === 'output' ? selOutput : selRefs;
+  const list = item.kind === 'output' ? selOutput : selRefs;
   const i = list.value.findIndex((x) => (x.key || x.name || x.url) === key);
   if (i >= 0) list.value.splice(i, 1);
   else list.value.push(item);
 }
 const isSel = (item) => {
   const key = item.key || item.name || item.url;
-  const list = item.kind === 'pose' ? selPoses : item.kind === 'output' ? selOutput : selRefs;
+  const list = item.kind === 'output' ? selOutput : selRefs;
   return list.value.some((x) => (x.key || x.name || x.url) === key);
 };
-const totalSel = computed(() => selRefs.value.length + selOutput.value.length + selPoses.value.length);
+const totalSel = computed(() => selRefs.value.length + selOutput.value.length);
 
 function confirmMulti() {
-  const all = [...selRefs.value, ...selOutput.value, ...selPoses.value];
+  const all = [...selRefs.value, ...selOutput.value];
   if (!all.length) return;
   emit('add', all);
   close();
@@ -158,7 +145,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
           <div class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600/15 text-brand-300"><svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
           <div>
             <p class="text-sm font-semibold text-cream-100">{{ title }}</p>
-            <p class="text-[11px] text-cream-300/60">{{ refs.length + output.length + poses.length }} ảnh<template v-if="query"> · “{{ query }}”</template></p>
+            <p class="text-[11px] text-cream-300/60">{{ refs.length + output.length }} ảnh<template v-if="query"> · “{{ query }}”</template></p>
           </div>
         </div>
         <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -171,22 +158,6 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
       </label>
 
       <div class="scrollbar-hide -mr-1 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-        <!-- Pose (dáng) -->
-        <template v-if="includePoses">
-          <p class="mb-1.5 text-xs font-semibold text-cream-200">🧍 Pose (dáng)</p>
-          <div v-if="posesLoading" class="mb-3 flex items-center gap-2 py-2 text-[11px] text-cream-300/50">
-            <span class="h-3 w-3 animate-spin rounded-full border border-brand-300 border-t-transparent"></span> Đang tải dáng…
-          </div>
-          <div v-else-if="poses.length" class="mb-3 grid gap-2" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
-            <div v-for="p in poses" :key="'pose-' + p.id" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSel({ ...p, kind: 'pose', key: 'pose-' + p.id, url: p.image, name: p.name }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" style="padding-bottom: 133%" @click="clickItem({ key: 'pose-' + p.id, url: p.image, name: p.name, skeleton: p.skeleton, kind: 'pose' })">
-              <img v-if="p.image && !poseImgError[p.id]" :src="p.image" class="absolute inset-0 h-full w-full bg-ink-900 object-cover object-top" loading="lazy" alt="" @error="poseImgError[p.id] = true">
-              <span v-if="!p.image || poseImgError[p.id]" class="absolute inset-0 grid place-items-center bg-ink-800 text-2xl" :title="'Dáng: ' + p.name">🧍</span>
-              <span class="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span>
-            </div>
-          </div>
-          <p v-else class="mb-3 text-[11px] text-cream-300/50">Chưa có dáng mẫu — tải ảnh dáng của riêng bạn từ mục "Tải ảnh mới".</p>
-        </template>
-
         <!-- Kết quả (output library) -->
         <template v-if="includeOutput && output.length">
           <p class="mb-1.5 text-xs font-semibold text-cream-200">🖼 Ảnh kết quả (output library)</p>
