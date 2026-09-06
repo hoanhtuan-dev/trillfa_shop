@@ -43,6 +43,7 @@ class VirtualTryOnService
                     'name' => $p->name,
                     'ethnicity' => $p->ethnicity ?: 'Vietnamese female',
                     'image' => studio_image_url($p->image), // may be null (text-only preset)
+                    'thumb' => studio_image_thumb_url($p->image),
                     'desc' => $p->description,
                     'preset' => true,
                 ];
@@ -51,6 +52,7 @@ class VirtualTryOnService
 
         return array_map(function ($m) {
             $m['image'] = studio_image_url($m['image']);
+            $m['thumb'] = studio_image_thumb_url($m['image'] ?? null);
             return $m;
         }, $this->builtinFacePresets());
     }
@@ -99,6 +101,7 @@ class VirtualTryOnService
                     'name' => $p->name,
                     'skeleton' => $p->description,
                     'image' => studio_image_url($p->image ?: $this->builtinPoseImageByName($p->name)),
+                    'thumb' => studio_image_thumb_url($p->image ?: $this->builtinPoseImageByName($p->name)),
                     'preset' => true,
                 ];
             })->values()->all();
@@ -106,6 +109,7 @@ class VirtualTryOnService
 
         return array_map(function ($p) {
             $p['image'] = studio_image_url($p['image']);
+            $p['thumb'] = studio_image_thumb_url($p['image'] ?? null);
             return $p;
         }, $this->builtinPosePresets());
     }

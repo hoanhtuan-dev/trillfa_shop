@@ -279,7 +279,7 @@ async function runRefgen() {
           <button v-for="f in faces" :key="f.id" @click="faceModelId = (String(faceModelId) === String(f.id)) ? '' : String(f.id)"
                   :class="String(faceModelId) === String(f.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                   class="flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
-            <img v-if="f.image" :src="f.image" class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+            <img v-if="f.thumb || f.image" :src="f.thumb || f.image" loading="lazy" class="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
             <span v-else class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-700 text-[12px]">👩</span>
             <span class="truncate">{{ f.name }}</span>
           </button>
@@ -317,7 +317,7 @@ async function runRefgen() {
           <button v-for="p in poses" :key="p.id" @click="poseId = (String(poseId) === String(p.id)) ? '' : String(p.id)"
                   :class="String(poseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
                   class="flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
-            <img v-if="p.image" :src="p.image" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+            <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
             <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700 text-sm">🧍</span>
             <span class="truncate">{{ p.name }}</span>
           </button>

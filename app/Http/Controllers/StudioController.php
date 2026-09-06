@@ -1758,6 +1758,68 @@ RULES:
         return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
     }
 
+    /**
+     * Phục vụ ảnh THUMBNAIL (160px WebP/JPEG) cho selector pose/khuôn mặt — tải nhanh hơn ~50x.
+     * Thumbnail được tạo 1 lần rồi cache ra storage/app/public/studio/thumb/{path}.{ext}.
+     * Ảnh gốc full-size vẫn dùng studioImage() cho AI vision / face_ref / pose_ref.
+     */
+    public function studioImageThumb(string $path)
+    {
+        if (str_contains($path, '..') || ! preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path)) {
+            return response()->json(['error' => 'invalid'], 404);
+        }
+        // Resolve ảnh gốc (cùng cơ chế studioImage).
+        $file = storage_path('app/public/'.$path);
+        foreach ([base_path('public_html/storage/'.$path), base_path('public_html/'.$path)] as $alt) {
+            if (! is_file($file) && is_file($alt)) { $file = $alt; }
+        }
+        if (! is_file($file)) {
+            return response()->json(['error' => 'not found', 'path' => $path], 404);
+        }
+
+        $thumbDir = storage_path('app/public/studio/thumb/'.dirname($path));
+        $useWebp = function_exists('imagewebp');
+        $thumbExt = $useWebp ? 'webp' : 'jpg';
+        $thumbFile = $thumbDir.'/'.basename($path).'.'.$thumbExt;
+
+        // Cache: chỉ tạo thumbnail lần đầu.
+        if (! is_file($thumbFile)) {
+            @mkdir($thumbDir, 0775, true);
+            $img = @imagecreatefromstring((string) file_get_contents($file));
+            if (! $img) {
+                return response()->file($file); // fallback ảnh gốc nếu không đọc được
+            }
+            $w = imagesx($img);
+            $h = imagesy($img);
+            $max = 160;
+            $scale = min(1.0, $max / max($w, $h));
+            $nw = max(1, (int) round($w * $scale));
+            $nh = max(1, (int) round($h * $scale));
+            $out = imagecreatetruecolor($nw, $nh);
+            imagealphablending($out, false);
+            imagesavealpha($out, true);
+            imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            if ($useWebp) {
+                imagewebp($out, $thumbFile, 80);
+            } else {
+                // JPEG không có alpha → đổ nền trắng trước khi nén.
+                $white = imagecolorallocate($out, 255, 255, 255);
+                imagefilledrectangle($out, 0, 0, $nw - 1, $nh - 1, $white);
+                imagealphablending($out, true);
+                imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                imagejpeg($out, $thumbFile, 80);
+            }
+            imagedestroy($out);
+            imagedestroy($img);
+        }
+
+        if (! is_file($thumbFile)) {
+            return response()->file($file);
+        }
+
+        return response()->file($thumbFile, ['Cache-Control' => 'public, max-age=31536000, immutable']);
+    }
+
     public function garmentAvatar(string $id)
     {
         if (! preg_match('/^[a-z0-9-]+$/', $id)) {

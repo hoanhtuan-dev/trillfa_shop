@@ -300,6 +300,23 @@ if (! function_exists('studio_image_url')) {
     }
 }
 
+if (! function_exists('studio_image_thumb_url')) {
+    function studio_image_thumb_url(?string $image): ?string
+    {
+        // URL thumbnail (160px WebP) cho HIỂN THỊ selector — giảm ~50x dung lượng so với ảnh gốc.
+        // Ảnh gốc vẫn dùng studio_image_url() cho AI vision / face_ref / pose_ref.
+        if (! $image) { return null; }
+        if (str_starts_with($image, '/storage/')) {
+            return '/studio/image-thumb/'.substr($image, strlen('/storage/'));
+        }
+        $path = ltrim((string) parse_url($image, PHP_URL_PATH), '/');
+        if (str_starts_with($path, 'studio/image/')) {
+            return '/studio/image-thumb/'.substr($path, strlen('studio/image/'));
+        }
+        return null;
+    }
+}
+
 if (! function_exists('studio_vision_image_data_uri')) {
     /**
      * Chuyển /storage/... hoặc đường dẫn local thành base64 data-URI cho các call VISION.

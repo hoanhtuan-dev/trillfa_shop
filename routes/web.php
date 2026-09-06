@@ -205,6 +205,8 @@ Route::get('/garment/{id}/thumb', [StudioController::class, 'garmentThumb'])->na
 
 // Public studio image endpoint — phục vụ ảnh upload từ storage (không phụ thuộc symlink).
 Route::get('/studio/image/{path}', [StudioController::class, 'studioImage'])->where('path', '.*')->name('studio.image');
+// Public studio image THUMBNAIL (160px WebP) — cho selector pose/khuôn mặt tải nhanh.
+Route::get('/studio/image-thumb/{path}', [StudioController::class, 'studioImageThumb'])->where('path', '.*')->name('studio.image.thumb');
 
 // Blog category filter only — index + show are owned by the Storefront module.
 Route::prefix('blog')->name('blog.')->group(function () {
