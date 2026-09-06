@@ -3,6 +3,14 @@ import { useStudioStore } from '../store.js';
 const store = useStudioStore();
 function openGallery() { store.viewer = store.preview || store.generations[0] || null; }
 function goLibrary() { window.location.href = '/studio/library'; }
+// Thumbnail URL cho ảnh hiển thị lưới Outputs (giảm ~50x dung lượng so với full-size 2K).
+// Ảnh gốc full-size vẫn được dùng khi mở viewer (store.viewer = g → media_url gốc).
+function thumbUrl(url) {
+  if (!url) return url;
+  if (url.startsWith('/storage/')) return '/studio/image-thumb/' + url.slice(9);
+  if (url.startsWith('/studio/image/')) return '/studio/image-thumb/' + url.slice(14);
+  return url; // URL ngoài hoặc data:URL → giữ nguyên
+}
 </script>
 <template>
   <div class="card flex flex-1 flex-col p-3" style="min-height:0">
@@ -11,7 +19,7 @@ function goLibrary() { window.location.href = '/studio/library'; }
       <div v-for="g in store.generations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'">
         <!-- Ảnh hoàn tất -->
         <template v-if="g.status === 'completed' && g.media_url">
-          <button @click="store.viewer = g" class="absolute inset-0"><img :src="g.media_url" class="h-full w-full bg-ink-900 object-cover" loading="lazy"></button>
+          <button @click="store.viewer = g" class="absolute inset-0"><img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy"></button>
         </template>
         <!-- Đang xử lý / chờ: skeleton shimmer + overlay tiến độ -->
         <template v-else>
