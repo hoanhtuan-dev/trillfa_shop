@@ -423,7 +423,7 @@ function saveSettings() {
     </div>
 
     <button @click="run" :disabled="busy || selectedCount < 2 || !prompt.trim()" class="btn-brand mt-3 w-full whitespace-nowrap">
-      {{ busy ? 'Đang ghép…' : (mode === 'tryon' ? 'Thử đồ ' + bestOf + ' bản' : 'Ghép ảnh') }} <span v-if="!busy" class="opacity-70">· {{ (mode === 'tryon' ? bestOf : 1) * store.imageCreditCost }} credit</span>
+      {{ busy ? 'Đang ghép…' : (mode === 'tryon' ? 'Thử đồ ' + bestOf + ' bản' : (variants > 1 ? 'Ghép ' + variants + ' biến thể' : 'Ghép ảnh')) }} <span v-if="!busy" class="opacity-70">· {{ (mode === 'tryon' ? bestOf : variants) * store.imageCreditCost }} credit</span>
     </button>
 
     <!-- Tiến độ (LoadingSpinner dùng chung) -->

@@ -55,7 +55,7 @@ class ImageAIService
         };
     }
 
-    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = [], ?string $mode = null): string
+    public function generate(string $prompt, ?string $baseImage = null, ?string $maskImage = null, ?string $resolution = null, ?string $ratio = null, ?string $faceRef = null, ?string $providerOverride = null, ?string $modelOverride = null, ?string $negativePrompt = null, array $refImages = [], ?string $mode = null, ?string $tryonBgText = null): string
     {
         $dashscopeKey = studio_api_key('dashscope');
 
@@ -119,34 +119,34 @@ class ImageAIService
                 // Tách pass nền ra khỏi PASS 1 (mặc đồ + pose) vì gộp chung khiến model bỏ qua
                 // tư thế (đã verified trong "Thay Đổi Người Mẫu" PASS 2). Giữ nguyên người
                 // + trang phục + pose, chỉ đổi hậu cảnh.
-                // Hỗ trợ 2 nguồn nền: (1) ảnh bối cảnh từ slot 3, (2) text mô tả nền từ chip "Nền Studio".
+                // Hỗ trợ 2 nguồn nền: (1) ảnh bối cảnh từ slot 3, (2) text mô tả nền từ chip "Nền Studio"
+                // (truyền riêng qua $tryonBgText — KHÔNG nằm trong $prompt để PASS 1 không nhiễm màu nền).
                 $bgUrl = null;
-                $bgText = null;
+                $bgText = $tryonBgText ? trim((string) $tryonBgText) : null;
                 if (! empty($tryonRefs)) {
                     $bgUrl = (string) $tryonRefs[0];
-                } elseif (preg_match('/nền\s+([^;]+)/u', $prompt, $m)) {
-                    // Chip "Nền Studio" → mô tả nền text. Dùng text làm instruction, không cần ảnh.
-                    $bgText = trim($m[1]);
+                    $bgText = null; // ưu tiên ảnh bối cảnh nếu có
                 }
                 if ($bgUrl || $bgText) {
                     if ($bgUrl) {
                         $bgPrompt = 'Replace the ENTIRE background of the scene with the background from the FIRST image. '
-                            .'Keep the person, their pose, the garment and body shape 100% unchanged. '
+                            .'Keep the person, their pose, the garment, body shape and GARMENT COLOR 100% unchanged. '
                             .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look and stay clearly visible; do NOT darken or shade them into a silhouette. '
                             .'Frame the person at about 75-80% of the image height, with the background clearly visible all around them. '
                             .'Blend the person into the scene: the HAIR and its edges, the clothing silhouette and the body outline must merge naturally with the background — NO hard cut-out outline, halo, white fringe or aliasing around the hair. '
                             .'Unify the color grading, warmth and lighting of the person and the new background so they blend into ONE cohesive photograph with no visible seam. '
-                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, deformed hands, blurry, low quality. Photorealistic.';
+                            .'Do NOT tint, recolor or reflect the background color onto the garment — keep the garment its original colors. '
+                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, garment color changed, deformed hands, blurry, low quality. Photorealistic.';
                         $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, $bgUrl, null, []);
                     } else {
                         // Text nền (chip "Nền Studio"): model edit tự sinh nền từ text description.
-                        $bgPrompt = 'Replace the ENTIRE background of the scene with a new background: '.$bgText.'. '
-                            .'Keep the person, their pose, the garment and body shape 100% unchanged. '
+                        $bgPrompt = 'Replace ONLY the background of the scene with: '.$bgText.'. '
+                            .'Keep the person, their pose, the garment, body shape and GARMENT COLOR 100% unchanged — the background color must NOT be applied to, tinted onto, or reflected on the garment. '
                             .'Do NOT change the person brightness, exposure or lighting — the person must keep their original fully-lit look. '
                             .'Frame the person at about 75-80% of the image height. '
                             .'Blend the person naturally into the background — NO hard outline, halo, white fringe. '
                             .'Unify the color grading, warmth and lighting so the person and background blend into ONE cohesive photograph. '
-                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, deformed hands, blurry, low quality. Photorealistic.';
+                            .'Avoid: cropped body, wrong face, wrong pose, extra garments, wrong colors, garment color changed, deformed hands, blurry, low quality. Photorealistic.';
                         $bgResult = $this->editImage($bgPrompt, $edited, $editModel, null, null, null, []);
                     }
                     if ($bgResult) {

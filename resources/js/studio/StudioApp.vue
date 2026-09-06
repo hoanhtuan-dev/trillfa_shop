@@ -444,11 +444,23 @@ function onTouchEnd(e) {
             <button v-for="b in ['grid','dark','white','cream']" :key="b" @click="store.canvasBg = b" class="h-6 w-6 rounded-full border" :class="store.canvasBg === b ? 'border-white' : 'border-ink-600'" :style="{ background: b === 'grid' ? 'repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 10px 10px' : b === 'dark' ? '#0a0a0f' : b === 'white' ? '#fff' : '#f5ead9' }" :title="b"></button>
           </div>
           <!-- variant slider (bottom, only when multiple variants) -->
-          <div v-if="store.showBatch && store.activeBatch.length > 1" class="absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
+          <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
             <div class="flex items-center gap-1.5">
               <span class="text-[10px] text-cream-300/60">{{ store.activeBatch.length }} biến thể</span>
-              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2" :class="store.previewId === v.id ? 'border-brand-500' : 'border-ink-700'"><img :src="v.media_url" class="h-full w-full bg-ink-900 object-cover"><span v-if="v.status !== 'completed'" class="absolute inset-0 grid place-items-center bg-black/60 text-[9px] text-cream-200">{{ v.status }}</span></button>
-              <button @click="store.hideBatch()" class="ml-1 grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600">✕</button>
+              <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-300" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-700 hover:border-brand-400'">
+                <template v-if="v.status === 'completed' && v.media_url">
+                  <img :src="v.media_url" class="batch-thumb h-full w-full bg-ink-900 object-cover" loading="lazy">
+                </template>
+                <template v-else>
+                  <div class="skeleton-shimmer absolute inset-0"></div>
+                  <span class="absolute inset-0 grid place-items-center bg-black/40 text-[9px] font-semibold text-cream-200">
+                    <span v-if="['pending','processing'].includes(v.status)" class="batch-dot"></span>
+                    <span v-else-if="v.status === 'failed'">⚠️</span>
+                    <span v-else-if="v.status === 'cancelled'">🚫</span>
+                  </span>
+                </template>
+              </button>
+              <button @click="store.hideBatch()" class="ml-1 grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 transition-colors hover:bg-red-600">✕</button>
             </div>
           </div>
           </div>
@@ -496,4 +508,38 @@ function onTouchEnd(e) {
 </template>
 <style scoped>
 .cvs-checker { background: repeating-conic-gradient(#3a3a44 0 25%, #2a2a31 0 50%) 0 / 18px 18px; }
+
+/* ── Batch slider (biến thể cùng lượt) ── */
+.batch-slider { animation: batchSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes batchSlideIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.batch-thumb { animation: batchThumbIn 0.4s ease; }
+@keyframes batchThumbIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+/* Skeleton shimmer cho thumbnail đang chờ/xử lý */
+.skeleton-shimmer {
+  background: linear-gradient(100deg, #1c2333 20%, #2a3347 40%, #3a4560 60%, #2a3347 80%, #1c2333 100%);
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.8s linear infinite;
+}
+@keyframes shimmerSweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+/* Dot nhấp nháy cho thumbnail pending */
+.batch-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #f5c06a;
+  animation: dotBlink 1.2s ease-in-out infinite;
+}
+@keyframes dotBlink {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
 </style>

@@ -438,24 +438,26 @@ export const useStudioStore = defineStore('studio', {
       if (gens.length < this.composeGenIds.length) return; // chưa đủ thông tin
       if (!gens.every(g => ['completed', 'failed', 'cancelled'].includes(g.status))) return;
       const done = gens.filter(g => g.status === 'completed').length;
+      const failed = gens.filter(g => g.status === 'failed').length;
       if (done > 0) {
         this.composeStage = 'done';
         const isTryon = this.composeMode === 'tryon';
         // best-of-N + chấm điểm: chọn bản có điểm cao nhất (nếu có điểm) và highlight trong Outputs.
         if (isTryon && done > 1) this.pickBestTryon(gens);
+        const warn = failed > 0 ? ' — ' + failed + ' bản thất bại.' : '';
         if (isTryon) {
           const scored = gens.filter(g => g.meta && g.meta.qa && g.meta.qa.score != null);
           if (this.composeBestId) {
             const best = gens.find(g => g.id === this.composeBestId);
             const sc = best && best.meta && best.meta.qa ? Number(best.meta.qa.score) : null;
-            this.toast('✅ Đã thử đồ xong ' + done + ' bản — chọn bản tốt nhất' + (sc != null ? ' (' + sc.toFixed(1) + '/10)' : '') + '.');
+            this.toast('✅ Đã thử đồ xong ' + done + ' bản — chọn bản tốt nhất' + (sc != null ? ' (' + sc.toFixed(1) + '/10)' : '') + '.' + warn);
           } else if (scored.length < gens.length) {
-            this.toast('✅ Đã thử đồ xong ' + done + ' bản (chưa chấm điểm được — thiếu key vision? Các bản vẫn ở Outputs).');
+            this.toast('✅ Đã thử đồ xong ' + done + ' bản (chưa chấm điểm được — thiếu key vision? Các bản vẫn ở Outputs).' + warn);
           } else {
-            this.toast('✅ Đã thử đồ xong ' + done + ' bản.');
+            this.toast('✅ Đã thử đồ xong ' + done + ' bản.' + warn);
           }
         } else {
-          this.toast('✅ Đã ghép xong ' + done + ' biến thể.');
+          this.toast('✅ Đã ghép xong ' + done + ' biến thể.' + warn);
         }
       } else {
         this.composeStage = 'error';

@@ -55,6 +55,8 @@ class RenderImageJob implements ShouldQueue
                 $refImages,
                 // mode='refgen' (card "Tạo ảnh mới từ ảnh mẫu"): i2i qua model sinh ảnh, KHÔNG edit.
                 $generation->meta['mode'] ?? null,
+                // Thử đồ ảo: text nền (chip "Nền Studio") — xử lý riêng ở PASS 2, không nhiễm PASS 1.
+                $generation->meta['tryon_bg_text'] ?? null,
             );
 
             // DEEP REDESIGN (region): AI đã sửa trên CROP — paste lại vào ẢNH GỐC đúng vị trí

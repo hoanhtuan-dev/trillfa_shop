@@ -668,6 +668,7 @@ class StudioController extends Controller
                 'candidate_idx' => $isTryon && $variants > 1 ? $i : null,
                 'tryon_batch' => $tryonBatch,
                 'tryon_score' => $tryonScore,
+                'tryon_bg_text' => $parts['tryon_bg_text'] ?? null,
             ], $cost)->getData(true);
         }
 
@@ -839,6 +840,14 @@ class StudioController extends Controller
         $creativeLevel = (int) ($data['creative_level'] ?? 8);
         $style = trim((string) ($data['style'] ?? ''));
         $ornamentLevel = (int) ($data['ornament_level'] ?? 0);
+        // Thử đồ ảo: tách text "nền ..." (chip Nền Studio) ra khỏi prompt PASS 1 để model KHÔNG
+        // hiểu nhầm màu nền thành màu trang phục. Text nền được xử lý RIÊNG ở PASS 2 (đổi hậu cảnh).
+        $tryonBgText = null;
+        if ($isTryon && preg_match('/nền\s+([^;]+)/u', $userPrompt, $bm)) {
+            $tryonBgText = trim($bm[1]);
+            $userPrompt = trim((string) preg_replace('/;\s*nền\s+[^;]+/u', '', $userPrompt));
+            $userPrompt = trim((string) preg_replace('/^nền\s+[^;]+/u', '', $userPrompt));
+        }
 
         if ($isTryon) {
             // Thử đồ ảo: @image1 = trang phục (base/source), @image2 = pose, @image3 = bối cảnh (tuỳ chọn).
@@ -850,7 +859,7 @@ class StudioController extends Controller
                 .'CRITICAL — preserve the ORIGINAL GARMENT FIT (tight/loose/cropped/oversized/draped) exactly as it appears in @image1: if the garment is tight-fitting, it must be tight on the body; if it is loose or oversized, it must drape loosely; if it is cropped (shows midriff), keep the midriff exposed — do NOT stretch, shrink, tighten or loosen the garment. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
                 .'REMOVE any text, watermark, logo, brand label, typography or printed graphics from the garment — render clean, plain fabric without any writing or marks. '
-                .'COMPLETE THE LOOK: if the garment image does NOT show shoes, handbag, belt, jewelry or other accessories, add complementary, stylish accessories that match the garment style and color palette — elegant shoes, a matching handbag, subtle jewelry — so the model looks polished and complete. Do NOT add accessories that clash with the garment style. '
+                .'COMPLETE THE LOOK: if the garment image does NOT show shoes, handbag, belt, jewelry or other accessories, add complementary, stylish accessories that match the garment style and color palette — elegant shoes, a matching handbag, subtle jewelry — so the model looks polished and complete. Do NOT add accessories that clash with the garment style. CRITICAL — keep every accessory CORRECTLY SCALED and proportioned to the body: shoes sized to the feet, handbag in realistic proportion to the body, jewelry subtle — never oversized, tiny, floating, or misplaced. '
                 .'CRITICAL — single clean pose, no ghosting: completely REPLACE the original person/body in @image1 with a NEW model in the target pose; do NOT blend, superimpose, or leave any ghost, double-exposure, or faint overlapping outline of the original pose. The final image must show ONLY ONE crisp, clean body pose with no duplicated limbs, no translucent leftovers, no motion blur. '
                 .'Reproduce the EXACT body pose, stance, arm/leg placement, facing direction and posture from the pose reference in @image2 — do NOT copy the garment or the person from the pose image; keep the model\'s face, hairstyle and skin tone natural and consistent with @image2. '
                 .'Render a vertically-balanced FULL BODY from head to toe (not cropped), with natural elongated fashion-model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat or stubby. '
@@ -911,6 +920,7 @@ class StudioController extends Controller
             'style' => $style,
             'ornament_level' => $ornamentLevel,
             'is_faceswap' => $isFaceSwap,
+            'tryon_bg_text' => $tryonBgText,
         ];
     }
 
@@ -1497,6 +1507,7 @@ RULES:
                 'candidate_idx' => $data['candidate_idx'] ?? null,
                 'tryon_batch' => $data['tryon_batch'] ?? null,
                 'tryon_score' => $data['tryon_score'] ?? null,
+                'tryon_bg_text' => $data['tryon_bg_text'] ?? null,
             ], fn ($v) => $v !== null && $v !== ''),
         ]);
 

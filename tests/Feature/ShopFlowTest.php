@@ -1030,6 +1030,15 @@ class ShopFlowTest extends TestCase
         $this->assertNull($c->json('best_of'));
         $g0 = Generation::find($c->json('items.0.generation_id'));
         $this->assertArrayNotHasKey('tryon_batch', $g0->meta ?? []);
+
+        // Regression: chọn 3 biến thể phải tạo ĐỦ 3 generation (không chỉ 2).
+        $c3 = $this->postJson('/studio/compose', [
+            'images' => ['/storage/studio/a.jpg', '/storage/studio/b.jpg'],
+            'prompt' => 'giữ nền, đặt cô gái vào studio',
+            'mode' => 'compose',
+            'variants' => 3,
+        ])->assertOk();
+        $this->assertCount(3, $c3->json('items'));
     }
 
     public function test_studio_outfit_settings_save_and_reload(): void
