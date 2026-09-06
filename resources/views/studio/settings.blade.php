@@ -279,6 +279,16 @@
                     <p class="mt-1 text-xs text-ink-500">Dùng riêng cho gợi ý — không theo mức sáng tạo chung.</p>
                 </div>
                 <div>
+                    <label class="label">Độ bám ảnh gốc (0-10)</label>
+                    <input type="number" name="suggest_adherence" min="0" max="10" value="{{ old('suggest_adherence', $suggest_adherence) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">0 = tự theo mức sáng tạo. Cao = tái tạo chính xác trang phục gốc (màu/đường may/hoạ tiết/độ dài/cổ/tay).</p>
+                </div>
+                <div>
+                    <label class="label">Mức chi tiết phân tích (1-10)</label>
+                    <input type="number" name="suggest_detail_level" min="1" max="10" value="{{ old('suggest_detail_level', $suggest_detail_level) }}" class="input !py-2">
+                    <p class="mt-1 text-xs text-ink-500">Cao = vision liệt kê đầy đủ màu/đường may/hoạ tiết/độ dài/cổ/tay/phụ kiện từ ảnh gốc.</p>
+                </div>
+                <div>
                     <label class="label">Số phong cách tối đa (1-5)</label>
                     <input type="number" name="suggest_max_styles" min="1" max="5" value="{{ old('suggest_max_styles', $suggest_max_styles) }}" class="input !py-2">
                 </div>

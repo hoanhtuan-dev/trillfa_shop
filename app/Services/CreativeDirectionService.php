@@ -88,6 +88,48 @@ class CreativeDirectionService
     }
 
     /**
+     * Directive bám ảnh gốc (adherence) — dùng riêng cho "Gợi ý từ ảnh" để ép model
+     * tái tạo chính xác trang phục gốc thay vì sáng tạo lại. Cao = càng trung thành.
+     */
+    public function adherenceDirective(int $level): string
+    {
+        $level = $this->clamp($level, 1, 10);
+
+        if ($level <= 3) {
+            return 'ADHERENCE: low ('.$level.'/10). The output may reinterpret the garment freely; capturing the general style is enough.';
+        }
+
+        if ($level <= 6) {
+            return 'ADHERENCE: medium ('.$level.'/10). Keep the garment recognisably close to the reference — same colours, fabric feel and silhouette — but tasteful refinement is allowed.';
+        }
+
+        return 'ADHERENCE: high ('.$level.'/10). REPRODUCE the reference garment as faithfully as possible: identical colours, fabric, pattern, neckline, sleeve shape, hem length, fit, trims and visible accessories. Do NOT change, add, or omit garment details; this must read as the SAME outfit.';
+    }
+
+    /**
+     * Directive mức chi tiết phân tích — yêu cầu vision model đào sâu chi tiết trang phục.
+     * 1 = chỉ tên loại + 1-2 đặc điểm; 10 = liệt kê đầy đủ màu/đường may/hoạ tiết/độ dài/cổ/tay/phụ kiện.
+     */
+    public function detailDirective(int $level): string
+    {
+        $level = $this->clamp($level, 1, 10);
+
+        if ($level <= 2) {
+            return 'DETAIL LEVEL: minimal ('.$level.'/10). Identify only the garment type and 1-2 obvious features.';
+        }
+
+        if ($level <= 5) {
+            return 'DETAIL LEVEL: medium ('.$level.'/10). Identify garment type, dominant colour, fabric family, silhouette, neckline and sleeve length.';
+        }
+
+        if ($level <= 8) {
+            return 'DETAIL LEVEL: high ('.$level.'/10). Identify garment type, exact dominant + accent colours, fabric/material & texture, neckline, collar, sleeve length & shape, hem length, fit/silhouette, drape, patterns/prints, buttons/zips/trims, accessories and footwear.';
+        }
+
+        return 'DETAIL LEVEL: extreme ('.$level.'/10). Capture every visible garment attribute: exact colour names (dominant + accents), fabric weight & weave, texture, sheen, neckline, collar, lapel, sleeve length & shape, cuff, hem length, fit, silhouette, drape, lining visibility, patterns/prints, embellishment type (sequins/beads/embroidery), buttons/zips/hooks, belts, jewellery, footwear, hairstyle & colour, makeup palette, pose, body angle, and background/lighting. Note anything ambiguous explicitly.';
+    }
+
+    /**
      * Canonicalise a raw model response into the Creative Direction. This is where
      * the schema is unified and where the image/video prompts are kept in sync.
      */
@@ -115,6 +157,12 @@ class CreativeDirectionService
         // Guarantee both prompts carry the same garment identity (no divergence).
         $imagePrompt = $this->ensureSignature($imagePrompt, $sig, $tokens, suppress: true);
         $videoPrompt = $this->ensureSignature($videoPrompt, $sig, $tokens);
+
+        // Ghi chú chi tiết gốc (style_notes) — bám ảnh trang phục. Chỉ chèn nếu chưa có.
+        $notes = $this->clean((string) ($raw['style_notes'] ?? ''));
+        if ($notes !== '' && ! str_contains($this->lowerise($imagePrompt), $this->lowerise($notes))) {
+            $imagePrompt = $this->clean($imagePrompt.' Reference detail: '.$notes);
+        }
 
         return [
             'idea' => $idea,
@@ -232,6 +280,13 @@ class CreativeDirectionService
         // Higher creativity tolerates a slightly less strict negative prompt.
         if ($level >= 7) {
             $default = str_replace('duplicated outfit, cropped garment, inconsistent face', '', $default);
+        }
+
+        // Gợi ý từ ảnh (có style_notes chi tiết gốc) -> ép bám: cấm đổi màu/đường may/hoạ tiết.
+        $notes = trim((string) ($raw['style_notes'] ?? ''));
+        if ($notes !== '') {
+            $default .= ', altered garment colour, changed neckline, changed sleeve length, changed hem length, '
+                .'fabric pattern drift, mismatched trim, missing accessory, reinvented outfit';
         }
 
         return (string) ($raw['negative_prompt'] ?? $default);

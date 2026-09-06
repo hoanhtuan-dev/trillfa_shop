@@ -13,12 +13,16 @@ use Illuminate\Support\Facades\Http;
  */
 class StyleSuggestService
 {
-    public function suggest(string $imagePath, int $creativeLevel = 6): array
+    public function suggest(string $imagePath, int $creativeLevel = 6, ?array $opts = null): array
     {
         // Tính năng bị tắt -> trả kết quả rỗng kèm cờ `disabled` để controller báo lỗi thân thiện.
         if (! studio_suggest_enabled()) {
             return ['disabled' => true, 'styles' => [], 'background' => '', 'image_prompt_en' => ''];
         }
+
+        // Độ bám ảnh gốc + mức chi tiết — kiểm soát riêng cho "Gợi ý từ ảnh".
+        $adherence = $this->resolveAdherence($opts);
+        $detailLevel = $this->resolveDetailLevel($opts);
 
         // Provider + model RIÊNG cho "Gợi ý từ ảnh" — không dùng chung cấu hình Vision.
         $provider = studio_suggest_provider();
@@ -39,10 +43,10 @@ class StyleSuggestService
         foreach ($attempts as $attempt) {
             try {
                 if ($attempt === 'qwen') {
-                    return $this->suggestViaQwenVision($imagePath, $creativeLevel);
+                    return $this->suggestViaQwenVision($imagePath, $creativeLevel, $adherence, $detailLevel);
                 }
 
-                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey);
+                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey, $adherence, $detailLevel);
             } catch (\Throwable $e) {
                 logger()->error($attempt.' vision suggest failed: '.$e->getMessage());
             }
@@ -50,21 +54,86 @@ class StyleSuggestService
 
         // Không có key + đã bật fallback màu -> phân tích màu GD để vẫn gợi ý offline.
         if (studio_suggest_fallback()) {
-            return $this->suggestViaColor($imagePath, $creativeLevel);
+            return $this->suggestViaColor($imagePath, $creativeLevel, $adherence, $detailLevel);
         }
 
         throw new \RuntimeException('Chưa cấu hình API key vision cho "Gợi ý từ ảnh" và fallback màu đang tắt.');
     }
 
-    protected function suggestViaQwenVision(string $imagePath, int $creativeLevel): array
+    /**
+     * Độ bám ảnh gốc (1..10). Ưu tiên: opts override -> setting -> default theo creative
+     * (creative càng thấp càng bám). Cao = tái tạo chính xác chi tiết trang phục gốc.
+     */
+    protected function resolveAdherence(?array $opts): int
+    {
+        $val = $opts['adherence'] ?? null;
+        if ($val === null) {
+            $val = studio_suggest_config('adherence', null);
+        }
+        if ($val !== null && $val !== '' && (int) $val > 0) {
+            return max(1, min(10, (int) $val));
+        }
+        // Mặc định: creative thấp => bám cao; creative cao => bám vừa.
+        $creative = (int) ($opts['creative_level'] ?? studio_suggest_config('creative_level', 6));
+
+        return max(5, 11 - $creative);
+    }
+
+    /**
+     * Mức độ chi tiết phân tích (1..10). Ưu tiên: opts -> setting -> default 8.
+     * Cao = yêu cầu vision liệt kê chi tiết (màu, đường may, họa tiết, độ dài, cổ, tay...).
+     */
+    protected function resolveDetailLevel(?array $opts): int
+    {
+        $val = $opts['detail_level'] ?? null;
+        if ($val === null) {
+            $val = studio_suggest_config('detail_level', null);
+        }
+        if ($val !== null && $val !== '' && (int) $val > 0) {
+            return max(1, min(10, (int) $val));
+        }
+
+        return 8;
+    }
+
+    /**
+     * Prompt phân tích chi tiết — yêu cầu vision mô tả chính xác trang phục gốc (màu, họa tiết,
+     * đường may, độ dài, kiểu cổ/tay, chất liệu, phụ kiện) và sinh prompt EN/VI bám sát.
+     */
+    protected function analysisPrompt(int $adherence, int $detailLevel): string
+    {
+        $direction = app(CreativeDirectionService::class);
+        $adherenceClause = $direction->adherenceDirective($adherence);
+        $detailClause = $direction->detailDirective($detailLevel);
+
+        return "You are a senior fashion stylist & prompt engineer. Analyze this fashion model photo and the EXACT garment worn. "
+            .$detailClause.' '
+            .$adherenceClause.' '
+            ."Study the reference image precisely and capture: garment type (dress / top+bottom / suit / outerwear ...), "
+            ."exact dominant and accent colours, fabric/material & texture, neckline, collar, sleeve length & shape, "
+            ."hem length, fit/silhouette, drape, patterns/prints/embellishments, buttons/zips/trims, accessories, footwear, "
+            ."hairstyle & hair colour, makeup palette, pose, body angle, and the background/setting/lighting. "
+            ."Do NOT invent new colours, fabrics, silhouettes or accessories that are not in the image. "
+            ."If a detail is not visible, omit it rather than guessing. "
+            ."Return ONLY valid JSON (no markdown) with these keys: "
+            .'"styles" (1-3 style labels), "background" (one label), "pose" (one label), '
+            .'"fabric" (one label), "silhouette" (one label), "camera" (one label), '
+            .'"garment_type" (one short label, e.g. "midi dress", "blazer + trousers"), '
+            .'"color_palette" (array of 2-5 colour names matching the image), '
+            .'"embellishment" (one short label of pattern/decoration level, e.g. "plain solid", "floral print", "sequin embellishment"), '
+            .'"detail_notes" (a 1-3 sentence English note of the key visible garment details), '
+            .'"image_prompt_en" (a DETAILED, ready-to-use English image-generation prompt of 60-160 words that faithfully REPRODUCES '
+            ."the outfit, fabric, colours, fit, neckline, sleeves, hem, pattern, accessories and setting from the reference image), "
+            .'"prompt_vi" (a Vietnamese translation of image_prompt_en — keep technical fashion terms like fabric, silhouette, pose, camera, '
+            ."neckline, hem in English; translate only the descriptive parts naturally into Vietnamese), "
+            .'"video_prompt_en" (a matching English video-catwalk prompt for the SAME garment), '
+            .'"keywords" (array of 5-12 tags).';
+    }
+
+    protected function suggestViaQwenVision(string $imagePath, int $creativeLevel, int $adherence, int $detailLevel): array
     {
         [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
-        $direction = app(CreativeDirectionService::class);
-        $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
-            .'Return ONLY valid JSON with keys: "styles", "background", "pose", "fabric", "silhouette", "camera", '
-            .'"image_prompt_en" (a detailed ready-to-use English image prompt), '
-            .'"prompt_vi" (a Vietnamese translation of image_prompt_en — keep technical fashion terms like fabric, silhouette, pose, camera in English; translate only the descriptive parts naturally into Vietnamese), '
-            .'"video_prompt_en" (a matching English video-catwalk prompt for the SAME garment), "keywords" (array).';
+        $prompt = $this->analysisPrompt($adherence, $detailLevel);
 
         // Try several Qwen VISION models × keys. qwen3.8-flash/max (multimodal) thường thử trước; các tài khoản cũ chỉ expose qwen-vl-* nên giữ fallback ở cuối danh sách.
         $last = null;
@@ -86,7 +155,7 @@ class StyleSuggestService
                         $text = (string) data_get($resp->json(), 'choices.0.message.content');
                         $json = json_decode(trim($text), true);
                         if (is_array($json)) {
-                            return $this->finalize($json, $creativeLevel);
+                            return $this->finalize($json, $creativeLevel, $adherence, $detailLevel);
                         }
                         $last = 'Không phân tích được JSON từ Qwen vision ('.$model.').';
                     } elseif (is_qwen_quota_error((string) $resp->body())) {
@@ -111,7 +180,7 @@ class StyleSuggestService
         throw new \RuntimeException('Qwen vision: '.($last ?: 'không xác định'));
     }
 
-    protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key): array
+    protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key, int $adherence, int $detailLevel): array
     {
         $model = studio_suggest_gemini_model();
         [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
@@ -120,13 +189,7 @@ class StyleSuggestService
             $b64 = base64_encode((string) file_get_contents($imagePath));
         }
 
-        $direction = app(CreativeDirectionService::class);
-        $prompt = 'Analyze this fashion model photo and its garment. '.$direction->creativityDirective($creativeLevel).' '
-            .'Return ONLY valid JSON with keys: "styles" (1-3 style labels), "background" (one label), "pose" (one label), '
-            .'"fabric" (one label), "silhouette" (one label), "camera" (one label), '
-            .'"image_prompt_en" (a detailed, ready-to-use English image-generation prompt describing the outfit, fabric, colors, fit and setting), '
-            .'"prompt_vi" (a Vietnamese translation of image_prompt_en — keep technical fashion terms like fabric, silhouette, pose, camera in English; translate only the descriptive parts naturally into Vietnamese), '
-            .'"video_prompt_en" (a matching English video-catwalk prompt for the SAME garment), "keywords" (array).';
+        $prompt = $this->analysisPrompt($adherence, $detailLevel);
 
         $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
             ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
@@ -149,7 +212,7 @@ class StyleSuggestService
             throw new \RuntimeException('Không phân tích được JSON từ vision.');
         }
 
-        return $this->finalize($json, $creativeLevel);
+        return $this->finalize($json, $creativeLevel, $adherence, $detailLevel);
     }
 
     /**
@@ -164,7 +227,7 @@ class StyleSuggestService
         return trim((string) $v);
     }
 
-    protected function finalize(array $json, int $creativeLevel): array
+    protected function finalize(array $json, int $creativeLevel, int $adherence = 8, int $detailLevel = 8): array
     {
         $styles = array_values(array_filter((array) ($json['styles'] ?? [])));
         // Giới hạn số phong cách gợi ý (cấu hình riêng max_styles).
@@ -174,6 +237,10 @@ class StyleSuggestService
         $fabric = $this->str($json['fabric'] ?? '');
         $silhouette = $this->str($json['silhouette'] ?? '');
         $camera = $this->str($json['camera'] ?? '');
+        $garmentType = $this->str($json['garment_type'] ?? '');
+        $embellishment = $this->str($json['embellishment'] ?? '');
+        $detailNotes = $this->str($json['detail_notes'] ?? '');
+        $palette = array_values(array_filter((array) ($json['color_palette'] ?? [])));
 
         $injections = array_filter([
             'fabric' => $fabric,
@@ -184,6 +251,13 @@ class StyleSuggestService
             'camera' => $camera,
         ]);
 
+        // Ghi chú chi tiết từ ảnh gốc được nhồi vào style_notes để ensureSignature/normalize
+        // luôn giữ thông tin bám ảnh (màu/đường may/hoạ tiết) — không bị mất qua consolidation.
+        $styleNotes = trim(($json['style_notes'] ?? '').($detailNotes !== '' ? ' '.$detailNotes : ''));
+        if ($styleNotes === '') {
+            $styleNotes = 'Faithful reproduction of the reference garment — same colours, fabric, silhouette, neckline, hem, pattern and accessories.';
+        }
+
         $raw = [
             'image_prompt_en' => (string) ($json['image_prompt_en'] ?? ''),
             'prompt_vi' => (string) ($json['prompt_vi'] ?? ''),
@@ -191,8 +265,8 @@ class StyleSuggestService
             'keywords' => $json['keywords'] ?? [],
             'category' => $injections,
             'mood' => $json['mood'] ?? ($styles[0] ?? 'luxury'),
-            'color_palette' => $json['color_palette'] ?? ['ivory', 'black', 'gold'],
-            'style_notes' => $json['style_notes'] ?? 'High-fashion editorial, minimal, luxury fabric feel.',
+            'color_palette' => ! empty($palette) ? $palette : ['ivory', 'black', 'gold'],
+            'style_notes' => $styleNotes,
         ];
 
         $dir = app(CreativeDirectionService::class);
@@ -206,11 +280,16 @@ class StyleSuggestService
             'fabric' => $fabric,
             'silhouette' => $silhouette,
             'camera' => $camera,
+            'garment_type' => $garmentType,
+            'embellishment' => $embellishment,
+            'detail_notes' => $detailNotes,
+            'color_palette' => $c['color_palette'],
             'image_prompt_en' => $c['image_prompt_en'],
             'prompt_vi' => (string) ($json['prompt_vi'] ?? ''),
             'video_prompt_en' => studio_suggest_include_video() ? $c['video_prompt_en'] : '',
             'creative_level' => $c['creative_level'],
-            'adherence' => $c['adherence'],
+            'adherence' => $adherence,
+            'detail_level' => $detailLevel,
             'negative_prompt' => $c['negative_prompt'],
             'keywords' => $c['keywords'],
             'category' => $c['category'],
@@ -311,7 +390,7 @@ class StyleSuggestService
         return null;
     }
 
-    protected function suggestViaColor(string $imagePath, int $creativeLevel = 6): array
+    protected function suggestViaColor(string $imagePath, int $creativeLevel = 6, int $adherence = 8, int $detailLevel = 8): array
     {
         $styles = Preset::category('style')->get();
         $backgrounds = Preset::category('background')->get();
@@ -345,7 +424,7 @@ class StyleSuggestService
             'pose' => $pose?->ui_label,
             'fabric' => $fabric?->ui_label,
             'silhouette' => $silhouette?->ui_label,
-        ], $creativeLevel);
+        ], $creativeLevel, $adherence, $detailLevel);
     }
 
     /**

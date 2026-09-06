@@ -82,6 +82,8 @@ return [
         'qwen_model' => env('STUDIO_SUGGEST_QWEN_MODEL', 'qwen3.8-flash'), // multimodal chính
         'qwen_models' => env('STUDIO_SUGGEST_QWEN_MODELS', ''), // danh sách ưu tiên, phân cách dấu phẩy
         'creative_level' => (int) env('STUDIO_SUGGEST_CREATIVE_LEVEL', 6),
+        'adherence' => (int) env('STUDIO_SUGGEST_ADHERENCE', 0), // 0 = tự theo creative; 1..10 ép bám ảnh gốc
+        'detail_level' => (int) env('STUDIO_SUGGEST_DETAIL_LEVEL', 8), // 1..10 mức chi tiết phân tích ảnh (màu/đường may/hoạ tiết/độ dài/cổ/tay...)
         'max_styles' => (int) env('STUDIO_SUGGEST_MAX_STYLES', 3),
         'downscale_max' => (int) env('STUDIO_SUGGEST_DOWNSCALE_MAX', 1024),
         'fallback' => (bool) env('STUDIO_SUGGEST_FALLBACK', true), // GD color fallback khi không có key

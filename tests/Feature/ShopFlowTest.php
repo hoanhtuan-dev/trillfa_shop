@@ -1191,12 +1191,14 @@ class ShopFlowTest extends TestCase
 
         $response->assertJsonStructure([
             'preset_ids', 'styles', 'image_prompt_en', 'video_prompt_en', 'creative_level', 'adherence',
+            'detail_level', 'garment_type', 'embellishment', 'color_palette', 'detail_notes',
         ]);
         $data = $response->json();
         $this->assertNotEmpty($data['image_prompt_en']);
         $this->assertNotEmpty($data['video_prompt_en']);
         $this->assertSame(6, (int) $data['creative_level']);
         $this->assertSame(5, (int) $data['adherence']);
+        $this->assertSame(8, (int) $data['detail_level']);
     }
 
     public function test_studio_presets_camera_lens_video_scene(): void

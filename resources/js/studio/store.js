@@ -165,6 +165,8 @@ export const useStudioStore = defineStore('studio', {
     suggestResult: null,
     suggestEnabled: true,   // bật/tắt tính năng "💡 Gợi ý từ ảnh" (cấu hình Studio)
     suggestLang: 'en',      // ngôn ngữ hiển thị mặc định (en | vi)
+    suggestAdherence: 0,     // 0 = tự theo creative; 1..10 ép bám ảnh gốc (cao = tái tạo chính xác trang phục gốc)
+    suggestDetailLevel: 8,   // 1..10 mức chi tiết phân tích ảnh gốc (màu/đường may/hoạ tiết/độ dài/cổ/tay...)
     promptOpen: false,
     viewer: null,
     flashMsg: '',
@@ -244,9 +246,11 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.video_duration) this.videoDuration = defaults.video_duration;
       if (defaults.video_resolution) this.videoRes = defaults.video_resolution;
       if (defaults.negative_prompt !== undefined) this.negativePromptEn = defaults.negative_prompt;
-      // 💡 Gợi ý từ ảnh — trạng thái + ngôn ngữ mặc định.
+      // 💡 Gợi ý từ ảnh — trạng thái + ngôn ngữ + độ bám/chi tiết mặc định.
       if (defaults.suggest_enabled !== undefined) this.suggestEnabled = !!defaults.suggest_enabled;
       if (defaults.suggest_default_lang) this.suggestLang = defaults.suggest_default_lang === 'vi' ? 'vi' : 'en';
+      if (defaults.suggest_adherence != null) this.suggestAdherence = Number(defaults.suggest_adherence);
+      if (defaults.suggest_detail_level != null) this.suggestDetailLevel = Number(defaults.suggest_detail_level);
       if (defaults.image_credits != null) this.imageCreditCost = Number(defaults.image_credits);
       // Card Sửa ảnh: danh sách model chỉnh sửa (mặc định đứng đầu).
       if (Array.isArray(defaults.inpaint_models)) this.inpaintModels = defaults.inpaint_models;
@@ -1632,7 +1636,17 @@ export const useStudioStore = defineStore('studio', {
       if (!this.suggestEnabled) { this.toast('Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt.', 'error'); return; }
       if (!image) { this.toast('Chọn ảnh nguồn để gợi ý.', 'error'); return; }
       this.suggesting = true;
-      try { const d = await this.api('/studio/suggest', { reference_url: image, creative_level: this.creativeLevel }); this.suggestResult = d; const styles = (d.styles || []).join(', '); this.toast(styles ? 'Phong cách: ' + styles + (d.background ? ' · ' + d.background : '') : 'Đã gợi ý.'); }
+      try {
+        const payload = { reference_url: image, creative_level: this.creativeLevel };
+        // Gửi độ bám/chi tiết để backend ép bám ảnh gốc (0 = tự theo creative).
+        if (this.suggestAdherence) payload.adherence = this.suggestAdherence;
+        if (this.suggestDetailLevel) payload.detail_level = this.suggestDetailLevel;
+        const d = await this.api('/studio/suggest', payload);
+        this.suggestResult = d;
+        const styles = (d.styles || []).join(', ');
+        const extras = [styles, d.garment_type, d.background].filter(Boolean).join(' · ');
+        this.toast(extras ? 'Đã gợi ý: ' + extras : 'Đã gợi ý.');
+      }
       catch(e){ this.toast(e.message || 'Lỗi gợi ý.', 'error'); }
       finally { this.suggesting = false; }
     },

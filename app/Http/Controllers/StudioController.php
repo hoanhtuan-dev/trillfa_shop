@@ -858,8 +858,8 @@ class StudioController extends Controller
             $finalPrompt = 'Virtual try-on: dress the model in the EXACT garment and every accessory shown in @image1 — identical colors, prints, patterns, fabric, silhouette, length and details. '
                 .'CRITICAL — preserve the ORIGINAL GARMENT FIT (tight/loose/cropped/oversized/draped) exactly as it appears in @image1: if the garment is tight-fitting, it must be tight on the body; if it is loose or oversized, it must drape loosely; if it is cropped (shows midriff), keep the midriff exposed — do NOT stretch, shrink, tighten or loosen the garment. '
                 .'Do NOT redesign, replace, or omit any garment or accessory. '
+                .'ANALYZE the garment image @image1 deeply and reproduce EVERY visible feature faithfully: neckline, sleeve length and shape, hemline, waistline, buttons, zippers, pockets, pleats, ruffles, collar, straps, length, and any accessory already on the garment (belt, bow, brooch) — keep them all identical, correctly positioned and proportioned. Do NOT add, remove, or invent any garment detail that is not in the source. '
                 .'REMOVE any text, watermark, logo, brand label, typography or printed graphics from the garment — render clean, plain fabric without any writing or marks. '
-                .'COMPLETE THE LOOK: if the garment image does NOT show shoes, handbag, belt, jewelry or other accessories, add complementary, stylish accessories that match the garment style and color palette — elegant shoes, a matching handbag, subtle jewelry — so the model looks polished and complete. Do NOT add accessories that clash with the garment style. CRITICAL — keep every accessory CORRECTLY SCALED and proportioned to the body: shoes sized to the feet, handbag in realistic proportion to the body, jewelry subtle — never oversized, tiny, floating, or misplaced. '
                 .'CRITICAL — single clean pose, no ghosting: completely REPLACE the original person/body in @image1 with a NEW model in the target pose; do NOT blend, superimpose, or leave any ghost, double-exposure, or faint overlapping outline of the original pose. The final image must show ONLY ONE crisp, clean body pose with no duplicated limbs, no translucent leftovers, no motion blur. '
                 .'Reproduce the EXACT body pose, stance, arm/leg placement, facing direction and posture from the pose reference in @image2 — do NOT copy the garment or the person from the pose image; keep the model\'s face, hairstyle and skin tone natural and consistent with @image2. '
                 .'Render a vertically-balanced FULL BODY from head to toe (not cropped), with natural elongated fashion-model proportions (long legs, about 1:7.5 head-to-body) — do NOT make the figure short, squat or stubby. '
@@ -1550,6 +1550,8 @@ RULES:
             'image' => ['nullable', 'image', 'max:8192'],
             'reference_url' => ['nullable', 'string', 'max:2048'],
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'adherence' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'detail_level' => ['nullable', 'integer', 'min:1', 'max:10'],
         ]);
 
         $imagePath = null;
@@ -1567,7 +1569,11 @@ RULES:
 
         // "Gợi ý từ ảnh" dùng mức sáng tạo RIÊNG (studio_suggest_creative_level), không theo cấu hình chung.
         $creativeLevel = (int) ($data['creative_level'] ?? studio_suggest_config('creative_level', 6));
-        $result = app(StyleSuggestService::class)->suggest($imagePath, $creativeLevel);
+        $result = app(StyleSuggestService::class)->suggest($imagePath, $creativeLevel, [
+            'adherence' => $data['adherence'] ?? null,
+            'detail_level' => $data['detail_level'] ?? null,
+            'creative_level' => $creativeLevel,
+        ]);
 
         if (($result['disabled'] ?? false) === true) {
             return response()->json(['message' => 'Tính năng "Gợi ý từ ảnh" đang bị tắt trong cài đặt Studio.'], 422);
@@ -3682,6 +3688,8 @@ RULES:
             'suggest_qwen_model' => (string) studio_suggest_config('qwen_model', 'qwen3.8-flash'),
             'suggest_qwen_models' => (string) studio_suggest_config('qwen_models', ''),
             'suggest_creative_level' => (int) studio_suggest_config('creative_level', 6),
+            'suggest_adherence' => (int) studio_suggest_config('adherence', 0),
+            'suggest_detail_level' => (int) studio_suggest_config('detail_level', 8),
             'suggest_max_styles' => (int) studio_suggest_config('max_styles', 3),
             'suggest_downscale_max' => (int) studio_suggest_config('downscale_max', 1024),
             'suggest_fallback' => studio_suggest_fallback(),
@@ -3950,6 +3958,8 @@ RULES:
             'suggest_qwen_model' => ['nullable', 'string', 'max:255'],
             'suggest_qwen_models' => ['nullable', 'string', 'max:1000'],
             'suggest_creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'suggest_adherence' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'suggest_detail_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'suggest_max_styles' => ['nullable', 'integer', 'min:1', 'max:5'],
             'suggest_downscale_max' => ['nullable', 'integer', 'min:64', 'max:4096'],
             'suggest_fallback' => ['nullable', 'string', 'in:1'],
@@ -3963,6 +3973,8 @@ RULES:
         set_setting('studio_suggest_qwen_model', $data['suggest_qwen_model'] ?? '');
         set_setting('studio_suggest_qwen_models', $data['suggest_qwen_models'] ?? '');
         if (isset($data['suggest_creative_level'])) set_setting('studio_suggest_creative_level', (string) $data['suggest_creative_level']);
+        if (isset($data['suggest_adherence'])) set_setting('studio_suggest_adherence', (string) $data['suggest_adherence']);
+        if (isset($data['suggest_detail_level'])) set_setting('studio_suggest_detail_level', (string) $data['suggest_detail_level']);
         if (isset($data['suggest_max_styles'])) set_setting('studio_suggest_max_styles', (string) $data['suggest_max_styles']);
         if (isset($data['suggest_downscale_max'])) set_setting('studio_suggest_downscale_max', (string) $data['suggest_downscale_max']);
         set_setting('studio_suggest_fallback', ! empty($data['suggest_fallback']) ? '1' : '0');
