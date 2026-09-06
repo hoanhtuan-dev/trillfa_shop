@@ -19,8 +19,12 @@ const SAFE = /^[a-zA-Z0-9/_.-]+$/;
  * - /studio/image/... → /studio/image-thumb/{path}
  * - URL ngoài / data:URL / path đặc biệt / khác origin → trả nguyên url gốc (fallback an toàn).
  * - url rỗng/null → trả nguyên (component tự xử lý v-if để tránh img rỗng).
+ *
+ * @param {string} url   media_url gốc.
+ * @param {number} size  Cỡ thumbnail (160|320|480|640). Bỏ trống/160 → không thêm query (mặc định 160px).
+ *                       Dùng 480 cho grid lớn (Thư viện /studio/library) để không bị nhòe.
  */
-export function thumbUrl(url) {
+export function thumbUrl(url, size = 0) {
   if (!url) return url;
   let clean = String(url).split(/[?#]/)[0]; // bỏ query string / fragment
   // URL tuyệt đối cùng origin → tách path (asset() có thể sinh http(s)://<host>/storage/...).
@@ -34,13 +38,14 @@ export function thumbUrl(url) {
       return url; // URL malformed → giữ nguyên
     }
   }
+  const qs = size && size !== 160 ? '?size=' + size : '';
   if (clean.startsWith('/storage/')) {
     const p = clean.slice(9);
-    return SAFE.test(p) ? '/studio/image-thumb/' + p : url;
+    return SAFE.test(p) ? '/studio/image-thumb/' + p + qs : url;
   }
   if (clean.startsWith('/studio/image/')) {
     const p = clean.slice(14);
-    return SAFE.test(p) ? '/studio/image-thumb/' + p : url;
+    return SAFE.test(p) ? '/studio/image-thumb/' + p + qs : url;
   }
   return url; // URL ngoài hoặc data:URL → giữ nguyên
 }

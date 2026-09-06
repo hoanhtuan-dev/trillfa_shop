@@ -238,7 +238,7 @@ onMounted(async () => {
              class="group relative overflow-hidden rounded-2xl border-2 transition"
              :class="isSelected(g.id) ? 'border-brand-400' : 'border-ink-700'">
           <div class="relative cursor-pointer" @click="openViewer(g)">
-            <img v-if="g.media_url" :src="thumbUrl(g.media_url)" class="aspect-[3/4] w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
+            <img v-if="g.media_url" :src="thumbUrl(g.media_url, 480)" class="aspect-[3/4] w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
             <div v-else class="grid aspect-[3/4] w-full place-items-center bg-ink-800 text-xs text-cream-300/60">
               {{ g.status === 'failed' ? 'Lỗi' : (g.status === 'cancelled' ? 'Đã hủy' : (g.type === 'video' ? '▶ Video' : 'Không có ảnh')) }}
             </div>
@@ -340,7 +340,7 @@ onMounted(async () => {
                class="group relative overflow-hidden rounded-2xl border-2 transition"
                :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
             <div class="relative cursor-pointer">
-              <img :src="f.url" class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="$event.target.src='/images/placeholder.svg'">
+              <img :src="thumbUrl(f.url, 480)" class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, f.url)">
               <span v-if="f.used" class="absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold text-emerald-200">đang dùng</span>
               <span v-else class="absolute left-2 top-2 rounded-full border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[9px] font-semibold text-red-200">chưa dùng</span>
               <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2 pb-1.5 pt-6">

@@ -1759,11 +1759,12 @@ RULES:
     }
 
     /**
-     * Phục vụ ảnh THUMBNAIL (160px WebP/JPEG) cho selector pose/khuôn mặt — tải nhanh hơn ~50x.
-     * Thumbnail được tạo 1 lần rồi cache ra storage/app/public/studio/thumb/{path}.{ext}.
+     * Phục vụ ảnh THUMBNAIL (WebP/JPEG) — mặc định 160px, hỗ trợ ?size=320|480|640 cho các
+     * lưới hiển thị lớn hơn (vd Thư viện /studio/library dùng 480px để không bị nhòe).
+     * Thumbnail được tạo 1 lần rồi cache ra storage/app/public/studio/thumb/{size}/{path}.{ext}.
      * Ảnh gốc full-size vẫn dùng studioImage() cho AI vision / face_ref / pose_ref.
      */
-    public function studioImageThumb(string $path)
+    public function studioImageThumb(string $path, Request $request)
     {
         if (str_contains($path, '..') || ! preg_match('#^[a-zA-Z0-9/_.\-]+$#', $path)) {
             return response()->json(['error' => 'invalid'], 404);
@@ -1783,7 +1784,14 @@ RULES:
             return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
         }
 
-        $thumbDir = storage_path('app/public/studio/thumb/'.dirname($path));
+        // Cỡ thumbnail: whitelist cứng để chống lạm dụng tạo ảnh lớn/tiêu tốn bộ nhớ.
+        $size = (int) $request->query('size', 160);
+        $allowed = [160, 320, 480, 640];
+        if (! in_array($size, $allowed, true)) {
+            $size = 160;
+        }
+
+        $thumbDir = storage_path('app/public/studio/thumb/'.$size.'/'.dirname($path));
         $useWebp = function_exists('imagewebp');
         $thumbExt = $useWebp ? 'webp' : 'jpg';
         $thumbFile = $thumbDir.'/'.basename($path).'.'.$thumbExt;
@@ -1798,7 +1806,7 @@ RULES:
                 }
                 $w = imagesx($img);
                 $h = imagesy($img);
-                $max = 160;
+                $max = $size;
                 $scale = min(1.0, $max / max($w, $h));
                 $nw = max(1, (int) round($w * $scale));
                 $nh = max(1, (int) round($h * $scale));
