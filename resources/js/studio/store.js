@@ -265,7 +265,6 @@ export const useStudioStore = defineStore('studio', {
     selectedIds() { const a = [this.activeLayerId, ...this.selectedLayerIds].filter(Boolean); return [...new Set(a)]; },
     selection() { return this.canvasLayers.filter(l => this.selectedIds.includes(l.id) && l.visible !== false); },
     selectionCount() { return this.selection.length; },
-    isSelected(id) { return this.selectedIds.includes(id); },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
     // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
     // ảnh. canvasLayers giữ thứ tự vẽ (zIndex), getter này chỉ đảo để hiển thị panel.
@@ -1449,6 +1448,7 @@ export const useStudioStore = defineStore('studio', {
     _setActive(id) { if (!id) { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; return; } const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (this.highlightLayerId && this.highlightLayerId !== id) this.highlightLayerId = ''; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } },
     setActiveLayer(id) { this._setActive(id); this.selectedLayerIds = []; this.saveLayerLayout(); },
     // Shift+click: thêm/bỏ một layer vào nhóm chọn nhiều (không xáo trộn nhóm).
+    isSelected(id) { return this.selectedIds.includes(id); },
     shiftSelectLayer(id) { const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (id === this.activeLayerId) { const rest = this.selectedLayerIds.slice(); this.selectedLayerIds = []; if (rest.length) this._setActive(rest[rest.length - 1]); else this._setActive(''); } else { const idx = this.selectedLayerIds.indexOf(id); if (idx >= 0) this.selectedLayerIds.splice(idx, 1); else { if (this.activeLayerId) this.selectedLayerIds.push(this.activeLayerId); this._setActive(id); } } this.saveLayerLayout(); },
     clearSelection() { this.selectedLayerIds = []; if (this.activeLayerId) this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
