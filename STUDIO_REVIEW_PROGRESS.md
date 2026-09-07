@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3aj (2026-09-07) — SỬA GỐC lỗi không chọn được layer trong panel (truyền nhầm object thay vì id)
+
+- **Nguyên nhân gốc**: hàng layer trong panel gọi `selectLayerWithGroup(l)` (truyền **OBJECT**), còn method nhận **ID** → `find(x => x.id === l)` luôn không khớp → return im lặng. Canvas truyền `l.id` nên chọn được, panel thì không.
+- **Sửa**: `@click.exact="selectLayerWithGroup(l.id)"` + `onRowClick` truyền `l.id`; đồng thời `selectLayerWithGroup` **normalize** tham số (chấp nhận cả object lẫn id) để phòng lỗi tương tự.
+- Verify: vite build ✓ (811ms).
+
 ## Phiên UI-3ai (2026-09-07) — Click chọn layer bằng Vue modifiers + lưu cài đặt status bar
 
 - **Chọn layer**: đổi click hàng layer sang **Vue modifiers** (`@click.exact` → chọn layer/nhóm · `@click.shift.exact` → shift chọn · `@click.alt.exact` → chỉnh riêng trong nhóm) — loại bỏ nhầm modifier, đảm bảo click thường chọn đúng layer.

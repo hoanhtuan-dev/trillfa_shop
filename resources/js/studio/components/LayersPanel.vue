@@ -47,7 +47,7 @@ function onRowDragLeave(e, l) {
   if (dropTargetId.value === l.id) { dropTargetId.value = null; dropBelow.value = false; }
 }
 // Nhấn 1 layer = chọn riêng; shift+click = thêm/bỏ vào nhóm chọn nhiều (đồng bộ canvas).
-function onRowClick(l, e) { if (e && e.shiftKey) { store.shiftSelectLayer(l.id); return; } if (e && e.altKey && l.groupId) { store.setActiveLayer(l.id); return; } store.selectLayerWithGroup(l); }
+function onRowClick(l, e) { if (e && e.shiftKey) { store.shiftSelectLayer(l.id); return; } if (e && e.altKey && l.groupId) { store.setActiveLayer(l.id); return; } store.selectLayerWithGroup(l.id); }
 // ── Nhóm layer: hiển thị dưới dạng folder riêng trong panel ──
 const collapsedGroups = ref(new Set()); // mặc định rỗng = tất cả nhóm MỞ (hiển thị member); thu gọn mới ẩn hết
 function toggleGroup(gid) { const s = new Set(collapsedGroups.value); s.has(gid) ? s.delete(gid) : s.add(gid); collapsedGroups.value = s; }
@@ -166,7 +166,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           l.groupId ? 'ml-3' : '',
           dropTargetId === l.id ? (dropBelow ? 'border-b-2 border-b-brand-400' : 'border-t-2 border-t-brand-400') : ''
         ]"
-        @click.exact="store.selectLayerWithGroup(l)"
+        @click.exact="store.selectLayerWithGroup(l.id)"
         @click.shift.exact="store.shiftSelectLayer(l.id)"
         @click.alt.exact="store.setActiveLayer(l.id)"
         @dragover="onRowDragOver($event, l)"

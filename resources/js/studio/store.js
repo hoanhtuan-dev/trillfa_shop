@@ -1459,7 +1459,8 @@ export const useStudioStore = defineStore('studio', {
     clearSelection() { this.selectedLayerIds = []; if (this.activeLayerId) this.saveLayerLayout(); },
     // Trả về layer của một nhóm (nếu layer thuộc nhóm) cho thao tác "chọn cả nhóm".
     selectLayerWithGroup(id) {
-      const l = this.canvasLayers.find(x => x.id === id); if (!l) return;
+      const lid = (id && typeof id === 'object') ? id.id : id; // chấp nhận cả object lẫn id
+      const l = this.canvasLayers.find(x => x.id === lid); if (!l) return;
       const g = l.groupId ? this.layerGroups.find(x => x.id === l.groupId) : null;
       if (g && g.layerIds.length > 1 && g.layerIds.includes(id)) {
         this._setActive(id);
