@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3l (2026-09-07) — Menu Thêm layer (LayersPanel): thoát khi mất tiêu điểm · bảng màu tùy chỉnh · giãn khoảng cách
+
+- **Thoát popup khi thoát tiêu điểm**: click-ra-ngoài (pointerdown) tự đóng menu Thêm layer (`menuRoot` + `onDocPointer` + watch; dọn listener onBeforeUnmount).
+- **Bảng chọn màu tùy chỉnh cho layer**: input màu (`blankColor`, mặc định #4f9dff) + nút "Thêm layer màu" → `addBlankLayer(blankColor, blankRatio)`.
+- **Giãn khoảng cách**: menu `gap-2 p-3` (rộng rãi hơn) · swatch màu `h-7 w-7` + hover scale-110 · nút tỷ lệ `px-2 py-1` gap-1.5 · nút "Trong suốt" py-1.5 · có dải phân cách trước phần Tỷ lệ · bo/padding to hơn cho dễ bấm.
+- Verify: vite build ✓ (783ms).
+
 ## Phiên UI-3k (2026-09-07) — addBlankLayer: ưu tiên kích thước ảnh hiện tại · trống theo preset tỷ lệ
 
 - `addBlankLayer(bg, ratio)` khôi phục tính năng đọc kích thước ảnh đang chọn: nếu active layer có ảnh → layer mới tạo **đúng kích thước (naturalWidth/Height) ảnh hiện tại** (ưu tiên); nếu tạo layer trống (không chọn ảnh) → tôn trọng **preset tỷ lệ khung hình** (`ratioToSize(ratio || imageRatio)`), baseW/baseH = w/h.
