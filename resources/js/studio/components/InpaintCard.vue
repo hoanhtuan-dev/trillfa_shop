@@ -130,21 +130,23 @@ const defaultEditLabel = computed(() => {
 
     <!-- Mask tools: chọn vùng trên canvas chính -->
     <div v-if="store.preview?.media_url" class="mt-3 flex flex-wrap gap-1.5">
-      <button @click="store.toggleInpaintMask('rect')" title="Chọn vùng chữ nhật trên canvas"
-              :class="store.inpaintMaskMode === 'rect' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
-        <StudioIcon name="scan" size="h-3.5 w-3.5" /> Chọn vùng
-      </button>
-      <button @click="store.toggleInpaintMask('brush')" title="Vẽ mask bằng cọ"
-              :class="store.inpaintMaskMode === 'brush' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
-        <StudioIcon name="brush" size="h-3.5 w-3.5" /> Vẽ mask
-      </button>
-      <button @click="store.toggleInpaintMask('freehand')" title="Vẽ vùng tự do bằng cọ"
-              :class="store.inpaintMaskMode === 'freehand' ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'"
-              class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors">
-        <StudioIcon name="spline" size="h-3.5 w-3.5" /> Vẽ tự do
-      </button>
+      <div class="seg flex-wrap">
+        <button @click="store.toggleInpaintMask('rect')" title="Chọn vùng chữ nhật trên canvas"
+                :class="store.inpaintMaskMode === 'rect' ? 'is-active' : ''"
+                class="seg-btn">
+          <StudioIcon name="scan" size="h-3.5 w-3.5" /> Chọn vùng
+        </button>
+        <button @click="store.toggleInpaintMask('brush')" title="Vẽ mask bằng cọ"
+                :class="store.inpaintMaskMode === 'brush' ? 'is-active' : ''"
+                class="seg-btn">
+          <StudioIcon name="brush" size="h-3.5 w-3.5" /> Vẽ mask
+        </button>
+        <button @click="store.toggleInpaintMask('freehand')" title="Vẽ vùng tự do bằng cọ"
+                :class="store.inpaintMaskMode === 'freehand' ? 'is-active' : ''"
+                class="seg-btn">
+          <StudioIcon name="spline" size="h-3.5 w-3.5" /> Vẽ tự do
+        </button>
+      </div>
       <button v-if="maskActive && store.inpaintMaskMode === 'rect' && (store.inpaintMaskBox.w || 0) >= 0.02"
               @click="store.resetInpaintMaskBox()"
               class="rounded-full bg-amber-600/30 px-2 py-1 text-[10px] font-semibold text-amber-200 hover:bg-amber-600"

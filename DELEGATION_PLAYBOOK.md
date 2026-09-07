@@ -27,13 +27,15 @@ Task càng lớn → JSON output càng dài → xác suất model bọc fence c�
 
 | Provider | Model | Context | Đo thực tế (cùng 1 task nhỏ) | Dùng khi |
 |---|---|---|---|---|
-| **`qwen-token-plan`** | **`qwen3.8-max`** | 262.144 | 4.817 input · 3.546 output · **2 step** | ✅ **MẶC ĐỊNH** — rẻ nhất, bám format chuẩn |
+| **`qwen-token-plan`** | **`qwen3.8-max`** | 262.144 | 4.817 input · 3.546 output · **2 step** | ✅ **MẶC ĐỊNH của template workflow (mục 5)** — rẻ nhất, bám format chuẩn |
 | **`qwen-token-plan`** | **`glm-5.2`** | 262.144 | 23.076 input · 1.658 output · **6 step** | Task cần **suy luận liên file** (authz/route/config precedence) — tự xác minh, đắt ~4,8× input |
 | **`qwen-token-plan`** | **`kimi-k3`** | 262.144 | 24.772 input · 6.280 output · **3 step** (scope KHÁC: 3 file Vue 46,5 KB/708 dòng) | ✅ Review **frontend chiều sâu** (Vue lifecycle/listener leak/race/a11y) — 6/8 finding đúng, cơ chế+dòng chính xác; **phồng severity** (xem bullet dưới) |
 | `qwen-token-plan` | `deepseek-v4-pro` | 262.144 | đã chạy tốt ở đợt trước | Dự phòng / task cần output dài |
-| `deepseek-official` | `deepseek-v4-pro` | 1.000.000 | — | ⏸ tạm dừng theo chính sách tiết kiệm hạn mức |
+| **`deepseek-official`** | **`deepseek-v4-flash`** | 1.000.000 | — | ✅ **`agent-default-model` HIỆN TẠI** — điều phối (agent chạy playbook này) chạy chính model này |
+| **`deepseek-official`** | **`deepseek-v4-pro`** | 1.000.000 | — | Task nặng nhất cần reasoning/output dài — nhánh mạnh hơn của DeepSeek, đắt hơn flash ~3× |
 
-- `agent-default-model` hiện là **`qwen-token-plan` / `qwen3.8-max`** → chính điều phối cũng chạy model này.
+- `agent-default-model` hiện là **`deepseek-official` / `deepseek-v4-flash`** (kèm `reasoningEffort: high`, nguồn `~/.dsh/settings.yaml`) → chính điều phối cũng chạy model DeepSeek này; task trong workflow vẫn pin model theo template mục 5 (mặc định `qwen3.8-max`) khi muốn giữ rẻ.
+- Model DeepSeek tồn tại trên **2 route riêng biệt** (đừng nhầm): `deepseek-official` = DeepSeek API chính hãng (key `DEEPSEEK_API_KEY`, base `api.deepseek.com`, context **1.000.000**; adapter mặc định nhận `deepseek-v4-flash`, `deepseek-v4-pro` và bản vision `deepseek-v4-flash-vision-exp`) — còn `qwen-token-plan` chỉ là DashScope compatible-mode chạy proxy `deepseek-v4-pro` và `deepseek-v4-flash-0731` (context 262.144).
 - Mọi model của route `qwen-token-plan` (hiện **5**, gồm `kimi-k3`) đều **không khai `contextWindow`** → cùng resolve về `defaultContextWindow` = **262.144** → **cùng một ngân sách chia task (mục 3) áp dụng cho tất cả**.
 - **Bằng chứng chất lượng (đo được, cùng scope `StylistDataController`):** `qwen3.8-max` khẳng định SAI rằng "`page()` serves the admin UI to any visitor"; thực tế route `/stylist-data` (`routes/web.php:128`) và các route mutating (:192-196) nằm TRONG group `[auth, admin, nostore]`. `glm-5.2` tự đọc `routes/web.php` và mô tả đúng. → **finding `high`/`critical` của `qwen3.8-max` bắt buộc xác minh**; `glm-5.2` đáng tin hơn ở suy luận liên file.
 - `glm-5.2` hay thêm **đoạn dạo đầu** trước `AREA:` và **bỏ dấu ` | ` trước `fix:`** (chỉ 3 field) → parser PHẢI bao dung (mục 5). Đừng kết luận model "hỏng" khi parser trượt.

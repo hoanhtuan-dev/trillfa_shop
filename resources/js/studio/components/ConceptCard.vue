@@ -473,14 +473,14 @@ const bodyHipsLabel = computed(() => {
       </div>
       <template v-else>
         <!-- ── Tab navigation ── -->
-        <div class="mb-4 flex gap-1 rounded-2xl border border-white/10 bg-ink-800/70 p-1">
+        <div class="mb-4 seg">
           <button v-for="tab in [
             { id: 'prompt', icon: 'pencil', label: 'Prompt', tooltip: 'Nhập và chỉnh sửa prompt tạo ảnh' },
             { id: 'body', icon: 'body', label: 'Phom dáng', tooltip: 'Điều chỉnh chiều cao, vóc dáng, eo, vai, hông của người mẫu' },
             { id: 'hair', icon: 'hair', label: 'Kiểu tóc', tooltip: 'Chọn kiểu tóc và màu tóc thời thượng' },
             { id: 'advanced', icon: 'gear', label: 'Nâng cao', tooltip: 'Negative prompt và các tùy chọn nâng cao' },
-          ]" :key="tab.id" @click="activeTab = tab.id" :title="tab.tooltip" class="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition"
-            :class="activeTab === tab.id ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/25' : 'text-cream-300/60 hover:text-cream-200'">
+          ]" :key="tab.id" @click="activeTab = tab.id" :title="tab.tooltip" class="seg-btn"
+            :class="activeTab === tab.id ? 'is-active' : ''">
             <StudioIcon :name="tab.icon" size="h-3.5 w-3.5" />
             <span class="hidden sm:inline">{{ tab.label }}</span>
           </button>
@@ -490,9 +490,9 @@ const bodyHipsLabel = computed(() => {
         <div v-show="activeTab === 'prompt'" class="space-y-3">
           <!-- Top bar -->
           <div class="flex items-center gap-2">
-            <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" title="Xem lại các prompt đã dùng trước đây" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showHistory ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử</span></button>
-            <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" title="Chọn mẫu prompt có sẵn để bắt đầu nhanh" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showTemplates ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="template" size="h-3.5 w-3.5" /> Templates</span></button>
-            <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" title="Prompt đã lưu từ Trợ lý thiết kế" class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition" :class="showPresets ? 'border-brand-500 bg-brand-600 text-white' : 'border-ink-600 bg-ink-800 text-cream-200 hover:border-brand-400'"><span class="flex items-center gap-1"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Preset</span></button>
+            <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" title="Xem lại các prompt đã dùng trước đây" class="tool-btn" :class="showHistory ? 'is-active' : ''"><span class="flex items-center gap-1"><StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử</span></button>
+            <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" title="Chọn mẫu prompt có sẵn để bắt đầu nhanh" class="tool-btn" :class="showTemplates ? 'is-active' : ''"><span class="flex items-center gap-1"><StudioIcon name="template" size="h-3.5 w-3.5" /> Templates</span></button>
+            <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" title="Prompt đã lưu từ Trợ lý thiết kế" class="tool-btn" :class="showPresets ? 'is-active' : ''"><span class="flex items-center gap-1"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Preset</span></button>
             <span class="ml-auto text-xs text-cream-300/40" title="Số credit ước tính cho lần tạo này">~{{ creditEstimate }} credit</span>
           </div>
 
@@ -510,8 +510,8 @@ const bodyHipsLabel = computed(() => {
           <div class="relative">
             <textarea v-model="store.imagePromptEn" @keydown="onPromptKeydown" rows="5" class="input !text-sm !py-3 !pr-16 !rounded-2xl" placeholder="Mô tả trang phục, phong cách, bối cảnh, ánh sáng… (EN hoặc VI)"></textarea>
             <div class="absolute bottom-2 right-2 flex items-center gap-1">
-              <button @click="undo" :disabled="undoStack.length < 2" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Hoàn tác thay đổi gần nhất (Ctrl+Z)"><StudioIcon name="undo" size="h-3.5 w-3.5" /></button>
-              <button @click="redo" :disabled="!redoStack.length" class="grid h-6 w-6 place-items-center rounded bg-ink-700 text-[10px] text-cream-200 hover:bg-ink-600 disabled:opacity-30" title="Làm lại thay đổi đã hoàn tác (Ctrl+Y)"><StudioIcon name="redo" size="h-3.5 w-3.5" /></button>
+              <button @click="undo" :disabled="undoStack.length < 2" class="icon-btn !h-6 !w-6" title="Hoàn tác thay đổi gần nhất (Ctrl+Z)"><StudioIcon name="undo" size="h-3.5 w-3.5" /></button>
+              <button @click="redo" :disabled="!redoStack.length" class="icon-btn !h-6 !w-6" title="Làm lại thay đổi đã hoàn tác (Ctrl+Y)"><StudioIcon name="redo" size="h-3.5 w-3.5" /></button>
               <span class="text-[10px] font-semibold" :class="charDanger ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-cream-300/50'" :title="'Số ký tự: ' + charCount + '/' + MAX_CHARS">{{ charCount }}/{{ MAX_CHARS }}</span>
             </div>
           </div>
@@ -524,11 +524,13 @@ const bodyHipsLabel = computed(() => {
                 <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
               </div>
               <!-- Chế độ chèn -->
-              <div class="mb-3 flex items-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800/70 p-1 text-[10px]">
+              <div class="mb-3 flex items-center gap-1.5 text-[10px]">
                 <span class="ml-1 text-cream-300/50">Chèn vào:</span>
-                <button @click="insertMode = 'append'" :class="insertMode === 'append' ? 'bg-brand-600 text-white' : 'text-cream-300/50 hover:text-cream-200'" class="rounded-lg px-2 py-1 font-semibold transition" title="Thêm vào cuối prompt hiện tại">Cuối</button>
-                <button @click="insertMode = 'prepend'" :class="insertMode === 'prepend' ? 'bg-brand-600 text-white' : 'text-cream-300/50 hover:text-cream-200'" class="rounded-lg px-2 py-1 font-semibold transition" title="Thêm vào đầu prompt hiện tại">Đầu</button>
-                <button @click="insertMode = 'replace'" :class="insertMode === 'replace' ? 'bg-brand-600 text-white' : 'text-cream-300/50 hover:text-cream-200'" class="rounded-lg px-2 py-1 font-semibold transition" title="Thay thế toàn bộ prompt hiện tại">Ghi đè</button>
+                <div class="seg">
+                  <button @click="insertMode = 'append'" :class="insertMode === 'append' ? 'is-active' : ''" class="seg-btn" title="Thêm vào cuối prompt hiện tại">Cuối</button>
+                  <button @click="insertMode = 'prepend'" :class="insertMode === 'prepend' ? 'is-active' : ''" class="seg-btn" title="Thêm vào đầu prompt hiện tại">Đầu</button>
+                  <button @click="insertMode = 'replace'" :class="insertMode === 'replace' ? 'is-active' : ''" class="seg-btn" title="Thay thế toàn bộ prompt hiện tại">Ghi đè</button>
+                </div>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <button v-for="t in templates" :key="t.id" @click="applyTemplate(t)" :title="'Nhấn để ' + (insertMode === 'replace' ? 'ghi đè' : insertMode === 'append' ? 'thêm vào cuối' : 'thêm vào đầu') + ' prompt'" class="rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400 hover:bg-brand-600/10">
@@ -696,15 +698,17 @@ const bodyHipsLabel = computed(() => {
               <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
             </div>
             <!-- Chế độ chèn cho preset -->
-            <div class="mb-3 flex items-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800/70 p-1 text-[10px]">
+            <div class="mb-3 flex items-center gap-1.5 text-[10px]">
               <span class="ml-1 text-cream-300/50">Chèn vào:</span>
-              <button @click="insertMode = 'append'" :class="insertMode === 'append' ? 'bg-brand-600 text-white' : 'text-cream-300/50 hover:text-cream-200'" class="rounded-lg px-2 py-1 font-semibold transition" title="Thêm vào cuối prompt hiện tại">Cuối</button>
-              <button @click="insertMode = 'prepend'" :class="insertMode === 'prepend' ? 'bg-brand-600 text-white' : 'text-cream-300/50 hover:text-cream-200'" class="rounded-lg px-2 py-1 font-semibold transition" title="Thêm vào đầu prompt hiện tại">Đầu</button>
-              <button @click="insertMode = 'replace'" :class="insertMode === 'replace' ? 'bg-brand-600 text-white' : 'text-cream-300/50 hover:text-cream-200'" class="rounded-lg px-2 py-1 font-semibold transition" title="Thay thế toàn bộ prompt hiện tại">Ghi đè</button>
+              <div class="seg">
+                <button @click="insertMode = 'append'" :class="insertMode === 'append' ? 'is-active' : ''" class="seg-btn" title="Thêm vào cuối prompt hiện tại">Cuối</button>
+                <button @click="insertMode = 'prepend'" :class="insertMode === 'prepend' ? 'is-active' : ''" class="seg-btn" title="Thêm vào đầu prompt hiện tại">Đầu</button>
+                <button @click="insertMode = 'replace'" :class="insertMode === 'replace' ? 'is-active' : ''" class="seg-btn" title="Thay thế toàn bộ prompt hiện tại">Ghi đè</button>
+              </div>
             </div>
             <div class="mb-3 flex flex-wrap gap-1.5">
-              <button @click="presetType = ''" :class="presetType === '' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition" title="Hiển thị tất cả loại preset">Tất cả</button>
-              <button v-for="t in presetTypes" :key="t.id" @click="presetType = t.id" :class="presetType === t.id ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-full px-3 py-1 text-xs font-semibold transition" :title="'Lọc preset loại ' + t.name">{{ t.emoji }} {{ t.name }}</button>
+              <button @click="presetType = ''" :class="presetType === '' ? 'is-active' : ''" class="tool-btn" title="Hiển thị tất cả loại preset">Tất cả</button>
+              <button v-for="t in presetTypes" :key="t.id" @click="presetType = t.id" :class="presetType === t.id ? 'is-active' : ''" class="tool-btn" :title="'Lọc preset loại ' + t.name">{{ t.emoji }} {{ t.name }}</button>
             </div>
             <p v-if="presetsLoading" class="py-6 text-center text-xs text-cream-300/60">Đang tải preset…</p>
             <div v-else-if="!filteredPresets.length" class="py-6 text-center text-xs text-cream-300/50">Chưa có preset.</div>

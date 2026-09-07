@@ -32,15 +32,15 @@ const sortedProducts = computed(() => {
 });
 </script>
 <template>
-  <div class="card p-2">
-    <div class="flex items-center justify-between">
-      <span class="flex items-center gap-1 text-[11px] font-semibold text-brand-300"><StudioIcon name="image" size="h-4 w-4"/>Nguồn</span>
-      <button v-if="store.editSource" @click="store.removeEditSource()" class="grid h-7 w-7 place-items-center rounded-lg bg-ink-800 text-red-300 transition-colors hover:bg-red-600 hover:text-white" title="Bỏ ảnh nguồn khỏi canvas" :aria-label="'Bỏ ảnh nguồn khỏi canvas'"><StudioIcon name="x" size="h-3.5 w-3.5"/></button>
+  <div class="card overflow-hidden">
+    <div class="panel-head border-b border-ink-700">
+      <span class="panel-title"><StudioIcon name="image" size="h-4 w-4"/>Nguồn</span>
+      <button v-if="store.editSource" @click="store.removeEditSource()" class="icon-btn text-red-300 hover:bg-red-600 hover:text-white" title="Bỏ ảnh nguồn khỏi canvas" :aria-label="'Bỏ ảnh nguồn khỏi canvas'"><StudioIcon name="x" size="h-3.5 w-3.5"/></button>
     </div>
-    <div v-if="store.editSource" class="mt-2 flex items-center gap-2"><img :src="store.editSource.url" class="h-10 w-10 rounded-lg bg-ink-900 object-cover"><span class="truncate text-[10px] text-cream-200">{{ store.editSource.name }}</span></div>
-    <div class="mt-2 flex gap-1.5">
-      <button @click="uploadOpen = true" class="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Thư viện ảnh đã tải lên"><StudioIcon name="imagePlus" size="h-4 w-4"/><span class="text-[10px] font-medium">Tải lên</span></button>
-      <button @click="openProducts" class="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Chọn ảnh từ sản phẩm"><StudioIcon name="shirt" size="h-4 w-4"/><span class="text-[10px] font-medium">Sản phẩm</span></button>
+    <div v-if="store.editSource" class="mt-2 flex items-center gap-2 p-2"><img :src="store.editSource.url" class="h-10 w-10 rounded-lg bg-ink-900 object-cover"><span class="truncate text-[10px] text-cream-200">{{ store.editSource.name }}</span></div>
+    <div class="mt-2 flex gap-1.5 p-2">
+      <button @click="uploadOpen = true" class="tool-btn flex-1 justify-center" title="Thư viện ảnh đã tải lên"><StudioIcon name="imagePlus" size="h-4 w-4"/><span class="text-[10px] font-medium">Tải lên</span></button>
+      <button @click="openProducts" class="tool-btn flex-1 justify-center" title="Chọn ảnh từ sản phẩm"><StudioIcon name="shirt" size="h-4 w-4"/><span class="text-[10px] font-medium">Sản phẩm</span></button>
     </div>
 
     <!-- Thư viện ảnh nguồn (dùng chung) -->

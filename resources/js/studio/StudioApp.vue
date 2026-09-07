@@ -253,10 +253,9 @@ function onTouchEnd(e) {
         </template>
       </div>
       <div class="flex shrink-0 items-center gap-2">
-        <button @click="projectsOpen = true" class="inline-flex items-center gap-1.5 rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-xs font-semibold text-cream-200 transition hover:border-brand-500 hover:bg-ink-700" title="Mở bảng quản lý dự án thiết kế"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Dự án</button>
-        <!-- Quick-apply popover -->
+        <!-- Dự án + quick-apply gộp 1 tool-btn -->
         <div class="relative">
-          <button @click="openApplyPopover" class="inline-flex items-center gap-1 rounded-full border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs font-semibold text-cream-200 transition hover:border-brand-500 hover:bg-ink-700" :class="store.appliedProject ? 'ring-1 ring-brand-500' : ''" title="Áp dụng nhanh một dự án"><StudioIcon name="pin" size="h-3.5 w-3.5" /></button>
+          <button @click="openApplyPopover" class="tool-btn" title="Dự án — áp dụng nhanh hoặc mở workspace quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Dự án</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
           <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-ink-700 bg-ink-900 shadow-xl">
             <div class="p-2.5">
               <p class="mb-2 text-[11px] font-semibold text-cream-200">Áp dụng dự án cho phiên tạo ảnh</p>
@@ -274,19 +273,22 @@ function onTouchEnd(e) {
               <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/30 bg-red-600/10 px-2 py-1.5 text-[10px] font-semibold text-red-200 transition hover:bg-red-600/20">
                 <StudioIcon name="pinOff" size="h-3 w-3" /> Ngắt dự án hiện tại
               </button>
+              <button @click="applyOpen = false; projectsOpen = true" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition hover:bg-ink-700">
+                <StudioIcon name="kanban" size="h-3 w-3" /> Mở workspace quản lý dự án
+              </button>
             </div>
           </div>
           <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
         </div>
-        <span v-if="store.appliedProject" class="hidden max-w-[13rem] items-center gap-1 rounded-full border border-brand-500/50 bg-brand-600/20 px-2.5 py-1 text-xs font-semibold text-brand-100 md:inline-flex" :title="'Dự án hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào dự án này'">
-          <button type="button" @click="projectsOpen = true" class="truncate hover:text-white"><StudioIcon name="pin" size="h-3.5 w-3.5" /> {{ store.appliedProject.name }}</button>
-          <button type="button" @click="store.unapplyProject()" class="ml-0.5 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
+        <span v-if="store.appliedProject" class="tool-btn is-active hidden max-w-[13rem] md:inline-flex" :title="'Dự án hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào dự án này'">
+          <button type="button" @click="projectsOpen = true" class="flex min-w-0 items-center gap-1.5 truncate hover:text-white"><StudioIcon name="pin" size="h-3.5 w-3.5" /><span class="truncate">{{ store.appliedProject.name }}</span></button>
+          <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </span>
-        <span v-if="store.user" class="hidden rounded-full bg-ink-800 px-2.5 py-1 text-xs font-semibold text-cream-200 md:inline-block">Credit {{ store.creditsLeft }}</span>
-        <a v-if="store.user && store.user.is_admin" href="/admin" class="inline-flex items-center gap-1 rounded-full border border-brand-500/40 bg-brand-600/20 px-3 py-1 text-xs font-semibold text-brand-200 transition hover:bg-brand-600 hover:text-white" title="Đi tới trang quản trị (Dashboard Manager)"><StudioIcon name="gear" size="h-3.5 w-3.5" /> Quản trị shop</a>
+        <span v-if="store.user" class="tool-btn hidden cursor-default md:inline-flex" title="Số credit còn lại"><StudioIcon name="coins" size="h-3.5 w-3.5" /> {{ store.creditsLeft }}</span>
+        <a v-if="store.user && store.user.is_admin" href="/admin" class="tool-btn" title="Đi tới trang quản trị (Dashboard Manager)"><StudioIcon name="gear" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Quản trị</span></a>
         <form v-if="store.user" method="POST" action="/dang-xuat" class="m-0">
           <input type="hidden" name="_token" :value="csrfToken">
-          <button type="submit" class="rounded-full border border-ink-700 px-3 py-1 text-xs font-semibold text-cream-100 transition hover:border-red-600 hover:bg-red-600 hover:text-white">Đăng xuất</button>
+          <button type="submit" class="tool-btn" title="Đăng xuất khỏi tài khoản">Đăng xuất</button>
         </form>
         <a v-else href="/dang-nhap?redirect=/studio" class="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-amber-400">Đăng nhập</a>
       </div>
@@ -295,19 +297,19 @@ function onTouchEnd(e) {
     <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
     <!-- Mobile top bar -->
     <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
-      <button @click="menuOpen = true" class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-cream-200" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
-      <span class="font-display text-sm font-semibold">Studio</span>
-      <div class="flex items-center gap-2">
-        <button @click="projectsOpen = true" class="rounded-lg bg-ink-700 px-2.5 py-1.5 text-xs font-semibold text-cream-200" :class="store.appliedProject ? 'ring-2 ring-brand-500' : ''" :title="store.appliedProject ? 'Dự án hiện tại: ' + store.appliedProject.name : 'Dự án'"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
-        <button @click="outputOpen = true" class="rounded-lg bg-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-200">Kết quả ({{ store.generations.length }})</button>
+      <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
+      <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span>
+      <div class="flex items-center gap-1.5">
+        <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" :title="store.appliedProject ? 'Dự án hiện tại: ' + store.appliedProject.name : 'Dự án'" aria-label="Dự án"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
+        <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-none text-white">{{ store.generations.length }}</span></button>
       </div>
     </div>
     <div class="flex flex-1 overflow-hidden">
       <!-- Left sidebar (desktop) -->
       <aside class="scrollbar-hide hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 p-3 lg:flex">
         <div class="mb-3 flex items-center justify-between"><span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><span class="text-[10px] text-cream-300/50">Credit {{ store.creditsLeft }}</span></div>
-        <div class="mb-3 flex gap-1 rounded-2xl bg-ink-800 p-1">
-          <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0])" class="flex-1 rounded-xl px-2 py-1.5 text-xs font-semibold" :class="store.step === Number(s[0]) ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">{{ s[1] }}</button>
+        <div class="mb-3 seg">
+          <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0])" class="seg-btn" :class="store.step === Number(s[0]) ? 'is-active' : ''">{{ s[1] }}</button>
         </div>
         <div class="scrollbar-hide space-y-3">
           <component :is="c" v-for="(c,i) in panel" :key="i" />
@@ -418,7 +420,7 @@ function onTouchEnd(e) {
         </div>
       </main>
       <!-- Right outputs (desktop) -->
-      <aside class="scrollbar-hide hidden w-48 shrink-0 flex-col space-y-3 overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-2 lg:flex">
+      <aside class="scrollbar-hide hidden w-44 shrink-0 flex-col space-y-3 overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-2 lg:flex">
         <SourcePanel />
         <OutputModule />
       </aside>
@@ -428,9 +430,9 @@ function onTouchEnd(e) {
     <div v-if="menuOpen" class="fixed inset-0 z-50 lg:hidden" @click="menuOpen=false">
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
-        <div class="mb-2 flex items-center justify-between"><span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
-        <div class="mb-3 flex gap-1 rounded-2xl bg-ink-800 p-1">
-          <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0]); menuOpen=false" class="flex-1 rounded-xl px-2 py-1.5 text-xs font-semibold" :class="store.step === Number(s[0]) ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">{{ s[1] }}</button>
+        <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
+        <div class="mb-3 seg">
+          <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0]); menuOpen=false" class="seg-btn" :class="store.step === Number(s[0]) ? 'is-active' : ''">{{ s[1] }}</button>
         </div>
         <div class="space-y-3"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
       </div>
@@ -439,7 +441,7 @@ function onTouchEnd(e) {
     <div v-if="outputOpen" class="fixed inset-0 z-50 lg:hidden" @click="outputOpen=false">
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
-        <div class="mb-2 flex items-center justify-between"><p class="text-xs font-semibold">Outputs ({{ store.generations.length }})</p><button @click="outputOpen=false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button></div>
+        <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Outputs <span class="text-cream-300/50">({{ store.generations.length }})</span></span><button @click="outputOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button></div>
         <SourcePanel />
         <OutputModule />
       </div>

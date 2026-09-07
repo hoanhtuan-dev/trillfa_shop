@@ -100,8 +100,10 @@ function openSettings() { settingsOpen.value = true; }
       <template v-else>
         <div class="mb-3 flex items-center justify-between">
           <div class="flex gap-1.5">
-            <button @click="promptLang='en'" title="Hiển thị prompt tiếng Anh" :class="promptLang==='en' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">EN</button>
-            <button @click="promptLang='vi'" title="Hiển thị prompt tiếng Việt" :class="promptLang==='vi' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">VI</button>
+            <div class="seg w-28 shrink-0">
+              <button @click="promptLang='en'" title="Hiển thị prompt tiếng Anh" :class="promptLang === 'en' ? 'is-active' : ''" class="seg-btn">EN</button>
+              <button @click="promptLang='vi'" title="Hiển thị prompt tiếng Việt" :class="promptLang === 'vi' ? 'is-active' : ''" class="seg-btn">VI</button>
+            </div>
           </div>
           <button @click="backToSurvey" title="Quay lại chỉnh câu trả lời" class="btn-outline btn-sm">Chỉnh lại</button>
         </div>

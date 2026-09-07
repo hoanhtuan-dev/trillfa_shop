@@ -6,6 +6,15 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-2 (2026-09-07) — Đồng bộ chrome: right bar 1 cột · header tool-btn · chips seg · mobile (PHẦN II STUDIO_UI_REDESIGN.md)
+
+- **Provider**: CHỈ `deepseek-official` / `deepseek-v4-pro` (yêu cầu người dùng) — workflow 5 agent (concept · inpaint · refimage · langcards · rightbar), 5/5 thành công, 0 fail.
+- **Right bar 1 cột**: StudioApp aside `w-48→w-44` · OutputModule `grid-cols-2→grid-cols-1` + header `panel-head`/`panel-title` + nút `icon-btn` · SourcePanel header `panel-head` + nút `tool-btn` (Tải lên/Sản phẩm) · root `card overflow-hidden`.
+- **Header + mobile**: gộp nút Dự án + quick-apply thành 1 `tool-btn` (popover thêm footer "Mở workspace") · chip dự án áp dụng `tool-btn is-active` · credit `tool-btn`+icon coins · admin/logout `tool-btn` · mobile top bar `icon-btn !h-9 !w-9 border ink-700` + title sparkles + badge đếm trên icon outputs (thay nút text "Kết quả (n)") · drawer header `panel-head`+`panel-title` · step-nav → `.seg`/`.seg-btn`.
+- **Chips → seg**: ConceptCard (tab nav 4 tab · Lịch sử/Templates/Preset → `tool-btn` · insertMode ×2 → seg · undo/redo → icon-btn · preset filter → tool-btn) · InpaintCard (chế độ mask → seg) · RefImageCard (mode → seg · Số ảnh → seg) · SuggestCard/StylistCard (EN/VI → seg w-28).
+- **Verify**: vite build ✓ (765ms) · `.seg/.tool-btn/.icon-btn/.panel-head/.panel-title` sinh CSS · chỉ còn 1 `bg-brand-600 text-white` = checkbox slot multi-view InpaintCard (chủ đích, không phải chip).
+- **Deploy**: commit + push → SSH `ssh -p 65002 u310846799@145.79.25.57` (app `~/domains/trillfa.shop`) `git pull --ff-only` + `composer --no-scripts` + `migrate` + `optimize:clear`. Đã lưu: `scripts/deploy.sh` + ghi chú DEPLOY.md.
+
 ## Phiên UI-1 (2026-09-07) — REDESIGN "/studio" Designer Workspace (ngoài phạm vi review code)
 
 - Spec: **STUDIO_UI_REDESIGN.md** (phân tích + contract component + icon map + checklist).

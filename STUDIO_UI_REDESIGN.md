@@ -162,3 +162,49 @@ reorderLayer(id, targetId, placeAfter) { ... }
 3. Grep emoji chrome (`🔒 🎨 ☰ ✕ ⚙️ ⚠️ 🚫 ⏳`) trên các file đã sửa = 0 (trừ ConceptCard emoji data + SwapCard ẩn).
 4. CSS build mới có rule `.bg-ink-950`, `.bg-ink-600`, `.border-ink-600`, `.text-cream-400`.
 5. `StudioApp.vue` không còn `<svg` (0), import + render `<LayersPanel/>` + `<CanvasStatusBar/>`.
+
+---
+
+# PHẦN II (2026-09-07) — Đồng bộ chrome: sidebar phải 1 cột, header tinh tế, chips thống nhất, mobile
+
+## 9. Bộ class chrome dùng chung (đã thêm vào app.css — BẮT BUỘC dùng, không tự chế)
+
+| Class | Vai trò |
+|---|---|
+| `.seg` + `.seg-btn` (+ `.is-active`) | Segmented control — THAY mọi tab/chip lồng nhau (tabs ConceptCard, chế độ mask, EN/VI, chọn số biến thể, insertMode Cuối/Đầu/Ghi đè) |
+| `.tool-btn` (+ `.is-active`) | Nút toolbar nhỏ có label trong card/panel (Lịch sử/Templates/Preset, Tải lên/Sản phẩm) |
+| `.icon-btn` | Nút icon vuông chuẩn h-7 w-7 |
+| `.panel-head` + `.panel-title` | Header chuẩn của card/panel (icon + tiêu đề trái, actions phải) |
+
+Quy tắc: khi container segmented cần gọn (vd EN/VI cạnh tiêu đề) thêm `w-28`/shrink-0 vào `.seg`; nút seg-btn giữ `flex-1`. KHÔNG đổi logic/handler/store call; KHÔNG đụng emoji-data ConceptCard.
+
+## 10. Right bar — 1 cột, nhỏ gọn (W3)
+
+- Aside desktop `w-48` → `w-44` (StudioApp — điều phối đổi).
+- `OutputModule.vue`: grid outputs `grid-cols-2` → **1 cột** (`grid-cols-1`, thumb aspect-square); header → `panel-head`: `panel-title` với icon `grid` + "Outputs" + badge đếm (giữ logic filter/project đếm hiện có); actions phải giữ 2 nút (filter, library) dùng `icon-btn`. Body `p-2`.
+- `SourcePanel.vue`: header → `panel-head` + `panel-title` (icon `image` + "Nguồn"); nút xóa nguồn `icon-btn` đỏ; 2 nút Tải lên/Sản phẩm → `tool-btn` (`flex-1 justify-center`); chip ảnh nguồn hiện tại giữ, thumb `rounded-lg ring-1 ring-ink-700`.
+- Cả 2 card: `class="card overflow-hidden"` (bỏ p-2/p-3 ở root; body tự padding), `panel-head` có `border-b border-ink-700`.
+
+## 11. Header desktop + mobile (điều phối)
+
+- **Gộp** nút "Dự án" + nút pin popover thành 1 `tool-btn`: icon `kanban` + "Dự án" + `chevronDown`; popover giữ danh sách áp dụng + thêm footer "Mở workspace quản lý dự án" (`projectsOpen = true`).
+- Chip dự án đang áp dụng: `tool-btn is-active` + icon `pin` + tên + `x` ngắt.
+- Credit: chip không tương tác `tool-btn` + icon `coins` + số (ẩn < md như cũ).
+- Admin: `tool-btn` icon `gear` + "Quản trị". Đăng xuất: `tool-btn` thường. Đăng nhập: giữ pill amber (CTA chính).
+- Mobile top bar: icon-btn `!h-9 !w-9` viền ink-700; tiêu đề `sparkles` + Studio; phải: kanban (chấm brand khi đang áp dụng) + nút outputs icon `grid` + **badge đếm** góc (thay nút text "Kết quả (n)").
+- Drawer mobile (menuOpen/outputOpen): header thống nhất `panel-head` + `panel-title` + nút đóng `icon-btn !h-8 !w-8 bg-ink-800`.
+- Step nav (sidebar + drawer): đổi sang `.seg`/ `.seg-btn`.
+
+## 12. Chips trong card (W1: ConceptCard · W2: InpaintCard/RefImageCard/SuggestCard/StylistCard)
+
+- ConceptCard: tab nav (:476-487) → `.seg` + `.seg-btn` (giữ icon + label hidden sm:inline); 3 nút Lịch sử/Templates/Preset (:493-495) → `.tool-btn` + `is-active`; insertMode (:527-531 và bản lặp :701+) → `.seg` (giữ span "Chèn vào:"); bất kỳ nhóm chip nào khác cùng pattern `bg-brand-600 text-white` → đổi tương tự. Nút undo/redo nhỏ (:513-514) → `icon-btn !h-6 !w-6`.
+- InpaintCard: nhóm chọn chế độ mask (:134-144) → `.seg`; chip biến thể (:205) → `.seg`.
+- RefImageCard: mode (:174) → `.seg`; số biến thể (:353) → `.seg` (label = số).
+- SuggestCard (:88-89) + StylistCard (:103-104): EN/VI → `.seg w-28 shrink-0` + `.seg-btn`.
+
+## 13. Verify (UI-2)
+
+1. `npm run build` xanh; CSS mới có `.seg`, `.tool-btn`, `.icon-btn`, `.panel-head`.
+2. grep `bg-brand-600 text-white` trong 6 card = 0 (trừ nút CTA submit chính — giữ).
+3. OutputModule 1 cột; aside right bar `w-44`.
+4. Mobile: không nút text "Kết quả (n)"; badge đếm trên icon.

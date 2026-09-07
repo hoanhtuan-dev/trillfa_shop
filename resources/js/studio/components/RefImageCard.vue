@@ -169,15 +169,15 @@ async function runRefgen() {
     </h2>
 
     <!-- Chọn chế độ: segmented tabs (giống Card Ghép ảnh) -->
-    <div class="mt-3 grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-ink-900/60 p-1">
+    <div class="mt-3 seg">
       <button @click="setMode('refgen')" title="Tạo ảnh mới giống ảnh mẫu"
-              :class="mode === 'refgen' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
-              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
+              :class="mode === 'refgen' ? 'is-active' : ''"
+              class="seg-btn">
         <StudioIcon name="image" size="h-4 w-4" /> Tạo ảnh mới
       </button>
       <button @click="setMode('tryon')" title="Dùng ảnh làm trang phục → sinh người mẫu mặc đúng đồ (rẻ hơn edit)"
-              :class="mode === 'tryon' ? 'bg-emerald-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
-              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
+              :class="mode === 'tryon' ? 'is-active' : ''"
+              class="seg-btn">
         <StudioIcon name="shirt" size="h-4 w-4" /> Thử đồ
       </button>
     </div>
@@ -347,10 +347,10 @@ async function runRefgen() {
 
     <!-- Số ảnh -->
     <label class="label mt-3">Số ảnh</label>
-    <div class="flex gap-1.5">
+    <div class="seg">
       <button v-for="n in [1,2,3,4]" :key="n" @click="variants = n"
-              class="flex-1 rounded-xl border py-2 text-xs font-semibold transition-colors"
-              :class="variants === n ? 'border-brand-400 bg-brand-600 text-white' : 'border-ink-700 bg-ink-800 text-cream-200 hover:bg-ink-700'">{{ n }}</button>
+              class="seg-btn"
+              :class="variants === n ? 'is-active' : ''">{{ n }}</button>
     </div>
 
     <button @click="runRefgen" :disabled="!canSubmit" class="btn-brand mt-4 w-full whitespace-nowrap">

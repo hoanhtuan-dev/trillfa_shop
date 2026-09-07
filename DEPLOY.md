@@ -1,5 +1,7 @@
 # Hướng dẫn Deploy lên Hostinger (Shared Hosting)
 
+> **SSH deploy nhanh (đã lưu — dùng lại lần sau):** `ssh -p 65002 u310846799@145.79.25.57` · app ở `~/domains/trillfa.shop` (branch `main`, repo `github.com/hoanhtuan-dev/trillfa_shop`). Deploy từ git: chạy `bash scripts/deploy.sh` trên máy local (kéo `git pull --ff-only` + `composer --no-scripts` + `migrate` + `optimize:clear`).
+
 Tài liệu này hướng dẫn đưa ứng dụng **Trillfa Fa (Laravel 13)** lên hosting chia sẻ Hostinger bằng **MySQL** (production) — chuyển từ SQLite local.
 
 ---

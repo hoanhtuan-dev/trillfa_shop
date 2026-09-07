@@ -85,8 +85,10 @@ function applyPrompt() {
 
       <div v-if="store.suggestResult.image_prompt_en" class="mt-2">
         <div class="mb-1 flex items-center gap-1.5">
-          <button @click="lang='en'" title="Hiển thị tiếng Anh" :class="lang==='en' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">EN</button>
-          <button @click="lang='vi'; if (!store.suggestResult.prompt_vi) store.translate(store.suggestResult.image_prompt_en)" title="Hiển thị tiếng Việt" :class="lang==='vi' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-full px-3 py-1 text-xs font-semibold">VI</button>
+          <div class="seg w-28 shrink-0">
+            <button @click="lang='en'" title="Hiển thị tiếng Anh" :class="lang === 'en' ? 'is-active' : ''" class="seg-btn">EN</button>
+            <button @click="lang='vi'; if (!store.suggestResult.prompt_vi) store.translate(store.suggestResult.image_prompt_en)" title="Hiển thị tiếng Việt" :class="lang === 'vi' ? 'is-active' : ''" class="seg-btn">VI</button>
+          </div>
         </div>
         <p class="max-h-36 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-2 leading-relaxed text-cream-100">{{ lang === 'vi' ? (store.suggestResult.prompt_vi || 'Đang dịch…') : store.suggestResult.image_prompt_en }}</p>
         <button @click="applyPrompt" title="Đưa prompt vào ô Prompt Tạo Ảnh" class="btn-brand btn-sm mt-2 w-full">Áp dụng → Tạo Ảnh</button>

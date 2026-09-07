@@ -19,23 +19,22 @@ function projectName(pid, fallback) {
 }
 </script>
 <template>
-  <div class="card flex flex-1 flex-col p-3" style="min-height:0">
-    <div class="flex items-center justify-between gap-1">
-      <p class="text-xs font-semibold text-cream-200">
-        Outputs
+  <div class="card flex flex-1 flex-col overflow-hidden" style="min-height:0">
+    <div class="panel-head border-b border-ink-700">
+      <span class="panel-title"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400"/>Outputs
         <span v-if="store.appliedProject && store.outputFilterProject" class="text-cream-300/50">({{ store.visibleGenerations.length }}/{{ store.generations.length }})</span>
         <span v-else class="text-cream-300/50">({{ store.generations.length }})</span>
-      </p>
+      </span>
       <div class="flex items-center gap-1">
-        <button v-if="store.appliedProject" @click="store.outputFilterProject = !store.outputFilterProject" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors" :class="store.outputFilterProject ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" :title="store.outputFilterProject ? 'Đang lọc theo dự án: ' + store.appliedProject.name : 'Chỉ hiện outputs của dự án đang áp dụng'">
+        <button v-if="store.appliedProject" @click="store.outputFilterProject = !store.outputFilterProject" class="icon-btn" :class="store.outputFilterProject ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" :title="store.outputFilterProject ? 'Đang lọc theo dự án: ' + store.appliedProject.name : 'Chỉ hiện outputs của dự án đang áp dụng'">
           <StudioIcon name="filter" size="h-3.5 w-3.5" />
         </button>
-        <button @click="goLibrary" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Xem thư viện">
+        <button @click="goLibrary" class="icon-btn" title="Xem thư viện">
           <StudioIcon name="grid" size="h-4 w-4" />
         </button>
       </div>
     </div>
-    <div class="scrollbar-hide mt-2 grid flex-1 auto-rows-min grid-cols-2 gap-1.5 overflow-y-auto">
+    <div class="scrollbar-hide mt-2 grid flex-1 auto-rows-min grid-cols-1 gap-1.5 overflow-y-auto p-2">
       <div v-for="g in store.visibleGenerations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'">
         <!-- Badge dự án -->
         <span v-if="g.project_id" class="absolute top-1 left-1 z-10 h-2.5 w-2.5 rounded-full ring-1 ring-black/40" :style="{ background: projectColor(g.project_id) }" :title="'Dự án: ' + projectName(g.project_id, g.project)"></span>
