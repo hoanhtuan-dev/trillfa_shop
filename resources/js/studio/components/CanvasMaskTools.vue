@@ -205,6 +205,11 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
           <template v-for="(reg, idx) in pathRegionsPixels" :key="'r'+idx">
             <polyline :points="reg" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
             <polygon :points="reg" fill="rgba(167,139,250,0.12)" stroke="none" />
+            <!-- Node của vùng ĐÃ ĐÓNG: nhỏ + mờ, có thể BẤM để mở lại chỉnh sửa (chỉ khi không đang vẽ) -->
+            <template v-if="store.inpaintPathPoints.length === 0" v-for="(p2, j) in (store.inpaintPathRegions[idx] || [])" :key="'rn'+j">
+              <circle :cx="p2.nx * (anchor.w)" :cy="p2.ny * (anchor.h)" :r="circleR * 0.5" fill="#a78bfa" :opacity="0.55"
+                      style="pointer-events:auto; cursor:pointer" :title="'Nhấp để chỉnh sửa lại vùng này' + (p2.kind === 'cusp' ? ' · Cusp' : p2.kind === 'sharp' ? ' · Góc nhọn' : '')" />
+            </template>
           </template>
           <!-- Đang vẽ: ĐƯỜNG MỞ (chưa đóng vòng) — nối các điểm kế tiếp, không quay về đầu -->
           <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />

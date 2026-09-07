@@ -180,6 +180,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintPathRegions: [],       // các vùng path ĐÃ đóng (để preview hiển thị đủ nhiều vùng)
     _pathPending: null,           // neo đang kéo (khi vẽ Bezier)
     inpaintPathCloseHover: false, // hover gần điểm BẮT ĐẦU (snap để đóng kín) → highlight node đầu + guide
+    _pathEditingRegion: -1,     // index vùng ĐÃ ĐÓNG đang được chỉnh sửa lại (-1 = không)
     magicTolerance: 32,           // ngưỡng màu cho Magic Wand (1-128)
     magicFeather: 0,             // độ mịn Magic Wand (blur px 0-20) — làm mềm mép vùng chọn
     _inpaintFreehandActive: false,
@@ -2561,6 +2562,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintFreehandPaths = [];
       this.inpaintPathPoints = [];
       this.inpaintPathRegions = [];
+      this._pathEditingRegion = -1;
       if (this.inpaintMaskSource === 'canvas') {
         // Vùng chọn trên canvas: chỉ thoát + xoá dữ liệu, không giữ làm mask inpaint.
         this.inpaintMaskDone = false;
@@ -2586,6 +2588,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintFreehandPaths = [];
       this.inpaintPathPoints = [];
       this.inpaintPathRegions = [];
+      this._pathEditingRegion = -1;
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
     },
     async toggleInpaintMask(mode) {
@@ -2602,7 +2605,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._pathEditingRegion = -1; this._initInpaintBrush(); }
       if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // Mở vùng chọn từ THANH CÔNG CỤ CANVAS (rect/freehand) — dùng chung overlay chính xác của Inpaint,
@@ -2620,7 +2623,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._pathEditingRegion = -1; this._initInpaintBrush(); }
       if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // ── Freehand (lasso) select: vẽ tự do tạo vùng kín → mask ──
@@ -2711,28 +2714,101 @@ export const useStudioStore = defineStore('studio', {
       return -1;
     },
     // Ctrl+click node → xoay vòng kiểu: smooth (mượt) → cusp (góc cong lệch) → sharp (góc nhọn).
+    _zeroHandles(nd) { return !(nd.ox || 0) && !(nd.oy || 0) && !(nd.ix || 0) && !(nd.iy || 0); },
+    // Sinh tay điều khiển mặc định cho node khi chuyển kiểu KHỎI 'sharp' (đang không có tay).
+    _initHandlesForKind(i, kind) {
+      const pts = this.inpaintPathPoints; const n = pts.length;
+      const nd = pts[i]; if (!nd) return;
+      if (n < 2) { nd.ox = 0.09; nd.oy = 0; nd.ix = -0.09; nd.iy = 0; nd.sym = kind === 'smooth'; return; }
+      const prev = pts[(i - 1 + n) % n], next = pts[(i + 1) % n];
+      const tox = next.nx - nd.nx, toy = next.ny - nd.ny;
+      const tx = prev.nx - nd.nx, ty = prev.ny - nd.ny;
+      const lto = Math.hypot(tox, toy), lti = Math.hypot(tx, ty);
+      nd.ox = (lto > 0.0001 ? tox * 0.4 : 0.09); nd.oy = (lto > 0.0001 ? toy * 0.4 : 0);
+      if (kind === 'smooth') { nd.ix = -nd.ox; nd.iy = -nd.oy; nd.sym = true; }
+      else if (kind === 'cusp') { if (lti > 0.0001) { nd.ix = tx * 0.4; nd.iy = ty * 0.4; } else { nd.ix = -nd.ox * 0.5; nd.iy = -nd.oy * 0.5; } nd.sym = false; }
+      else { nd.ox = 0; nd.oy = 0; nd.ix = 0; nd.iy = 0; nd.sym = false; }
+    },
     pathSetNodeKind(i) {
       if (this.inpaintMaskMode !== 'path') return;
       const nd = this.inpaintPathPoints[i]; if (!nd) return;
       const order = ['smooth', 'cusp', 'sharp'];
       const cur = nd.kind || 'smooth';
       const next = order[(order.indexOf(cur) + 1) % order.length];
+      const hadNoHandles = cur === 'sharp' || this._zeroHandles(nd);
       nd.kind = next;
-      if (next === 'smooth') { nd.sym = true; }
-      if (next === 'cusp') { nd.sym = false; }
-      if (next === 'sharp') { nd.ox = 0; nd.oy = 0; nd.ix = 0; nd.iy = 0; nd.sym = false; }
+      // Chuyển KIỂU → đảm bảo tay điều khiển TƯƠNG ỨNG hiện ra (nếu node đang không có tay).
+      if ((next === 'smooth' || next === 'cusp') && hadNoHandles) this._initHandlesForKind(i, next);
+      else if (next === 'smooth') nd.sym = true;
+      else if (next === 'cusp') nd.sym = false;
+      else if (next === 'sharp') { nd.ox = 0; nd.oy = 0; nd.ix = 0; nd.iy = 0; nd.sym = false; }
       this.toast(next === 'smooth' ? 'Node: Mượt' : next === 'cusp' ? 'Node: Cusp' : 'Node: Góc nhọn');
+    },
+    // Hit node của vùng ĐÃ ĐÓNG (để mở lại chỉnh sửa) — trả về {region, index}.
+    _regionNodeHit(p) {
+      const m = this.canvasMetrics(); if (!m) return { region: -1, index: -1 };
+      for (let r = 0; r < this.inpaintPathRegions.length; r++) {
+        const arr = this.inpaintPathRegions[r];
+        for (let i = arr.length - 1; i >= 0; i--) {
+          const nd = arr[i];
+          if (Math.hypot((p.nx - nd.nx) * m.vw, (p.ny - nd.ny) * m.vh) < 14) return { region: r, index: i };
+        }
+      }
+      return { region: -1, index: -1 };
+    },
+    // Nạp vùng đã đóng vào inpaintPathPoints để chỉnh sửa (giữ _pathEditingRegion để đóng là cập nhật).
+    _loadEditRegion(region) {
+      const arr = this.inpaintPathRegions[region]; if (!arr) return false;
+      this._pathEditingRegion = region;
+      this.inpaintPathPoints = arr.map((p) => ({ nx: p.nx, ny: p.ny, ox: p.ox || 0, oy: p.oy || 0, ix: p.ix || 0, iy: p.iy || 0, sym: p.sym !== false, kind: p.kind || 'smooth' }));
+      return true;
+    },
+    // Vẽ lại mask từ TẤT CẢ vùng đã đóng (dùng để cập nhật sau khi sửa 1 vùng / thêm vùng mới).
+    _rebakePathRegions() {
+      if (!this._inpaintMaskCtx) this._initInpaintBrush();
+      const c = this._inpaintMaskCanvas, ctx = this._inpaintMaskCtx;
+      if (!c || !ctx) return;
+      const w = c.width, h = c.height;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, w, h);
+      for (const arr of this.inpaintPathRegions) {
+        ctx.globalCompositeOperation = (arr._mode === 'subtract') ? 'destination-out' : 'source-over';
+        const P = arr.map((p) => ({ x: p.nx * w, y: p.ny * h, ox: (p.ox || 0) * w, oy: (p.oy || 0) * h, ix: (p.ix || 0) * w, iy: (p.iy || 0) * h }));
+        const n = P.length;
+        ctx.beginPath();
+        ctx.moveTo(P[0].x, P[0].y);
+        for (let i = 0; i < n; i++) {
+          const a = P[i], b = P[(i + 1) % n];
+          ctx.bezierCurveTo(a.x + a.ox, a.y + a.oy, b.x + b.ix, b.y + b.iy, b.x, b.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(220,38,38,0.6)';
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      this._finalizeInpaintBrush();
     },
     pathDown(e) {
       if (this.inpaintMaskMode !== 'path') return;
       e.stopPropagation();
       const p = this.inpaintMaskPointer(e); if (!p) return;
       const pts = this.inpaintPathPoints;
-      // Ctrl(hoặc ⌘)+click node → đổi kiểu node (không thêm điểm mới, không đóng).
+      // Ctrl(hoặc ⌘)+click node → đổi kiểu node (đang vẽ hoặc của vùng đã đóng).
       if (e.ctrlKey || e.metaKey) {
         const ni = this._pathNodeHit(p);
-        if (ni >= 0) { this.pathSetNodeKind(ni); }
+        if (ni >= 0) { this.pathSetNodeKind(ni); return; }
+        const ri = this._regionNodeHit(p);
+        if (ri.region >= 0) { this._loadEditRegion(ri.region); this.pathSetNodeKind(ri.index); return; }
         return;
+      }
+      // Không có điểm đang vẽ (đã đóng hết) → bấm node của vùng ĐÃ ĐÓNG để mở lại chỉnh sửa nó.
+      if (pts.length === 0) {
+        const ri = this._regionNodeHit(p);
+        if (ri.region >= 0) {
+          this._loadEditRegion(ri.region);
+          this._pathDrag = { type: 'node', i: ri.index, sx: p.nx, sy: p.ny, moved: false };
+          return;
+        }
       }
       // Snap/đóng kín: >=3 điểm & nhấp gần điểm BẮT ĐẦU → tap = đóng, kéo = di chuyển node đầu.
       if (pts.length >= 3 && this._pathScreenDist(p.nx, p.ny, pts[0].nx, pts[0].ny) < 22) {
@@ -2787,30 +2863,26 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintPathCloseHover = false;
       const pts = this.inpaintPathPoints;
       if (pts.length < 3) { this.toast('Cần ít nhất 3 điểm để tạo vùng chọn.', 'error'); return; }
-      if (!this._inpaintMaskCtx) this._initInpaintBrush();
-      const c = this._inpaintMaskCanvas, ctx = this._inpaintMaskCtx;
-      if (!c || !ctx) return;
-      const w = c.width, h = c.height;
-      if (this.inpaintSelectMode === 'new') { ctx.clearRect(0, 0, w, h); this.inpaintPathRegions = []; }
-      // Bézier với 2 tay điều khiển riêng (out/in): c1 = a + a.out · c2 = b + b.in.
-      const P = pts.map((p) => ({ x: p.nx * w, y: p.ny * h, ox: (p.ox || 0) * w, oy: (p.oy || 0) * h, ix: (p.ix || 0) * w, iy: (p.iy || 0) * h }));
-      const n = P.length;
-      ctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
-      ctx.beginPath();
-      ctx.moveTo(P[0].x, P[0].y);
-      for (let i = 0; i < n; i++) {
-        const a = P[i], b = P[(i + 1) % n];
-        ctx.bezierCurveTo(a.x + a.ox, a.y + a.oy, b.x + b.ix, b.y + b.iy, b.x, b.y);
+      const mode = this.inpaintSelectMode === 'subtract' ? 'subtract' : 'add';
+      const clone = pts.map((p) => ({ nx: p.nx, ny: p.ny, ox: p.ox || 0, oy: p.oy || 0, ix: p.ix || 0, iy: p.iy || 0, sym: p.sym !== false, kind: p.kind || 'smooth' }));
+      // Nếu đang chỉnh sửa lại vùng đã đóng → thay thế vùng đó (giữ nguyên mode gốc).
+      let editing = this._pathEditingRegion != null && this._pathEditingRegion >= 0 && this._pathEditingRegion < this.inpaintPathRegions.length;
+      // Chế độ 'new' luôn bắt đầu vùng mới (xóa sạch vùng cũ).
+      if (this.inpaintSelectMode === 'new') { editing = false; this.inpaintPathRegions = []; this._pathEditingRegion = -1; }
+      if (editing) {
+        const j = this._pathEditingRegion;
+        const old = this.inpaintPathRegions[j];
+        clone._mode = (old && old._mode) || mode; // giữ chế độ gốc khi sửa
+        this.inpaintPathRegions.splice(j, 1, clone);
+      } else {
+        clone._mode = mode;
+        this.inpaintPathRegions.push(clone);
       }
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(220,38,38,0.6)';
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-      this._finalizeInpaintBrush();
-      this.inpaintPathRegions.push(pts.map((p) => ({ nx: p.nx, ny: p.ny, ox: p.ox || 0, oy: p.oy || 0, ix: p.ix || 0, iy: p.iy || 0, sym: p.sym !== false })));
+      this._pathEditingRegion = -1;
       this.inpaintPathPoints = [];
+      this._rebakePathRegions();
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
-      this.toast('Đã tạo vùng chọn Bezier — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
+      this.toast(editing ? 'Đã cập nhật vùng chọn Bezier.' : 'Đã tạo vùng chọn Bezier — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
     },
     // ── Magic Wand: click chọn vùng theo màu tương tự (flood-fill theo ngưỡng) ──
     async magicWand(e) {

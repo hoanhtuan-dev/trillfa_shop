@@ -170,3 +170,18 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (775ms) · push `116fa42` · SSH pull + `optimize:clear` ✓ · asset `app-cGbGBF60.js` + `GalleryModal-C_JwzfFG.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên Q (2026-09-07) — Ctrl+click node → đổi kiểu node (smooth/cusp/sharp)
+
+**Yêu cầu:** "thêm hành động ctrl + click node -> thay đổi kiểu".
+
+**Đã sửa (commit `d0628f6`):**
+- `_pathNodeHit(p)`: hit theo TÂM node (không xét tay điều khiển) — dùng cho Ctrl+click.
+- `pathDown`: nếu `e.ctrlKey || e.metaKey` → tìm node, gọi `pathSetNodeKind(ni)` rồi return. **Ctrl+click khoảng trống = no-op** (không thêm điểm/không đóng). Ctrl+click node 0 đổi kiểu (không đóng); đóng vẫn là click thường ở node 0.
+- `pathSetNodeKind`: xoay vòng **smooth (mượt, `sym:true`, mirror) → cusp (góc cong lệch, `sym:false`) → sharp (góc nhọn, xóa cả 2 tay) → smooth**. Toast xác nhận kiểu.
+- Node mới có `kind:'smooth'`.
+- `nodeFill`/màu node theo kiểu: smooth=tím #a78bfa · cusp=cam #fb923c · sharp=hồng #f43f5e; node 0 vẫn xanh khi hover snap. Thêm `:title` cho biết kiểu + phím tắt.
+- Status bar hint path bổ sung "Ctrl+click node = đổi kiểu (mượt/cusp/nhọn)".
+
+**Xác minh:** vite build ✓ (786ms) · push `d0628f6` · SSH pull + `optimize:clear` ✓ · asset `app-RERzE918.js` + `GalleryModal-BpLe8ZY9.js` + manifest = HTTP 200 trên `trillfa.shop`.
+
