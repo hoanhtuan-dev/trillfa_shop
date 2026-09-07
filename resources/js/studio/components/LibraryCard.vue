@@ -11,8 +11,8 @@ function goLibrary() { window.location.href = '/studio/library'; }
       <button
         @click="goLibrary"
         class="flex aspect-square w-full flex-col items-center justify-center rounded-xl border border-dashed border-ink-600 bg-ink-800/50 text-cream-300/70 transition-colors hover:border-brand-500/70 hover:bg-ink-800 hover:text-brand-300"
-        title="Xem thư viện ảnh đã tải lên"
-        :aria-label="'Xem thư viện ảnh đã tải lên'"
+        title="Xem ảnh trong thư viện"
+        :aria-label="'Xem ảnh trong thư viện'"
       >
         <StudioIcon name="grid" size="h-6 w-6"/>
       </button>
