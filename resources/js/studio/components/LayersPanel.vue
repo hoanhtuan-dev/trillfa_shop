@@ -1,7 +1,7 @@
 <script setup>
 // LayersPanel — inspector "Layers" dock bên phải khung canvas (Designer Workspace).
 // Không props, không emit — đọc/ghi trực tiếp useStudioStore() (spec STUDIO_UI_REDESIGN §4.1).
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 
@@ -59,6 +59,11 @@ function cancelGroupRename() { groupRenameId.value = null; }
 const groupName = (gid) => { const g = store.layerGroups.find(x => x.id === gid); return g ? g.name : 'Nhóm'; };
 const groupCount = (gid) => store.canvasLayers.filter(x => x.groupId === gid).length;
 const groupLocked = (gid) => store.canvasLayers.filter(x => x.groupId === gid).every(x => x.locked);
+// Giá trị ĐƠN VỊ (group = cấp group) để hiển thị + thao tác trong Thuộc tính khớp với handle canvas.
+const unitGroup = computed(() => { const a = store.activeLayer; return (a && a.groupId) ? (store.layerGroups.find(x => x.id === a.groupId) || null) : null; });
+const isUnitGroup = computed(() => { const g = unitGroup.value; return !!(g && g.layerIds.length > 1 && store.selectedIds.length === g.layerIds.length); });
+const activeUnitScale = computed(() => isUnitGroup.value ? (unitGroup.value.scale || 1) : (store.activeLayer ? (store.activeLayer.scale || 1) : 1));
+const activeUnitRotation = computed(() => isUnitGroup.value ? (unitGroup.value.rotation || 0) : (store.activeLayer ? (store.activeLayer.rotation || 0) : 0));
 function onRowDrop(e, l) {
   e.preventDefault();
   if (dragId.value && dragId.value !== l.id) {
@@ -209,13 +214,13 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       </div>
       <div class="flex items-center gap-1.5">
         <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Opacity</span>
-        <input type="range" min="0" max="1" step="0.05" :value="store.activeLayer.opacity" @input="store.updateLayerTransform(store.activeLayer.id, { opacity: Number($event.target.value) })" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Opacity">
+        <input type="range" min="0" max="1" step="0.05" :value="store.activeLayer.opacity" @input="store.updateUnitTransform('opacity', Number($event.target.value))" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Opacity">
         <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ Math.round(store.activeLayer.opacity * 100) }}%</span>
-        <button @click="store.updateLayerTransform(store.activeLayer.id, { opacity: 1 })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset opacity" aria-label="Reset opacity"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
+        <button @click="store.updateUnitTransform('opacity', 1)" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset opacity" aria-label="Reset opacity"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="flex items-center gap-1.5">
         <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Blend</span>
-        <select :value="store.activeLayer.blend" @change="store.updateLayerTransform(store.activeLayer.id, { blend: $event.target.value })" class="min-w-0 flex-1 rounded bg-ink-800 px-1 py-0.5 text-[10px] text-cream-100" aria-label="Blend">
+        <select :value="store.activeLayer.blend" @change="store.updateUnitTransform('blend', $event.target.value)" class="min-w-0 flex-1 rounded bg-ink-800 px-1 py-0.5 text-[10px] text-cream-100" aria-label="Blend">
           <option value="normal">Normal</option>
           <option value="multiply">Multiply</option>
           <option value="screen">Screen</option>
@@ -223,18 +228,18 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           <option value="darken">Darken</option>
           <option value="lighten">Lighten</option>
         </select>
-        <button @click="store.updateLayerTransform(store.activeLayer.id, { blend: 'normal' })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset blend" aria-label="Reset blend"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
+        <button @click="store.updateUnitTransform('blend', 'normal')" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset blend" aria-label="Reset blend"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="flex items-center gap-1.5">
         <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Scale</span>
-        <input type="range" min="0.2" max="3" step="0.05" :value="store.activeLayer.scale" @input="store.updateLayerTransform(store.activeLayer.id, { scale: Number($event.target.value) })" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Scale">
-        <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ Math.round(store.activeLayer.scale * 100) }}%</span>
-        <button @click="store.updateLayerTransform(store.activeLayer.id, { scale: 1 })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset scale" aria-label="Reset scale"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
+        <input type="range" min="0.2" max="3" step="0.05" :value="activeUnitScale" @input="store.updateUnitTransform('scale', Number($event.target.value))" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Scale">
+        <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ Math.round(activeUnitScale * 100) }}%</span>
+        <button @click="store.updateUnitTransform('scale', 1)" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset scale" aria-label="Reset scale"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="flex items-center gap-1.5">
         <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Xoay</span>
-        <input type="range" min="-180" max="180" step="1" :value="store.activeLayer.rotation" @input="store.updateLayerTransform(store.activeLayer.id, { rotation: Number($event.target.value) })" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Xoay">
-        <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ store.activeLayer.rotation }}°</span>
+        <input type="range" min="-180" max="180" step="1" :value="activeUnitRotation" @input="store.updateUnitTransform('rotation', Number($event.target.value))" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Xoay">
+        <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ activeUnitRotation }}°</span>
         <button @click="store.resetActiveUnitRotation()" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset rotation (group = cả nhóm)" aria-label="Reset rotation"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="grid grid-cols-4 gap-1">

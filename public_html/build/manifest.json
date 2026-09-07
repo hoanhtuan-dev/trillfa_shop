@@ -23,12 +23,8 @@
       "_BaseBadge-ENfE4myM.js"
     ]
   },
-  "_GalleryModal-DVFIplWF.css": {
-    "file": "assets/GalleryModal-DVFIplWF.css",
-    "src": "_GalleryModal-DVFIplWF.css"
-  },
-  "_GalleryModal-DzI0aoKq.js": {
-    "file": "assets/GalleryModal-DzI0aoKq.js",
+  "_GalleryModal-DE7U655_.js": {
+    "file": "assets/GalleryModal-DE7U655_.js",
     "name": "GalleryModal",
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
@@ -39,6 +35,10 @@
     "css": [
       "assets/GalleryModal-DVFIplWF.css"
     ]
+  },
+  "_GalleryModal-DVFIplWF.css": {
+    "file": "assets/GalleryModal-DVFIplWF.css",
+    "src": "_GalleryModal-DVFIplWF.css"
   },
   "_ProductCard-D3JAn6_r.js": {
     "file": "assets/ProductCard-D3JAn6_r.js",
@@ -352,7 +352,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-n1588K19.js",
+    "file": "assets/app-D9MZ_xn2.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -361,15 +361,15 @@
       "_pinia-CVAjlcja.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_useStudioThumb-BeLv8od7.js",
-      "_GalleryModal-DzI0aoKq.js",
+      "_GalleryModal-DE7U655_.js",
       "_StylistDataManager-ClLSjC0F.js"
     ],
     "css": [
-      "assets/app-D5ZAfrqo.css"
+      "assets/app-DzEsdam_.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-D9aR-0wN.js",
+    "file": "assets/library-D8c9hsCO.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
@@ -377,7 +377,7 @@
       "_runtime-dom.esm-bundler-JCahQlAg.js",
       "_pinia-CVAjlcja.js",
       "_useStudioThumb-BeLv8od7.js",
-      "_GalleryModal-DzI0aoKq.js"
+      "_GalleryModal-DE7U655_.js"
     ]
   },
   "resources/js/studio/settings.js": {

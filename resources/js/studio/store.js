@@ -1460,8 +1460,12 @@ export const useStudioStore = defineStore('studio', {
     selectLayerWithGroup(id) {
       const l = this.canvasLayers.find(x => x.id === id); if (!l) return;
       const g = l.groupId ? this.layerGroups.find(x => x.id === l.groupId) : null;
-      if (g && g.layerIds.length > 1) { this._setActive(g.layerIds[g.layerIds.indexOf(id)]); this.selectedLayerIds = g.layerIds.filter(x => x !== id); }
-      else this.setActiveLayer(id);
+      if (g && g.layerIds.length > 1 && g.layerIds.includes(id)) {
+        this._setActive(id);
+        this.selectedLayerIds = g.layerIds.filter(x => x !== id && this.canvasLayers.some(l2 => l2.id === x));
+      } else {
+        this.setActiveLayer(id);
+      }
       this.saveLayerLayout();
     },
     // Tạo NHÓM từ các layer đang chọn (≥2) — tiền đề cho tính năng group đầy đủ sau.
@@ -2124,6 +2128,23 @@ export const useStudioStore = defineStore('studio', {
       layers.forEach(l => { const dx = (l.x || 0) - c.cx, dy = (l.y || 0) - c.cy; l.x = c.cx + dx * cos - dy * sin; l.y = c.cy + dx * sin + dy * cos; let r = ((l.rotation || 0) + deg) % 360; if (r > 180) r -= 360; if (r < -180) r += 360; l.rotation = Math.round(r); });
       const g = (this.activeLayer && this.activeLayer.groupId) ? this.layerGroups.find(x => x.id === this.activeLayer.groupId) : null;
       if (g) g.rotation = (((g.rotation || 0) + deg) % 360 + 360) % 360;
+      this.saveLayerLayout();
+    },
+    // Cập nhật thuộc tính cho ĐƠN VỊ (group = áp dụng cả nhóm, thống nhất với handle canvas).
+    updateUnitTransform(field, value) {
+      const a = this.activeLayer; if (!a) return;
+      const g = a.groupId ? this.layerGroups.find(x => x.id === a.groupId) : null;
+      const isGroup = !!(g && g.layerIds.length > 1 && this.selectedIds.length === g.layerIds.length);
+      if (field === 'rotation') {
+        if (isGroup) { const delta = (Number(value) || 0) - (g.rotation || 0); this.rotateSelectionBy(delta); return; }
+        this.updateLayerTransform(a.id, { rotation: Number(value) || 0 }); return;
+      }
+      if (field === 'scale') {
+        if (isGroup) { const cur = g.scale || 1; const k = (Number(value) || 1) / cur; if (k > 0) this.scaleSelectionBy(k); return; }
+        this.updateLayerTransform(a.id, { scale: Number(value) || 1 }); return;
+      }
+      const layers = this._editUnitLayers(); if (!layers.length) return;
+      layers.forEach(l => { l[field] = value; });
       this.saveLayerLayout();
     },
     // Reset rotation cho ĐƠN VỊ: group = xoay vị trí thành viên NGƯỢC lại góc đã xoay (giữ layout nội bộ) + rotation=0.

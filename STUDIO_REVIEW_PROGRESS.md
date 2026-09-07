@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3ah (2026-09-07) — Chọn layer cứng cáp + thống nhất Thuộc tính vs handle canvas cho group
+
+- **Chọn layer cứng cáp hơn**: `selectLayerWithGroup` thêm guard `g.layerIds.includes(id)` + lọc `selectedLayerIds` theo layer tồn tại — tránh trường hợp groupId lệch khiến `_setActive(undefined)` xóa chọn (lỗi "không chọn được layer").
+- **Thống nhất Thuộc tính vs canvas (group)**: thêm `updateUnitTransform(field, value)` — rotation/scale dùng `rotateSelectionBy`/`scaleSelectionBy` (cấp group), opacity/blend áp dụng mọi thành viên. Bảng Thuộc tính (opacity · blend · scale · xoay + reset) giờ cùng hành vi với handle canvas; hiển thị `activeUnitScale`/`activeUnitRotation` (lấy từ g.scale/g.rotation).
+- Verify: vite build ✓ (761ms) · store 2, LayersPanel 12.
+
 ## Phiên UI-3ag (2026-09-07) — Sửa hệ thống group: rotation lưu ở cấp group (reset hoàn nguyên) + z-order cả nhóm
 
 - **Reset rotation hoàn nguyên vị trí nội bộ**: group giờ lưu `rotation`/`scale` ở cấp group (khi tạo/nhân đôi/khôi phục); `rotateSelectionBy`/`scaleSelectionBy` cập nhật `g.rotation`/`g.scale`. `resetActiveUnitRotation` **xoay vị trí thành viên NGƯỢC lại** góc đã xoay quanh tâm (khôi phục layout) rồi `rotation=0`.
