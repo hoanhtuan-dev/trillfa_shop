@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3ae (2026-09-07) — Fix viền layer bị ẩn (ring-inset che sau ảnh) → dùng outline offset âm
+
+- **Viền layer inner hiển thị lại**: `ring-inset` (box-shadow inset) trên `<img>` bị CHE sau nội dung ảnh (opaque) nên mất viền, tưởng không chọn được. Đổi sang **`outline outline-2 -outline-offset-2`** (vẽ ĐÈ lên ảnh, nằm bên trong) — active `outline-brand-300`, selected `outline-brand-400/70`.
+- Nhờ viền hiện rõ, thao tác chọn layer trong bảng/canvas nhìn thấy phản hồi ngay (không còn tưởng lỗi).
+- Verify: vite build ✓ (781ms).
+
 ## Phiên UI-3ad (2026-09-07) — Rà soát group: collapse mở mặc định (chọn được layer) · bbox tím · ring inner nổi bật
 
 - **Fix chọn được layer trong bảng layer**: đổi `openGroups` → `collapsedGroups` (mặc định rỗng = mọi nhóm MỞ, hiển thị member); chỉ ẩn hết khi bấm thu gọn. Trước đó nhóm mặc định thu gọn → không thấy/chọn được layer.
