@@ -293,3 +293,24 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (795ms) · push `54bef18` · SSH pull + `optimize:clear` ✓ · asset `app-Csuu2ltp.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AA (2026-09-07) — Sửa tỷ lệ vùng chọn khi vẽ lên layer MỚI (trống)
+
+**Yêu cầu:** "công cụ vẽ đường cong chỉ đúng tỷ lệ khi vẽ lên ảnh, sai tỷ lệ khi vẽ lên layer mới (vùng tô màu bị nhỏ lại)".
+
+**Gốc rễ:** layer TRỐNG (`addBlankLayer`) đặt `baseW/baseH = kích thước tự nhiên` (vd 1024×1024) KHÔNG cap 512, trong khi `<img>` hiển thị bị CSS `max-w-512/max-h-512` thu về 512. → `frameLayout` (và pointer/mask/preview) dùng 1024 nhưng ảnh hiển thị 512 → vùng chọn & tô màu lệch/nhỏ. Layer ẢNH (qua `_positionByImageSize`) thì cap 512 nên đúng.
+
+**Đã sửa (commit `2ec903b`):** `addBlankLayer` giờ cap `baseW/baseH` về cạnh dài ≤512 (giữ tỷ lệ, ảnh canvas vẫn giữ full w×h) → `frameLayout`/pointer/mask/preview khớp 1:1 với ảnh hiển thị; tô màu đúng kích thước trên layer mới.
+
+**Xác minh:** vite build ✓ (792ms) · push `2ec903b` · SSH pull + `optimize:clear` ✓ · asset `app-DA5-bNyr.js` = HTTP 200 trên `trillfa.shop`.
+
+
+## Phiên AB (2026-09-08) — Gộp PHẦN I.2 vào STUDIO_REVIEW.md + hoàn tất T7 (commit báo cáo)
+
+**Việc:** ghi "PHẦN I.2 — Bézier path tool + Card Sửa ảnh" (13 phiên O–AA · commit `5f8d7bf`→`2ec903b`) vào `STUDIO_REVIEW.md` (mục PHẦN I), đồng thời cập nhật sổ cái này.
+
+**Nội dung gộp (bản nén theo tính năng):**
+- **A. Vùng chọn đường cong (Bézier, Krita):** 2 tay/node (out/in) + kéo chỉnh + Alt phá đối xứng · hiện ngay lần nhấp đầu + preview khi kéo (push node reactive) · mở đường bao khi vẽ + snap-đóng ở điểm đầu (tap đóng/kéo dời node) · Ctrl+click node đổi kiểu smooth/cusp/sharp (+ sinh tay khi rời sharp) · chỉnh sửa vùng đã đóng (nút "Sửa" hover + re-bake mask theo `_mode`) · icon +/− vùng chọn + tô sáng nút chọn · tỷ lệ/tô màu chuẩn (mask theo frameLayout, cứng hoá mép, willReadFrequently, cap baseW/baseH layer trống).
+- **B. Card Sửa ảnh (clean):** bỏ Render đa góc + Model chỉnh sửa + Chọn vùng/Vẽ tự do/Vẽ mask · 1 nút "Vẽ mask" (path) + tự lấy vùng chọn làm mask khi đóng · nhận MỌI ảnh canvas (backend `POST /studio/inpaint` source-agnostic, store dùng `upscaleSrc`).
+
+**T7 — commit báo cáo:** ĐÓNG — `STUDIO_REVIEW.md` (PHẦN I.2) + `STUDIO_REVIEW_PROGRESS.md` (Phiên O–AB) đã commit cùng đợt này.

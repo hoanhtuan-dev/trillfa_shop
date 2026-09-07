@@ -26,6 +26,28 @@
 
 **Verify:** vite build ✓ mỗi phiên · grep/diff 100% · deploy SSH + verify live asset HTTP 200.
 
+
+### PHẦN I.2 — Bézier path tool + Card Sửa ảnh (2026-09-07→08 · 13 phiên O–AA · commit `5f8d7bf` → `2ec903b`)
+
+> Nối tiếp PHẦN I (UI-1→UI-3aj). Toàn bộ chi tiết từng phiên nằm trong `STUDIO_REVIEW_PROGRESS.md` (mục "## Phiên O…AA"). Đây là bản gộp theo tính năng.
+
+**A. Công cụ vùng chọn đường cong (Bézier, Krita Pen):**
+- **2 tay điều khiển/node** (out `#38bdf8` + in `#f0abfc`, ẩn tay suy biến): kéo node/tay để chỉnh, **Alt = phá đối xứng**, right-click xóa node, Ctrl+Z bỏ điểm.
+- **Hiện ngay lần nhấp đầu + preview khi kéo**: `pathDown` push node vào `inpaintPathPoints` (reactive) ngay pointer-down → node hiện tức thì; `pathMove` chỉnh tay in-place → đường cong/tay preview sống.
+- **Mở đường bao khi vẽ** (không đóng vòng sẵn): `pathSmooth(pts, closed=false)`; **snap-đóng ở điểm đầu** (node 0 phóng to + guide nét đứt xanh khi hover gần) → **tap = đóng kín, kéo = di chuyển node đầu**.
+- **Ctrl+click node → đổi kiểu** xoay vòng **smooth/cusp/sharp** (màu node theo kiểu: tím/cam/hồng); chuyển KHỎI sharp → tự sinh tay điều khiển trỏ về node kế/trước.
+- **Chỉnh sửa vùng ĐÃ ĐÓNG**: bấm node vùng (chấm mờ) hoặc nút "Sửa" (pencil + độ trễ ẩn 450ms khi hover đường bao) → nạp lại node để sửa; đóng → cập nhật đúng vùng + **re-bake toàn bộ mask** (`_rebakePathRegions`, mỗi region giữ `_mode` add/subtract).
+- **Icon +/− vùng chọn** chuẩn ngành (`selectAdd`/`selectSubtract`) cho freehand/path/magic; ContextToolbar **tô sáng nút chọn** (ring brand) + nút "Hoàn thành" (xanh, chỉnh sửa vùng) phân biệt nút "Xong" thoát.
+- **Tỷ lệ & tô màu chuẩn**: mask canvas theo **frameLayout (baseW/baseH)** — 1 px mask = 1 px khung vẽ; **cứng hoá mép** (ngưỡng sel≥128) để Xóa/Tô/Nhân đôi/Nâng che trọn vùng (bỏ viền mờ anti-alias); `willReadFrequently` cho mask ctx (hết warning). Fix layer TRỐNG: `addBlankLayer` cap `baseW/baseH` ≤512 khớp CSS `max-w/max-h`.
+
+**B. Card Sửa ảnh (clean + 1 công cụ):**
+- XÓA **Render đa góc**, **Model chỉnh sửa**, **Chọn vùng / Vẽ tự do / Vẽ mask** (cũ).
+- Nút **"Vẽ mask"** duy nhất → gọi đúng 1 công cụ **vùng chọn bằng đường cong**; **vẽ xong & đóng → tự lấy vùng chọn làm mask** (`pathClose` finalize khi source=inpaint). Nút "Chỉnh lại" (card + toolbar) mở lại path.
+- **Nhận MỌI ảnh từ canvas** (upload/sản phẩm/kết quả/đã sửa): backend tách `handleInpaint(Request, ?Generation)` + endpoint **`POST /studio/inpaint`** (source-agnostic, chỉ cần `source_url`); store `inpaint()` nguồn = `upscaleSrc`, bỏ yêu cầu `previewId`.
+- Nút "Vẽ mask" **đẹp mắt** full-width: gradient emerald→teal khi active, viền/nền xanh nhạt khi nghỉ, icon badge + label + sub-label + trạng thái động.
+
+**Verify:** php -l ✓ (controller/routes) · vite build ✓ mỗi phiên · deploy SSH + verify live asset HTTP 200 (commit `2ec903b` mới nhất).
+
 ## 0. Tổng kết
 
 - Ghi nhận gốc: **30 area · 214 findings** (gồm 6 bug phát hiện & vá ngay trong các đợt vá: K.4 ×2 · K.8 ×2 · L.2 ×2).
@@ -45,7 +67,7 @@
 | **T4** | ~~Vá 2 medium sống I.4~~ | Vá | J.8#3 = K.7#2 | **ĐÓNG — phiên N** (subagent + điều phối đọc diff): M6 `onFhEnd` xử lý `pointercancel` như `pointerup` + `onBeforeUnmount` gỡ đủ 5 window listener · M8 guard `e.target` INPUT/TEXTAREA/SELECT/isContentEditable theo đúng pattern GalleryModal · SFC_OK. |
 | **T5** | ~~Xóa 2 component Vue mồ côi~~ | Dọn dẹp | I.1 | **ĐÓNG — phiên N**: `git rm` sau khi grep 0 tham chiếu lần cuối ngay trước xóa · vite build ✓. |
 | **T6** | ~~Feature mini K.8~~ | Feature | K.8 → M → N | **ĐÓNG HOÀN TOÀN — phiên N**: pattern/tryon blade có select dự án (fetch `/studio/projects`, ẩn khi 401/403) gửi `project_id` — chuỗi đầy đủ đã kiểm chứng: blade → validate ownership (`:4468/:4485`) → `queueGeneration` lưu (`:1502`) · **move 1-chạm** giữa 2 dự án (nút 'Chuyển' trong GalleryModal khi ảnh đã gắn — panel chọn dùng chung) · popover quick-apply 8→20 mục, cuộn được. |
-| **T7** | Commit 2 file báo cáo (`STUDIO_REVIEW.md` · `STUDIO_REVIEW_PROGRESS.md`) — chờ quyết định người dùng | Repo | K.7#4 + M | MỞ (nhỏ) — toàn bộ code đã commit (`Project.php` ofMany → `f90c5e9`; test parity → `8817f85`; phiên M → `be01615`); chưa commit: `STUDIO_REVIEW.md` (các hàng M + đợt đồng bộ `kimi-k3` này) · `STUDIO_REVIEW_PROGRESS.md` (ghi chú M + `kimi-k3`). |
+| **T7** | Commit 2 file báo cáo (`STUDIO_REVIEW.md` · `STUDIO_REVIEW_PROGRESS.md`) | Repo | K.7#4 + M | **ĐÓNG — phiên AB**: đã commit `STUDIO_REVIEW.md` (PHẦN I.2) + `STUDIO_REVIEW_PROGRESS.md` (Phiên O–AB) cùng đợt này. |
 
 **Nhiệm vụ cũ ĐÃ ĐÓNG nhờ công việc mới (không theo dõi nữa):**
 
