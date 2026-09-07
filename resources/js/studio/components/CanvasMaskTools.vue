@@ -132,6 +132,21 @@ const pathSmooth = (pts, closed = true) => {
 };
 const pathSmoothPixels = computed(() => pathSmooth(store.inpaintPathPoints, false)); // đang vẽ: MỞ
 const pathRegionsPixels = computed(() => store.inpaintPathRegions.map((pts) => pathSmooth(pts))); // đã đóng: kín
+// Vị trí nút "Sửa" (trọng tâm vùng ĐÃ ĐÓNG đang hover) — giữ kích thước ổn định trên màn hình.
+const hoverRegionCentroid = computed(() => {
+  const i = store._pathHoverRegion;
+  const arr = store.inpaintPathRegions[i];
+  if (i < 0 || !arr || !arr.length || !anchor.value) return null;
+  let cx = 0, cy = 0;
+  for (const p of arr) { cx += p.nx; cy += p.ny; }
+  cx /= arr.length; cy /= arr.length;
+  return { x: cx * anchor.value.w, y: cy * anchor.value.h };
+});
+const hoverRegionTransform = computed(() => {
+  const c = hoverRegionCentroid.value;
+  if (!c) return '';
+  return 'translate(' + fmt1(c.x) + ', ' + fmt1(c.y) + ') scale(' + invScale.value + ')';
+});
 
 // ── Brush: canvas overlay nét vẽ mask (đỏ 60%) — nằm TRONG khung layer, co giãn đúng theo ảnh ──
 const metricsTick = ref(0);
@@ -239,6 +254,15 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
               :title="'Kiểu: ' + nodeKindLabel(p) + ' — Ctrl+click để đổi · click phải để xóa'"
               stroke="#111" :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
           </template>
+          <!-- Nút "Sửa" khi hover vùng ĐÃ ĐÓNG (và không đang vẽ điểm mới) -->
+          <g v-if="hoverRegionTransform && store.inpaintPathPoints.length === 0"
+             :transform="hoverRegionTransform"
+             style="pointer-events:auto; cursor:pointer"
+             @pointerdown.stop.prevent="store.enterEditRegion(store._pathHoverRegion)"
+             title="Sửa lại vùng chọn này">
+            <rect x="-20" y="-11.5" width="40" height="23" rx="6" fill="#0b1220" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1" />
+            <text x="0" y="4" text-anchor="middle" font-size="11" fill="#7dd3fc" font-weight="600">Sửa</text>
+          </g>
         </svg>
 
         <!-- Rect: box + handles (chỉ khi ĐANG chỉnh) -->

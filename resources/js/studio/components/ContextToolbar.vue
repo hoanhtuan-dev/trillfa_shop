@@ -12,7 +12,8 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
 const I = 'h-4 w-4';
 const primary = 'bg-cream-100 text-ink-900 hover:bg-cream-200';
 const btn = 'bg-ink-800 text-cream-200 hover:bg-ink-700';
-const on = 'bg-cream-100 text-ink-900';
+// Nút ĐANG ĐƯỢC CHỌN (toggle/mode): nền sáng + vòng brand + bóng → rõ là đang active.
+const on = '!bg-cream-100 !text-ink-900 ring-2 ring-brand-300 shadow';
 const iconBtn = 'grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700';
 const iconBtnDanger = 'grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-red-600 hover:text-white';
 const lbl = 'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors';

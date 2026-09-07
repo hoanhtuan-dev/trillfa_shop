@@ -185,3 +185,16 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (786ms) · push `d0628f6` · SSH pull + `optimize:clear` ✓ · asset `app-RERzE918.js` + `GalleryModal-BpLe8ZY9.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên R (2026-09-07) — Chỉnh sửa sau khi đóng + tay cầm theo kiểu node
+
+**Yêu cầu:** "đổi kiểu nhưng không xuất hiện tay cầm tương ứng · nên cho người dùng chỉnh sửa khi đã đóng đường bao, đảm bảo vẫn tạo đường bao mới được".
+
+**Đã sửa (commit `4373efa`):**
+- **Đổi kiểu → hiện tay cầm:** `pathSetNodeKind` khi chuyển KHỎI 'sharp' (node đang không có tay) gọi `_initHandlesForKind(i, kind)` sinh tay điều khiển MẶC ĐỊNH trỏ về node kế/trước (out hướng next, in hướng prev; smooth mirror, cusp lệch). Chuyển sang 'sharp' vẫn xóa tay.
+- **Chỉnh sửa vùng ĐÃ ĐÓNG:** thêm `_pathEditingRegion`, `_regionNodeHit`, `_loadEditRegion`, `_rebakePathRegions`. Khi không đang vẽ (`inpaintPathPoints` rỗng), bấm node của vùng đã đóng → nạp points vào `inpaintPathPoints` để kéo/đổi kiểu/xóa; đóng bởi snap-close → `pathClose` thay thế đúng vùng đi (giữ `_mode` gốc) và **re-bake toàn bộ vùng** (`_rebakePathRegions` clear canvas + fill từng region theo add/subtract). Bấm khoảng trống vẫn tạo đường bao mới.
+- Vùng đã đóng giờ hiện **node chấm nhỏ/mờ** (chỉ khi không đang vẽ) để bấm mở lại; mỗi region lưu `_mode` (add/subtract) để re-bake đúng.
+- Hint status bar: "…bấm node vùng đã đóng để sửa lại…".
+
+**Xác minh:** vite build ✓ (737ms) · push `4373efa` · SSH pull + `optimize:clear` ✓ · asset `app-I6rNsxwG.js` + `GalleryModal-Dx0-eGGc.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

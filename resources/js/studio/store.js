@@ -181,6 +181,7 @@ export const useStudioStore = defineStore('studio', {
     _pathPending: null,           // neo đang kéo (khi vẽ Bezier)
     inpaintPathCloseHover: false, // hover gần điểm BẮT ĐẦU (snap để đóng kín) → highlight node đầu + guide
     _pathEditingRegion: -1,     // index vùng ĐÃ ĐÓNG đang được chỉnh sửa lại (-1 = không)
+    _pathHoverRegion: -1,       // index vùng ĐÃ ĐÓNG đang HOVER (để hiện nút 'Sửa') — -1 = không
     magicTolerance: 32,           // ngưỡng màu cho Magic Wand (1-128)
     magicFeather: 0,             // độ mịn Magic Wand (blur px 0-20) — làm mềm mép vùng chọn
     _inpaintFreehandActive: false,
@@ -2563,6 +2564,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintPathPoints = [];
       this.inpaintPathRegions = [];
       this._pathEditingRegion = -1;
+      this._pathHoverRegion = -1;
       if (this.inpaintMaskSource === 'canvas') {
         // Vùng chọn trên canvas: chỉ thoát + xoá dữ liệu, không giữ làm mask inpaint.
         this.inpaintMaskDone = false;
@@ -2589,6 +2591,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintPathPoints = [];
       this.inpaintPathRegions = [];
       this._pathEditingRegion = -1;
+      this._pathHoverRegion = -1;
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
     },
     async toggleInpaintMask(mode) {
@@ -2605,7 +2608,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._pathEditingRegion = -1; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._pathEditingRegion = -1; this._pathHoverRegion = -1; this._initInpaintBrush(); }
       if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // Mở vùng chọn từ THANH CÔNG CỤ CANVAS (rect/freehand) — dùng chung overlay chính xác của Inpaint,
@@ -2623,7 +2626,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._pathEditingRegion = -1; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._pathEditingRegion = -1; this._pathHoverRegion = -1; this._initInpaintBrush(); }
       if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // ── Freehand (lasso) select: vẽ tự do tạo vùng kín → mask ──
@@ -2698,11 +2701,51 @@ export const useStudioStore = defineStore('studio', {
       return Math.hypot((nx - px) * m.vw, (ny - py) * m.vh);
     },
     // Hover gần điểm BẮT ĐẦU (snap để đóng kín): highlight node đầu + guide line nối về điểm đầu.
+    // Đồng thời: khi không đang vẽ, hover gần đường bao vùng ĐÃ ĐÓNG → đánh dấu vùng để hiện nút 'Sửa'.
     pathHover(e) {
-      if (this.inpaintMaskMode !== 'path' || this._pathDrag) { this.inpaintPathCloseHover = false; return; }
-      const p = this.inpaintMaskPointer(e); if (!p || this.inpaintPathPoints.length < 3) { this.inpaintPathCloseHover = false; return; }
-      const s = this.inpaintPathPoints[0];
-      this.inpaintPathCloseHover = this._pathScreenDist(p.nx, p.ny, s.nx, s.ny) < 20;
+      if (this.inpaintMaskMode !== 'path' || this._pathDrag) { this.inpaintPathCloseHover = false; this._pathHoverRegion = -1; return; }
+      const p = this.inpaintMaskPointer(e);
+      if (!p) { this.inpaintPathCloseHover = false; this._pathHoverRegion = -1; return; }
+      if (this.inpaintPathPoints.length >= 3) {
+        const s = this.inpaintPathPoints[0];
+        this.inpaintPathCloseHover = this._pathScreenDist(p.nx, p.ny, s.nx, s.ny) < 20;
+      } else {
+        this.inpaintPathCloseHover = false;
+      }
+      // Chỉ hover vùng ĐÃ ĐÓNG khi không đang vẽ điểm mới.
+      this._pathHoverRegion = this.inpaintPathPoints.length === 0 ? this._regionHoverHit(p) : -1;
+    },
+    // Khoảng cách điểm-đoạn thẳng (px màn hình).
+    _pointSegDist(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1, dy = y2 - y1;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 ? ((px - x1) * dx + (py - y1) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const qx = x1 + t * dx, qy = y1 + t * dy;
+      return Math.hypot(px - qx, py - qy);
+    },
+    // Vùng đã đóng gần con trỏ nhất (theo đường bao nối các node) — trả về index hoặc -1.
+    _regionHoverHit(p) {
+      const m = this.canvasMetrics(); if (!m) return -1;
+      const sx = p.nx * m.vw, sy = p.ny * m.vh;
+      let best = -1, bestDist = 18;
+      for (let r = 0; r < this.inpaintPathRegions.length; r++) {
+        const arr = this.inpaintPathRegions[r]; const n = arr.length;
+        let dmin = Infinity;
+        for (let i = 0; i < n; i++) {
+          const a = arr[i], b = arr[(i + 1) % n];
+          const d = this._pointSegDist(sx, sy, a.nx * m.vw, a.ny * m.vh, b.nx * m.vw, b.ny * m.vh);
+          if (d < dmin) dmin = d;
+        }
+        if (dmin < bestDist) { bestDist = dmin; best = r; }
+      }
+      return best;
+    },
+    // Mở vùng đã đóng để chỉnh sửa (từ nút 'Sửa').
+    enterEditRegion(r) {
+      if (this.inpaintMaskMode !== 'path') return;
+      if (this._pathEditingRegion >= 0) return;
+      if (this._loadEditRegion(r)) { this._pathHoverRegion = -1; this.inpaintPathCloseHover = false; }
     },
     // Hit node (KHÔNG xét tay điều khiển) — dùng cho Ctrl+click đổi kiểu node.
     _pathNodeHit(p) {
