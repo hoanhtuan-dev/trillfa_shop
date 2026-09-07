@@ -17,6 +17,7 @@ import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
 import LibraryCard from './components/LibraryCard.vue';
+import MultiSelectBar from './components/MultiSelectBar.vue';
 import GalleryModal from './components/GalleryModal.vue';
 import ProjectWorkspace from './components/ProjectWorkspace.vue';
 import StudioIcon from './components/StudioIcon.vue';
@@ -83,8 +84,14 @@ function onCanvasKey(e) {
 // Phím tắt cho layer (chế độ stack): mũi tên di chuyển, Ctrl/Cmd+D nhân đôi.
 function onLayerKeys(e) {
   if (store.cropMode || store.inpaintMaskMode !== 'none') return;
+  if (store.viewer || store.confirmDeleteOpen) return; // đang có modal → không xử lý phím layer
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  // Phím Delete/Backspace → popup xác nhận xóa layer đang chọn (1 hoặc nhiều).
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (store.selectedIds.length && !e.ctrlKey && !e.metaKey) { e.preventDefault(); store.deleteSelection(); }
+    return;
+  }
   const l = store.activeLayer;
   if (!l || l.locked) return;
   if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); store.duplicateLayer(l.id); return; }
@@ -96,7 +103,7 @@ function onLayerKeys(e) {
   else if (e.key === 'ArrowDown') dy = step;
   else return;
   e.preventDefault();
-  store.updateLayerTransform(l.id, { x: (l.x || 0) + dx, y: (l.y || 0) + dy });
+  store.nudgeSelection(dx, dy); // di chuyển toàn bộ nhóm đang chọn
 }
 // Phím tắt undo/redo toàn cục (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y) — trừ khi đang vẽ mask brush.
 function onHistoryKeys(e) {
@@ -170,7 +177,10 @@ const drawOverlayStyle = computed(() => {
   };
 });
 function onLayerPointerDown(l, e) {
+  if (e.shiftKey) { store.shiftSelectLayer(l.id); return; } // shift+click: thêm/bỏ vào nhóm chọn nhiều
   if (l.locked) { store.selectLayer(l); return; }
+  // Click thường: nếu layer không thuộc nhóm đang chọn → chọn riêng nó; nếu thuộc nhóm → giữ nhóm.
+  if (!store.isSelected(l.id)) store.setActiveLayer(l.id);
   store.beginLayerDrag(l.id, e);
   const move = (ev) => store.layerDragMove(ev);
   const up = () => { store.endLayerDrag(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
@@ -337,6 +347,8 @@ function onTouchEnd(e) {
           <div class="flex min-h-0 flex-1">
           <!-- ══ Vùng canvas (trái, flex-1) ══ -->
           <div class="relative flex-1 overflow-hidden" :class="bgClass">
+            <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
+            <MultiSelectBar v-if="store.selectionCount > 1" class="absolute left-1/2 top-3 z-50 -translate-x-1/2" />
           <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->
           <RegionTools />
           <!-- Inpaint mask overlay on canvas -->
@@ -359,7 +371,7 @@ function onTouchEnd(e) {
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
-                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :class="[l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : '', l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
+                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :class="[l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : (store.isSelected(l.id) ? 'ring-2 ring-brand-400/60' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
                   <template v-if="l.id === store.activeLayerId && !l.locked">
                     <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
                     <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>
@@ -461,6 +473,20 @@ function onTouchEnd(e) {
         <SourcePanel />
         <OutputModule />
         <LibraryCard />
+      </div>
+    </div>
+    <!-- Popup xác nhận xóa layer đang chọn (phím Delete / nút Xóa) -->
+    <div v-if="store.confirmDeleteOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="store.confirmDeleteOpen = false">
+      <div class="w-full max-w-sm rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl">
+        <div class="mb-2 flex items-center gap-2">
+          <div class="grid h-8 w-8 place-items-center rounded-xl bg-red-600/15 text-red-300"><StudioIcon name="trash" size="h-4 w-4"/></div>
+          <p class="text-sm font-semibold text-cream-100">Xóa {{ store.selectionCount }} layer?</p>
+        </div>
+        <p class="text-xs leading-relaxed text-cream-300/60">Hành động này sẽ xóa {{ store.selectionCount }} layer khỏi canvas. (Ctrl+Z để hoàn tác).</p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button @click="store.confirmDeleteOpen = false" class="rounded-xl border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
+          <button @click="store.confirmDeleteSelection()" class="flex items-center gap-1 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa layer</button>
+        </div>
       </div>
     </div>
     <GalleryModal v-if="store.viewer" />

@@ -46,6 +46,8 @@ function onRowDragLeave(e, l) {
   if (e.currentTarget.contains(e.relatedTarget)) return; // di chuyển giữa phần tử con — bỏ qua
   if (dropTargetId.value === l.id) { dropTargetId.value = null; dropBelow.value = false; }
 }
+// Nhấn 1 layer = chọn riêng; shift+click = thêm/bỏ vào nhóm chọn nhiều (đồng bộ canvas).
+function onRowClick(l, e) { if (e && e.shiftKey) store.shiftSelectLayer(l.id); else store.selectLayer(l); }
 function onRowDrop(e, l) {
   e.preventDefault();
   if (dragId.value && dragId.value !== l.id) {
@@ -123,11 +125,11 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       <div v-for="l in store.layersFrontFirst" :key="l.id"
         class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
         :class="[
-          store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/15' : 'border-transparent hover:bg-ink-800/70',
+          store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/15' : (store.isSelected(l.id) ? 'border-brand-500/60 bg-brand-600/10' : 'border-transparent hover:bg-ink-800/70'),
           l.visible === false ? 'opacity-45' : '',
           dropTargetId === l.id ? (dropBelow ? 'border-b-2 border-b-brand-400' : 'border-t-2 border-t-brand-400') : ''
         ]"
-        @click="store.selectLayer(l)"
+        @click="onRowClick(l, $event)"
         @dragover="onRowDragOver($event, l)"
         @dragleave="onRowDragLeave($event, l)"
         @drop="onRowDrop($event, l)">

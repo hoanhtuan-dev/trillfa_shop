@@ -63,6 +63,8 @@ export const useStudioStore = defineStore('studio', {
     _layerDrag: null,
     snapX: null,
     snapY: null,
+    snapGrid: 0, // lưới bắt điểm (px) khi di chuyển/kéo layer — 0 = tắt
+    confirmDeleteOpen: false, // popup xác nhận xóa nhiều layer
     _pinch: null,
     // Xóa vùng (erase) với feather
     eraseMode: false,
@@ -217,6 +219,7 @@ export const useStudioStore = defineStore('studio', {
     uploadCleaning: false,
     canvasLayers: [],
     activeLayerId: '',
+    selectedLayerIds: [], // các layer được chọn (shift+click) ngoài active — hỗ trợ chọn/di chuyển nhiều layer
     // Panel Layers: dock phải khung canvas trên desktop, drawer đè canvas trên mobile.
     // Mặc định mở trên desktop, đóng trên mobile để không che canvas lúc vào trang.
     inspectorOpen: (typeof window !== 'undefined' && window.innerWidth < 1024) ? false : true,
@@ -258,6 +261,11 @@ export const useStudioStore = defineStore('studio', {
       return this.generations;
     },
     activeLayer() { return this.canvasLayers.find(x => x.id === this.activeLayerId) || null; },
+    // ── Chọn nhiều layer (shift+click) ──
+    selectedIds() { const a = [this.activeLayerId, ...this.selectedLayerIds].filter(Boolean); return [...new Set(a)]; },
+    selection() { return this.canvasLayers.filter(l => this.selectedIds.includes(l.id) && l.visible !== false); },
+    selectionCount() { return this.selection.length; },
+    isSelected(id) { return this.selectedIds.includes(id); },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
     // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
     // ảnh. canvasLayers giữ thứ tự vẽ (zIndex), getter này chỉ đảo để hiển thị panel.
@@ -1438,7 +1446,11 @@ export const useStudioStore = defineStore('studio', {
       img.onerror = () => {};
       img.src = image;
     },
-    setActiveLayer(id) { if (!id) return; const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (this.highlightLayerId && this.highlightLayerId !== id) this.highlightLayerId = ''; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } this.saveLayerLayout(); },
+    _setActive(id) { if (!id) { this.activeLayerId = ''; this.editSource = null; this.previewId = null; this.preview = null; return; } const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (l.visible === false) l.visible = true; this.activeLayerId = id; if (this.highlightLayerId && this.highlightLayerId !== id) this.highlightLayerId = ''; if (l.kind === 'source') { this.editSource = { url: l.image, name: l.name }; this.previewId = null; this.preview = null; } else if (l.genId) { const g = this.generations.find(x => x.id === l.genId); if (g) { this.previewId = g.id; this.preview = { id: g.id, media_url: g.media_url, type: g.type || 'image', status: g.status || 'completed' }; } this.editSource = null; } },
+    setActiveLayer(id) { this._setActive(id); this.selectedLayerIds = []; this.saveLayerLayout(); },
+    // Shift+click: thêm/bỏ một layer vào nhóm chọn nhiều (không xáo trộn nhóm).
+    shiftSelectLayer(id) { const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (id === this.activeLayerId) { const rest = this.selectedLayerIds.slice(); this.selectedLayerIds = []; if (rest.length) this._setActive(rest[rest.length - 1]); else this._setActive(''); } else { const idx = this.selectedLayerIds.indexOf(id); if (idx >= 0) this.selectedLayerIds.splice(idx, 1); else { if (this.activeLayerId) this.selectedLayerIds.push(this.activeLayerId); this._setActive(id); } } this.saveLayerLayout(); },
+    clearSelection() { this.selectedLayerIds = []; if (this.activeLayerId) this.saveLayerLayout(); },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
     deleteLayer(item) {
@@ -1867,35 +1879,42 @@ export const useStudioStore = defineStore('studio', {
         return false;
       } finally { this._flattenBusy = false; }
     },
-    // Kéo layer trên canvas để di chuyển (tách khỏi pan/zoom khung nhìn).
+    // Kéo layer trên canvas để di chuyển — hỗ trợ di chuyển NHIỀU layer cùng lúc (nhóm).
     beginLayerDrag(id, e) {
       const l = this.canvasLayers.find((x) => x.id === id);
       if (!l || l.locked) return;
-      this.setActiveLayer(id);
-      // Snapshot lúc BẮT ĐẦU kéo (giữ lại để push vào history khi kết thúc) — không push ngay
-      // để tránh mỗi cú click (chưa kéo) làm bẩn lịch sử + lệch vị trí.
-      this._layerDrag = { id, sx: e.clientX, sy: e.clientY, ox: Number(l.x) || 0, oy: Number(l.y) || 0, snap: this._snapshot() };
+      // Nếu layer bị kéo nằm trong NHÓM chọn nhiều → kéo cả nhóm; ngược lại chọn riêng nó.
+      let ids = this.selectedIds;
+      if (!ids.includes(id)) { this.setActiveLayer(id); ids = [id]; }
+      const items = this.canvasLayers.filter(x => ids.includes(x.id) && x.visible !== false && !x.locked).map(x => ({ id: x.id, ox: Number(x.x) || 0, oy: Number(x.y) || 0 }));
+      if (!items.length) return;
+      // Snapshot lúc bắt đầu kéo (push vào history khi kết thúc) — tránh làm bẩn lịch sử.
+      this._layerDrag = { id, ids, items, sx: e.clientX, sy: e.clientY, snap: this._snapshot() };
     },
     layerDragMove(e) {
       const d = this._layerDrag;
       if (!d) return;
-      const l = this.canvasLayers.find((x) => x.id === d.id);
-      if (!l) return;
-      let nx = d.ox + (e.clientX - d.sx) / (this.zoom || 1);
-      let ny = d.oy + (e.clientY - d.sy) / (this.zoom || 1);
-      const SNAP = 20 / (this.zoom || 1); // ≈20px trên màn hình — nhạy hơn
+      const prim = d.items.find(x => x.id === d.id) || d.items[0];
+      if (!prim) return;
+      let dx = (e.clientX - d.sx) / (this.zoom || 1);
+      let dy = (e.clientY - d.sy) / (this.zoom || 1);
+      const SNAP = 20 / (this.zoom || 1);  // ≈20px màn hình
+      const G = ((this.snapGrid || 0) / (this.zoom || 1)); // lưới bắt điểm (preset)
+      let tx = prim.ox + dx, ty = prim.oy + dy;
       let sx = null, sy = null;
-      // Bắt điểm vào tâm canvas (0,0) và vào các layer khác.
-      if (Math.abs(nx) < SNAP) { nx = 0; sx = 0; }
-      if (Math.abs(ny) < SNAP) { ny = 0; sy = 0; }
+      // Bắt điểm LƯỚI preset trước (ưu tiên rơi vào nút lưới).
+      if (G > 0) { tx = Math.round(tx / G) * G; ty = Math.round(ty / G) * G; }
+      // Bắt điểm tâm canvas (0,0) + cạnh các layer NGOÀI nhóm.
+      if (Math.abs(tx) < SNAP) { tx = 0; sx = 0; }
+      if (Math.abs(ty) < SNAP) { ty = 0; sy = 0; }
       this.canvasLayers.forEach((o) => {
-        if (o.id === d.id || o.visible === false) return;
-        const ox = o.x || 0, oy = o.y || 0;
-        if (Math.abs(nx - ox) < SNAP) { nx = ox; sx = ox; }
-        if (Math.abs(ny - oy) < SNAP) { ny = oy; sy = oy; }
+        if (d.ids.includes(o.id) || o.visible === false) return;
+        if (Math.abs(tx - (o.x || 0)) < SNAP) { tx = o.x || 0; sx = tx; }
+        if (Math.abs(ty - (o.y || 0)) < SNAP) { ty = o.y || 0; sy = ty; }
       });
-      l.x = nx;
-      l.y = ny;
+      // Áp delta đã bắt điểm cho toàn bộ nhóm.
+      dx = tx - prim.ox; dy = ty - prim.oy;
+      d.items.forEach(it => { const m = this.canvasLayers.find(x => x.id === it.id); if (m) { m.x = it.ox + dx; m.y = it.oy + dy; } });
       this.snapX = sx;
       this.snapY = sy;
     },
@@ -1906,8 +1925,55 @@ export const useStudioStore = defineStore('studio', {
       this.snapX = null;
       this.snapY = null;
       this.saveLayerLayout();
-      // Push snapshot pre-drag vào history (chỉ 1 lần, sau khi kéo xong).
       if (snap) { this.undoStack.push(snap); if (this.undoStack.length > 50) this.undoStack.shift(); this.redoStack = []; }
+    },
+    // Di chuyển TOÀN BỘ layer đang chọn theo (dx,dy) — dùng phím mũi tên.
+    nudgeSelection(dx, dy) {
+      const ids = this.selectedIds; if (!ids.length) return;
+      let moved = false;
+      this.canvasLayers.forEach(l => { if (ids.includes(l.id) && !l.locked) { l.x = (l.x || 0) + dx; l.y = (l.y || 0) + dy; moved = true; } });
+      if (moved) { this.saveLayerLayout(); }
+    },
+    setSnapGrid(v) { this.snapGrid = Number(v) || 0; },
+    // Kích thước hiển thị (bbox) của layer — dùng cho căn/chia đều.
+    _layerBox(l) { const w = Math.max(1, (Number(l.baseW) || 0) * (Number(l.scale) || 1)); const h = Math.max(1, (Number(l.baseH) || 0) * (Number(l.scale) || 1)); return { w, h, cx: (l.x || 0), cy: (l.y || 0) }; },
+    // Căn lề nhóm theo cạnh: left/hcenter/right/top/vcenter/bottom.
+    alignSelection(kind) {
+      const sels = this.selection; if (sels.length < 2) return;
+      const boxes = sels.map(l => this._layerBox(l));
+      const left = Math.min(...boxes.map(b => b.cx - b.w / 2)), right = Math.max(...boxes.map(b => b.cx + b.w / 2));
+      const top = Math.min(...boxes.map(b => b.cy - b.h / 2)), bottom = Math.max(...boxes.map(b => b.cy + b.h / 2));
+      const hc = (left + right) / 2, vc = (top + bottom) / 2;
+      this.pushHistory();
+      sels.forEach((l, i) => { const b = boxes[i]; if (kind === 'left') l.x = left + b.w / 2; else if (kind === 'hcenter') l.x = hc; else if (kind === 'right') l.x = right - b.w / 2; else if (kind === 'top') l.y = top + b.h / 2; else if (kind === 'vcenter') l.y = vc; else if (kind === 'bottom') l.y = bottom - b.h / 2; });
+      this.saveLayerLayout();
+    },
+    // Chia đều khoảng cách theo trục x (kind='x') hoặc y (kind='y') — giữ 2 layer đầu/cuối.
+    distributeSelection(kind) {
+      const sels = this.selection; if (sels.length < 3) return;
+      const prop = kind === 'y' ? 'cy' : 'cx';
+      const sorted = sels.slice().sort((a, b) => this._layerBox(a)[prop] - this._layerBox(b)[prop]);
+      const first = this._layerBox(sorted[0])[prop], last = this._layerBox(sorted[sorted.length - 1])[prop];
+      const step = (last - first) / (sorted.length - 1);
+      this.pushHistory();
+      sorted.forEach((l, i) => { if (i === 0 || i === sorted.length - 1) return; if (kind === 'y') l.y = first + step * i; else l.x = first + step * i; });
+      this.saveLayerLayout();
+    },
+    // Phím Delete → mở popup xác nhận xóa NHIỀU layer.
+    deleteSelection() { if (this.selectedIds.length) this.confirmDeleteOpen = true; },
+    confirmDeleteSelection() {
+      const ids = this.selectedIds; if (!ids.length) { this.confirmDeleteOpen = false; return; }
+      const wasActive = this.activeLayerId;
+      this.pushHistory();
+      this.canvasLayers = this.canvasLayers.filter(l => !ids.includes(l.id));
+      const rest = this.canvasLayers.filter(l => l.visible !== false);
+      const at = rest.findIndex(l => l.id === wasActive);
+      const next = rest[at] || rest[rest.length - 1] || null;
+      if (next) this._setActive(next.id); else this._setActive('');
+      this.selectedLayerIds = [];
+      this.confirmDeleteOpen = false;
+      this.saveLayerLayout();
+      this.toast('Đã xóa ' + ids.length + ' layer.');
     },
     // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
     deselectAll() {
@@ -1915,6 +1981,7 @@ export const useStudioStore = defineStore('studio', {
       this.editSource = null;
       this.previewId = null;
       this.preview = null;
+      this.selectedLayerIds = [];
       this.saveLayerLayout();
     },
     // Gộp tất cả layer đang hiển thị thành 1 ảnh PNG (data URL) theo đúng transform/opacity/blend.

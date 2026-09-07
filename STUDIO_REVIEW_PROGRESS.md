@@ -6,6 +6,16 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3n (2026-09-07) — Đa chọn & thao tác canvas nâng cao (shift+click, kéo nhóm, snap preset, căn/chia đều, Delete→xác nhận)
+
+- **Chọn nhiều layer (shift+click)**: store thêm `selectedLayerIds` + `selectedIds`/`selection`/`selectionCount`/`isSelected` + `shiftSelectLayer`/`clearSelection`; `setActiveLayer` refactor thành `_setActive` (giữ nhóm) + clear selection. Hoạt động trên canvas (`onLayerPointerDown` shift) lẫn panel Layers (`onRowClick` shift) — row/ảnh được chọn có ring brand mờ.
+- **Kéo nhiều layer cùng lúc**: `beginLayerDrag` lấy nhóm `selectedIds`, `layerDragMove` áp delta (đã bắt điểm) cho toàn bộ nhóm.
+- **Snap preset**: `snapGrid` (0/8/16/24/32) — kéo layer bắt vào lưới + tâm canvas + cạnh layer ngoài nhóm (giữ `snapX/snapY` guide). Mặc định 0 (tắt).
+- **Popup ngữ cảnh chọn nhiều (`MultiSelectBar.vue` — MỚI)**: nổi giữa trên khi `selectionCount>1` — căn lề (6 hướng) · chia đều X/Y · chọn khoảng cách bắt điểm · Xóa. (tiền đề mở rộng — gắn nút mới dễ).
+- **Căn/chia đều**: `alignSelection(kind)` (left/hcenter/right/top/vcenter/bottom theo bbox layer) · `distributeSelection('x'/'y')` (giữ 2 đầu, ≥3 layer).
+- **Phím Delete → popup xác nhận xóa**: `onLayerKeys` bắt Delete/Backspace → `confirmDeleteOpen` modal (đếm layer · Hủy/Xóa) → `confirmDeleteSelection`; mũi tên giờ `nudgeSelection` di chuyển cả nhóm; chặn phím khi modal mở.
+- **Verify**: vite build ✓ (769ms) · grep marker đầy đủ gal.
+
 ## Phiên UI-3m (2026-09-07) — Menu Thêm layer: fix nhầm nút chọn màu + thoát chắc khi bấm ngoài
 
 - **Bỏ nút "Thêm layer màu" gây nhầm**: thay bằng **1 hàng chọn màu rõ ràng** "Chọn màu tùy chỉnh…" (swatch + label + chevron) — bấm cả hàng mở bảng màu; chọn xong (`@change` đóng bảng màu) tự `addBlankLayer(blankColor, ratio)` + đóng menu.
