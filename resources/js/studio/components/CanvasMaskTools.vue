@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
+import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 
 // Hiển thị overlay khi: đang chỉnh (rect/brush) HOẶC đã lưu (done — vẫn xem được vùng đã chọn)

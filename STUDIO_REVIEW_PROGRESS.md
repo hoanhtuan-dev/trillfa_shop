@@ -6,6 +6,16 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-1 (2026-09-07) — REDESIGN "/studio" Designer Workspace (ngoài phạm vi review code)
+
+- Spec: **STUDIO_UI_REDESIGN.md** (phân tích + contract component + icon map + checklist).
+- **Lỗ hổng production mới phát hiện & vá**: theme app.css thiếu `ink-600` (dùng 56 lần trong studio SFC) · `ink-950` (4 lần, gồm root StudioApp) · `cream-400` → class không sinh CSS trên production (kiểm chứng grep = 0 trong bundle build thật). Đã thêm 3 biến màu vào `@theme` — KHÔNG thêm ink-100..400 (tránh đụng override .studio-dark storefront). `z-32` xác nhận hợp lệ (Tailwind v4 bare value), không phải lỗi.
+- **Icon đồng bộ 1 hệ**: StudioIcon +26 icon (tổng 90) — thay toàn bộ inline SVG icon: StudioApp 27 · ContextToolbar 29 · SourcePanel 12 · SourceLibraryPicker 10 · RegionTools 8; emoji chrome (🔒🎨☰✕⚙️⚠️🚫−+) → icon; CanvasMaskTools giữ đúng 2 `<svg>` overlay dữ liệu mask. Emoji dữ liệu kiểu tóc ConceptCard = nội dung picker, giữ.
+- **Canvas + layers → workspace chuyên nghiệp**: `LayersPanel.vue` MỚI (dock phải desktop / drawer mobile — header+đếm, thêm layer, dọn canvas, **kéo-thả sắp xếp** qua `store.reorderLayer()` mới, eye/lock, double-click rename, hover duplicate/delete, empty state, thuộc tính opacity/blend/scale/xoay + flip + front/back + tô màu + Xóa nền AI kèm confirm, palette ảnh, footer Xuất/Gộp/Lưu) · `CanvasStatusBar.vue` MỚI (dock đáy: undo/redo, zoom −/%/+/fit, 4 nền canvas, số lớp + layer đang chọn, download, toggle inspector) · xóa 5 vùng nổi cũ (zoom pill, bg pill, layers popover, transform popover, palette popover).
+- Store: +`inspectorOpen` (mặc định theo viewport), +`toggleInspector()`, +`reorderLayer(id, targetId, placeAfter)` (pushHistory + saveLayerLayout, cấm kéo layer locked).
+- Triển khai: workflow 5 agent kimi-k3 (W1-W5) + điều phối tích hợp StudioApp/GalleryModal; workflow timeout 600s sau khi agents đã ghi đủ file → xác minh đọc diff 100%: đúng contract, giữ nguyên handler/store call. Vá tích hợp: thiếu 1 `</div>` vùng canvas (build bắt), shrink-0 header/footer panel, cap max-h properties.
+- Verify: vite build ✓ (769ms) · 0 inline svg icon (trừ 2 overlay mask) · 0 emoji chrome · 90 icon hợp lệ · CSS mới có .bg-ink-950/.bg-ink-600/.border-ink-600/.text-cream-400 · store API cross-check ✓.
+
 
 - Kết quả: `STUDIO_REVIEW.md` — **30 area**, **214 findings** (critical 2 · high 18 · medium 53 · low 98 · info 43), 8 claim dương tính giả đã gạch bỏ kèm bằng chứng. Đối chiếu `grep -cE '^- \*\*\[(critical|high|medium|low|info)\]\*\*'` = **214** ✓ (đo sau khi gộp Phần L). Cấu trúc file hiện: Phần A–L (K = hoàn thiện Quản lý dự án + K.8 current-project/hardening; **L = đợt vá production-refgen: chẩn đoán Hostinger còn code trước 234d405 + refgen 422 `be3cfe7` + fix warning CSS color**, thêm 2026-09-07).
 - Footprint module studio: **1.338.134 bytes** = PHP 532.648 (24 file) + JS/Vue 562.602 (34 file) + blade 242.884 (11 file) ≈ 405k token → bắt buộc fan-out.

@@ -25,11 +25,17 @@
     --color-cream-100: #f4f2ec;
     --color-cream-200: #e9e5db;
     --color-cream-300: #d8d2c4;
+    --color-cream-400: #c7c0ae;
 
     --color-ink-900: #17150f;
     --color-ink-700: #36332a;
     --color-ink-500: #6b6657;
     --color-ink-800: #2f2c23;
+    /* Studio dark workspace — bù các level studio SFC đang dùng mà theme thiếu
+       (trước đây class không sinh CSS trên production). Không thêm ink-100..400
+       để tránh đụng override .studio-dark .text-ink-300 của storefront. */
+    --color-ink-600: #4b483c;
+    --color-ink-950: #0e0d09;
 
     --color-clay-500: #b56a37;
     --color-clay-600: #9a5227;

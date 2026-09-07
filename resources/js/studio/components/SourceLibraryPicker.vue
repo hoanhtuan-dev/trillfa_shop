@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
+import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 
 const props = defineProps({
@@ -143,17 +144,17 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
     <div class="flex h-[82vh] w-full max-w-3xl flex-col rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl" style="height: min(82vh, 760px)">
       <div class="mb-3 flex items-start justify-between">
         <div class="flex items-center gap-2.5">
-          <div class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600/15 text-brand-300"><svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
+          <div class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600/15 text-brand-300"><StudioIcon name="image" size="h-4.5 w-4.5"/></div>
           <div>
             <p class="text-sm font-semibold text-cream-100">{{ title }}</p>
             <p class="text-[11px] text-cream-300/60">{{ refs.length + output.length }} ảnh<template v-if="query"> · “{{ query }}”</template></p>
           </div>
         </div>
-        <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition-colors hover:bg-ink-700 hover:text-white" title="Đóng" :aria-label="'Đóng'"><StudioIcon name="x" size="h-4 w-4"/></button>
       </div>
 
       <label class="mb-3 flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink-600 bg-ink-800/40 text-xs font-medium text-cream-200 transition-colors hover:border-brand-500 hover:bg-brand-600/10 hover:text-brand-200">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <StudioIcon name="imagePlus" size="h-4 w-4"/>
         {{ uploading ? 'Đang tải lên…' : 'Tải ảnh mới' }}<span class="text-cream-300/50">(chọn nhiều file được)</span>
         <input ref="fileRef" type="file" accept="image/*" multiple @change="onFile" class="hidden">
       </label>
@@ -161,7 +162,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
       <div class="scrollbar-hide -mr-1 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
         <!-- Kết quả (output library) -->
         <template v-if="includeOutput && output.length">
-          <p class="mb-1.5 text-xs font-semibold text-cream-200">🖼 Ảnh kết quả (output library)</p>
+          <p class="mb-1.5 flex items-center gap-1 text-xs font-semibold text-cream-200"><StudioIcon name="image" size="h-3.5 w-3.5"/>Ảnh kết quả (output library)</p>
           <div class="mb-3 grid gap-2" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
             <div v-for="g in output" :key="g.key" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSel({ ...g, kind: 'output' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" style="padding-bottom: 100%" @click="clickItem({ ...g, kind: 'output' })">
               <img :src="thumbUrl(g.url)" class="absolute inset-0 h-full w-full bg-ink-900 object-cover" loading="lazy" alt="" @error="onThumbError($event, g.url)">
@@ -173,26 +174,26 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
         <!-- Thư viện đã tải lên -->
         <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           <div class="relative flex-1">
-            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <StudioIcon name="search" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50"/>
             <input v-model="query" placeholder="Tìm theo tên ảnh…" class="h-9 w-full rounded-xl border border-ink-700 bg-ink-800/60 pl-9 pr-3 text-xs text-cream-100 placeholder:text-cream-300/40 focus:border-brand-500 focus:outline-none">
           </div>
           <div class="relative">
-            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M10 18h4"/></svg>
+            <StudioIcon name="sliders" size="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-300/50"/>
             <select v-model="sortKey" class="h-9 w-full appearance-none rounded-xl border border-ink-700 bg-ink-800/60 pl-9 pr-8 text-xs text-cream-100 focus:border-brand-500 focus:outline-none sm:w-52">
               <option v-for="o in sortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
-            <svg class="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-300/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <StudioIcon name="chevronDown" size="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-300/50"/>
           </div>
           <div class="flex h-9 items-center gap-2 rounded-xl border border-ink-700 bg-ink-800/60 px-3" title="Kích thước ô ảnh">
-            <svg class="h-4 w-4 shrink-0 text-cream-300/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <StudioIcon name="grid" size="h-4 w-4 shrink-0 text-cream-300/50"/>
             <input type="range" min="2" max="8" step="1" v-model.number="gridCols" class="h-1.5 w-24 cursor-pointer accent-brand-500">
           </div>
         </div>
         <div class="grid content-start gap-2.5" :style="{ gridTemplateColumns: 'repeat(' + gridCols + ', minmax(0, 1fr))' }">
           <div v-for="it in sortedRefs" :key="it.name" class="group relative cursor-pointer overflow-hidden rounded-xl border transition-colors" :class="isSel({ ...it, key: 'ref-' + it.name, kind: 'ref' }) ? 'border-brand-400 ring-2 ring-brand-400/70' : 'border-ink-700 hover:border-ink-600'" :title="it.name" style="padding-bottom: 100%" @click="clickItem({ key: 'ref-' + it.name, url: it.url, name: it.name, kind: 'ref' })">
             <img :src="thumbUrl(it.url)" class="absolute inset-0 h-full w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, it.url)">
-            <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>đang dùng</span>
-            <button v-if="!it.used" @click.stop="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white transition-colors hover:bg-red-500 group-hover:grid" title="Xóa ảnh"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+            <span v-if="it.used" class="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300"><StudioIcon name="check" size="h-3 w-3"/>đang dùng</span>
+            <button v-if="!it.used" @click.stop="delRef(it)" class="absolute right-1.5 top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-red-600/90 text-white transition-colors hover:bg-red-500 group-hover:grid" title="Xóa ảnh" :aria-label="'Xóa ảnh'"><StudioIcon name="trash" size="h-3.5 w-3.5"/></button>
             <div class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-1.5 pb-1 pt-5">
               <p class="truncate text-[10px] font-medium text-cream-100">{{ it.name }}</p>
               <p class="truncate text-[9px] text-cream-300/75">{{ it.width }}×{{ it.height }} · {{ fmtSize(it.size) }}</p>
@@ -210,7 +211,7 @@ const fmtSize = (b) => { if (!b) return '—'; if (b < 1024) return b + ' B'; if
           <template v-else>{{ totalSel ? 'Đã chọn ' + totalSel + ' ảnh' : 'Chọn 1 hoặc nhiều ảnh để thêm vào canvas' }}</template>
         </span>
         <button v-if="!isPick" @click="confirmMulti" :disabled="!totalSel" class="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40">
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Thêm vào canvas ({{ totalSel }})
+          <StudioIcon name="plus" size="h-4 w-4"/>Thêm vào canvas ({{ totalSel }})
         </button>
       </div>
     </div>

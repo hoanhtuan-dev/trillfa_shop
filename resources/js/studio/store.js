@@ -217,6 +217,9 @@ export const useStudioStore = defineStore('studio', {
     uploadCleaning: false,
     canvasLayers: [],
     activeLayerId: '',
+    // Panel Layers: dock phải khung canvas trên desktop, drawer đè canvas trên mobile.
+    // Mặc định mở trên desktop, đóng trên mobile để không che canvas lúc vào trang.
+    inspectorOpen: (typeof window !== 'undefined' && window.innerWidth < 1024) ? false : true,
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
     redoStack: [],   // lịch sử làm lại
     highlightLayerId: '',  // layer mới tạo cần viền nổi bật tạm thời
@@ -1554,6 +1557,25 @@ export const useStudioStore = defineStore('studio', {
       const item = arr.splice(i, 1)[0];
       if (where === 'front') arr.push(item);
       else arr.unshift(item);
+      this.canvasLayers = arr;
+      this.saveLayerLayout();
+    },
+    // Bật/tắt panel Layers dock (Designer Workspace) — CanvasStatusBar/LayersPanel header.
+    toggleInspector() { this.inspectorOpen = !this.inspectorOpen; },
+    // Kéo-thả sắp xếp: đặt layer 'id' NGAY TRƯỚC (placeAfter=false) hoặc NGAY SAU (true)
+    // 'targetId' trong stack canvasLayers (index 0 = dưới cùng, cuối = trước nhất).
+    // Layer bị khóa không cho kéo; thả quanh target khóa vẫn hợp lệ. No-op khi kéo lên chính nó.
+    reorderLayer(id, targetId, placeAfter) {
+      const arr = this.canvasLayers.slice();
+      const i = arr.findIndex((x) => x.id === id);
+      const t = arr.findIndex((x) => x.id === targetId);
+      if (i < 0 || t < 0 || i === t) return;
+      if (arr[i].locked) return;
+      this.pushHistory();
+      const item = arr.splice(i, 1)[0];
+      let j = arr.findIndex((x) => x.id === targetId);
+      if (placeAfter) j += 1;
+      arr.splice(j, 0, item);
       this.canvasLayers = arr;
       this.saveLayerLayout();
     },
