@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3d (2026-09-07) — GalleryModal: chuyển ảnh mượt không chớp · info thu gọn · nút Sử dụng → Prompt Tạo Ảnh
+
+- **Không chớp + crossfade khi chuyển ảnh**: `GalleryModal` giữ ảnh cũ tới khi ảnh mới `load` xong (probe Image + `loadedUrls` cache) rồi mới đổi `shown` → `Transition cf` opacity 0.18s; prefetch 2 ảnh láng giềng để bấm mũi tên gần như tức thì. Bỏ `:key='img-'+current.id` cũ (nguồn chớp trắng).
+- **Thông tin ảnh thu gọn được**: `infoOpen` + nút icon `columns` nổi góc trên phải vùng ảnh (title: Thu gọn/Mở thông tin ảnh) · aside bọc `Transition aside` + `v-if`.
+- **Nút "Sử dụng prompt · Tạo ảnh mới"**: `usePrompt` = copy prompt (clipboard) + `store.imagePromptEn` + đóng viewer + `store.step=1` (mount ConceptCard chứa popup) + `store.promptOpen=true` (popup Prompt Tạo Ảnh, sẵn prompt để chỉnh & tạo). `Chỉnh sửa → Fitting Room` đổi xuống `btn-outline`. StudioApp thêm watcher `promptOpen` → mở drawer menu + đóng drawer Outputs (đảm bảo ConceptCard mount trên mobile).
+- **Verify**: vite build ✓ (761ms) · grep markers OK.
+
 ## Phiên UI-3c (2026-09-07) — Card Nguồn tối giản tuyệt đối + tách card icon Thư viện xuống đáy
 
 - **Card Nguồn chỉ còn slot** (`SourcePanel.vue`): xóa tiêu đề "Nguồn" + caption "Thư viện · Sản phẩm" (người dùng chốt: "chỉ giữ slot, tên hiện khi hover") — slot trống = icon imagePlus; có ảnh = ảnh nguồn (`store.editSource`) + nút X bỏ ảnh (overlay góc, `@click.stop`); mọi mô tả qua `title` (hover). Bấm slot → `SourcePickerPopup` (2 tab) như cũ.

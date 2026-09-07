@@ -29,6 +29,9 @@ const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 const menuOpen = ref(false);
 const outputOpen = ref(false);
 const projectsOpen = ref(false);
+// Popup "Prompt Tạo Ảnh" (ConceptCard) mở từ bất kỳ nơi nào (vd GalleryModal > nút "Sử dụng"):
+// trên mobile ConceptCard chỉ mount trong drawer menu → mở drawer + đóng drawer Outputs cho gọn.
+watch(() => store.promptOpen, (v) => { if (v) { outputOpen.value = false; menuOpen.value = true; } });
 const applyOpen = ref(false);
 function openApplyPopover() {
   applyOpen.value = !applyOpen.value;

@@ -12,6 +12,34 @@ const current = computed(() => items.value[idx.value] || store.viewer);
 const isVideo = computed(() => current.value?.type === 'video');
 const imgError = ref(false);
 
+// ── Bảng "thông tin ảnh" thu gọn / mở rộng ──
+const infoOpen = ref(true);
+
+// ── Hiển thị ảnh KHÔNG chớp khi chuyển: giữ ảnh cũ đến khi ảnh mới load xong, rồi crossfade ──
+const shown = ref({ id: store.viewer?.id ?? null, url: store.viewer?.media_url || '' });
+const loadedUrls = new Set(); // url đã load xong → chuyển ngay, không chớp trắng
+let probeId = 0;
+function prefetchNeighbors() {
+  const arr = items.value; const i = idx.value;
+  if (!arr.length) return;
+  for (const d of [-1, 1]) {
+    const n = arr[(i + d + arr.length) % arr.length];
+    if (n && n.media_url && n.type !== 'video' && !loadedUrls.has(n.media_url)) {
+      const im = new Image(); im.onload = () => loadedUrls.add(n.media_url); im.src = n.media_url;
+    }
+  }
+}
+function requestShow(c) {
+  if (!c || !c.media_url || c.type === 'video') { shown.value = { id: c?.id ?? null, url: '' }; return; }
+  const url = c.media_url;
+  if (shown.value.url === url || loadedUrls.has(url)) { shown.value = { id: c.id, url }; return; }
+  const my = ++probeId;
+  const probe = new Image();
+  probe.onload = () => { loadedUrls.add(url); if (probeId === my && current.value?.media_url === url) shown.value = { id: c.id, url }; };
+  probe.onerror = () => { if (probeId === my) { imgError.value = true; shown.value = { id: c.id, url }; } };
+  probe.src = url;
+}
+
 function nav(d) {
   const n = items.value[(idx.value + d + items.value.length) % items.value.length];
   if (n) { store.viewer = n; }
@@ -19,7 +47,12 @@ function nav(d) {
 function close() { store.viewer = null; }
 
 // Đổi ảnh (mọi cách: nav / click thumbnail / xóa) → reset zoom + hủy confirm + scroll strip theo
-watch(() => current.value?.id, () => { resetZoom(); resetConfirm(); imgError.value = false; attachOpen.value = false; attachBusy.value = false; nextTick(scrollStripToActive); });
+watch(() => current.value?.id, () => {
+  resetZoom(); resetConfirm(); imgError.value = false; attachOpen.value = false; attachBusy.value = false;
+  requestShow(current.value);
+  prefetchNeighbors();
+  nextTick(scrollStripToActive);
+});
 
 // ── Xóa an toàn: xác nhận 2 bước, tự reset sau 3.5s ──
 const confirming = ref(false);
@@ -94,7 +127,7 @@ function panStart(e) {
 function panMove(e) { if (drag) { viewerPan.value = { x: drag.px + (e.clientX - drag.x), y: drag.py + (e.clientY - drag.y) }; } } // không giới hạn
 function panEnd() { drag = null; dragging.value = false; }
 function toggleZoom() { zoomTo(0, 0, viewerZoom.value <= 1.0001 ? 2 : 1 / 2); }
-function onImgLoad() { imgError.value = false; resetZoom(); }
+function onImgLoad() { imgError.value = false; if (shown.value.url) loadedUrls.add(shown.value.url); }
 
 // ── Dải thumbnail: wheel + kéo để cuộn ngang ──
 const stripEl = ref(null);
@@ -139,6 +172,18 @@ function copyPrompt() {
   const p = current.value?.prompt || current.value?.image_prompt_en || '';
   if (!p) { store.toast('Không có prompt để sao chép.', 'error'); return; }
   try { navigator.clipboard.writeText(p); store.toast('Đã sao chép prompt.'); } catch (e) { store.toast('Lỗi sao chép.', 'error'); }
+}
+const canUsePrompt = computed(() => !!(current.value?.prompt || current.value?.image_prompt_en));
+// Nút "Sử dụng": copy prompt vào ô Tạo Ảnh + mở popup Prompt Tạo Ảnh (ConceptCard — cần step 1 mount).
+function usePrompt() {
+  const p = current.value?.prompt || current.value?.image_prompt_en || '';
+  if (!p) { store.toast('Ảnh này không có prompt để sử dụng.', 'error'); return; }
+  try { navigator.clipboard.writeText(p); } catch (e) { /* popup vẫn mở */ }
+  store.imagePromptEn = p;
+  store.step = 1;           // đảm bảo ConceptCard (chứa popup Prompt Tạo Ảnh) được mount
+  close();                  // đóng viewer trước (popup z70 < viewer z110)
+  store.promptOpen = true;  // mở popup Prompt Tạo Ảnh
+  store.toast('Đã copy prompt — chỉnh rồi tạo ảnh mới.');
 }
 
 // ── Badge trạng thái ──
@@ -223,6 +268,7 @@ onMounted(() => {
   window.addEventListener('keydown', onKey, true);
   document.body.style.overflow = 'hidden'; // khóa scroll nền khi modal mở
   nextTick(scrollStripToActive);
+  prefetchNeighbors();
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey, true);
@@ -252,11 +298,13 @@ onBeforeUnmount(() => {
         <div ref="zoomArea" v-else-if="current?.media_url && !imgError" class="absolute inset-0 cursor-grab overflow-hidden active:cursor-grabbing" style="touch-action:none"
              @wheel.prevent="onWheel"
              @pointerdown="panStart" @pointermove="panMove" @pointerup="panEnd" @pointerleave="panEnd">
-          <img ref="imgEl" :src="current.media_url" :key="'img-' + current.id"
-               class="absolute inset-0 m-auto max-h-full max-w-full select-none object-contain"
-               :class="dragging ? 'transition-none' : 'transition-transform duration-100 ease-out'"
-               :style="{ transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + viewerZoom + ')' }"
-               draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="onImgLoad" />
+          <Transition name="cf">
+            <img v-if="shown.url" ref="imgEl" :src="shown.url" :key="'img-' + shown.id"
+                 class="absolute inset-0 m-auto max-h-full max-w-full select-none object-contain"
+                 :class="dragging ? 'transition-none' : 'transition-transform duration-100 ease-out'"
+                 :style="{ transform: 'translate(' + viewerPan.x + 'px, ' + viewerPan.y + 'px) scale(' + viewerZoom + ')' }"
+                 draggable="false" @dblclick="toggleZoom" @error="imgError = true" @load="onImgLoad" />
+          </Transition>
         </div>
         <p v-else class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">{{ imgError ? 'Không tải được nội dung.' : 'Không có nội dung.' }}</p>
         <!-- Badge trạng thái -->
@@ -266,6 +314,14 @@ onBeforeUnmount(() => {
         </span>
         <!-- Bộ đếm x / y -->
         <span v-if="items.length > 1" class="absolute right-3 top-3 rounded-full border border-ink-700 bg-ink-900/90 px-2 py-0.5 text-[10px] font-semibold text-cream-200">{{ idx + 1 }} / {{ items.length }}</span>
+        <!-- Thu gọn / mở thông tin ảnh -->
+        <button @click="infoOpen = !infoOpen"
+                class="absolute right-3 top-14 z-20 grid h-7 w-7 place-items-center rounded-full border transition"
+                :class="infoOpen ? 'border-ink-700 bg-ink-900/90 text-cream-200 hover:bg-ink-700 hover:text-white' : 'border-brand-500/60 bg-brand-600/25 text-brand-200 hover:bg-brand-600/40'"
+                :title="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'"
+                :aria-label="infoOpen ? 'Thu gọn thông tin ảnh' : 'Mở thông tin ảnh'">
+          <StudioIcon name="columns" size="h-3.5 w-3.5"/>
+        </button>
         <!-- Zoom toolbar (chỉ khi có ảnh) -->
         <div v-if="current?.media_url && !isVideo" class="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-ink-700 bg-ink-900/95 px-1.5 py-1 shadow-lg">
           <button @click="zoomOut" class="grid h-7 w-7 place-items-center rounded-full text-cream-200 transition hover:bg-ink-700" title="Thu nhỏ" aria-label="Thu nhỏ"><StudioIcon name="minus" size="h-4 w-4" /></button>
@@ -288,7 +344,8 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- ══ Panel thông tin + hành động ══ -->
-      <aside class="flex max-h-[42vh] w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-ink-700 bg-ink-900/95 p-4 lg:max-h-none lg:w-80">
+      <Transition name="aside">
+      <aside v-if="infoOpen" class="flex max-h-[42vh] w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-ink-700 bg-ink-900/95 p-4 lg:max-h-none lg:w-80">
         <!-- Tiêu đề -->
         <div class="flex items-center justify-between">
           <p class="text-sm font-semibold text-cream-100">Ảnh #<span class="text-brand-300">{{ current?.id }}</span></p>
@@ -375,8 +432,15 @@ onBeforeUnmount(() => {
             Tạo video
           </button>
         </div>
+        <!-- Nút Sử dụng: copy prompt → mở popup Prompt Tạo Ảnh để tạo ảnh mới -->
+        <button @click="usePrompt" :disabled="!canUsePrompt" class="btn-brand btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5"
+          :title="canUsePrompt ? 'Copy prompt & mở popup Prompt Tạo Ảnh để tạo ảnh mới' : 'Ảnh này không có prompt để sử dụng'">
+          <StudioIcon name="sparkles" size="h-3.5 w-3.5" />
+          Sử dụng prompt · Tạo ảnh mới
+        </button>
+
         <!-- Nhóm primary: Chỉnh sửa (hành động chính) -->
-        <button v-if="!isVideo" @click="store.goEdit(current)" class="btn-brand btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5">
+        <button v-if="!isVideo" @click="store.goEdit(current)" class="btn-outline btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5">
           <StudioIcon name="pencil" size="h-3.5 w-3.5" />
           Chỉnh sửa → Fitting Room
         </button>
@@ -402,6 +466,16 @@ onBeforeUnmount(() => {
           <p class="mt-1.5 text-center text-[10px] text-cream-300/40">Nhấn Esc để đóng · dùng ← → để xem ảnh khác</p>
         </div>
       </aside>
+      </Transition>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Crossfade khi chuyển ảnh — không chớp trắng (ảnh mới chỉ vào sau khi load xong) */
+.cf-enter-active, .cf-leave-active { transition: opacity .18s ease; }
+.cf-enter-from, .cf-leave-to { opacity: 0; }
+/* Bảng thông tin ảnh thu gọn / mở rộng */
+.aside-enter-active, .aside-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.aside-enter-from, .aside-leave-to { opacity: 0; transform: translateX(28px); }
+</style>
