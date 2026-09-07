@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3z (2026-09-07) — Tái định hướng tầm nhìn GROUP (group = 1 đối tượng, dễ đoán, như Figma)
+
+- **Group = 1 đối tượng**: `shiftSelectLayer` giờ **toggle TOÀN BỘ nhóm** (không còn để lẻ thành viên → hết xáo trộn khó đoán); chọn nhóm hiện **khung bbox dashed** quanh nhóm (`selectedGroupOutlines` + `store.groupBox`) thay vì tưởng như nhiều layer riêng lẻ.
+- **Duplicate group luôn đúng**: `duplicateActiveUnit` nhân đôi **TOÀN BỘ nhóm** khi layer active thuộc nhóm (bỏ điều kiện phải chọn trọn số layer).
+- Mọi hành động vẫn nhất quán: chọn/move/scale/rotate/căn/chia đều/xóa/khóa = khối group; chỉnh sửa từng member = Alt+click.
+- Verify: vite build ✓ (768ms) · store 3, StudioApp 3.
+
 ## Phiên UI-3y (2026-09-07) — Đa-đối-tượng chạy đúng: đếm theo ĐỐI TƯỢNG (group=1), căn/chia đều theo đơn vị
 
 - Thêm `selectionUnitCount` (group = 1 đối tượng). Bar ngữ cảnh hiện khi chọn ≥2 ĐỐI TƯỢNG; nhãn "N đối tượng"; nút **Chia đều** disabled khi <3 đối tượng.

@@ -286,6 +286,15 @@ const marqueeStyle = computed(() => {
   const left = Math.min(m.x0, m.x1) - r.left, top = Math.min(m.y0, m.y1) - r.top;
   return { left: left + 'px', top: top + 'px', width: Math.abs(m.x1 - m.x0) + 'px', height: Math.abs(m.y1 - m.y0) + 'px' };
 });
+// Khung bbox quanh MỖI NHÓM được chọn trọn (group = 1 đối tượng, giảm rối như Figma).
+const selectedGroupOutlines = computed(() => {
+  const gids = new Set();
+  store.selection.forEach(l => { if (l.groupId) gids.add(l.groupId); });
+  const el = store.canvasZoom; if (!el) return [];
+  const r = el.getBoundingClientRect(); const z = store.zoom || 1, pan = store.pan; const out = [];
+  gids.forEach(gid => { const g = store.layerGroups.find(x => x.id === gid); if (!g || !g.layerIds.every(id => store.selectedIds.includes(id))) return; const b = store.groupBox(gid); if (!b) return; const left = r.left + r.width / 2 + ((b.x - b.w / 2) * z + pan.x); const top = r.top + r.height / 2 + ((b.y - b.h / 2) * z + pan.y); out.push({ gid, style: { left: left + 'px', top: top + 'px', width: (b.w * z) + 'px', height: (b.h * z) + 'px' } }); });
+  return out;
+});
 // ── Đổi tên nhóm (nhấn đúp badge group trên canvas) ──
 const renamingGroupId = ref(null);
 const groupRenameVal = ref('');
@@ -401,6 +410,8 @@ function onTouchEnd(e) {
           <div class="relative flex-1 overflow-hidden" :class="bgClass" @dragover.prevent="dropOver = true" @dragleave="dropOver = false" @drop.prevent="onCanvasDrop($event)">
             <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
             <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-2xl border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
+            <!-- Khung chọn nhóm (mỗi nhóm được chọn trọn = 1 đối tượng) -->
+            <template v-for="o in selectedGroupOutlines" :key="o.gid"><div class="pointer-events-none absolute z-40 rounded-lg border-2 border-dashed border-brand-400/80" :style="o.style"></div></template>
             <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
             <MultiSelectBar v-if="store.selectionUnitCount > 1" class="absolute left-1/2 top-3 z-50 -translate-x-1/2" />
           <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->

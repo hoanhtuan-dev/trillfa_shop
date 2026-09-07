@@ -1452,7 +1452,7 @@ export const useStudioStore = defineStore('studio', {
     setActiveLayer(id) { this._setActive(id); this.selectedLayerIds = []; this.saveLayerLayout(); },
     // Shift+click: thêm/bỏ một layer vào nhóm chọn nhiều (không xáo trộn nhóm).
     isSelected(id) { return this.selectedIds.includes(id); },
-    shiftSelectLayer(id) { const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (id === this.activeLayerId) { const rest = this.selectedLayerIds.slice(); this.selectedLayerIds = []; if (rest.length) this._setActive(rest[rest.length - 1]); else this._setActive(''); } else { const idx = this.selectedLayerIds.indexOf(id); if (idx >= 0) this.selectedLayerIds.splice(idx, 1); else { if (this.activeLayerId) this.selectedLayerIds.push(this.activeLayerId); this._setActive(id); } } this.saveLayerLayout(); },
+    shiftSelectLayer(id) { const l = this.canvasLayers.find(x => x.id === id); if (!l) return; const g = l.groupId ? this.layerGroups.find(x => x.id === l.groupId) : null; const toggles = (g && g.layerIds.length > 1) ? g.layerIds.filter(xs => this.canvasLayers.some(l2 => l2.id === xs)) : [id]; const prev = this.activeLayerId; const already = toggles.some(xs => this.selectedIds.includes(xs)); if (already) { this.selectedLayerIds = this.selectedLayerIds.filter(xs => !toggles.includes(xs)); if (toggles.includes(prev)) { const rest = this.selectedIds.length ? this.selectedIds[this.selectedIds.length - 1] : ''; this._setActive(rest); } } else { this.selectedLayerIds = this.selectedLayerIds.filter(xs => !toggles.includes(xs)); if (prev && !this.selectedIds.includes(prev)) this.selectedLayerIds.push(prev); toggles.forEach(xs => { if (xs !== prev && !this.selectedLayerIds.includes(xs)) this.selectedLayerIds.push(xs); }); this._setActive(toggles[toggles.length - 1]); } this.saveLayerLayout(); },
     clearSelection() { this.selectedLayerIds = []; if (this.activeLayerId) this.saveLayerLayout(); },
     // Trả về layer của một nhóm (nếu layer thuộc nhóm) cho thao tác "chọn cả nhóm".
     selectLayerWithGroup(id) {
@@ -2090,6 +2090,7 @@ export const useStudioStore = defineStore('studio', {
       }
       return [a];
     },
+    groupBox(gid) { const all = this.canvasLayers.filter(l => l.groupId === gid && l.visible !== false); if (!all.length) return null; const b = this._unitBox(all); return { x: b.cx, y: b.cy, w: b.w, h: b.h }; },
     _editUnitCenter() {
       const layers = this._editUnitLayers(); if (!layers.length) return null;
       const b = this._unitBox(layers); return { x: b.cx, y: b.cy };
@@ -2112,7 +2113,8 @@ export const useStudioStore = defineStore('studio', {
     duplicateActiveUnit() {
       const a = this.activeLayer; if (!a) return;
       const g = a.groupId ? this.layerGroups.find(x => x.id === a.groupId) : null;
-      if (g && g.layerIds.length > 1 && this.selectedIds.length === g.layerIds.length) { this.duplicateGroup(g.id); return; }
+      // GROUP = 1 đối tượng: nhân đôi TOÀN BỘ nhóm (không phụ thuộc số layer đang chọn).
+      if (g) { this.duplicateGroup(g.id); return; }
       this.duplicateLayer(a.id);
     },
     // Căn lề theo ĐƠN VỊ (group là 1 khối): left/hcenter/right/top/vcenter/bottom.
