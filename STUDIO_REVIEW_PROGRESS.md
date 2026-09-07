@@ -267,3 +267,18 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** php -l ✓ (controller + routes) · vite build ✓ (732ms) · push `3e056d0` · SSH pull + `optimize:clear` ✓ · asset `app-DMqx4PoW.js` + `GalleryModal-DqbqwFah.js` + manifest + `/studio` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên Y (2026-09-07) — Nút "Vẽ mask" đẹp mắt
+
+**Yêu cầu:** "tạo button đẹp mắt cho nút vẽ mask".
+
+**Đã sửa (commit `df118ee`):**
+- Nút **Vẽ mask** trong card Sửa ảnh đổi từ seg-btn nhỏ → **nút full-width**:
+  - Icon badge (penTool) trong khung bo góc + label đậm + sub-label "Vùng chọn bằng đường cong (Bezier)".
+  - Trạng thái **đang vẽ** (path active): **gradient emerald→teal** + chữ trắng + bóng xanh.
+  - Trạng thái nghỉ: viền xanh mờ + nền xanh nhạt + hover sáng + bóng + active scale.
+  - Label động: "Đang vẽ mask — đóng kín để hoàn tất" khi active.
+  - Nút "Bỏ mask" chuyển thành chip nhỏ căn giữa phía dưới.
+
+**Xác minh:** vite build ✓ (813ms) · push `df118ee` · SSH pull + `optimize:clear` ✓ · asset `app--S4b4qMS.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

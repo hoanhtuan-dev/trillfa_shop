@@ -77,7 +77,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   <!-- ══ Đã lưu vùng ══ -->
   <div v-else-if="store.inpaintMaskDone" class="flex items-center gap-1.5 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <span class="flex items-center gap-1 px-1 text-[10px] font-medium text-cream-200"><StudioIcon name="check" :size="I"/>Đã lưu vùng</span>
-    <button @click="store.toggleInpaintMask(store._inpaintMaskKind)" :class="[lbl, btn]" title="Mở lại để chỉnh sửa"><StudioIcon name="pencil" :size="I"/>Chỉnh lại</button>
+    <button @click="store.toggleInpaintMask('path')" :class="[lbl, btn]" title="Mở lại để chỉnh sửa"><StudioIcon name="pencil" :size="I"/>Chỉnh lại</button>
     <button @click="store.clearInpaintMask()" :class="iconBtnDanger" title="Bỏ mask" aria-label="Bỏ mask"><StudioIcon name="x" :size="I"/></button>
   </div>
 
