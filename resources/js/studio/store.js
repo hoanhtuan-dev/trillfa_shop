@@ -1336,7 +1336,16 @@ export const useStudioStore = defineStore('studio', {
     async addBlankLayer(bg = null, ratio = null) {
       this.pushHistory();
       const src = this.activeLayer;
-      const { w, h } = this.ratioToSize(ratio || this.imageRatio);
+      // Ưu tiên 1: nếu đang có ẢNH CHỌN (active layer có image) → tạo layer mới ĐÚNG KÍCH THƯỚC ảnh hiện tại.
+      // Ưu tiên 2: tạo layer TRỐNG (không chọn ảnh) → tôn trọng preset tỷ lệ khung hình (imageRatio / ratio).
+      let w = 0, h = 0;
+      if (src && src.image) {
+        try {
+          const img = await this._loadImageSrc(src.image);
+          if (img.naturalWidth && img.naturalHeight) { w = img.naturalWidth; h = img.naturalHeight; }
+        } catch (e) { /* giữ mặc định (theo tỷ lệ) */ }
+      }
+      if (!w || !h) { const rt = this.ratioToSize(ratio || this.imageRatio); w = rt.w; h = rt.h; }
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       if (bg) {

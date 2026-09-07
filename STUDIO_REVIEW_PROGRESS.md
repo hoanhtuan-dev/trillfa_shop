@@ -6,6 +6,11 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3k (2026-09-07) — addBlankLayer: ưu tiên kích thước ảnh hiện tại · trống theo preset tỷ lệ
+
+- `addBlankLayer(bg, ratio)` khôi phục tính năng đọc kích thước ảnh đang chọn: nếu active layer có ảnh → layer mới tạo **đúng kích thước (naturalWidth/Height) ảnh hiện tại** (ưu tiên); nếu tạo layer trống (không chọn ảnh) → tôn trọng **preset tỷ lệ khung hình** (`ratioToSize(ratio || imageRatio)`), baseW/baseH = w/h.
+- Verify: vite build ✓ (772ms).
+
 ## Phiên UI-3j (2026-09-07) — RegionTools: dải phân cách nhóm xoay NGANG 90° (bỏ bản dọc trên desktop)
 
 - `sep` đổi từ `h-px w-6 ... lg:h-6 lg:w-px` → chỉ còn `h-px w-6` (luôn nằm ngang): trên desktop (cột dọc) phân cách nhóm là đường ngang thay vì đường dọc.
