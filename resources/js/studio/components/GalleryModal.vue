@@ -103,15 +103,30 @@ function stripWheel(e) {
   const el = e.currentTarget;
   el.scrollLeft += e.deltaY + e.deltaX;
 }
+// QUAN TRỌNG: KHÔNG setPointerCapture ngay ở pointerdown — capture sẽ nuốt mọi click
+// lên thumbnail (không chuyển ảnh được). Chỉ capture SAU KHI người dùng kéo thật sự (>5px);
+// nhấn giữ yên / chạm = click bình thường để chọn & chuyển ảnh.
 function stripDown(e) {
-  stripDrag = { x: e.clientX, left: e.currentTarget.scrollLeft };
-  if (e.currentTarget.setPointerCapture) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} }
+  stripDrag = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false, id: e.pointerId, el: e.currentTarget };
 }
 function stripMove(e) {
   if (!stripDrag) return;
-  e.currentTarget.scrollLeft = stripDrag.left - (e.clientX - stripDrag.x);
+  const dx = e.clientX - stripDrag.x;
+  if (!stripDrag.moved && Math.abs(dx) > 5) {
+    stripDrag.moved = true;
+    try { if (stripDrag.el.setPointerCapture) stripDrag.el.setPointerCapture(stripDrag.id); } catch (err) { /* không hỗ trợ capture — vẫn cuộn khi con trỏ ở trong dải */ }
+    stripDrag.el.style.cursor = 'grabbing';
+  }
+  if (stripDrag.moved) stripDrag.el.scrollLeft = stripDrag.left - dx;
 }
-function stripUp() { stripDrag = null; }
+function stripUp() {
+  if (!stripDrag) return;
+  try {
+    if (stripDrag.el.hasPointerCapture && stripDrag.el.hasPointerCapture(stripDrag.id)) stripDrag.el.releasePointerCapture(stripDrag.id);
+  } catch (err) {}
+  stripDrag.el.style.cursor = 'grab';
+  stripDrag = null;
+}
 function scrollStripToActive() {
   const el = stripEl.value;
   if (!el) return;
@@ -260,14 +275,14 @@ onBeforeUnmount(() => {
         <!-- Dải thumbnail: cuộn ngang bằng wheel (vertical scroll → horizontal) + kéo chuột/touch -->
         <div v-if="items.length > 1" ref="stripEl"
              class="absolute bottom-14 left-1/2 z-10 flex max-w-[92%] -translate-x-1/2 items-center gap-1.5 overflow-x-auto rounded-2xl border border-ink-700 bg-ink-900/95 p-1.5 shadow-lg"
-             style="scrollbar-width:none; scroll-snap-type:x proximity; cursor:grab; touch-action:pan-x"
+             style="scrollbar-width:none; scroll-snap-type:x proximity; cursor:grab; touch-action:pan-x; user-select:none; -webkit-user-select:none;"
              @wheel.prevent="stripWheel"
-             @pointerdown="stripDown" @pointermove="stripMove" @pointerup="stripUp" @pointerleave="stripUp">
+             @pointerdown="stripDown" @pointermove="stripMove" @pointerup="stripUp" @pointercancel="stripUp" @pointerleave="stripUp">
           <button v-for="g in items" :key="g.id" @click="store.viewer = g"
                   :data-active="current?.id === g.id ? 'true' : 'false'"
                   class="relative h-11 w-11 shrink-0 snap-start overflow-hidden rounded-lg border-2 transition"
                   :class="current?.id === g.id ? 'border-brand-500' : 'border-ink-700/60 hover:border-ink-500'">
-            <img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)" />
+            <img :src="thumbUrl(g.media_url)" class="pointer-events-none h-full w-full select-none bg-ink-900 object-cover" loading="lazy" draggable="false" @error="onThumbError($event, g.media_url)" />
           </button>
         </div>
       </div>
