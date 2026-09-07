@@ -71,7 +71,15 @@ const bgSwatchStyle = (b) => ({
       </template>
     </div>
 
-    <!-- 8. Download -->
+    <!-- 8. Lưu vật lý -->
+    <button
+      @click="store.saveNow()"
+      class="grid h-7 w-7 place-items-center rounded-md text-cream-200 hover:bg-ink-700"
+      title="Lưu trang (Save)"
+      aria-label="Lưu trang"
+    ><StudioIcon name="save" /></button>
+
+    <!-- 9. Download -->
     <button
       @click="store.downloadActive()"
       :disabled="!store.upscaleSrc"

@@ -2238,8 +2238,10 @@ export const useStudioStore = defineStore('studio', {
     },
     // Lưu bố cục layer (danh sách + layer active) để khôi phục khi tải lại trang.
     saveLayerLayout() {
-      try { localStorage.setItem('trillfa.layers', JSON.stringify({ layers: this.canvasLayers, activeLayerId: this.activeLayerId })); } catch (e) { console.error('studio operation failed', e); }
+      try { localStorage.setItem('trillfa.layers', JSON.stringify({ layers: this.canvasLayers, activeLayerId: this.activeLayerId, selectedLayerIds: this.selectedLayerIds, layerGroups: this.layerGroups })); } catch (e) { console.error('studio operation failed', e); }
     },
+    // Lưu VẬT LÝ (nút Save): flush toàn bộ trạng thái + thông báo thành công.
+    saveNow() { this.saveLayerLayout(); this.toast('Đã lưu trang.'); },
     // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).
     restoreLayerLayout() {
       try {
@@ -2250,10 +2252,18 @@ export const useStudioStore = defineStore('studio', {
         this.canvasLayers = (Array.isArray(d.layers) ? d.layers : [])
           .filter((l) => l && l.image)
           .filter((l) => l.kind !== 'gen' || (l.genId != null && genIds.has(Number(l.genId))))
-          .map((l) => ({ id: l.id, kind: l.kind, name: l.name, image: l.image, genId: l.genId, visible: l.visible !== false, locked: !!l.locked, x: Number(l.x) || 0, y: Number(l.y) || 0, scale: (l.scale != null ? Number(l.scale) : 1) || 1, rotation: Number(l.rotation) || 0, opacity: l.opacity != null ? Number(l.opacity) : 1, blend: l.blend || 'normal', baseW: Number(l.baseW) || null, baseH: Number(l.baseH) || null, flipX: !!l.flipX, flipY: !!l.flipY }));
+          .map((l) => ({ id: l.id, kind: l.kind, name: l.name, image: l.image, genId: l.genId, visible: l.visible !== false, locked: !!l.locked, x: Number(l.x) || 0, y: Number(l.y) || 0, scale: (l.scale != null ? Number(l.scale) : 1) || 1, rotation: Number(l.rotation) || 0, opacity: l.opacity != null ? Number(l.opacity) : 1, blend: l.blend || 'normal', baseW: Number(l.baseW) || null, baseH: Number(l.baseH) || null, flipX: !!l.flipX, flipY: !!l.flipY, groupId: l.groupId || '' }));
+        // Khôi phục NHÓM (giữ nhóm còn ≥2 thành viên; nhóm thiếu thành viên → tách).
+        const ids = new Set(this.canvasLayers.map((l) => l.id));
+        this.layerGroups = (Array.isArray(d.layerGroups) ? d.layerGroups : [])
+          .map((g) => ({ id: g.id, name: g.name || 'Nhóm', layerIds: (Array.isArray(g.layerIds) ? g.layerIds : []).filter((id) => ids.has(id)) }))
+          .filter((g) => g.layerIds.length >= 2);
+        const gids = new Set(this.layerGroups.map((g) => g.id));
+        this.canvasLayers.forEach((l) => { if (l.groupId && !gids.has(l.groupId)) l.groupId = ''; });
         const active = this.canvasLayers.find((l) => l.id === d.activeLayerId && l.visible !== false);
-        if (active) this.setActiveLayer(active.id);
-        else { this.activeLayerId = ''; this.saveLayerLayout(); }
+        if (active) this._setActive(active.id); else this._setActive('');
+        this.selectedLayerIds = (Array.isArray(d.selectedLayerIds) ? d.selectedLayerIds : []).filter((id) => this.canvasLayers.some((l) => l.id === id) && id !== this.activeLayerId);
+        this.saveLayerLayout();
       } catch (e) { this.canvasLayers = []; this.activeLayerId = ''; this.saveLayerLayout(); }
     },
     setBatch(ids) { this.lastBatch = (ids || []).filter(Boolean); this.showBatch = this.lastBatch.length > 1; },

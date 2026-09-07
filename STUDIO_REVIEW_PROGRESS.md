@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3t (2026-09-07) — Nút Save vật lý (icon chuẩn) · lưu/khôi phục đầy đủ nhóm & lựa chọn sau refresh
+
+- **Nút Save**: `store.saveNow()` (flush layout + toast "Đã lưu trang") — nút icon `save` (floppy, chuẩn ngành) trong `CanvasStatusBar`.
+- **Đảm bảo lưu & bảo toàn sau refresh**: `saveLayerLayout` lưu thêm `selectedLayerIds` + `layerGroups` (groupId trên layer); `restoreLayerLayout` (gọi trong `load()`) khôi phục `groupId` + nhóm (giữ ≥2 thành viên, nhóm thiếu → tách) + lựa chọn. Trạng thái canvas/nhóm/lựa chọn giữ nguyên khi refresh.
+- Verify: vite build ✓ (768ms) · markers store 3, statusbar 2.
+
 ## Phiên UI-3s (2026-09-07) — cursor theo select tool · hint edit-in-group · fix group tách khi ẩn hết · auto-save trước khi thoát
 
 - **Cursor theo tool**: khi bật Select → con trỏ **crosshair** (quét chọn), còn lại grab/grabbing như cũ.
