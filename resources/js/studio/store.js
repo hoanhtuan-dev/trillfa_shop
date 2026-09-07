@@ -1369,6 +1369,12 @@ export const useStudioStore = defineStore('studio', {
         } catch (e) { /* giữ mặc định (theo tỷ lệ) */ }
       }
       if (!w || !h) { const rt = this.ratioToSize(ratio || this.imageRatio); w = rt.w; h = rt.h; }
+      // baseW/baseH = kích thước HIỂN THỊ (cạnh dài tối đa 512 — khớp CSS max-w/max-h của <img>).
+      // Ảnh canvas vẫn giữ FULL w×h, chỉ có baseW/baseH được cap để overlay/mask/pointer khớp 1:1.
+      const MAXB = 512;
+      const bcap = Math.min(1, MAXB / w, MAXB / h);
+      const bw = Math.max(1, Math.round(w * bcap));
+      const bh = Math.max(1, Math.round(h * bcap));
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       if (bg) {
@@ -1386,7 +1392,7 @@ export const useStudioStore = defineStore('studio', {
         scale: src ? (src.scale || 1) : 1, rotation: src ? (src.rotation || 0) : 0,
         opacity: src ? (src.opacity != null ? src.opacity : 1) : 1,
         blend: src ? (src.blend || 'normal') : 'normal', flipX: false, flipY: false,
-        baseW: w, baseH: h,
+        baseW: bw, baseH: bh,
       });
       this.saveLayerLayout();
       // Highlight layer mới (viền nổi bật) rồi tự tắt sau 2.5s hoặc khi người dùng chọn layer khác.

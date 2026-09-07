@@ -282,3 +282,14 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (813ms) · push `df118ee` · SSH pull + `optimize:clear` ✓ · asset `app--S4b4qMS.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên Z (2026-09-07) — Sửa nút "Chỉnh lại" trên thanh toolbar gọi lại công cụ path
+
+**Yêu cầu:** "khi vẽ mask xong nếu nhấn nút chỉnh trên thanh toolbar area đang gọi công cụ vẽ tự do cũ thay vì công cụ vẽ đường cong".
+
+**Gốc rễ:** ContextToolbar trạng thái "Đã lưu vùng" có nút "Chỉnh lại" gọi `toggleInpaintMask(store._inpaintMaskKind)` — mà path mask lưu `_inpaintMaskKind='brush'` → mở lại cọ (vẽ tự do cũ), không phải đường cong.
+
+**Đã sửa (commit `54bef18`):** ContextToolbar "Chỉnh lại" đổi thành `store.toggleInpaintMask('path')` — luôn mở lại công cụ **vùng chọn bằng đường cong (Bezier)**, khớp card Sửa ảnh mới chỉ dùng 1 công cụ này.
+
+**Xác minh:** vite build ✓ (795ms) · push `54bef18` · SSH pull + `optimize:clear` ✓ · asset `app-Csuu2ltp.js` = HTTP 200 trên `trillfa.shop`.
+
