@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3ai (2026-09-07) — Click chọn layer bằng Vue modifiers + lưu cài đặt status bar
+
+- **Chọn layer**: đổi click hàng layer sang **Vue modifiers** (`@click.exact` → chọn layer/nhóm · `@click.shift.exact` → shift chọn · `@click.alt.exact` → chỉnh riêng trong nhóm) — loại bỏ nhầm modifier, đảm bảo click thường chọn đúng layer.
+- **Lưu cài đặt status bar**: `saveBarSettings`/`restoreBarSettings` (localStorage `trillfa.bar` = snapGrid · canvasBg · inspectorOpen); gọi `restoreBarSettings` trong `load()`; `StudioApp` watch 3 giá trị → tự lưu.
+- Verify: vite build ✓ (690ms) · row modifiers 3, bar settings store3/StudioApp1.
+
 ## Phiên UI-3ah (2026-09-07) — Chọn layer cứng cáp + thống nhất Thuộc tính vs handle canvas cho group
 
 - **Chọn layer cứng cáp hơn**: `selectLayerWithGroup` thêm guard `g.layerIds.includes(id)` + lọc `selectedLayerIds` theo layer tồn tại — tránh trường hợp groupId lệch khiến `_setActive(undefined)` xóa chọn (lỗi "không chọn được layer").

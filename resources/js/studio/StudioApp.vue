@@ -33,6 +33,8 @@ const projectsOpen = ref(false);
 // Popup "Prompt Tạo Ảnh" (ConceptCard) mở từ bất kỳ nơi nào (vd GalleryModal > nút "Sử dụng"):
 // trên mobile ConceptCard chỉ mount trong drawer menu → mở drawer + đóng drawer Outputs cho gọn.
 watch(() => store.promptOpen, (v) => { if (v) { outputOpen.value = false; menuOpen.value = true; } });
+// Lưu cài đặt status bar khi thay đổi (snap · nền canvas · inspector).
+watch([() => store.snapGrid, () => store.canvasBg, () => store.inspectorOpen], () => store.saveBarSettings());
 // ── Thoát công cụ thông minh khi chuyển tác vụ / thoát ảnh tiêu điểm ──
 watch(() => store.step, () => store.exitCanvasTools());
 watch(() => store.activeLayerId, (id) => { if (!id) store.exitCanvasTools(); });

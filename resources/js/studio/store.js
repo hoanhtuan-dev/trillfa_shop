@@ -364,6 +364,7 @@ export const useStudioStore = defineStore('studio', {
         // KHÔNG tự in lại các kết quả swap vào layer nữa: việc này làm layer "sống lại" sau mỗi lần tải lại
         // và khiến người dùng không thể xóa chúng khỏi canvas. Kết quả swap vẫn hiển thị ở Output/Thư viện.
         this.restoreLayerLayout();
+        this.restoreBarSettings();
         // Deep-link từ Studio Library: /studio?step=2|3&id=<genId> — khôi phục đúng bước + ảnh.
         const sp = new URLSearchParams(window.location.search);
         const stepParam = parseInt(sp.get('step') || '', 10);
@@ -2352,6 +2353,9 @@ export const useStudioStore = defineStore('studio', {
     },
     // Lưu VẬT LÝ (nút Save): flush toàn bộ trạng thái + thông báo thành công.
     saveNow() { this.saveLayerLayout(); this.toast('Đã lưu trang.'); },
+    // ── Cài đặt status bar (snap · nền canvas · inspector) ──
+    saveBarSettings() { try { localStorage.setItem('trillfa.bar', JSON.stringify({ snapGrid: this.snapGrid, canvasBg: this.canvasBg, inspectorOpen: this.inspectorOpen })); } catch (e) { /* bỏ qua */ } },
+    restoreBarSettings() { try { const d = JSON.parse(localStorage.getItem('trillfa.bar') || 'null'); if (!d) return; if (d.snapGrid != null) this.snapGrid = Number(d.snapGrid) || 0; if (d.canvasBg) this.canvasBg = d.canvasBg; if (d.inspectorOpen != null) this.inspectorOpen = !!d.inspectorOpen; } catch (e) { /* bỏ qua */ } },
     // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).
     restoreLayerLayout() {
       try {

@@ -166,7 +166,9 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           l.groupId ? 'ml-3' : '',
           dropTargetId === l.id ? (dropBelow ? 'border-b-2 border-b-brand-400' : 'border-t-2 border-t-brand-400') : ''
         ]"
-        @click="onRowClick(l, $event)"
+        @click.exact="store.selectLayerWithGroup(l)"
+        @click.shift.exact="store.shiftSelectLayer(l.id)"
+        @click.alt.exact="store.setActiveLayer(l.id)"
         @dragover="onRowDragOver($event, l)"
         @dragleave="onRowDragLeave($event, l)"
         @drop="onRowDrop($event, l)">
