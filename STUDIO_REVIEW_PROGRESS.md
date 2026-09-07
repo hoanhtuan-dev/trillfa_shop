@@ -243,3 +243,14 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (774ms) · push `f1613a1` · SSH pull + `optimize:clear` ✓ · asset `app-CtK06bRF.js` + `GalleryModal-W6ypwzMD.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên W (2026-09-07) — Nút "Hoàn thành" xanh + icon · sửa viền mờ khi tô màu
+
+**Yêu cầu:** "đổi nút Xong chỉnh sửa -> 'Hoàn thành' và có icon, tô màu khác · sửa lỗi vùng chọn không che khuất hết khi tô màu (vẫn bị ảnh hưởng nhẹ)".
+
+**Đã sửa (commit `b0ba642`):**
+- **Nút "Hoàn thành" (chỉnh sửa vùng):** đổi nhãn thành "Hoàn thành", có icon **check**, và dùng màu **xanh lục** (`confirm` = emerald-600/trắng) — KHÁC hẳn nút "Xong" thoát (kem) → hết nhầm lẫn.
+- **Sửa viền mờ khi tô màu:** gốc rễ — mép vùng chọn bị anti-alias (alpha bán trong suốt) → `_buildSelectionAlpha` chuyển thành alpha bán trong suốt, khi tô/xóa màu chỉ phủ ~50% ở mép → lộ ảnh nền một ít. Sửa: **cứng hoá mép (ngưỡng sel≥128)** trong `_buildSelectionAlpha` → alpha nhị phân 0/255, màu tô/xóa/nhân đôi/nâng **che khuất trọn** vùng chọn, không còn viền mờ.
+
+**Xác minh:** vite build ✓ (763ms) · push `b0ba642` · SSH pull + `optimize:clear` ✓ · asset `app-DOIWj1aF.js` + `GalleryModal-Chgr3H0O.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

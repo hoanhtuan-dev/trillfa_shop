@@ -2495,15 +2495,16 @@ export const useStudioStore = defineStore('studio', {
       this._pollTimers[id] = setTimeout(tick, 2000);
     },
     async inpaint(prompt) {
-      const src = this.preview && this.preview.media_url;
-      if (!this.previewId || !src || this.inpainting) { this.toast('Chọn ảnh kết quả để sửa.', 'error'); return; }
+      // Nguồn ảnh = ẢNH ĐANG CHỌN TRÊN CANVAS (bất kỳ: upload / sản phẩm / kết quả / đã chỉnh sửa).
+      const src = this.upscaleSrc || (this.preview && this.preview.media_url) || '';
+      if (!src || this.inpainting) { this.toast('Chọn một ảnh trên canvas để sửa.', 'error'); return; }
       if (!(prompt || '').trim()) { this.toast('Nhập mô tả chỉnh sửa.', 'error'); return; }
       this.inpainting = true;
       this.inpaintError = '';
       this.inpaintStage = 'send';
       this.inpaintStartTs = Date.now();
       try {
-        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: this.upscaleSrc || src, feather: Number(this.inpaintFeather) || 0 };
+        const body = { prompt, preserve_background: this.inpaintPreserveBg, preserve_face: this.inpaintPreserveFace, source_url: src, feather: Number(this.inpaintFeather) || 0 };
         // Model do người dùng CHỌN trên card Sửa ảnh ('' = mặc định: Qwen Edit trong Cài đặt).
         const selModel = this.inpaintModel ? this.inpaintModels.find(o => o.provider + ':' + o.model === this.inpaintModel) : null;
         if (selModel) { body.provider = selModel.provider; body.model = selModel.model; }
@@ -2515,7 +2516,8 @@ export const useStudioStore = defineStore('studio', {
             body.mask_data = this.inpaintBrushData;
           }
         }
-        const d = await this.api('/studio/generations/' + this.previewId + '/inpaint', body);
+        // Endpoint source-agnostic: nhận ẢNH BẤT KỲ (không phụ thuộc generation cha của Outputs).
+        const d = await this.api('/studio/inpaint', body);
         if (!d.generation_id) { throw new Error(d.message || 'Không tạo được yêu cầu sửa ảnh.'); }
         this.inpaintGenId = d.generation_id;
         this.inpaintStage = 'processing';
@@ -2954,7 +2956,17 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintPathPoints = [];
       this._rebakePathRegions();
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
-      this.toast(editing ? 'Đã cập nhật vùng chọn Bezier.' : 'Đã tạo vùng chọn Bezier — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
+      // Card "Sửa ảnh" (source=inpaint): vẽ xong & ĐÓNG → LẤY NGAY vùng chọn làm mask (không cần bấm "Xong" riêng).
+      if (this.inpaintMaskSource === 'inpaint') {
+        this._inpaintMaskKind = 'brush';
+        this.inpaintMaskDone = true;
+        this.inpaintMaskMode = 'none';
+        this._pathHoverRegion = -1;
+        this._pathHoverPoint = null;
+        this.toast('Đã lấy vùng chọn làm mask — bấm "Sửa ảnh" để xử lý.');
+      } else {
+        this.toast(editing ? 'Đã cập nhật vùng chọn Bezier.' : 'Đã tạo vùng chọn Bezier — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
+      }
     },
     // ── Magic Wand: click chọn vùng theo màu tương tự (flood-fill theo ngưỡng) ──
     async magicWand(e) {

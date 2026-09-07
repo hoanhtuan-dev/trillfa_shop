@@ -179,7 +179,23 @@ class StudioController extends Controller
     public function inpaint(Request $request, Generation $generation)
     {
         abort_unless($generation->user_id === auth()->id(), 403);
+        return $this->handleInpaint($request, $generation);
+    }
 
+    /**
+     * Inpaint từ ẢNH BẤT KỲ đang chọn trên canvas (source_url) — không cần generation cha.
+     * Card "Sửa ảnh" nhận ảnh từ nhiều nguồn: upload / sản phẩm / kết quả / đã chỉnh sửa.
+     */
+    public function inpaintSource(Request $request)
+    {
+        if (trim((string) $request->input('source_url', '')) === '') {
+            return response()->json(['message' => 'Chưa chọn ảnh để sửa.'], 422);
+        }
+        return $this->handleInpaint($request, null);
+    }
+
+    private function handleInpaint(Request $request, ?Generation $generation)
+    {
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:4000'],
             'preserve_background' => ['nullable', 'boolean'],
@@ -206,7 +222,10 @@ class StudioController extends Controller
         $preserveFace = ! empty($data['preserve_face']);
 
         $sourceUrl = trim((string) ($data['source_url'] ?? ''));
-        if ($sourceUrl === '') { $sourceUrl = (string) $generation->media_url; }
+        if ($sourceUrl === '') { $sourceUrl = $generation ? (string) $generation->media_url : ''; }
+        if ($sourceUrl === '') {
+            return response()->json(['message' => 'Chưa chọn ảnh để sửa.'], 422);
+        }
         // Tự downscale về ≤1600px để mask & base CÙNG kích thước model xử lý (kết quả không nhòe)
         $sourceUrl = $this->downscaleSource($sourceUrl, 1600);
 

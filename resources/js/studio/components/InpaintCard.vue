@@ -4,97 +4,17 @@ import { useStudioStore } from '../store.js';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
-import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
 
 const beforeUrl = ref('');   // ảnh gốc trước khi sửa (để so sánh)
 const compareOpen = ref(false);
 function submitInpaint() {
-  beforeUrl.value = store.preview?.media_url || '';
+  beforeUrl.value = store.upscaleSrc || '';
   store.inpaint(store.inpaintPrompt);
 }
 
-// ── Render đa góc: 4 slot tương ứng 4 góc chụp, người dùng bật/tắt + chỉnh prompt từng góc ──
-const mvOpen = ref(false);
-const mvBusy = ref(false);          // đang gửi các góc (tạo generation)
-const mvViews = ref([
-  { id: 'front', icon: 'pose', label: 'Chính diện', enabled: true, prompt: 'full-body front view, facing straight ahead', genId: null },
-  { id: 'back', icon: 'arrowRight', label: 'Mặt sau', enabled: true, prompt: 'full-body back view', genId: null },
-  { id: 'side', icon: 'columns', label: 'Nghiêng 45°', enabled: true, prompt: '45-degree side view, three-quarter angle', genId: null },
-  { id: 'detail', icon: 'search', label: 'Cận cảnh chi tiết', enabled: true, prompt: 'close-up detail of the fabric texture and stitching', genId: null },
-]);
-const mvCount = computed(() => mvViews.value.filter(v => v.enabled).length);
-const srcImg = computed(() => store.upscaleSrc || store.preview?.media_url || '');
-
-// Model chỉnh sửa đang chọn trên card Sửa ảnh (null = mặc định Qwen Edit cấu hình).
-function selectedEditModel() {
-  if (!store.inpaintModel) return null;
-  const m = store.inpaintModels.find(o => o.provider + ':' + o.model === store.inpaintModel);
-  return m ? { provider: m.provider, model: m.model } : null;
-}
-// Prompt nguyên vẹn cho 1 góc (giữ chi tiết sản phẩm, chỉ đổi góc máy chụp).
-const mvPrompt = (v) => 'render this fashion product at a new camera angle — ' + v.prompt
-  + '. Keep the product, color, material, proportions and every detail exactly unchanged, no detail loss, crisp sharp, professional studio lighting';
-
-// Trạng thái từng góc — lấy trực tiếp từ store.generations (phản ứng qua pollGeneration).
-function viewStatus(v) {
-  if (v.busy) return 'sending';
-  if (!v.genId) return v.enabled ? 'idle' : 'off';
-  const g = store.generations.find(g => g.id === Number(v.genId));
-  return g?.status || 'pending';
-}
-const mvStatusLabel = (s) => ({ off: 'Tắt', idle: 'Chờ render', sending: 'Đang gửi', pending: 'Đang chờ', processing: 'Đang render', completed: 'Xong', failed: 'Lỗi' }[s] || s || '');
-const mvStatusClass = (s) => ({
-  off: 'bg-ink-700 text-cream-300/50', idle: 'bg-ink-700 text-cream-200',
-  sending: 'bg-amber-600/30 text-amber-200', pending: 'bg-amber-600/30 text-amber-200',
-  processing: 'bg-blue-600/30 text-blue-200', completed: 'bg-emerald-600/30 text-emerald-200',
-  failed: 'bg-red-600/30 text-red-200',
-}[s] || 'bg-ink-700 text-cream-300/50');
-
-const mvTotal = computed(() => mvViews.value.filter(v => v.enabled).length);
-const mvDone = computed(() => mvViews.value.filter(v => v.enabled && viewStatus(v) === 'completed').length);
-const mvFailed = computed(() => mvViews.value.filter(v => v.enabled && viewStatus(v) === 'failed').length);
-const mvRunning = computed(() => mvBusy.value || mvViews.value.some(v => v.enabled && ['sending','pending','processing'].includes(viewStatus(v))));
-
-// Render TẤT CẢ góc đang bật: tạo hết trước (process=false) rồi xử lý MỘT lần — tránh nhiều
-// processQueue song song cùng xử lý lặp 1 generation (tốn quota, chỉ ra 1 ảnh rồi lỗi).
-// Gom genId vào 1 batch → thanh biến thể hiện cả 4 góc; poll từng góc để cập nhật tiến độ.
-async function runMultiView() {
-  const img = srcImg.value;
-  if (!img) { store.toast('Chọn một ảnh để render đa góc.', 'error'); return; }
-  const enabled = mvViews.value.filter(v => v.enabled);
-  if (!enabled.length) { store.toast('Chọn ít nhất 1 góc chụp.', 'error'); return; }
-  mvBusy.value = true;
-  enabled.forEach(v => { v.genId = null; });
-  const model = selectedEditModel();
-  const ids = [];
-  for (const v of enabled) {
-    const items = await store.reimagine(img, mvPrompt(v), 85, 1, false, model);
-    if (items && items.length) { v.genId = items[0].generation_id; ids.push(items[0].generation_id); }
-  }
-  if (ids.length) store.setBatch(ids);      // gom thành 1 batch — thanh biến thể hiển thị cả 4 góc
-  await store.processQueue();               // xử lý tuần tự 1 lần (không chồng lặp)
-  ids.forEach(id => store.pollGeneration(id, { select: false }));  // cập nhật tiến độ từng góc
-  mvBusy.value = false;
-  store.toast('Đã gửi ' + ids.length + ' góc — đang render…');
-}
-
-// Render lại 1 góc (thường cho góc LỖI sau khi quota/key phục hồi): tạo + xử lý + poll riêng.
-async function renderOneView(v) {
-  const img = srcImg.value;
-  if (!img) { store.toast('Chọn một ảnh để render.', 'error'); return; }
-  if (!(v.prompt || '').trim()) { store.toast('Nhập mô tả góc chụp.', 'error'); return; }
-  v.busy = true; v.genId = null;
-  const model = selectedEditModel();
-  const items = await store.reimagine(img, mvPrompt(v), 85, 1, true, model);
-  if (items && items.length) {
-    v.genId = items[0].generation_id;
-    // giữ/ghép vào batch hiện có nếu có
-    if (!store.lastBatch.includes(items[0].generation_id)) store.setBatch([...store.lastBatch, items[0].generation_id]);
-    store.pollGeneration(v.genId, { select: false });
-  }
-  v.busy = false;
-}
+// Ảnh ĐANG CHỌN TRÊN CANVAS — nhận MỌI nguồn: upload / sản phẩm / kết quả / đã chỉnh sửa.
+const activeImg = computed(() => store.upscaleSrc || '');
 
 const now = ref(Date.now());
 let timer = null;
@@ -105,53 +25,30 @@ const elapsedSec = computed(() => store.inpaintStartTs ? Math.max(0, Math.floor(
 const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 
 const activeGen = computed(() => store.inpaintGenId ? store.generations.find(g => g.id === Number(store.inpaintGenId)) : null);
-const canSubmit = computed(() => !!store.previewId && !!store.preview?.media_url && !store.inpainting && !!store.inpaintPrompt.trim());
+const canSubmit = computed(() => !!activeImg.value && !store.inpainting && !!store.inpaintPrompt.trim());
 const running = computed(() => store.inpaintStage === 'send' || store.inpaintStage === 'processing');
 const maskActive = computed(() => store.inpaintMaskMode !== 'none');
-// Nhãn tùy chọn mặc định: model Qwen Edit đang cấu hình (mục default từ /studio/defaults).
-const defaultEditLabel = computed(() => {
-  const d = store.inpaintModels.find(o => o.default) || store.inpaintModels[0];
-  return d ? ('Mặc định — ' + d.model) : 'Mặc định (Qwen Edit trong Cài đặt)';
-});
 </script>
 <template>
   <div class="card p-5" style="background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="pencil" /> Sửa ảnh</h2>
 
-    <!-- Ảnh đang chọn -->
-    <div v-if="store.preview?.media_url" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
-      <img :src="store.preview.media_url" class="h-14 w-14 rounded-xl bg-ink-900 object-cover">
+    <!-- Ảnh đang chọn (mọi nguồn: upload / sản phẩm / kết quả / đã chỉnh sửa) -->
+    <div v-if="activeImg" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
+      <img :src="activeImg" class="h-14 w-14 rounded-xl bg-ink-900 object-cover">
       <div class="min-w-0 text-xs text-cream-200">
-        <p class="truncate font-semibold">Ảnh kết quả #{{ store.preview.id }}</p>
+        <p class="truncate font-semibold">{{ store.upscaleName || 'Ảnh đang chọn' }}</p>
         <p class="text-cream-300/60">Sẽ sửa trực tiếp trên ảnh này</p>
       </div>
     </div>
-    <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh kết quả trong <b>Outputs</b> để sửa.</div>
+    <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trên <b>canvas</b> (Nguồn / Kết quả / sản phẩm) để sửa.</div>
 
-    <!-- Mask tools: chọn vùng trên canvas chính -->
-    <div v-if="store.preview?.media_url" class="mt-3 flex flex-wrap gap-1.5">
-      <div class="seg flex-wrap">
-        <button @click="store.toggleInpaintMask('rect')" title="Chọn vùng chữ nhật trên canvas"
-                :class="store.inpaintMaskMode === 'rect' ? 'is-active' : ''"
-                class="seg-btn">
-          <StudioIcon name="scan" size="h-3.5 w-3.5" /> Chọn vùng
-        </button>
-        <button @click="store.toggleInpaintMask('brush')" title="Vẽ mask bằng cọ"
-                :class="store.inpaintMaskMode === 'brush' ? 'is-active' : ''"
-                class="seg-btn">
-          <StudioIcon name="brush" size="h-3.5 w-3.5" /> Vẽ mask
-        </button>
-        <button @click="store.toggleInpaintMask('freehand')" title="Vẽ vùng tự do bằng cọ"
-                :class="store.inpaintMaskMode === 'freehand' ? 'is-active' : ''"
-                class="seg-btn">
-          <StudioIcon name="spline" size="h-3.5 w-3.5" /> Vẽ tự do
-        </button>
-      </div>
-      <button v-if="maskActive && store.inpaintMaskMode === 'rect' && (store.inpaintMaskBox.w || 0) >= 0.02"
-              @click="store.resetInpaintMaskBox()"
-              class="rounded-full bg-amber-600/30 px-2 py-1 text-[10px] font-semibold text-amber-200 hover:bg-amber-600"
-              title="Bỏ vùng hiện tại để kéo chọn vùng mới">
-        Vẽ lại
+    <!-- Vẽ Mask: DUY NHẤT 1 công cụ = vùng chọn bằng đường cong (Bezier). Vẽ xong & đóng → tự lấy làm mask. -->
+    <div v-if="activeImg" class="mt-3 flex flex-wrap items-center gap-1.5">
+      <button @click="store.toggleInpaintMask('path')" title="Vẽ vùng cần sửa bằng đường cong — đóng kín để làm mask"
+              :class="store.inpaintMaskMode === 'path' ? 'is-active' : ''"
+              class="seg-btn">
+        <StudioIcon name="penTool" size="h-3.5 w-3.5" /> Vẽ mask
       </button>
       <button v-if="maskActive || store.inpaintMaskDone" @click="store.clearInpaintMask()" title="Bỏ mask hiện tại"
               class="rounded-full bg-red-600/25 px-2 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">
@@ -159,11 +56,7 @@ const defaultEditLabel = computed(() => {
       </button>
     </div>
     <div v-if="maskActive" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">
-      <template v-if="store.inpaintMaskMode === 'rect'">
-        <span v-if="(store.inpaintMaskBox.w || 0) >= 0.02">Vùng {{ Math.round(store.inpaintMaskBox.w * 100) }}% × {{ Math.round(store.inpaintMaskBox.h * 100) }}% — kéo để di chuyển · đúp chuột để vẽ lại</span>
-        <span v-else>Kéo chọn vùng trên canvas — AI chỉ sửa trong vùng đã chọn</span>
-      </template>
-      <span v-else>Vẽ mask trên canvas — AI chỉ sửa vùng đã vẽ</span>
+      Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.
     </div>
     <!-- Trạng thái mask ĐÃ LƯU (bấm Xong, overlay tắt): hiển thị vùng sẽ xử lý + thumbnail -->
     <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-xl border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-2 text-[10px] text-emerald-200">
@@ -177,70 +70,9 @@ const defaultEditLabel = computed(() => {
           <p class="font-semibold">{{ store._inpaintMaskKind === 'rect' ? 'Đã chọn vùng ' + Math.round((store.inpaintMaskBox.w || 0) * 100) + '% × ' + Math.round((store.inpaintMaskBox.h || 0) * 100) + '%' : 'Đã vẽ mask' }}</p>
           <p class="mt-0.5 text-emerald-200/70">AI sẽ chỉ sửa trong vùng tô đen bên cạnh.</p>
         </div>
-        <button @click="store.toggleInpaintMask(store._inpaintMaskKind)" class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
+        <button @click="store.toggleInpaintMask('path')" class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
       </div>
     </div>
-
-    <!-- Render đa góc (nút vuông giống slot nền chính) -->
-    <div class="mt-4">
-      <button @click="mvOpen = true" title="Render nhiều góc chụp từ 1 ảnh"
-              class="flex h-14 w-full items-center justify-center gap-2.5 rounded-xl border border-dashed border-ink-700 bg-ink-900/40 transition hover:border-brand-400">
-        <span class="grid h-9 w-9 place-items-center rounded-full bg-ink-800/70 text-cream-300/70"><StudioIcon name="camera" size="h-5 w-5" /></span>
-        <span class="text-xs font-medium text-cream-200">Render đa góc</span>
-      </button>
-    </div>
-
-    <!-- Modal render đa góc: 4 slot + hướng dẫn + kiểm soát -->
-    <BaseModal v-model="mvOpen" title="Render đa góc từ 1 ảnh" wide>
-      <div class="mb-3 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3 text-xs leading-relaxed text-brand-100">
-        <p class="font-semibold">Cách dùng:</p>
-        <p class="mt-1 text-brand-100/80">① Chọn ảnh sản phẩm ở canvas · ② Bật/tắt các góc bạn muốn · ③ Bấm "Render N góc". AI giữ nguyên sản phẩm, chỉ đổi góc chụp.</p>
-      </div>
-
-      <div class="space-y-2">
-        <div v-for="(v, i) in mvViews" :key="v.id"
-             class="rounded-2xl border p-2.5 transition"
-             :class="v.enabled ? 'border-brand-500/50 bg-brand-900/20' : 'border-ink-700 bg-ink-800/40 opacity-60'">
-          <div class="flex items-center gap-2">
-            <button @click="v.enabled = !v.enabled"
-                    class="grid h-5 w-5 shrink-0 place-items-center rounded border text-xs"
-                    :class="v.enabled ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-300'">
-              <StudioIcon v-if="v.enabled" name="check" size="h-3 w-3" />
-            </button>
-            <span class="flex items-center gap-1.5 font-semibold text-cream-100"><StudioIcon :name="v.icon" size="h-4 w-4" /> {{ v.label }}</span>
-            <span class="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold" :class="mvStatusClass(viewStatus(v))">{{ mvStatusLabel(viewStatus(v)) }}</span>
-            <span class="ml-auto text-[10px] text-cream-300/60">Slot {{ i + 1 }}</span>
-          </div>
-          <input v-if="v.enabled" v-model="v.prompt" class="input mt-2 !py-1.5 !text-xs" placeholder="Mô tả góc chụp…">
-          <!-- Nút render lại riêng góc lỗi (sau khi quota/key phục hồi) -->
-          <button v-if="v.enabled && viewStatus(v) === 'failed'"
-                  @click="renderOneView(v)"
-                  class="mt-1.5 flex items-center gap-1 rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] font-semibold text-red-200 hover:bg-red-600 hover:text-white">
-            <StudioIcon name="refresh" size="h-3 w-3" /> Render lại góc này
-          </button>
-        </div>
-      </div>
-
-      <div class="mt-4 flex items-center justify-between gap-3">
-        <span class="text-xs text-cream-300/70">
-          Đã chọn: <b class="text-brand-300">{{ mvCount }}/4 góc</b>
-          <span v-if="mvTotal && (mvDone || mvFailed) && !mvRunning" class="ml-1">
-            · <span class="text-emerald-300">{{ mvDone }} xong</span><span v-if="mvFailed" class="text-red-300"> · {{ mvFailed }} lỗi</span>
-          </span>
-        </span>
-        <button @click="runMultiView" :disabled="mvBusy || !mvCount" class="btn-brand whitespace-nowrap">
-          {{ mvBusy ? 'Đang gửi…' : 'Render ' + mvCount + ' góc' }}
-        </button>
-      </div>
-    </BaseModal>
-
-    <label class="label mt-4">Model chỉnh sửa</label>
-    <select v-model="store.inpaintModel" class="input !py-2 !text-xs" title="Model dùng để sửa ảnh — mặc định theo “Qwen Edit” trong Cài đặt">
-      <option value="">{{ defaultEditLabel }}</option>
-      <template v-for="o in store.inpaintModels" :key="o.provider + ':' + o.model">
-        <option v-if="!o.default" :value="o.provider + ':' + o.model">{{ o.label }}</option>
-      </template>
-    </select>
 
     <label class="label mt-4">Mô tả chỉnh sửa</label>
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước…"></textarea>
