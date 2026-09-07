@@ -189,7 +189,7 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
         </svg>
 
         <!-- Path (curve) select: hiển thị TẤT CẢ vùng đã đóng + path đang vẽ -->
-        <svg v-if="store.inpaintMaskMode === 'path' && (store.inpaintPathRegions.length || store.inpaintPathPoints.length > 1)"
+        <svg v-if="store.inpaintMaskMode === 'path' && (store.inpaintPathRegions.length || store.inpaintPathPoints.length > 0)"
              class="pointer-events-none absolute left-0 top-0 h-full w-full">
           <template v-for="(reg, idx) in pathRegionsPixels" :key="'r'+idx">
             <polyline :points="reg" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
@@ -198,11 +198,16 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
           <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
           <polygon v-if="store.inpaintPathPoints.length > 2" :points="pathSmoothPixels" fill="rgba(167,139,250,0.12)" stroke="none" />
           <template v-for="(p, i) in store.inpaintPathPoints" :key="'p'+i">
-            <!-- Tay điều khiển Bezier (Krita): out (xanh) + in (hồng); kéo node/tay để chỉnh, right-click node = xóa -->
-            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ox||0)) * anchor.w" :y2="(p.ny + (p.oy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
-            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ix||0)) * anchor.w" :y2="(p.ny + (p.iy||0)) * anchor.h" stroke="#f0abfc" :stroke-width="1.5 * invScale" stroke-linecap="round" />
-            <circle :cx="(p.nx + (p.ox||0)) * anchor.w" :cy="(p.ny + (p.oy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" style="pointer-events:auto; cursor:move" />
-            <circle :cx="(p.nx + (p.ix||0)) * anchor.w" :cy="(p.ny + (p.iy||0)) * anchor.h" :r="circleR * 0.7" fill="#f0abfc" style="pointer-events:auto; cursor:move" />
+            <!-- Tay điều khiển Bezier (Krita): out (xanh) + in (hồng); kéo node/tay để chỉnh, right-click node = xóa.
+                 Ẩn tay SUY BIẾN (độ dài ~0) để lần nhấp đầu hiện node sạch & kéo node không dính tay lệch. -->
+            <template v-if="Math.hypot(p.ox||0, p.oy||0) * anchor.w > 2">
+              <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ox||0)) * anchor.w" :y2="(p.ny + (p.oy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
+              <circle :cx="(p.nx + (p.ox||0)) * anchor.w" :cy="(p.ny + (p.oy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" style="pointer-events:auto; cursor:move" />
+            </template>
+            <template v-if="Math.hypot(p.ix||0, p.iy||0) * anchor.w > 2">
+              <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ix||0)) * anchor.w" :y2="(p.ny + (p.iy||0)) * anchor.h" stroke="#f0abfc" :stroke-width="1.5 * invScale" stroke-linecap="round" />
+              <circle :cx="(p.nx + (p.ix||0)) * anchor.w" :cy="(p.ny + (p.iy||0)) * anchor.h" :r="circleR * 0.7" fill="#f0abfc" style="pointer-events:auto; cursor:move" />
+            </template>
             <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)" :r="circleR" fill="#a78bfa" stroke="#111" :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
           </template>
         </svg>

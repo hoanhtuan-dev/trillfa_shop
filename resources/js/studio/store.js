@@ -2679,8 +2679,9 @@ export const useStudioStore = defineStore('studio', {
       const R = 12; // bán kính grab (px màn hình, chia theo vw/vh)
       for (let i = this.inpaintPathPoints.length - 1; i >= 0; i--) {
         const nd = this.inpaintPathPoints[i];
-        if (d(nd.nx + (nd.ox || 0), nd.ny + (nd.oy || 0)) < R) return { type: 'handle', i, side: 'out' };
-        if (d(nd.nx + (nd.ix || 0), nd.ny + (nd.iy || 0)) < R) return { type: 'handle', i, side: 'in' };
+        // Bỏ qua tay điều khiển SUY BIẾN (độ dài ~0) để kéo NODE thay vì kéo tay lệch.
+        if (Math.hypot((nd.ox || 0) * m.vw, (nd.oy || 0) * m.vh) > 4 && d(nd.nx + (nd.ox || 0), nd.ny + (nd.oy || 0)) < R) return { type: 'handle', i, side: 'out' };
+        if (Math.hypot((nd.ix || 0) * m.vw, (nd.iy || 0) * m.vh) > 4 && d(nd.nx + (nd.ix || 0), nd.ny + (nd.iy || 0)) < R) return { type: 'handle', i, side: 'in' };
       }
       for (let i = this.inpaintPathPoints.length - 1; i >= 0; i--) {
         const nd = this.inpaintPathPoints[i];
@@ -2694,14 +2695,21 @@ export const useStudioStore = defineStore('studio', {
       const p = this.inpaintMaskPointer(e); if (!p) return;
       const hit = this._pathHit(p);
       if (hit) { this._pathDrag = { ...hit, broke: false }; return; }
-      // Khoảng trống → neo mới (kéo để tạo tay điều khiển đối xứng).
-      this._pathDrag = { type: 'pending', nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true };
+      // Khoảng trống → neo mới, push NGAY vào mảng (hiển thị ngay ở lần nhấp đầu).
+      // Kéo (move) chỉnh tay điều khiển của chính node này in-place để preview sống.
+      const i = this.inpaintPathPoints.push({ nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true }) - 1;
+      this._pathDrag = { type: 'pending', i, nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true };
     },
     pathMove(e) {
       if (this.inpaintMaskMode !== 'path' || !this._pathDrag) return;
       const p = this.inpaintMaskPointer(e); if (!p) return;
       const dr = this._pathDrag;
-      if (dr.type === 'pending') { dr.ox = (p.nx - dr.nx) * 0.5; dr.oy = (p.ny - dr.ny) * 0.5; dr.ix = -dr.ox; dr.iy = -dr.oy; dr.sym = true; return; }
+      if (dr.type === 'pending') {
+        const nd = this.inpaintPathPoints[dr.i]; if (!nd) return;
+        nd.ox = (p.nx - dr.nx) * 0.5; nd.oy = (p.ny - dr.ny) * 0.5;
+        nd.ix = -nd.ox; nd.iy = -nd.oy; nd.sym = true;
+        return;
+      }
       if (dr.type === 'node') { const nd = this.inpaintPathPoints[dr.i]; if (nd) { nd.nx = p.nx; nd.ny = p.ny; } return; }
       if (dr.type === 'handle') {
         const nd = this.inpaintPathPoints[dr.i]; if (!nd) return;
@@ -2714,8 +2722,8 @@ export const useStudioStore = defineStore('studio', {
     },
     pathUp() {
       if (this.inpaintMaskMode !== 'path') return;
-      const dr = this._pathDrag; this._pathDrag = null;
-      if (dr && dr.type === 'pending') this.inpaintPathPoints.push({ nx: dr.nx, ny: dr.ny, ox: dr.ox || 0, oy: dr.oy || 0, ix: dr.ix || 0, iy: dr.iy || 0, sym: dr.sym !== false });
+      // Neo đã push ở pathDown; ở đây chỉ kết thúc kéo (giữ node + tay điều khiển vừa chỉnh).
+      this._pathDrag = null;
     },
     pathDeleteNode(i) { if (this.inpaintMaskMode !== 'path') return; if (i >= 0 && i < this.inpaintPathPoints.length) this.inpaintPathPoints.splice(i, 1); },
     pathUndoPoint() { if (this.inpaintMaskMode !== 'path') return; this.inpaintPathPoints.pop(); },
@@ -3042,7 +3050,8 @@ export const useStudioStore = defineStore('studio', {
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       this._inpaintMaskCanvas = c;
-      this._inpaintMaskCtx = c.getContext('2d');
+      // willReadFrequently: _finalizeInpaintBrush đọc lại (getImageData) sau mỗi nét → tránh cảnh báo + nhanh hơn.
+      this._inpaintMaskCtx = c.getContext('2d', { willReadFrequently: true });
       this._inpaintUndoStack = [];
     },
     // Ctrl+Z: khôi phục canvas về trước nét vẽ gần nhất, rồi snapshot lại mask data.
@@ -3063,7 +3072,7 @@ export const useStudioStore = defineStore('studio', {
     attachBrushCanvas(el) {
       if (!el) { this._inpaintMaskCanvas = null; this._inpaintMaskCtx = null; return; }
       const c = markRaw(el);
-      const ctx = c.getContext('2d');
+      const ctx = c.getContext('2d', { willReadFrequently: true });
       ctx.clearRect(0, 0, c.width, c.height);
       this._inpaintMaskCanvas = c;
       this._inpaintMaskCtx = ctx;
@@ -3096,7 +3105,7 @@ export const useStudioStore = defineStore('studio', {
       const ctx = this._inpaintMaskCtx;
       const src = ctx.getImageData(0, 0, w, h);
       const mask = document.createElement('canvas'); mask.width = w; mask.height = h;
-      const mctx = mask.getContext('2d');
+      const mctx = mask.getContext('2d', { willReadFrequently: true });
       const out = mctx.createImageData(w, h);
       for (let i = 0; i < w * h; i++) {
         // Grayscale mask chống răng cưa: nét đỏ 60% (alpha≈153) chuẩn hoá → đen(0=edit),
