@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3ag (2026-09-07) — Sửa hệ thống group: rotation lưu ở cấp group (reset hoàn nguyên) + z-order cả nhóm
+
+- **Reset rotation hoàn nguyên vị trí nội bộ**: group giờ lưu `rotation`/`scale` ở cấp group (khi tạo/nhân đôi/khôi phục); `rotateSelectionBy`/`scaleSelectionBy` cập nhật `g.rotation`/`g.scale`. `resetActiveUnitRotation` **xoay vị trí thành viên NGƯỢC lại** góc đã xoay quanh tâm (khôi phục layout) rồi `rotation=0`.
+- **Z-order cả nhóm**: thêm `bringUnitTo(id, 'front'/'back')` (giữ thứ tự nội bộ nhóm); nút **Lên đầu / Xuống đáy** trong Thuộc tính dùng `bringUnitTo`.
+- Verify: vite build ✓ (819ms) · store 4, LayersPanel 2.
+
 ## Phiên UI-3af (2026-09-07) — Viền layer xanh sky dễ nhận biết · reset rotation cho cả group · cursor xoay
 
 - **Viền layer dễ nhận biết**: active/selected layer dùng **xanh sky** (`outline-sky-400` canvas · `border-sky-400` panel row); group dùng **tím** (folder `border-violet-400` + bbox violet) — phân biệt rõ layer vs group.

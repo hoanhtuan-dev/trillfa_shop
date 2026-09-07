@@ -1469,7 +1469,7 @@ export const useStudioStore = defineStore('studio', {
       const ids = this.selectedIds; if (ids.length < 2) { this.toast('Chọn ít nhất 2 layer để tạo nhóm.', 'error'); return; }
       if (ids.some(id => { const l = this.canvasLayers.find(x => x.id === id); return l && l.groupId; })) { this.toast('Đã có layer thuộc nhóm — chọn các layer chưa nhóm.', 'error'); return; }
       const gid = 'g-' + Date.now();
-      this.layerGroups.push({ id: gid, name: 'Nhóm ' + (this.layerGroups.length + 1), layerIds: ids });
+      this.layerGroups.push({ id: gid, name: 'Nhóm ' + (this.layerGroups.length + 1), layerIds: ids, rotation: 0, scale: 1 });
       this.canvasLayers.forEach(l => { if (ids.includes(l.id)) l.groupId = gid; });
       this._setActive(ids[0]);
       this.selectedLayerIds = ids.filter(x => x !== ids[0]);
@@ -1511,7 +1511,7 @@ export const useStudioStore = defineStore('studio', {
         this.canvasLayers.push({ id: cid, kind: l.kind, name: (l.name || 'Ảnh') + ' (bản sao)', image: l.image, genId: l.genId, visible: true, locked: false, x: (l.x || 0) + 40, y: (l.y || 0) + 40, scale: l.scale || 1, rotation: l.rotation || 0, opacity: l.opacity != null ? l.opacity : 1, blend: l.blend || 'normal', flipX: !!l.flipX, flipY: !!l.flipY, baseW: l.baseW, baseH: l.baseH, groupId: gid2 });
         newIds.push(cid);
       });
-      this.layerGroups.push({ id: gid2, name: 'Nhóm ' + (this.layerGroups.length + 1), layerIds: newIds });
+      this.layerGroups.push({ id: gid2, name: 'Nhóm ' + (this.layerGroups.length + 1), layerIds: newIds, rotation: 0, scale: 1 });
       this._setActive(newIds[newIds.length - 1]);
       this.selectedLayerIds = newIds.filter(x => x !== newIds[newIds.length - 1]);
       this.saveLayerLayout();
@@ -1713,6 +1713,16 @@ export const useStudioStore = defineStore('studio', {
       if (where === 'front') arr.push(item);
       else arr.unshift(item);
       this.canvasLayers = arr;
+      this.saveLayerLayout();
+    },
+    // Đưa ĐƠN VỊ (group = nguyên nhóm, giữ thứ tự nội bộ) lên đầu / xuống đáy.
+    bringUnitTo(id, where) {
+      const l = this.canvasLayers.find((x) => x.id === id); if (!l) return;
+      const ids = l.groupId ? this.canvasLayers.filter(x => x.groupId === l.groupId).map(x => x.id) : [id];
+      this.pushHistory();
+      const rest = this.canvasLayers.filter(x => !ids.includes(x.id));
+      const unit = this.canvasLayers.filter(x => ids.includes(x.id));
+      this.canvasLayers = where === 'front' ? [...rest, ...unit] : [...unit, ...rest];
       this.saveLayerLayout();
     },
     // Bật/tắt panel Layers dock (Designer Workspace) — CanvasStatusBar/LayersPanel header.
@@ -2103,6 +2113,8 @@ export const useStudioStore = defineStore('studio', {
       const layers = this._editUnitLayers(); if (!layers.length || !Number.isFinite(k) || k <= 0) return;
       const c = this._unitBox(layers);
       layers.forEach(l => { const dx = (l.x || 0) - c.cx, dy = (l.y || 0) - c.cy; l.x = c.cx + dx * k; l.y = c.cy + dy * k; l.scale = Math.max(0.05, Math.min(8, (l.scale || 1) * k)); });
+      const g = (this.activeLayer && this.activeLayer.groupId) ? this.layerGroups.find(x => x.id === this.activeLayer.groupId) : null;
+      if (g) g.scale = (g.scale || 1) * k;
       this.saveLayerLayout();
     },
     // Xoay CẢ đơn vị (nguyên nhóm) quanh tâm — deg (không push history, gọi trong drag).
@@ -2110,13 +2122,24 @@ export const useStudioStore = defineStore('studio', {
       const layers = this._editUnitLayers(); if (!layers.length) return;
       const c = this._unitBox(layers); const a = (deg * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
       layers.forEach(l => { const dx = (l.x || 0) - c.cx, dy = (l.y || 0) - c.cy; l.x = c.cx + dx * cos - dy * sin; l.y = c.cy + dx * sin + dy * cos; let r = ((l.rotation || 0) + deg) % 360; if (r > 180) r -= 360; if (r < -180) r += 360; l.rotation = Math.round(r); });
+      const g = (this.activeLayer && this.activeLayer.groupId) ? this.layerGroups.find(x => x.id === this.activeLayer.groupId) : null;
+      if (g) g.rotation = (((g.rotation || 0) + deg) % 360 + 360) % 360;
       this.saveLayerLayout();
     },
-    // Reset rotation cho ĐƠN VỊ đang active (group = reset mọi thành viên).
+    // Reset rotation cho ĐƠN VỊ: group = xoay vị trí thành viên NGƯỢC lại góc đã xoay (giữ layout nội bộ) + rotation=0.
     resetActiveUnitRotation() {
-      const layers = this._editUnitLayers(); if (!layers.length) return;
+      const a = this.activeLayer; if (!a) return;
+      const g = a.groupId ? this.layerGroups.find(x => x.id === a.groupId) : null;
       this.pushHistory();
-      layers.forEach(l => { l.rotation = 0; });
+      if (g && g.layerIds.length > 1) {
+        const layers = this.canvasLayers.filter(l => l.groupId === g.id && l.visible !== false);
+        const c = this._unitBox(layers);
+        const deg = -(g.rotation || 0); const rad = deg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+        layers.forEach(l => { const dx = (l.x || 0) - c.cx, dy = (l.y || 0) - c.cy; l.x = c.cx + dx * cos - dy * sin; l.y = c.cy + dx * sin + dy * cos; l.rotation = 0; });
+        g.rotation = 0;
+      } else {
+        a.rotation = 0;
+      }
       this.saveLayerLayout();
     },
     // Nhân đôi ĐƠN VỊ đang active: nếu group được chọn trọn → nhân đôi nhóm, ngược lại nhân đôi layer.
@@ -2322,7 +2345,7 @@ export const useStudioStore = defineStore('studio', {
         // Khôi phục NHÓM (giữ nhóm còn ≥2 thành viên; nhóm thiếu thành viên → tách).
         const ids = new Set(this.canvasLayers.map((l) => l.id));
         this.layerGroups = (Array.isArray(d.layerGroups) ? d.layerGroups : [])
-          .map((g) => ({ id: g.id, name: g.name || 'Nhóm', layerIds: (Array.isArray(g.layerIds) ? g.layerIds : []).filter((id) => ids.has(id)) }))
+          .map((g) => ({ id: g.id, name: g.name || 'Nhóm', layerIds: (Array.isArray(g.layerIds) ? g.layerIds : []).filter((id) => ids.has(id)), rotation: Number(g.rotation) || 0, scale: Number(g.scale) || 1 }))
           .filter((g) => g.layerIds.length >= 2);
         const gids = new Set(this.layerGroups.map((g) => g.id));
         this.canvasLayers.forEach((l) => { if (l.groupId && !gids.has(l.groupId)) l.groupId = ''; });
