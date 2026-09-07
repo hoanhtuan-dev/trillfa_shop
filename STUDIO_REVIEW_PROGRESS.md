@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3ac (2026-09-07) — Fix nhân đôi nhóm (cả nhóm) + bản sao không dính group nguồn + thu gọn ẩn hết layer
+
+- **Nhân đôi nhóm đúng cả nhóm**: nút "Nhân đôi" trong phần Thuộc tính chuyển sang `duplicateActiveUnit()` (group → `duplicateGroup` cả nhóm). Mọi lối vào (folder · member · thuộc tính · Ctrl+D) giờ đều nhân đôi TOÀN BỘ nhóm.
+- **Bản sao không dính group nguồn**: `duplicateLayer` bỏ kế thừa `groupId` (bản sao đơn lẻ = không thuộc nhóm).
+- **Thu gọn group ẩn HẾT layer**: row `v-if` bỏ `isGroupTop` → khi thu gọn chỉ còn folder, mọi thành viên ẩn.
+- Verify: vite build ✓ (780ms).
+
 ## Phiên UI-3ab (2026-09-07) — Fix bbox group lệch + chọn group highlight folder (nhân đôi/xóa/khóa theo group)
 
 - **Fix khung bbox lệch**: outline group dùng toạ độ local (`r.width/2`, `r.height/2`), bỏ cộng `r.left/r.top` (toạ độ viewport) → khung khớp đúng vị trí group.

@@ -153,7 +153,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           </div>
         </template>
         <!-- Row layer; ẩn các thành viên khi thu gọn nhóm (chỉ giữ đại diện) -->
-        <div v-if="!l.groupId || isGroupTop(l) || openGroups.has(l.groupId)"
+        <div v-if="!l.groupId || openGroups.has(l.groupId)"
         class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
         :class="[
           store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/15' : (store.isSelected(l.id) ? 'border-brand-500/60 bg-brand-600/10' : 'border-transparent hover:bg-ink-800/70'),
@@ -238,7 +238,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <button @click="store.updateLayerTransform(store.activeLayer.id, { rotation: 0 })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset rotation" aria-label="Reset rotation"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="grid grid-cols-4 gap-1">
-        <button @click="store.duplicateLayer(store.activeLayer.id)" class="flex flex-col items-center justify-center gap-0.5 rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Nhân đôi layer (Ctrl+D)"><StudioIcon name="copy" size="h-3.5 w-3.5" /><span>Nhân đôi</span></button>
+        <button @click="store.duplicateActiveUnit()" class="flex flex-col items-center justify-center gap-0.5 rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Nhân đôi đối tượng (Ctrl+D) — group sẽ nhân đôi cả nhóm"><StudioIcon name="copy" size="h-3.5 w-3.5" /><span>Nhân đôi</span></button>
         <button @click="store.bringLayerTo(store.activeLayer.id, 'front')" class="flex flex-col items-center justify-center gap-0.5 rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa lên trên cùng"><StudioIcon name="chevronsUp" size="h-3.5 w-3.5" /><span>Lên đầu</span></button>
         <button @click="store.bringLayerTo(store.activeLayer.id, 'back')" class="flex flex-col items-center justify-center gap-0.5 rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Đưa xuống dưới cùng"><StudioIcon name="chevronsDown" size="h-3.5 w-3.5" /><span>Xuống đáy</span></button>
         <button @click="store.fillActiveLayer()" class="flex flex-col items-center justify-center gap-0.5 rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Tô màu toàn bộ layer đang chọn"><StudioIcon name="paintBucket" size="h-3.5 w-3.5" /><span>Tô màu</span></button>

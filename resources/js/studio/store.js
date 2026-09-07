@@ -1694,6 +1694,7 @@ export const useStudioStore = defineStore('studio', {
         name: (l.name || 'Layer') + ' (bản sao)',
         x: (Number(l.x) || 0) + 12,
         y: (Number(l.y) || 0) + 12,
+        groupId: '', // bản sao ĐƠN lẻ không kế thừa group nguồn
       };
       this.canvasLayers.push(copy);
       this.highlightLayerId = copy.id;
