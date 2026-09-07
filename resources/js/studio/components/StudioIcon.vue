@@ -58,6 +58,12 @@ const ICONS = {
   distributeVertical: '<rect x="8" y="3" width="8" height="4" rx="1"/><rect x="8" y="17" width="8" height="4" rx="1"/><line x1="12" x2="12" y1="9" y2="15"/>',
   group: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M3 17v2a2 2 0 0 0 2 2h2"/><path d="M17 21h2a2 2 0 0 0 2-2v-2"/><rect x="8" y="8" width="8" height="8" rx="1"/>',
   cursor: '<path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/>',
+  droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-4-2-5l-5-9-5 9c-1 1-2 3-2 5a7 7 0 0 0 7 7z"/>',
+  feather: '<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" x2="2" y1="8" y2="22"/><line x1="17.5" x2="9" y1="15" y2="15"/>',
+  waves: '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.5 0 2.5 2 5 2 1.3 0 1.9-.5 2.5-1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.5 0 2.5 2 5 2 1.3 0 1.9-.5 2.5-1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.5 0 2.5 2 5 2 1.3 0 1.9-.5 2.5-1"/>',
+  betweenDots: '<circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><line x1="7" x2="17" y1="12" y2="12"/>',
+  blend: '<circle cx="9" cy="9" r="5"/><circle cx="14" cy="14" r="5"/>',
+  hardness: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/>',
   // ── Bộ icon Quản lý dự án (Project Management) — cùng phong cách Lucide với canvas ──
   pin: '<line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>',
   pinOff: '<line x1="2" x2="22" y1="2" y2="22"/><line x1="12" x2="12" y1="17" y2="22"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/><path d="M15 9.34V6h1a2 2 0 0 0 0-4H7.89"/>',
