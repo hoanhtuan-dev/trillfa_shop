@@ -282,6 +282,14 @@ function onCanvasBgUp(e) {
   if (bgDownPos && !isolateActive.value && Math.hypot(e.clientX - bgDownPos.x, e.clientY - bgDownPos.y) < 5) store.deselectAll();
   bgDownPos = null;
 }
+// Vòng cọ (preview) khi vẽ — bám con trỏ, cỡ = drawBrushSize × zoom.
+const brushCursorStyle = computed(() => {
+  if (!store.drawMode || !store._drawCursor) return { display: 'none' };
+  const el = store.canvasZoom; if (!el) return { display: 'none' };
+  const r = el.getBoundingClientRect();
+  const d = Math.max(2, (store.drawBrushSize || 24) * 2 * (store.zoom || 1));
+  return { left: (store._drawCursor.x - r.left - d / 2) + 'px', top: (store._drawCursor.y - r.top - d / 2) + 'px', width: d + 'px', height: d + 'px' };
+});
 const marqueeStyle = computed(() => {
   const m = marquee.value, el = store.canvasZoom; if (!m || !el) return { display: 'none' };
   const r = el.getBoundingClientRect();
@@ -460,6 +468,7 @@ function onTouchEnd(e) {
             <!-- Overlay canvas xóa: bám đúng vùng ảnh hiển thị (chịu zoom/pan) -->
             <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-red-500/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
             <!-- Overlay canvas vẽ (paint): tô màu lên layer -->
+            <div v-if="store.drawMode" class="pointer-events-none absolute z-40 rounded-full border border-white/80" :style="brushCursorStyle"></div>
             <canvas v-if="store.drawMode" ref="drawOverlay" class="absolute z-30 cursor-crosshair rounded" :style="drawOverlayStyle" @pointerdown.stop="store.beginDrawBrush($event)" @pointermove="store.drawBrushMove($event)" @pointerup="store.endDrawBrush()" @pointerleave="store.endDrawBrush()"></canvas>
             <!-- Vùng chọn quét (marquee) -->
             <div v-if="marquee" class="pointer-events-none absolute z-50 rounded border-2 border-brand-400 bg-brand-400/10" :style="marqueeStyle"></div>

@@ -82,8 +82,15 @@ export const useStudioStore = defineStore('studio', {
     drawBrushSize: 24,   // độ dày cọ (px 3-150)
     drawOpacity: 1,      // độ đậm nét (0-1)
     drawSoftness: 15,    // độ mềm mép (0-60)
+    drawHardness: 80,   // độ cứng cọ 0-100 (%)
+    drawFlow: 1,        // lượng mực 0.01-1 (thấp = nét nhạt, tô dày dần)
+    drawSpacing: 0.15,  // khoảng cách giữa các chấm cọ (tỉ lệ đường kính 0.03-1)
+    drawSmoothing: 0,   // làm mượt nét 0-100 (0 = tắt)
+    drawBlend: 'normal', // chế độ hòa trộn nét vẽ
     _drawCanvas: null,
     _drawCtx: null,
+    _drawCursor: null,  // {x,y} client coords cho vòng cọ
+    _drawSmooth: null,  // điểm đã làm mượt
     _drawDrawing: false,
     _drawLast: null,
     _drawHasStrokes: false, // đã có nét thật? (tránh push history/bake khi không vẽ gì)
@@ -1881,6 +1888,7 @@ export const useStudioStore = defineStore('studio', {
       if (!mm) return 'rgba(255,255,255,' + a + ')';
       return 'rgba(' + parseInt(mm[1], 16) + ',' + parseInt(mm[2], 16) + ',' + parseInt(mm[3], 16) + ',' + a + ')';
     },
+    _drawBlendOp() { return { normal: 'source-over', multiply: 'multiply', screen: 'screen', overlay: 'overlay', darken: 'darken', lighten: 'lighten' }[this.drawBlend] || 'source-over'; },
     _drawPoint(e) {
       const m = this.canvasMetrics();
       if (!m) return { nx: 0.5, ny: 0.5 };
@@ -1889,25 +1897,33 @@ export const useStudioStore = defineStore('studio', {
     _drawPaintDot(p) {
       const c = this._drawCtx; if (!c) return;
       const w = this._drawCanvas.width, h = this._drawCanvas.height, r = this._drawRadius();
-      const op = Math.max(0.05, Math.min(1, Number(this.drawOpacity) || 1));
-      const f = Math.max(0, Math.min(1, (Number(this.drawSoftness) || 0) / 60));
-      const hard = Math.max(0.2, 0.9 - f * 0.7);
+      const op = Math.max(0.01, Math.min(1, (Number(this.drawOpacity) || 1) * (Number(this.drawFlow) || 1))); // opacity × flow
+      const feather = Math.max(0, Math.min(1, (Number(this.drawSoftness) || 0) / 60)); // 0..1
+      const core = Math.max(0, Math.min(1, (Number(this.drawHardness) || 80) / 100));   // 0..1
+      const edge = Math.min(1, core + (1 - core) * feather);
       const g = c.createRadialGradient(p.nx * w, p.ny * h, 0, p.nx * w, p.ny * h, r);
-      g.addColorStop(0, this._hexToRgba(this.inpaintFillColor, op));
-      g.addColorStop(hard, this._hexToRgba(this.inpaintFillColor, op * 0.85));
-      g.addColorStop(1, this._hexToRgba(this.inpaintFillColor, 0));
+      const stops = [[0, op]];
+      if (core > 0.01) stops.push([core, op]);
+      if (edge > core + 0.01) stops.push([edge, op * 0.3]);
+      stops.push([1, 0]);
+      stops.forEach((s) => g.addColorStop(s[0], this._hexToRgba(this.inpaintFillColor, s[1])));
+      c.save();
+      c.globalCompositeOperation = this._drawBlendOp();
       c.fillStyle = g;
       c.beginPath(); c.arc(p.nx * w, p.ny * h, r, 0, Math.PI * 2); c.fill();
+      c.restore();
     },
     _drawPaintLine(from, to) {
       const c = this._drawCtx; if (!c) return;
       const w = this._drawCanvas.width, r = this._drawRadius();
-      const steps = Math.max(1, Math.ceil(Math.hypot(to.nx - from.nx, to.ny - from.ny) * w / (r / 2)));
+      const spacing = Math.max(0.5, r * 2 * Math.min(1, Math.max(0.03, Number(this.drawSpacing) || 0.15)));
+      const dist = Math.hypot(to.nx - from.nx, to.ny - from.ny) * w;
+      const steps = Math.max(1, Math.ceil(dist / spacing));
       for (let s = 0; s <= steps; s++) this._drawPaintDot({ nx: from.nx + (to.nx - from.nx) * (s / steps), ny: from.ny + (to.ny - from.ny) * (s / steps) });
     },
-    beginDrawBrush(e) { if (!this.drawMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._drawPressure = (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) ? e.pressure : 1; this._drawDrawing = true; this._drawLast = this._drawPoint(e); this._drawHasStrokes = true; this._drawPaintDot(this._drawLast); },
-    drawBrushMove(e) { if (!this._drawDrawing) return; if (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) this._drawPressure = e.pressure; const p = this._drawPoint(e); this._drawPaintLine(this._drawLast || p, p); this._drawLast = p; },
-    endDrawBrush() { this._drawDrawing = false; this._drawLast = null; },
+    beginDrawBrush(e) { if (!this.drawMode) return; if (e.currentTarget && e.currentTarget.setPointerCapture && e.pointerId != null) { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} } this._drawPressure = (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) ? e.pressure : 1; this._drawDrawing = true; const p = this._drawPoint(e); this._drawSmooth = p; this._drawLast = p; this._drawCursor = { x: e.clientX, y: e.clientY }; this._drawHasStrokes = true; this._drawPaintDot(p); },
+    drawBrushMove(e) { if (!this._drawDrawing) return; if (e.pointerType === 'pen' && e.pressure != null && e.pressure > 0) this._drawPressure = e.pressure; let p = this._drawPoint(e); const sm = Math.max(0, Math.min(100, Number(this.drawSmoothing) || 0)); if (sm > 0 && this._drawSmooth) { const k = Math.max(0.05, 1 - sm / 100); p = { nx: this._drawSmooth.nx + (p.nx - this._drawSmooth.nx) * k, ny: this._drawSmooth.ny + (p.ny - this._drawSmooth.ny) * k }; } this._drawSmooth = p; this._drawCursor = { x: e.clientX, y: e.clientY }; this._drawPaintLine(this._drawLast || p, p); this._drawLast = p; },
+    endDrawBrush() { this._drawDrawing = false; this._drawLast = null; this._drawSmooth = null; this._drawCursor = null; },
     applyDraw() {
       if (this._drawBusy) return Promise.resolve();
       // Không có nét thật → không push history / không bake.

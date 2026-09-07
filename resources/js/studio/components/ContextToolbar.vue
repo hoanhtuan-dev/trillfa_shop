@@ -152,6 +152,27 @@ const ring = 'ring-ink-600/70'; // ring đồng nhất thay cho ring màu từng
     <input type="range" min="0" max="60" step="1" :value="store.drawSoftness" @input="store.drawSoftness = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-cream-300">
     <span class="w-6 text-right text-[10px] text-cream-200">{{ store.drawSoftness }}</span>
     <span :class="sep"></span>
+    <span class="text-[10px] text-cream-300/70">Cứng</span>
+    <input type="range" min="0" max="100" step="1" :value="store.drawHardness" @input="store.drawHardness = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-cream-300">
+    <span class="w-8 text-right text-[10px] text-cream-200">{{ store.drawHardness }}%</span>
+    <span :class="sep"></span>
+    <span class="text-[10px] text-cream-300/70">Mực</span>
+    <input type="range" min="0.05" max="1" step="0.05" :value="store.drawFlow" @input="store.drawFlow = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-cream-300">
+    <span class="w-8 text-right text-[10px] text-cream-200">{{ Math.round(store.drawFlow * 100) }}%</span>
+    <span :class="sep"></span>
+    <span class="text-[10px] text-cream-300/70">Khoảng cách</span>
+    <input type="range" min="0.05" max="1" step="0.05" :value="store.drawSpacing" @input="store.drawSpacing = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-cream-300">
+    <span class="w-8 text-right text-[10px] text-cream-200">{{ Math.round(store.drawSpacing * 100) }}%</span>
+    <span :class="sep"></span>
+    <span class="text-[10px] text-cream-300/70">Làm mượt</span>
+    <input type="range" min="0" max="100" step="1" :value="store.drawSmoothing" @input="store.drawSmoothing = Number($event.target.value)" class="h-1.5 w-20 cursor-pointer accent-cream-300">
+    <span class="w-6 text-right text-[10px] text-cream-200">{{ store.drawSmoothing }}</span>
+    <span :class="sep"></span>
+    <span class="text-[10px] text-cream-300/70">Chế độ</span>
+    <select :value="store.drawBlend" @change="store.drawBlend = $event.target.value" class="h-7 rounded-lg border border-ink-700 bg-ink-800 px-1.5 text-[10px] text-cream-100 focus:outline-none" title="Chế độ hòa trộn nét vẽ">
+      <option value="normal">Thường</option><option value="multiply">Nhân</option><option value="screen">Màn hình</option><option value="overlay">Phủ</option><option value="darken">Tối</option><option value="lighten">Sáng</option>
+    </select>
+    <span :class="sep"></span>
     <label class="relative inline-flex h-7 w-7 cursor-pointer overflow-hidden rounded-full ring-1 ring-white/20" title="Chọn màu vẽ">
       <span class="absolute inset-0" :style="{ background: store.inpaintFillColor }"></span>
       <input type="color" :value="store.inpaintFillColor" @input="store.inpaintFillColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0">
