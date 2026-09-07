@@ -73,7 +73,12 @@ function onPointerDown(e) {
     return;
   }
   if (store.inpaintMaskMode === 'path') {
-    store.pathAddPoint(e);
+    store.pathDown(e); // click = neo; kéo (move) = tay điều khiển Bezier
+    const mo = (ev) => store.pathMove(ev);
+    const up = () => { store.pathUp(); window.removeEventListener('pointermove', mo); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+    window.addEventListener('pointermove', mo);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
     return;
   }
   if (store.inpaintMaskMode === 'magic') {
@@ -96,19 +101,19 @@ const pathPixels = (pts) => (pts || []).map(pt).join(' ');
 const freehandPoints = computed(() => pathPixels(store.inpaintFreehandPoints));
 const freehandPaths = computed(() => store.inpaintFreehandPaths.map((pts) => pathPixels(pts)));
 // Đường cong path/curve: lấy mẫu Catmull-Rom (đóng kín) qua các điểm neo — sample theo khung ảnh.
+// Bézier thật dùng TAY ĐIỀU KHIỂN (như Krita): c1 = a + handle(a) · c2 = b - handle(b) phản chiếu.
 const pathSmooth = (pts) => {
   const f = frame.value;
   if (!f || !pts || pts.length < 2) return '';
-  const P = pts.map((p) => ({ x: p.nx * f.w, y: p.ny * f.h }));
-  const n = P.length, SAMPLES = 24, out = [];
+  const P = pts.map((p) => ({ x: p.nx * f.w, y: p.ny * f.h, hx: (p.hx || 0) * f.w, hy: (p.hy || 0) * f.h }));
+  const n = P.length, SAMPLES = 20, out = [];
   for (let i = 0; i < n; i++) {
-    const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
-    const cx1 = p1.x + (p2.x - p0.x) / 6, cy1 = p1.y + (p2.y - p0.y) / 6;
-    const cx2 = p2.x - (p3.x - p1.x) / 6, cy2 = p2.y - (p3.y - p1.y) / 6;
+    const a = P[i], b = P[(i + 1) % n];
+    const c1x = a.x + a.hx, c1y = a.y + a.hy, c2x = b.x - b.hx, c2y = b.y - b.hy;
     for (let s = 0; s < SAMPLES; s++) {
-      const t = s / SAMPLES, a = 1 - t, b = t;
-      const x = a * a * a * p1.x + 3 * a * a * b * cx1 + 3 * a * b * b * cx2 + b * b * b * p2.x;
-      const y = a * a * a * p1.y + 3 * a * a * b * cy1 + 3 * a * b * b * cy2 + b * b * b * p2.y;
+      const t = s / SAMPLES, mt = 1 - t;
+      const x = mt * mt * mt * a.x + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * b.x;
+      const y = mt * mt * mt * a.y + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * b.y;
       out.push(fmt1(x) + ',' + fmt1(y));
     }
   }
@@ -193,7 +198,12 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
           <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
           <polygon v-if="store.inpaintPathPoints.length > 2" :points="pathSmoothPixels" fill="rgba(167,139,250,0.12)" stroke="none" />
           <template v-for="(p, i) in store.inpaintPathPoints" :key="'p'+i">
+            <!-- Tay điều khiển Bezier (Krita): neo + 2 control point (ra + vào phản chiếu) -->
+            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.hx||0)) * anchor.w" :y2="(p.ny + (p.hy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
+            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx - (p.hx||0)) * anchor.w" :y2="(p.ny - (p.hy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
             <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)" :r="circleR" fill="#a78bfa" />
+            <circle :cx="(p.nx + (p.hx||0)) * anchor.w" :cy="(p.ny + (p.hy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" />
+            <circle :cx="(p.nx - (p.hx||0)) * anchor.w" :cy="(p.ny - (p.hy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" />
           </template>
         </svg>
 

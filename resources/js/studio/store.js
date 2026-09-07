@@ -176,8 +176,9 @@ export const useStudioStore = defineStore('studio', {
     _inpaintDrew: false,         // đã kéo thật (>4px) khi vẽ vùng mới?
     inpaintFreehandPoints: [],    // path lasso đang vẽ [{nx, ny}] — hiển thị đường GIMP
     inpaintFreehandPaths: [],     // các nét lasso ĐÃ hoàn thành
-    inpaintPathPoints: [],        // điểm neo đang vẽ cho vùng chọn bằng đường cong (path/curve)
+    inpaintPathPoints: [],        // điểm neo {nx,ny,hx,hy} — h = tay điều khiển (normalized) cho Bezier curve selection (Krita Pen tool)
     inpaintPathRegions: [],       // các vùng path ĐÃ đóng (để preview hiển thị đủ nhiều vùng)
+    _pathPending: null,           // neo đang kéo (khi vẽ Bezier)
     magicTolerance: 32,           // ngưỡng màu cho Magic Wand (1-128)
     magicFeather: 0,             // độ mịn Magic Wand (blur px 0-20) — làm mềm mép vùng chọn
     _inpaintFreehandActive: false,
@@ -2670,11 +2671,24 @@ export const useStudioStore = defineStore('studio', {
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
     },
     // ── Path (curve) select: click thêm điểm neo → đường cong mượt → đóng để tạo vùng chọn ──
-    pathAddPoint(e) {
+    // ── Bezier curve selection (giống Krita Pen tool): click = neo, KÉO = tay điều khiển cong ──
+    pathDown(e) {
       if (this.inpaintMaskMode !== 'path') return;
       e.stopPropagation();
       const p = this.inpaintMaskPointer(e); if (!p) return;
-      this.inpaintPathPoints.push(p);
+      this._pathPending = { nx: p.nx, ny: p.ny, hx: 0, hy: 0 };
+    },
+    pathMove(e) {
+      if (this.inpaintMaskMode !== 'path' || !this._pathPending) return;
+      const p = this.inpaintMaskPointer(e); if (!p) return;
+      // Tay điều khiển cạnh ra = (con trỏ - neo) * 0.5 (normalized) — neo tới sẽ phản chiếu ngược (Krita).
+      this._pathPending.hx = (p.nx - this._pathPending.nx) * 0.5;
+      this._pathPending.hy = (p.ny - this._pathPending.ny) * 0.5;
+    },
+    pathUp() {
+      if (this.inpaintMaskMode !== 'path' || !this._pathPending) return;
+      const p = this._pathPending; this._pathPending = null;
+      this.inpaintPathPoints.push({ nx: p.nx, ny: p.ny, hx: p.hx || 0, hy: p.hy || 0 });
     },
     pathUndoPoint() {
       if (this.inpaintMaskMode !== 'path') return;
@@ -2688,31 +2702,26 @@ export const useStudioStore = defineStore('studio', {
       const c = this._inpaintMaskCanvas, ctx = this._inpaintMaskCtx;
       if (!c || !ctx) return;
       const w = c.width, h = c.height;
-      // 'new' → chọn mới (xoá mask + regions cũ); 'add'/'subtract' → cộng/trừ vào vùng hiện có.
-      if (this.inpaintSelectMode === 'new') {
-        ctx.clearRect(0, 0, w, h);
-        this.inpaintPathRegions = [];
-      }
-      const P = pts.map((p) => ({ x: p.nx * w, y: p.ny * h }));
+      if (this.inpaintSelectMode === 'new') { ctx.clearRect(0, 0, w, h); this.inpaintPathRegions = []; }
+      // Bézier thật: c1 = neo a + tay ra(a) · c2 = neo b - tay ra(b) (phản chiếu) — giống Krita.
+      const P = pts.map((p) => ({ x: p.nx * w, y: p.ny * h, hx: (p.hx || 0) * w, hy: (p.hy || 0) * h }));
       const n = P.length;
       ctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
       ctx.beginPath();
       ctx.moveTo(P[0].x, P[0].y);
       for (let i = 0; i < n; i++) {
-        const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
-        ctx.bezierCurveTo(p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6, p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6, p2.x, p2.y);
+        const a = P[i], b = P[(i + 1) % n];
+        ctx.bezierCurveTo(a.x + a.hx, a.y + a.hy, b.x - b.hx, b.y - b.hy, b.x, b.y);
       }
       ctx.closePath();
       ctx.fillStyle = 'rgba(220,38,38,0.6)';
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
       this._finalizeInpaintBrush();
-      // Lưu vùng đã đóng để preview hiển thị ĐỦ nhiều vùng; xoá điểm để vẽ path tiếp theo.
-      this.inpaintPathRegions.push(pts.map((p) => ({ nx: p.nx, ny: p.ny })));
+      this.inpaintPathRegions.push(pts.map((p) => ({ nx: p.nx, ny: p.ny, hx: p.hx || 0, hy: p.hy || 0 })));
       this.inpaintPathPoints = [];
-      // Sau lần đóng đầu tiên, chuyển sang 'add' → các path sau tự cộng dồn (dễ vẽ đa vùng).
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
-      this.toast('Đã tạo vùng chọn — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
+      this.toast('Đã tạo vùng chọn Bezier — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
     },
     // ── Magic Wand: click chọn vùng theo màu tương tự (flood-fill theo ngưỡng) ──
     async magicWand(e) {
