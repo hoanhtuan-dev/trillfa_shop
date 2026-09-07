@@ -51,7 +51,14 @@ const bgSwatchStyle = (b) => ({
       :aria-label="'Nền: ' + b"
     ></button>
 
-    <!-- 6. Spacer -->
+    <!-- 6. Snap (bắt điểm) — mặc định BẬT 8px -->
+    <div class="h-4 w-px bg-ink-700" aria-hidden="true"></div>
+    <button @click="store.snapGrid = store.snapGrid ? 0 : 8" :class="[BTN, store.snapGrid ? 'text-brand-200' : '']" title="Bật/tắt bắt điểm (snap)" aria-label="Bật/tắt bắt điểm (snap)"><StudioIcon name="target" /></button>
+    <select v-if="store.snapGrid" :value="store.snapGrid" @change="store.snapGrid = Number($event.target.value)" class="h-6 rounded-md border border-ink-700 bg-ink-800 px-1 text-[10px] tabular-nums text-cream-100 focus:outline-none" title="Khoảng cách bắt điểm (px)">
+      <option :value="8">8</option><option :value="16">16</option><option :value="24">24</option><option :value="32">32</option>
+    </select>
+
+    <!-- 7. Spacer -->
     <div class="flex-1"></div>
 
     <!-- 7. Trạng thái (md+) -->

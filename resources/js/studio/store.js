@@ -63,7 +63,7 @@ export const useStudioStore = defineStore('studio', {
     _layerDrag: null,
     snapX: null,
     snapY: null,
-    snapGrid: 0, // lưới bắt điểm (px) khi di chuyển/kéo layer — 0 = tắt
+    snapGrid: 8, // lưới bắt điểm (px) khi kéo layer — mặc định BẬT 8px (0 = tắt)
     confirmDeleteOpen: false, // popup xác nhận xóa nhiều layer
     _pinch: null,
     // Xóa vùng (erase) với feather
@@ -1481,6 +1481,44 @@ export const useStudioStore = defineStore('studio', {
       this.layerGroups = this.layerGroups.filter(g => !gids.has(g.id));
       this.saveLayerLayout();
       this.toast('Đã tách nhóm — các layer trở về độc lập.');
+    },
+    // Chọn toàn bộ layer của một nhóm (khi nhấn folder).
+    selectGroup(gid) { const g = this.layerGroups.find(x => x.id === gid); if (!g) return; const ids = g.layerIds.filter(id => this.canvasLayers.some(l => l.id === id)); if (!ids.length) return; this._setActive(ids[ids.length - 1]); this.selectedLayerIds = ids.filter(x => x !== ids[ids.length - 1]); this.saveLayerLayout(); },
+    // Tách riêng một nhóm (nút trong dock thuộc tính).
+    ungroupGroup(gid) { const g = this.layerGroups.find(x => x.id === gid); if (!g) return; this.canvasLayers.forEach(l => { if (l.groupId === gid) l.groupId = ''; }); this.layerGroups = this.layerGroups.filter(x => x.id !== gid); this.saveLayerLayout(); this.toast('Đã tách nhóm.'); },
+    // Đổi tên nhóm (có thể rename trên canvas).
+    renameGroup(gid, name) {
+      const g = this.layerGroups.find(x => x.id === gid); if (!g) return;
+      const n = (name || '').trim(); if (!n) return;
+      g.name = n;
+      this.saveLayerLayout();
+    },
+    // Tên nhóm của layer NẾU layer này là đại diện (trên cùng) của nhóm — để hiện badge canvas.
+    groupLabel(l) {
+      if (!l || !l.groupId) return '';
+      const g = this.layerGroups.find(x => x.id === l.groupId); if (!g) return '';
+      const members = this.canvasLayers.filter(x => x.groupId === l.groupId && x.visible !== false);
+      const top = members[members.length - 1];
+      return (top && top.id === l.id) ? (g.name || 'Nhóm') : '';
+    },
+    groupOf(id) { const l = this.canvasLayers.find(x => x.id === id); return l ? (this.layerGroups.find(g => g.id === l.groupId) || null) : null; },
+    // Quét (marquee) chọn nhiều layer trong một hình chữ nhật — toạ độ canvas.
+    selectInRect(x0, y0, x1, y1) {
+      const mnx = Math.min(x0, x1), mxx = Math.max(x0, x1), mny = Math.min(y0, y1), mxy = Math.max(y0, y1);
+      const hits = [];
+      this.canvasLayers.forEach(l => {
+        if (l.visible === false) return;
+        const b = this._layerBox(l); const cx = l.x || 0, cy = l.y || 0;
+        const lx = cx - b.w / 2, rx = cx + b.w / 2, ty = cy - b.h / 2, by = cy + b.h / 2;
+        if (lx <= mxx && rx >= mnx && ty <= mxy && by >= mny) hits.push(l);
+      });
+      if (!hits.length) { this.deselectAll(); return; }
+      const ids = new Set();
+      hits.forEach(l => { ids.add(l.id); const g = l.groupId ? this.layerGroups.find(x => x.id === l.groupId) : null; if (g) g.layerIds.forEach(x => ids.add(x)); });
+      const arr = [...ids];
+      this._setActive(arr[arr.length - 1]);
+      this.selectedLayerIds = arr.filter(x => x !== arr[arr.length - 1]);
+      this.saveLayerLayout();
     },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.

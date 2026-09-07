@@ -48,6 +48,16 @@ function onRowDragLeave(e, l) {
 }
 // Nhấn 1 layer = chọn riêng; shift+click = thêm/bỏ vào nhóm chọn nhiều (đồng bộ canvas).
 function onRowClick(l, e) { if (e && e.shiftKey) store.shiftSelectLayer(l.id); else store.selectLayerWithGroup(l); }
+// ── Nhóm layer: hiển thị dưới dạng folder riêng trong panel ──
+const openGroups = ref(new Set());
+function toggleGroup(gid) { const s = new Set(openGroups.value); s.has(gid) ? s.delete(gid) : s.add(gid); openGroups.value = s; }
+function isGroupTop(l) { if (!l.groupId) return false; const m = store.canvasLayers.filter(x => x.groupId === l.groupId && x.visible !== false); return (m[m.length - 1]?.id === l.id); }
+const groupRenameId = ref(null), groupRenameVal = ref('');
+function startGroupRename(gid) { const g = store.layerGroups.find(x => x.id === gid); if (!g) return; groupRenameId.value = gid; groupRenameVal.value = g.name || ''; }
+function commitGroupRename() { if (groupRenameId.value) store.renameGroup(groupRenameId.value, groupRenameVal.value); groupRenameId.value = null; }
+function cancelGroupRename() { groupRenameId.value = null; }
+const groupName = (gid) => { const g = store.layerGroups.find(x => x.id === gid); return g ? g.name : 'Nhóm'; };
+const groupCount = (gid) => store.canvasLayers.filter(x => x.groupId === gid && x.visible !== false).length;
 function onRowDrop(e, l) {
   e.preventDefault();
   if (dragId.value && dragId.value !== l.id) {
@@ -120,13 +130,29 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       </div>
     </div>
 
-    <!-- 2. Danh sách layer (front-first: trên cùng = trước nhất) + kéo-thả sắp xếp -->
+    <!-- 2. Danh sách layer (front-first) — NHÓM hiển thị như folder riêng + kéo-thả sắp xếp -->
     <div class="flex-1 space-y-1 overflow-y-auto p-1.5">
-      <div v-for="l in store.layersFrontFirst" :key="l.id"
+      <template v-for="l in store.layersFrontFirst" :key="l.id">
+        <!-- Folder nhóm (hiện trước layer đại diện) -->
+        <template v-if="isGroupTop(l)">
+          <div class="flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-ink-800/60 px-1.5 py-1" @click="store.selectGroup(l.groupId)">
+            <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300/70 hover:bg-ink-700 hover:text-cream-100" :title="openGroups.has(l.groupId) ? 'Thu gọn nhóm' : 'Mở rộng nhóm'"><StudioIcon :name="openGroups.has(l.groupId) ? 'chevronDown' : 'chevronUp'" size="h-3.5 w-3.5" /></button>
+            <StudioIcon name="group" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
+            <template v-if="groupRenameId === l.groupId">
+              <input v-model="groupRenameVal" @keydown.enter.prevent="commitGroupRename" @keydown.esc="cancelGroupRename" @blur="commitGroupRename" class="min-w-0 flex-1 rounded bg-ink-950 px-1 py-0.5 text-[10px] text-cream-100 outline-none ring-1 ring-brand-500" aria-label="Đổi tên nhóm" @click.stop>
+            </template>
+            <span v-else class="min-w-0 flex-1 truncate text-[11px] font-semibold text-cream-100" :title="'Nhóm: ' + groupName(l.groupId) + ' — nhấn đúp để đổi tên'" @dblclick.stop="startGroupRename(l.groupId)">{{ groupName(l.groupId) }}</span>
+            <span class="shrink-0 rounded bg-ink-700 px-1 text-[9px] text-cream-300/70">{{ groupCount(l.groupId) }}</span>
+            <button @click.stop="store.ungroupGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-red-600/25 hover:text-red-200" :title="'Tách nhóm ' + groupName(l.groupId)"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
+          </div>
+        </template>
+        <!-- Row layer; ẩn các thành viên khi thu gọn nhóm (chỉ giữ đại diện) -->
+        <div v-if="!l.groupId || isGroupTop(l) || openGroups.has(l.groupId)"
         class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
         :class="[
           store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/15' : (store.isSelected(l.id) ? 'border-brand-500/60 bg-brand-600/10' : 'border-transparent hover:bg-ink-800/70'),
           l.visible === false ? 'opacity-45' : '',
+          l.groupId ? 'ml-3' : '',
           dropTargetId === l.id ? (dropBelow ? 'border-b-2 border-b-brand-400' : 'border-t-2 border-t-brand-400') : ''
         ]"
         @click="onRowClick(l, $event)"
@@ -157,6 +183,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           </div>
         </div>
       </div>
+      </template>
       <!-- Empty state -->
       <div v-if="!store.canvasLayers.length" class="flex flex-col items-center gap-1.5 px-3 py-8 text-center">
         <StudioIcon name="layers" size="h-7 w-7" class="text-cream-300/30" />

@@ -6,6 +6,14 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3p (2026-09-07) — Snap→status bar (mặc định 8px) · group fold trong Layers · quét chọn nhiều layer
+
+- **Snap xuống status bar**: `CanvasStatusBar` thêm nút bật/tắt snap (target, mặc định BẬT 8px) + select 8/16/24/32; bỏ phần "Bắt điểm" khỏi `MultiSelectBar`. `snapGrid` mặc định = 8.
+- **Group icon + tên (rename) trên canvas**: `store.groupLabel(l)` hiện badge nhóm (icon group + tên) trên layer đại diện; nhấn đúp (`startGroupRename`) đổi tên. `renameGroup(gid,name)`.
+- **Nhóm thành folder trong Layers**: panel hiển thị folder nhóm (icon + tên + đếm + collapse + nút **Tách nhóm**) và các thành viên lùi vào (`ml-3`); thu gọn thì chỉ giữ đại diện (`openGroups`/`isGroupTop`). Kèm `selectGroup(gid)` + `ungroupGroup(gid)` (nút tách nhóm trong dock thuộc tính).
+- **Quét chọn nhiều layer**: kéo trên vùng trống = marquee (khung chọn) → `store.selectInRect` chọn mọi layer trong vùng (mở rộng theo nhóm); pan bằng Ctrl/Cmd/Alt+kéo. `marquee` state + `onCanvasBgMove/Up` + `selectInRect`.
+- **Verify**: vite build ✓ (747ms) · grep markers đầy đủ màn.
+
 ## Phiên UI-3o (2026-09-07) — Popup ngữ cảnh đẹp mắt (icon chuẩn Lucide) + tạo nhóm layer
 
 - **MultiSelectBar redesign**: đổi sang **icon chuẩn ngành (Lucide)** — căn lề 6 hướng (`alignStart/Center/EndHorizontal/Vertical`), chia đều X/Y (`distributeHorizontal/Vertical`), nhóm (`group`), bắt điểm, xóa — dạng icon-button mono `h-7 w-7`, tooltip, kèm số layer & nhãn nhỏ; gọn & đẹp hơn.

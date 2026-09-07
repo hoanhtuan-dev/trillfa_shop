@@ -39,13 +39,6 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
     <button @click="store.ungroupSelection()" :class="[lblBtn, 'text-cream-200 hover:bg-ink-700']" title="Tách nhóm — trả các layer về độc lập"><StudioIcon name="unlink" size="h-3.5 w-3.5"/>Tách</button>
     <span :class="sep"></span>
 
-    <!-- Bắt điểm preset -->
-    <span class="flex items-center gap-1 px-1 text-[10px] text-cream-300/70"><StudioIcon name="target" size="h-3 w-3"/>Bắt điểm</span>
-    <select :value="store.snapGrid" @change="store.setSnapGrid($event.target.value)" class="h-7 rounded-lg border border-ink-700 bg-ink-800 px-1.5 text-[10px] text-cream-100 focus:border-brand-400 focus:outline-none" title="Khoảng cách bắt điểm khi kéo layer">
-      <option v-for="o in snapOptions" :key="o[0]" :value="o[0]">{{ o[1] }}</option>
-    </select>
-    <span :class="sep"></span>
-
     <!-- Xóa -->
     <button @click="store.deleteSelection()" :class="[lblBtn, 'text-red-300 hover:bg-red-600/25 hover:text-red-200']" title="Xóa các layer đang chọn (Delete)"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa</button>
   </div>

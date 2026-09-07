@@ -228,18 +228,56 @@ function onRotatePointerDown(l, e) {
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
 }
+// ── Quét chọn nhiều layer (marquee) trên vùng trống · pan khi giữ Ctrl/Space/Cmd ──
+const marquee = ref(null); // {x0,y0,x1,y1} toạ độ client
 let bgDownPos = null;
+function marqueeClientOn(e) { if (!store.canvasZoom) return 0; const r = store.canvasZoom.getBoundingClientRect(); void r; return 0; }
 function onCanvasBgDown(e) {
   store.panStart(e);
   bgDownPos = { x: e.clientX, y: e.clientY };
+  marquee.value = null;
+}
+function onCanvasBgMove(e) {
+  if (!bgDownPos) return;
+  const dx = e.clientX - bgDownPos.x, dy = e.clientY - bgDownPos.y;
+  const panMod = e.ctrlKey || e.metaKey || e.altKey;
+  // Chưa quyết định: kéo xa hơn 6px với nút trái & không giữ phím pan → bắt đầu quét chọn.
+  if (marquee.value === null && !panMod && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+    marquee.value = { x0: bgDownPos.x, y0: bgDownPos.y, x1: e.clientX, y1: e.clientY };
+    store.panEnd();
+  }
+  if (marquee.value) { marquee.value.x1 = e.clientX; marquee.value.y1 = e.clientY; return; }
+  store.panMove(e);
 }
 function onCanvasBgUp(e) {
-  store.panEnd();
-  if (bgDownPos && !isolateActive.value && Math.hypot(e.clientX - bgDownPos.x, e.clientY - bgDownPos.y) < 5) {
-    store.deselectAll();
+  if (marquee.value) {
+    const m = marquee.value, el = store.canvasZoom;
+    if (el) {
+      const r = el.getBoundingClientRect(); const z = store.zoom || 1, p = store.pan;
+      const x0 = (Math.min(m.x0, m.x1) - (r.left + r.width / 2) - p.x) / z;
+      const x1 = (Math.max(m.x0, m.x1) - (r.left + r.width / 2) - p.x) / z;
+      const y0 = (Math.min(m.y0, m.y1) - (r.top + r.height / 2) - p.y) / z;
+      const y1 = (Math.max(m.y0, m.y1) - (r.top + r.height / 2) - p.y) / z;
+      store.selectInRect(x0, y0, x1, y1);
+    }
+    marquee.value = null; store.panEnd(); bgDownPos = null; return;
   }
+  store.panEnd();
+  if (bgDownPos && !isolateActive.value && Math.hypot(e.clientX - bgDownPos.x, e.clientY - bgDownPos.y) < 5) store.deselectAll();
   bgDownPos = null;
 }
+const marqueeStyle = computed(() => {
+  const m = marquee.value, el = store.canvasZoom; if (!m || !el) return { display: 'none' };
+  const r = el.getBoundingClientRect();
+  const left = Math.min(m.x0, m.x1) - r.left, top = Math.min(m.y0, m.y1) - r.top;
+  return { left: left + 'px', top: top + 'px', width: Math.abs(m.x1 - m.x0) + 'px', height: Math.abs(m.y1 - m.y0) + 'px' };
+});
+// ── Đổi tên nhóm (nhấn đúp badge group trên canvas) ──
+const renamingGroupId = ref(null);
+const groupRenameVal = ref('');
+function startGroupRename(gid) { const g = store.groupOf(gid); if (!g) return; renamingGroupId.value = gid; groupRenameVal.value = g.name || ''; }
+function commitGroupRename() { if (renamingGroupId.value) store.renameGroup(renamingGroupId.value, groupRenameVal.value); renamingGroupId.value = null; }
+function cancelGroupRename() { renamingGroupId.value = null; }
 function onTouchStart(e) {
   if (e.touches.length === 2) store.beginPinch(e.touches[0], e.touches[1]);
 }
@@ -357,7 +395,7 @@ function onTouchEnd(e) {
           <div v-if="store.editSource" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
             <button @click="store.removeEditSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas" aria-label="Bỏ ảnh nguồn khỏi canvas"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
           </div>
-          <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="store.panMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="store.panEnd" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
+          <div ref="canvasZoom" class="absolute inset-0 cursor-grab active:cursor-grabbing" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="onCanvasBgMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="onCanvasBgUp($event)" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint/erase): layer active GIỮ ĐÚNG vị trí/scale như stack — không xê dịch -->
             <div v-if="isolateActive" class="absolute inset-0">
               <div v-if="store.upscaleSrc" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
@@ -376,6 +414,16 @@ function onTouchEnd(e) {
                     <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
                     <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>
                   </template>
+                  <!-- Nhãn nhóm trên canvas (icon + tên, nhấn đúp để đổi tên) -->
+                  <template v-if="store.groupLabel(l)">
+                    <span @dblclick.stop="startGroupRename(l.groupId)" class="absolute -top-7 left-0 flex max-w-[140px] items-center gap-1 rounded-full border border-ink-600 bg-ink-900/95 px-1.5 py-0.5 text-[9px] font-semibold text-cream-100 shadow" :title="'Nhóm: ' + store.groupLabel(l) + ' — nhấn đúp để đổi tên'">
+                      <StudioIcon name="group" size="h-2.5 w-2.5" class="text-brand-300"/>
+                      <template v-if="renamingGroupId === l.groupId">
+                        <input v-model="groupRenameVal" @keydown.enter.prevent="commitGroupRename" @keydown.esc="cancelGroupRename" @blur="commitGroupRename" class="w-24 bg-ink-800 text-[9px] text-cream-100 placeholder:text-cream-300/40 focus:outline-none" />
+                      </template>
+                      <span v-else class="truncate">{{ store.groupLabel(l) }}</span>
+                    </span>
+                  </template>
                 </div>
               </div>
               <p v-if="!store.visibleLayers.length" class="absolute inset-0 grid place-items-center text-sm text-cream-300/60">Chọn/hiện một ảnh (Nguồn hoặc Kết quả) để làm việc.</p>
@@ -384,6 +432,8 @@ function onTouchEnd(e) {
             <canvas v-if="store.eraseMode" ref="eraseOverlay" class="absolute z-30 cursor-crosshair rounded bg-red-500/10" :style="eraseOverlayStyle" @pointerdown.stop="store.beginEraseBrush($event)" @pointermove="store.eraseBrushMove($event)" @pointerup="store.endEraseBrush()" @pointerleave="store.endEraseBrush()"></canvas>
             <!-- Overlay canvas vẽ (paint): tô màu lên layer -->
             <canvas v-if="store.drawMode" ref="drawOverlay" class="absolute z-30 cursor-crosshair rounded" :style="drawOverlayStyle" @pointerdown.stop="store.beginDrawBrush($event)" @pointermove="store.drawBrushMove($event)" @pointerup="store.endDrawBrush()" @pointerleave="store.endDrawBrush()"></canvas>
+            <!-- Vùng chọn quét (marquee) -->
+            <div v-if="marquee" class="pointer-events-none absolute z-50 rounded border-2 border-brand-400 bg-brand-400/10" :style="marqueeStyle"></div>
             <!-- Đường guide khi bắt điểm (snap) -->
             <div v-if="store.snapX != null" class="pointer-events-none absolute inset-y-0 z-40 w-px bg-brand-400/80" :style="{ left: 'calc(50% + ' + (store.snapX * store.zoom + store.pan.x) + 'px)' }"></div>
             <div v-if="store.snapY != null" class="pointer-events-none absolute inset-x-0 z-40 h-px bg-brand-400/80" :style="{ top: 'calc(50% + ' + (store.snapY * store.zoom + store.pan.y) + 'px)' }"></div>
