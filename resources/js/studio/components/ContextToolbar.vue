@@ -57,8 +57,8 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <span :class="sep"></span>
       <template v-if="store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
-        <button @click="store.setInpaintSelectMode('add')" :class="[iconBtn, store.inpaintSelectMode === 'add' ? on : '']" title="Cộng vào vùng chọn"><StudioIcon name="boxSelect" :size="I"/></button>
-        <button @click="store.setInpaintSelectMode('subtract')" :class="[iconBtn, store.inpaintSelectMode === 'subtract' ? on : '']" title="Trừ khỏi vùng chọn"><StudioIcon name="boxSelect" :size="I"/></button>
+        <button @click="store.setInpaintSelectMode('add')" :class="[iconBtn, store.inpaintSelectMode === 'add' ? on : '']" title="Cộng vào vùng chọn (+ vùng chọn)"><StudioIcon name="selectAdd" :size="I"/></button>
+        <button @click="store.setInpaintSelectMode('subtract')" :class="[iconBtn, store.inpaintSelectMode === 'subtract' ? on : '']" title="Trừ khỏi vùng chọn (− vùng chọn)"><StudioIcon name="selectSubtract" :size="I"/></button>
       </template>
       <button @click="store.invertSelection()" :class="[lbl, btn]" title="Đảo ngược vùng chọn"><StudioIcon name="swapHorizontal" :size="I"/>Đảo</button>
       <button @click="store.floatSelectedRegion()" :class="[lbl, btn]" title="Nâng (cắt) vùng chọn thành layer mới"><StudioIcon name="scissors" :size="I"/>Nâng</button>

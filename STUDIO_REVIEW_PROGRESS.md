@@ -198,3 +198,14 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (737ms) · push `4373efa` · SSH pull + `optimize:clear` ✓ · asset `app-I6rNsxwG.js` + `GalleryModal-Dx0-eGGc.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên S (2026-09-07) — Nút "Sửa" khi hover đường bao + ContextToolbar tô sáng nút chọn
+
+**Yêu cầu:** "nên hiện nút sửa khi hover vào vị trí đường bao · làm cho contexToollbar tô sáng các nút khi được chọn".
+
+**Đã sửa (commit `1b00426`):**
+- **Nút "Sửa" khi hover đường bao:** store thêm `_pathHoverRegion`; `pathHover` tính vùng đã đóng gần con trỏ (`_regionHoverHit` — khoảng cách con trỏ → từng đoạn nối node, ngưỡng 18px, chỉ khi không đang vẽ điểm mới). CanvasMaskTools render **nút "Sửa" SVG** đặt ở trọng tâm vùng hover, giữ kích thước ổn định trên màn hình (`scale(invScale)`); bấm gọi `enterEditRegion` (nạp vùng để chỉnh). Kích thước nút không phóng to khi zoom.
+- **ContextToolbar tô sáng nút chọn:** hằng `on` = `!bg-cream-100 !text-ink-900 ring-2 ring-brand-300 shadow` (dùng `!` để thắng bg cũ, tránh xung đột Tailwind) → mọi toggle/mode đang chọn (Vẽ/Tẩy, add/subtract) nền sáng + vòng brand + bóng, phân biệt rõ với nút chưa chọn (`btn`).
+
+**Xác minh:** vite build ✓ (762ms) · push `1b00426` · SSH pull + `optimize:clear` ✓ · asset `app-PwMHRIGd.js` + `GalleryModal-CFpBKWkc.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

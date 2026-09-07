@@ -182,6 +182,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintPathCloseHover: false, // hover gần điểm BẮT ĐẦU (snap để đóng kín) → highlight node đầu + guide
     _pathEditingRegion: -1,     // index vùng ĐÃ ĐÓNG đang được chỉnh sửa lại (-1 = không)
     _pathHoverRegion: -1,       // index vùng ĐÃ ĐÓNG đang HOVER (để hiện nút 'Sửa') — -1 = không
+    _pathHoverPoint: null,      // điểm gần nhất trên đường bao vùng hover (anchor nút 'Sửa')
     magicTolerance: 32,           // ngưỡng màu cho Magic Wand (1-128)
     magicFeather: 0,             // độ mịn Magic Wand (blur px 0-20) — làm mềm mép vùng chọn
     _inpaintFreehandActive: false,
@@ -2702,10 +2703,15 @@ export const useStudioStore = defineStore('studio', {
     },
     // Hover gần điểm BẮT ĐẦU (snap để đóng kín): highlight node đầu + guide line nối về điểm đầu.
     // Đồng thời: khi không đang vẽ, hover gần đường bao vùng ĐÃ ĐÓNG → đánh dấu vùng để hiện nút 'Sửa'.
+    _clearPathHover() {
+      if (this._pathHoverTimer) { clearTimeout(this._pathHoverTimer); this._pathHoverTimer = null; }
+      this._pathHoverRegion = -1;
+      this._pathHoverPoint = null;
+    },
     pathHover(e) {
-      if (this.inpaintMaskMode !== 'path' || this._pathDrag) { this.inpaintPathCloseHover = false; this._pathHoverRegion = -1; return; }
+      if (this.inpaintMaskMode !== 'path' || this._pathDrag) { this.inpaintPathCloseHover = false; this._clearPathHover(); return; }
       const p = this.inpaintMaskPointer(e);
-      if (!p) { this.inpaintPathCloseHover = false; this._pathHoverRegion = -1; return; }
+      if (!p) { this.inpaintPathCloseHover = false; this._clearPathHover(); return; }
       if (this.inpaintPathPoints.length >= 3) {
         const s = this.inpaintPathPoints[0];
         this.inpaintPathCloseHover = this._pathScreenDist(p.nx, p.ny, s.nx, s.ny) < 20;
@@ -2713,7 +2719,20 @@ export const useStudioStore = defineStore('studio', {
         this.inpaintPathCloseHover = false;
       }
       // Chỉ hover vùng ĐÃ ĐÓNG khi không đang vẽ điểm mới.
-      this._pathHoverRegion = this.inpaintPathPoints.length === 0 ? this._regionHoverHit(p) : -1;
+      if (this.inpaintPathPoints.length === 0) {
+        const hit = this._regionHoverHit(p);
+        if (hit.region >= 0) {
+          // Đang hover: giữ nút + hủy timer ẩn.
+          if (this._pathHoverTimer) { clearTimeout(this._pathHoverTimer); this._pathHoverTimer = null; }
+          this._pathHoverRegion = hit.region;
+          this._pathHoverPoint = { nx: hit.x, ny: hit.y };
+        } else if (this._pathHoverRegion >= 0 && !this._pathHoverTimer) {
+          // Rời vùng → đếm 450ms mới ẩn nút (đủ thời gian di tới bấm).
+          this._pathHoverTimer = setTimeout(() => { this._pathHoverRegion = -1; this._pathHoverPoint = null; this._pathHoverTimer = null; }, 450);
+        }
+      } else {
+        this._clearPathHover();
+      }
     },
     // Khoảng cách điểm-đoạn thẳng (px màn hình).
     _pointSegDist(px, py, x1, y1, x2, y2) {
@@ -2724,20 +2743,30 @@ export const useStudioStore = defineStore('studio', {
       const qx = x1 + t * dx, qy = y1 + t * dy;
       return Math.hypot(px - qx, py - qy);
     },
-    // Vùng đã đóng gần con trỏ nhất (theo đường bao nối các node) — trả về index hoặc -1.
+    // Điểm gần nhất trên đoạn thẳng AB với điểm P (px màn hình).
+    _closestOnSeg(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1, dy = y2 - y1;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 ? ((px - x1) * dx + (py - y1) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      return { x: x1 + t * dx, y: y1 + t * dy };
+    },
+    // Vùng đã đóng gần con trỏ nhất: trả {region, x, y} (x,y = điểm gần nhất, normalized) — anchor nút 'Sửa'.
     _regionHoverHit(p) {
-      const m = this.canvasMetrics(); if (!m) return -1;
+      const m = this.canvasMetrics(); if (!m) return { region: -1, x: 0, y: 0 };
       const sx = p.nx * m.vw, sy = p.ny * m.vh;
-      let best = -1, bestDist = 18;
+      let best = { region: -1, x: p.nx, y: p.ny }, bestDist = 18;
       for (let r = 0; r < this.inpaintPathRegions.length; r++) {
         const arr = this.inpaintPathRegions[r]; const n = arr.length;
-        let dmin = Infinity;
         for (let i = 0; i < n; i++) {
           const a = arr[i], b = arr[(i + 1) % n];
-          const d = this._pointSegDist(sx, sy, a.nx * m.vw, a.ny * m.vh, b.nx * m.vw, b.ny * m.vh);
-          if (d < dmin) dmin = d;
+          const ax = a.nx * m.vw, ay = a.ny * m.vh, bx = b.nx * m.vw, by = b.ny * m.vh;
+          const d = this._pointSegDist(sx, sy, ax, ay, bx, by);
+          if (d < bestDist) {
+            const cp = this._closestOnSeg(sx, sy, ax, ay, bx, by);
+            bestDist = d; best = { region: r, x: cp.x / m.vw, y: cp.y / m.vh };
+          }
         }
-        if (dmin < bestDist) { bestDist = dmin; best = r; }
       }
       return best;
     },
@@ -2745,7 +2774,7 @@ export const useStudioStore = defineStore('studio', {
     enterEditRegion(r) {
       if (this.inpaintMaskMode !== 'path') return;
       if (this._pathEditingRegion >= 0) return;
-      if (this._loadEditRegion(r)) { this._pathHoverRegion = -1; this.inpaintPathCloseHover = false; }
+      if (this._loadEditRegion(r)) { this._clearPathHover(); this.inpaintPathCloseHover = false; }
     },
     // Hit node (KHÔNG xét tay điều khiển) — dùng cho Ctrl+click đổi kiểu node.
     _pathNodeHit(p) {

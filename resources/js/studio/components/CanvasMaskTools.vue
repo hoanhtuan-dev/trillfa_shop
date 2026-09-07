@@ -132,20 +132,12 @@ const pathSmooth = (pts, closed = true) => {
 };
 const pathSmoothPixels = computed(() => pathSmooth(store.inpaintPathPoints, false)); // đang vẽ: MỞ
 const pathRegionsPixels = computed(() => store.inpaintPathRegions.map((pts) => pathSmooth(pts))); // đã đóng: kín
-// Vị trí nút "Sửa" (trọng tâm vùng ĐÃ ĐÓNG đang hover) — giữ kích thước ổn định trên màn hình.
-const hoverRegionCentroid = computed(() => {
-  const i = store._pathHoverRegion;
-  const arr = store.inpaintPathRegions[i];
-  if (i < 0 || !arr || !arr.length || !anchor.value) return null;
-  let cx = 0, cy = 0;
-  for (const p of arr) { cx += p.nx; cy += p.ny; }
-  cx /= arr.length; cy /= arr.length;
-  return { x: cx * anchor.value.w, y: cy * anchor.value.h };
-});
+// Vị trí nút "Sửa" (gần điểm đường bao người dùng đang hover) — giữ kích thước ổn định trên màn hình.
 const hoverRegionTransform = computed(() => {
-  const c = hoverRegionCentroid.value;
-  if (!c) return '';
-  return 'translate(' + fmt1(c.x) + ', ' + fmt1(c.y) + ') scale(' + invScale.value + ')';
+  const pt = store._pathHoverPoint;
+  if (!pt || store._pathHoverRegion < 0 || !anchor.value) return '';
+  const x = pt.nx * anchor.value.w, y = pt.ny * anchor.value.h;
+  return 'translate(' + fmt1(x) + ', ' + fmt1(y) + ') scale(' + invScale.value + ')';
 });
 
 // ── Brush: canvas overlay nét vẽ mask (đỏ 60%) — nằm TRONG khung layer, co giãn đúng theo ảnh ──
@@ -260,8 +252,9 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
              style="pointer-events:auto; cursor:pointer"
              @pointerdown.stop.prevent="store.enterEditRegion(store._pathHoverRegion)"
              title="Sửa lại vùng chọn này">
-            <rect x="-20" y="-11.5" width="40" height="23" rx="6" fill="#0b1220" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1" />
-            <text x="0" y="4" text-anchor="middle" font-size="11" fill="#7dd3fc" font-weight="600">Sửa</text>
+            <rect x="-27" y="-11.5" width="54" height="23" rx="6" fill="#0b1220" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1" />
+            <path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.36a.5.5 0 0 0 .62.62l4.36-1.32a2 2 0 0 0 .83-.5z" fill="none" stroke="#7dd3fc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="translate(-16, -1) scale(0.55)" />
+            <text x="8" y="4" text-anchor="middle" font-size="11" fill="#7dd3fc" font-weight="600">Sửa</text>
           </g>
         </svg>
 
