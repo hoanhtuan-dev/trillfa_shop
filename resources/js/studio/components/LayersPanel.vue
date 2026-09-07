@@ -136,7 +136,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       <template v-for="l in store.layersFrontFirst" :key="l.id">
         <!-- Folder nhóm (hiện trước layer đại diện) -->
         <template v-if="isGroupTop(l)">
-          <div class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1" :class="store.isGroupActive(l.groupId) ? 'border-brand-500 bg-brand-600/20' : 'border-brand-500/40 bg-ink-800/60'" @click="store.selectGroup(l.groupId)">
+          <div class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1" :class="store.isGroupActive(l.groupId) ? 'border-violet-400 bg-violet-400/20' : 'border-violet-400/40 bg-ink-800/60'" @click="store.selectGroup(l.groupId)">
             <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300/70 hover:bg-ink-700 hover:text-cream-100" :title="collapsedGroups.has(l.groupId) ? 'Mở rộng nhóm' : 'Thu gọn nhóm'"><StudioIcon :name="collapsedGroups.has(l.groupId) ? 'chevronUp' : 'chevronDown'" size="h-3.5 w-3.5" /></button>
             <StudioIcon name="group" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
             <template v-if="groupRenameId === l.groupId">
@@ -156,7 +156,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <div v-if="!l.groupId || !collapsedGroups.has(l.groupId)"
         class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
         :class="[
-          store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/15' : (store.isSelected(l.id) ? 'border-brand-500/60 bg-brand-600/10' : 'border-transparent hover:bg-ink-800/70'),
+          store.activeLayerId === l.id ? 'border-sky-400 bg-sky-400/15' : (store.isSelected(l.id) ? 'border-sky-400/60 bg-sky-400/10' : 'border-transparent hover:bg-ink-800/70'),
           l.visible === false ? 'opacity-45' : '',
           l.groupId ? 'ml-3' : '',
           dropTargetId === l.id ? (dropBelow ? 'border-b-2 border-b-brand-400' : 'border-t-2 border-t-brand-400') : ''
@@ -235,7 +235,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <span class="w-12 shrink-0 whitespace-nowrap text-[10px] text-cream-300/60">Xoay</span>
         <input type="range" min="-180" max="180" step="1" :value="store.activeLayer.rotation" @input="store.updateLayerTransform(store.activeLayer.id, { rotation: Number($event.target.value) })" class="h-1.5 min-w-0 flex-1 accent-brand-500" aria-label="Xoay">
         <span class="w-9 shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-cream-200">{{ store.activeLayer.rotation }}°</span>
-        <button @click="store.updateLayerTransform(store.activeLayer.id, { rotation: 0 })" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset rotation" aria-label="Reset rotation"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
+        <button @click="store.resetActiveUnitRotation()" class="grid h-4 w-4 shrink-0 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Reset rotation (group = cả nhóm)" aria-label="Reset rotation"><StudioIcon name="rotateCcw" size="h-3 w-3" /></button>
       </div>
       <div class="grid grid-cols-4 gap-1">
         <button @click="store.duplicateActiveUnit()" class="flex flex-col items-center justify-center gap-0.5 rounded-lg bg-ink-800 px-1 py-1.5 text-[9px] font-semibold text-cream-200 hover:bg-ink-700" title="Nhân đôi đối tượng (Ctrl+D) — group sẽ nhân đôi cả nhóm"><StudioIcon name="copy" size="h-3.5 w-3.5" /><span>Nhân đôi</span></button>

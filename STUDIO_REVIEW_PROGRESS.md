@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3af (2026-09-07) — Viền layer xanh sky dễ nhận biết · reset rotation cho cả group · cursor xoay
+
+- **Viền layer dễ nhận biết**: active/selected layer dùng **xanh sky** (`outline-sky-400` canvas · `border-sky-400` panel row); group dùng **tím** (folder `border-violet-400` + bbox violet) — phân biệt rõ layer vs group.
+- **Reset rotation cho cả group**: thêm `store.resetActiveUnitRotation()` (`_editUnitLayers`) — nút reset rotation trong Thuộc tính giờ xoay về 0 cho MỌI thành viên (không chỉ layer active).
+- **Cursor nút xoay**: handle xoay trên canvas đổi `cursor-grab` → **`cursor-crosshair`** (tín hiệu xoay rõ hơn).
+- Verify: vite build ✓ (729ms).
+
 ## Phiên UI-3ae (2026-09-07) — Fix viền layer bị ẩn (ring-inset che sau ảnh) → dùng outline offset âm
 
 - **Viền layer inner hiển thị lại**: `ring-inset` (box-shadow inset) trên `<img>` bị CHE sau nội dung ảnh (opaque) nên mất viền, tưởng không chọn được. Đổi sang **`outline outline-2 -outline-offset-2`** (vẽ ĐÈ lên ảnh, nằm bên trong) — active `outline-brand-300`, selected `outline-brand-400/70`.

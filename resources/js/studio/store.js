@@ -2112,6 +2112,13 @@ export const useStudioStore = defineStore('studio', {
       layers.forEach(l => { const dx = (l.x || 0) - c.cx, dy = (l.y || 0) - c.cy; l.x = c.cx + dx * cos - dy * sin; l.y = c.cy + dx * sin + dy * cos; let r = ((l.rotation || 0) + deg) % 360; if (r > 180) r -= 360; if (r < -180) r += 360; l.rotation = Math.round(r); });
       this.saveLayerLayout();
     },
+    // Reset rotation cho ĐƠN VỊ đang active (group = reset mọi thành viên).
+    resetActiveUnitRotation() {
+      const layers = this._editUnitLayers(); if (!layers.length) return;
+      this.pushHistory();
+      layers.forEach(l => { l.rotation = 0; });
+      this.saveLayerLayout();
+    },
     // Nhân đôi ĐƠN VỊ đang active: nếu group được chọn trọn → nhân đôi nhóm, ngược lại nhân đôi layer.
     duplicateActiveUnit() {
       const a = this.activeLayer; if (!a) return;
