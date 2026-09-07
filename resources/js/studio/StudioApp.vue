@@ -179,8 +179,10 @@ const drawOverlayStyle = computed(() => {
 function onLayerPointerDown(l, e) {
   if (e.shiftKey) { store.shiftSelectLayer(l.id); return; } // shift+click: thêm/bỏ vào nhóm chọn nhiều
   if (l.locked) { store.selectLayer(l); return; }
+  // Alt+click layer trong nhóm → chỉnh sửa RIÊNG layer đó (edit in group), không chọn cả nhóm.
+  if (e.altKey && l.groupId) store.setActiveLayer(l.id);
   // Click thường: nếu layer không thuộc nhóm đang chọn → chọn riêng nó; nếu thuộc nhóm → giữ nhóm.
-  if (!store.isSelected(l.id)) store.selectLayerWithGroup(l.id); // chọn cả nhóm nếu thuộc nhóm
+  else if (!store.isSelected(l.id)) store.selectLayerWithGroup(l.id); // chọn cả nhóm nếu thuộc nhóm
   store.beginLayerDrag(l.id, e);
   const move = (ev) => store.layerDragMove(ev);
   const up = () => { store.endLayerDrag(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
@@ -241,12 +243,14 @@ function onCanvasBgMove(e) {
   if (!bgDownPos) return;
   const dx = e.clientX - bgDownPos.x, dy = e.clientY - bgDownPos.y;
   const panMod = e.ctrlKey || e.metaKey || e.altKey;
-  // Chưa quyết định: kéo xa hơn 6px với nút trái & không giữ phím pan → bắt đầu quét chọn.
-  if (marquee.value === null && !panMod && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
-    marquee.value = { x0: bgDownPos.x, y0: bgDownPos.y, x1: e.clientX, y1: e.clientY };
-    store.panEnd();
+  // Chỉ QUÉT CHỌN khi công cụ "Lựa chọn" đang bật; ngược lại kéo vùng trống = pan (không cạnh tranh).
+  if (store.selectTool) {
+    if (marquee.value === null && !panMod && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+      marquee.value = { x0: bgDownPos.x, y0: bgDownPos.y, x1: e.clientX, y1: e.clientY };
+      store.panEnd();
+    }
+    if (marquee.value) { marquee.value.x1 = e.clientX; marquee.value.y1 = e.clientY; return; }
   }
-  if (marquee.value) { marquee.value.x1 = e.clientX; marquee.value.y1 = e.clientY; return; }
   store.panMove(e);
 }
 function onCanvasBgUp(e) {

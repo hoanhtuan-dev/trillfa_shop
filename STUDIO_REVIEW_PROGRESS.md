@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3r (2026-09-07) — Select tool (đầu dock, luôn nổi) · marquee chỉ khi chọn Select (hết đua pan) · edit in group
+
+- **Tool Lựa chọn**: `store.selectTool` — nút đầu toolbar (icon cursor chuẩn ngành, đơn sắc). Dock toolbar **LUÔN nổi** (bỏ `v-if=upscaleSrc`). Các tool khác tự tắt selectTool.
+- **Marquee chỉ khi Select**: kéo vùng trống = pan như cũ (hết đua); chỉ khi bật Select mới quét chọn (giữ Ctrl/Cmd/Alt = pan trong chế độ chọn).
+- **Edit in group**: Alt+click layer trong nhóm (canvas hoặc panel) → `setActiveLayer(id)` để chỉnh sửa riêng layer đó (không chọn cả nhóm).
+- Verify: vite build ✓ (746ms) · RegionTools 12, StudioApp 1, alt-edit 1+1.
+
 ## Phiên UI-3q (2026-09-07) — Group dùng được khóa/nhân đôi/xóa + nút tải hàng loạt trong popup chọn nhiều
 
 - **Tính năng layer cho group**: `toggleGroupLock` (khóa/mở khóa toàn bộ thành viên) · `duplicateGroup` (nhân đôi nhóm thành nhóm mới, lệch +40px) · `deleteGroup` (xóa toàn bộ thành viên) — thêm nút khóa/copy/trash trong folder nhóm (hover) tại LayersPanel + helper `groupLocked`.

@@ -57,6 +57,7 @@ const ICONS = {
   distributeHorizontal: '<rect x="3" y="8" width="4" height="8" rx="1"/><rect x="17" y="8" width="4" height="8" rx="1"/><line x1="9" x2="15" y1="12" y2="12"/>',
   distributeVertical: '<rect x="8" y="3" width="8" height="4" rx="1"/><rect x="8" y="17" width="8" height="4" rx="1"/><line x1="12" x2="12" y1="9" y2="15"/>',
   group: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M3 17v2a2 2 0 0 0 2 2h2"/><path d="M17 21h2a2 2 0 0 0 2-2v-2"/><rect x="8" y="8" width="8" height="8" rx="1"/>',
+  cursor: '<path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/>',
   // ── Bộ icon Quản lý dự án (Project Management) — cùng phong cách Lucide với canvas ──
   pin: '<line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>',
   pinOff: '<line x1="2" x2="22" y1="2" y2="22"/><line x1="12" x2="12" y1="17" y2="22"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/><path d="M15 9.34V6h1a2 2 0 0 0 0-4H7.89"/>',

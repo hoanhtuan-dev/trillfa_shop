@@ -47,7 +47,7 @@ function onRowDragLeave(e, l) {
   if (dropTargetId.value === l.id) { dropTargetId.value = null; dropBelow.value = false; }
 }
 // Nhấn 1 layer = chọn riêng; shift+click = thêm/bỏ vào nhóm chọn nhiều (đồng bộ canvas).
-function onRowClick(l, e) { if (e && e.shiftKey) store.shiftSelectLayer(l.id); else store.selectLayerWithGroup(l); }
+function onRowClick(l, e) { if (e && e.shiftKey) { store.shiftSelectLayer(l.id); return; } if (e && e.altKey && l.groupId) { store.setActiveLayer(l.id); return; } store.selectLayerWithGroup(l); }
 // ── Nhóm layer: hiển thị dưới dạng folder riêng trong panel ──
 const openGroups = ref(new Set());
 function toggleGroup(gid) { const s = new Set(openGroups.value); s.has(gid) ? s.delete(gid) : s.add(gid); openGroups.value = s; }

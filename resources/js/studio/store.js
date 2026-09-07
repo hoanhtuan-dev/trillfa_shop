@@ -64,6 +64,7 @@ export const useStudioStore = defineStore('studio', {
     snapX: null,
     snapY: null,
     snapGrid: 8, // lưới bắt điểm (px) khi kéo layer — mặc định BẬT 8px (0 = tắt)
+    selectTool: false, // công cụ LỰA CHỌN: bật thì kéo vùng trống = quét chọn (còn lại = pan như cũ)
     confirmDeleteOpen: false, // popup xác nhận xóa nhiều layer
     _pinch: null,
     // Xóa vùng (erase) với feather
