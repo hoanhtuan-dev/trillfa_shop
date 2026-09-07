@@ -179,6 +179,7 @@ export const useStudioStore = defineStore('studio', {
     inpaintPathPoints: [],        // điểm neo {nx,ny,hx,hy} — h = tay điều khiển (normalized) cho Bezier curve selection (Krita Pen tool)
     inpaintPathRegions: [],       // các vùng path ĐÃ đóng (để preview hiển thị đủ nhiều vùng)
     _pathPending: null,           // neo đang kéo (khi vẽ Bezier)
+    inpaintPathCloseHover: false, // hover gần điểm BẮT ĐẦU (snap để đóng kín) → highlight node đầu + guide
     magicTolerance: 32,           // ngưỡng màu cho Magic Wand (1-128)
     magicFeather: 0,             // độ mịn Magic Wand (blur px 0-20) — làm mềm mép vùng chọn
     _inpaintFreehandActive: false,
@@ -2601,7 +2602,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }; // khung mặc định 15% khi bật — nhỏ, dễ kéo/chỉnh
       if (mode === 'brush') { this._initInpaintBrush(); this.inpaintErase = false; }
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._initInpaintBrush(); }
       if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // Mở vùng chọn từ THANH CÔNG CỤ CANVAS (rect/freehand) — dùng chung overlay chính xác của Inpaint,
@@ -2619,7 +2620,7 @@ export const useStudioStore = defineStore('studio', {
       this.inpaintBrushData = '';
       this.inpaintMaskBox = { x: 0.425, y: 0.425, w: 0.15, h: 0.15 };
       if (mode === 'freehand') { this.inpaintFreehandPoints = []; this.inpaintFreehandPaths = []; this._initInpaintBrush(); }
-      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this._initInpaintBrush(); }
+      if (mode === 'path') { this.inpaintPathPoints = []; this.inpaintPathRegions = []; this.inpaintPathCloseHover = false; this._initInpaintBrush(); }
       if (mode === 'magic') { this._initInpaintBrush(); }
     },
     // ── Freehand (lasso) select: vẽ tự do tạo vùng kín → mask ──
@@ -2689,21 +2690,45 @@ export const useStudioStore = defineStore('studio', {
       }
       return null;
     },
+    _pathScreenDist(nx, ny, px, py) {
+      const m = this.canvasMetrics(); if (!m) return Infinity;
+      return Math.hypot((nx - px) * m.vw, (ny - py) * m.vh);
+    },
+    // Hover gần điểm BẮT ĐẦU (snap để đóng kín): highlight node đầu + guide line nối về điểm đầu.
+    pathHover(e) {
+      if (this.inpaintMaskMode !== 'path' || this._pathDrag) { this.inpaintPathCloseHover = false; return; }
+      const p = this.inpaintMaskPointer(e); if (!p || this.inpaintPathPoints.length < 3) { this.inpaintPathCloseHover = false; return; }
+      const s = this.inpaintPathPoints[0];
+      this.inpaintPathCloseHover = this._pathScreenDist(p.nx, p.ny, s.nx, s.ny) < 20;
+    },
     pathDown(e) {
       if (this.inpaintMaskMode !== 'path') return;
       e.stopPropagation();
       const p = this.inpaintMaskPointer(e); if (!p) return;
+      const pts = this.inpaintPathPoints;
+      // Snap/đóng kín: >=3 điểm & nhấp gần điểm BẮT ĐẦU → tap = đóng, kéo = di chuyển node đầu.
+      if (pts.length >= 3 && this._pathScreenDist(p.nx, p.ny, pts[0].nx, pts[0].ny) < 22) {
+        this.inpaintPathCloseHover = false;
+        this._pathDrag = { type: 'close', i: 0, sx: p.nx, sy: p.ny, moved: false };
+        return;
+      }
       const hit = this._pathHit(p);
-      if (hit) { this._pathDrag = { ...hit, broke: false }; return; }
+      if (hit) { this._pathDrag = { ...hit, broke: false, sx: p.nx, sy: p.ny, moved: false }; return; }
       // Khoảng trống → neo mới, push NGAY vào mảng (hiển thị ngay ở lần nhấp đầu).
       // Kéo (move) chỉnh tay điều khiển của chính node này in-place để preview sống.
       const i = this.inpaintPathPoints.push({ nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true }) - 1;
-      this._pathDrag = { type: 'pending', i, nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true };
+      this._pathDrag = { type: 'pending', i, nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true, sx: p.nx, sy: p.ny, moved: false };
     },
     pathMove(e) {
       if (this.inpaintMaskMode !== 'path' || !this._pathDrag) return;
       const p = this.inpaintMaskPointer(e); if (!p) return;
       const dr = this._pathDrag;
+      if (dr.type === 'close') {
+        // Kéo >4px → chuyển thành di chuyển node đầu (không đóng nữa).
+        if (this._pathScreenDist(p.nx, p.ny, dr.sx, dr.sy) > 4) dr.moved = true;
+        if (dr.moved) dr.type = 'node';
+        else return;
+      }
       if (dr.type === 'pending') {
         const nd = this.inpaintPathPoints[dr.i]; if (!nd) return;
         nd.ox = (p.nx - dr.nx) * 0.5; nd.oy = (p.ny - dr.ny) * 0.5;
@@ -2722,13 +2747,16 @@ export const useStudioStore = defineStore('studio', {
     },
     pathUp() {
       if (this.inpaintMaskMode !== 'path') return;
-      // Neo đã push ở pathDown; ở đây chỉ kết thúc kéo (giữ node + tay điều khiển vừa chỉnh).
-      this._pathDrag = null;
+      const dr = this._pathDrag; this._pathDrag = null;
+      // Nhấp (không kéo) gần điểm BẮT ĐẦU → đóng kín vùng chọn, rồi bắt đầu vùng mới.
+      if (dr && dr.type === 'close' && !dr.moved) { this.pathClose(); return; }
+      // Neo đã push ở pathDown; chỉ kết thúc kéo (giữ node + tay điều khiển vừa chỉnh).
     },
     pathDeleteNode(i) { if (this.inpaintMaskMode !== 'path') return; if (i >= 0 && i < this.inpaintPathPoints.length) this.inpaintPathPoints.splice(i, 1); },
     pathUndoPoint() { if (this.inpaintMaskMode !== 'path') return; this.inpaintPathPoints.pop(); },
     pathClose() {
       if (this.inpaintMaskMode !== 'path') return;
+      this.inpaintPathCloseHover = false;
       const pts = this.inpaintPathPoints;
       if (pts.length < 3) { this.toast('Cần ít nhất 3 điểm để tạo vùng chọn.', 'error'); return; }
       if (!this._inpaintMaskCtx) this._initInpaintBrush();

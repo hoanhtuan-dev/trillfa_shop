@@ -1,10 +1,28 @@
 <script setup>
 // CanvasStatusBar — thanh trạng thái dock dưới khung canvas (SPEC: STUDIO_UI_REDESIGN.md §4.2).
 // Không props — đọc/ghi trực tiếp useStudioStore(). Mọi icon qua <StudioIcon/>.
+import { computed } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
+
+// Gợi ý công cụ theo chế độ đang dùng (Krita-style) — hiện khi có công cụ active.
+const toolHint = computed(() => {
+  const m = store.inpaintMaskMode;
+  if (m === 'path') {
+    const n = store.inpaintPathPoints.length;
+    if (n === 0) return 'Đường cong: bấm để đặt điểm neo · kéo để chỉnh tay điều khiển';
+    if (n < 3) return `Đặt thêm điểm neo (${n}/3 tối thiểu) — quay lại điểm đầu (xanh) để đóng kín`;
+    if (store.inpaintPathCloseHover) return 'Bấm điểm đầu để đóng kín vùng chọn · kéo sẽ di chuyển thay vì đóng';
+    return 'Bấm điểm đầu (xanh) để đóng kín · kéo neo/tay để chỉnh · Alt = phá đối xứng · click phải = xóa';
+  }
+  if (m === 'freehand') return 'Vẽ tự do quanh vùng cần chọn — thả chuột để tự đóng kín';
+  if (m === 'rect') return 'Kéo để tạo vùng chữ nhật · kéo góc để chỉnh · kéo giữa để di chuyển';
+  if (m === 'brush') return 'Vẽ nét lên vùng cần sửa · Tẩy = xóa nét · Ctrl+Z = hoàn tác';
+  if (m === 'magic') return 'Bấm để chọn nhanh vùng màu — chỉnh Tolerance / Feather cho phù hợp';
+  return '';
+});
 
 // Nút icon chuẩn (spec §4.2): h-7 hit-target, hover nền ink-700, disabled mờ 30%.
 const BTN = 'grid h-7 w-7 place-items-center rounded-md text-cream-200 hover:bg-ink-700 disabled:opacity-30';
@@ -58,8 +76,12 @@ const bgSwatchStyle = (b) => ({
       <option :value="8">8</option><option :value="16">16</option><option :value="24">24</option><option :value="32">32</option>
     </select>
 
-    <!-- 7. Spacer -->
+    <!-- 7. Spacer + Gợi ý công cụ (Krita-style) -->
     <div class="flex-1"></div>
+    <div v-if="toolHint" class="flex min-w-0 items-center gap-1.5 overflow-hidden px-1 text-[10px] text-cream-300/60" title="Hướng dẫn công cụ">
+      <StudioIcon name="info" size="h-3.5 w-3.5" class="shrink-0" />
+      <span class="truncate">{{ toolHint }}</span>
+    </div>
 
     <!-- 7. Trạng thái (md+) -->
     <div class="hidden items-center gap-1.5 text-[10px] text-cream-300/60 md:flex">

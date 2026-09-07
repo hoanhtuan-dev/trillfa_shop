@@ -138,3 +138,21 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 **Kết quả:** StudioSecurityFixesTest mới 11/11 · ShopFlowTest 64/64 (từ 9 fail baseline) · ImageFallback 8/8 (cập nhật fake https — file:// bị chặn đúng sau vá S3) · **full suite 210 pass / 0 FAIL — xanh toàn bộ lần đầu** · vite build ✓ · 0 regression.
 
 **Còn mở:** T1 deploy production (việc người dùng) · T7 commit báo cáo · ~18 medium + ~45 low/info (§5) — backlog ưu tiên thấp.
+
+## Phiên O (2026-09-07) — Bezier draw: hiện ngay ở lần nhấp đầu + preview khi kéo · sạch console warning
+
+**Yêu cầu người dùng:** "Điều khiển chưa hoạt động" + flood `getImageData willReadFrequently` từ `_finalizeInpaintBrush` + "hiển thị ngay khi nhấp lần đầu tiên, preview khi nhấp và kéo".
+
+**Gốc rễ (2):**
+1. SVG preview path có `v-if="... length > 1"` → **node đầu tiên không render**; neo chỉ được push ở `pathUp` (pointerup) — nên click đầu không thấy gì. Đồng thời `_pathDrag` là property KHÔNG reactive → kéo tay điều khiển không preview sống.
+2. `_pathHit` kiểm tra HANDLE trước NODE; handle suy biến (độ dài 0) nằm đúng trên node → click node bắt phải HANDLE lệch, node không kéo được.
+3. `_finalizeInpaintBrush` gọi `getImageData` trên ctx không có `willReadFrequently` → cảnh báo lặp.
+
+**Đã sửa (commit `5f8d7bf`):**
+- `pathDown`: push node NGAY vào `inpaintPathPoints` (reactivity) → node hiện ở lần nhấp đầu; `pathMove` chỉnh ox/oy/ix/iy của node đó IN-PLACE → tay điều khiển + đường cong preview sống khi kéo. `pathUp` chỉ kết thúc kéo (bỏ push cũ).
+- SVG container `> 1` → `> 0`; ẩn tay điều khiển suy biến (`Math.hypot(...)*anchor.w > 2`) để lần nhấp đầu hiện node sạch.
+- `_pathHit`: bỏ qua handle có độ dài màn hình ≤4px → kéo node hoạt động đúng (control "hoạt động" trở lại).
+- `getContext('2d', { willReadFrequently: true })` ở `_initInpaintBrush` / `attachBrushCanvas` / `_finalizeInpaintBrush` (mask canvas) → hết cảnh báo + đọc mask nhanh hơn.
+
+**Xác minh:** vite build ✓ (789ms) · push `5f8d7bf` · SSH pull + `php artisan optimize:clear` ✓ · asset `app-By6qjKLN.js` + `GalleryModal-CUY1aRgV.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

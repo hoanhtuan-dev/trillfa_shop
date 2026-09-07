@@ -87,6 +87,8 @@ function onPointerDown(e) {
   }
   store.inpaintMaskStart(e);
 }
+// Hover (không bấm) trong mode path → cập nhật "snap để đóng kín" (highlight node đầu + guide).
+function onPointerMove(e) { if (store.inpaintMaskMode === 'path') store.pathHover(e); }
 
 // ── Toạ độ SVG trong KHUNG ẢNH (px layout) — normalized (0..1) × baseW/baseH ──
 // Toạ độ giữ SỐ THẬP PHÂN (0.1px layout) — nếu làm tròn về px layout nguyên thì khi phóng to
@@ -100,14 +102,15 @@ const pt = (p) => {
 const pathPixels = (pts) => (pts || []).map(pt).join(' ');
 const freehandPoints = computed(() => pathPixels(store.inpaintFreehandPoints));
 const freehandPaths = computed(() => store.inpaintFreehandPaths.map((pts) => pathPixels(pts)));
-// Đường cong path/curve: lấy mẫu Catmull-Rom (đóng kín) qua các điểm neo — sample theo khung ảnh.
-// Bézier thật dùng TAY ĐIỀU KHIỂN (như Krita): c1 = a + handle(a) · c2 = b - handle(b) phản chiếu.
-const pathSmooth = (pts) => {
+// Đường cong path/curve: lấy mẫu Bézier bằng TAY ĐIỀU KHIỂN (như Krita): c1 = a + a.out · c2 = b + b.in.
+// closed=false (đang vẽ, ĐỂ MỞ — không đóng vòng sẵn); closed=true (vùng ĐÃ đóng → đóng kín preview).
+const pathSmooth = (pts, closed = true) => {
   const f = frame.value;
   if (!f || !pts || pts.length < 2) return '';
   const P = pts.map((p) => ({ x: p.nx * f.w, y: p.ny * f.h, ox: (p.ox || 0) * f.w, oy: (p.oy || 0) * f.h, ix: (p.ix || 0) * f.w, iy: (p.iy || 0) * f.h }));
   const n = P.length, SAMPLES = 20, out = [];
-  for (let i = 0; i < n; i++) {
+  const segs = closed ? n : n - 1; // đang vẽ: chỉ nối các điểm kế tiếp, CHƯA quay về điểm đầu
+  for (let i = 0; i < segs; i++) {
     const a = P[i], b = P[(i + 1) % n];
     const c1x = a.x + a.ox, c1y = a.y + a.oy, c2x = b.x + b.ix, c2y = b.y + b.iy;
     for (let s = 0; s < SAMPLES; s++) {
@@ -119,8 +122,8 @@ const pathSmooth = (pts) => {
   }
   return out.join(' ');
 };
-const pathSmoothPixels = computed(() => pathSmooth(store.inpaintPathPoints));
-const pathRegionsPixels = computed(() => store.inpaintPathRegions.map((pts) => pathSmooth(pts)));
+const pathSmoothPixels = computed(() => pathSmooth(store.inpaintPathPoints, false)); // đang vẽ: MỞ
+const pathRegionsPixels = computed(() => store.inpaintPathRegions.map((pts) => pathSmooth(pts))); // đã đóng: kín
 
 // ── Brush: canvas overlay nét vẽ mask (đỏ 60%) — nằm TRONG khung layer, co giãn đúng theo ảnh ──
 const metricsTick = ref(0);
@@ -162,7 +165,7 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
 <template>
   <div v-if="visible" class="absolute inset-0 z-31 select-none" :class="editing ? 'cursor-crosshair' : 'cursor-default'"
        style="touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;"
-       @pointerdown="onPointerDown" @wheel.prevent="store.wheelZoom($event)" @contextmenu.prevent @dragstart.prevent>
+       @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerleave="store.inpaintPathCloseHover = false" @wheel.prevent="store.wheelZoom($event)" @contextmenu.prevent @dragstart.prevent>
 
     <!-- ══ Neo theo khung <img> isolate: wrapper lặp đúng transform pan/zoom + transform layer ══ -->
     <div v-if="anchor" class="pointer-events-none absolute left-1/2 top-1/2" :style="{ width: '0px', height: '0px', transform: anchor.outer, transformOrigin: 'center' }">
@@ -195,8 +198,16 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
             <polyline :points="reg" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
             <polygon :points="reg" fill="rgba(167,139,250,0.12)" stroke="none" />
           </template>
+          <!-- Đang vẽ: ĐƯỜNG MỞ (chưa đóng vòng) — nối các điểm kế tiếp, không quay về đầu -->
           <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
-          <polygon v-if="store.inpaintPathPoints.length > 2" :points="pathSmoothPixels" fill="rgba(167,139,250,0.12)" stroke="none" />
+          <!-- Guide nối điểm cuối → điểm BẮT ĐẦU khi hover snap để đóng kín (Krita) -->
+          <line
+            v-if="store.inpaintPathCloseHover && store.inpaintPathPoints.length >= 3"
+            :x1="store.inpaintPathPoints[store.inpaintPathPoints.length - 1].nx * (anchor.w)"
+            :y1="store.inpaintPathPoints[store.inpaintPathPoints.length - 1].ny * (anchor.h)"
+            :x2="store.inpaintPathPoints[0].nx * (anchor.w)"
+            :y2="store.inpaintPathPoints[0].ny * (anchor.h)"
+            stroke="#34d399" :stroke-width="1.5 * invScale" stroke-dasharray="5 4" stroke-linecap="round" />
           <template v-for="(p, i) in store.inpaintPathPoints" :key="'p'+i">
             <!-- Tay điều khiển Bezier (Krita): out (xanh) + in (hồng); kéo node/tay để chỉnh, right-click node = xóa.
                  Ẩn tay SUY BIẾN (độ dài ~0) để lần nhấp đầu hiện node sạch & kéo node không dính tay lệch. -->
@@ -208,7 +219,11 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
               <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ix||0)) * anchor.w" :y2="(p.ny + (p.iy||0)) * anchor.h" stroke="#f0abfc" :stroke-width="1.5 * invScale" stroke-linecap="round" />
               <circle :cx="(p.nx + (p.ix||0)) * anchor.w" :cy="(p.ny + (p.iy||0)) * anchor.h" :r="circleR * 0.7" fill="#f0abfc" style="pointer-events:auto; cursor:move" />
             </template>
-            <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)" :r="circleR" fill="#a78bfa" stroke="#111" :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
+            <!-- Node: node 0 = điểm BẮT ĐẦU (đóng kín) → highlight xanh khi hover snap -->
+            <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)"
+              :r="i === 0 && store.inpaintPathCloseHover ? circleR * 1.5 : circleR"
+              :fill="i === 0 && store.inpaintPathCloseHover ? '#34d399' : '#a78bfa'"
+              stroke="#111" :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
           </template>
         </svg>
 

@@ -33,7 +33,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   <div v-if="store.inpaintMaskMode !== 'none'" class="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <template v-if="store.inpaintMaskMode === 'path'">
-        <button @click="store.pathClose()" :class="[lbl, btn]" title="Đóng vùng chọn từ đường cong">Đóng</button>
+        <!-- Tự động đóng kín khi quay lại điểm bắt đầu (Krita) → không cần nút "Đóng" nữa. -->
         <button @click="store.pathUndoPoint()" :class="iconBtn" title="Bỏ điểm neo cuối" aria-label="Bỏ điểm neo cuối"><StudioIcon name="undo" :size="I"/></button>
       </template>
       <template v-if="store.inpaintMaskMode === 'magic'">
