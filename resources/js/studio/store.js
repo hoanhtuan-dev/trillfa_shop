@@ -2064,26 +2064,39 @@ export const useStudioStore = defineStore('studio', {
     setSnapGrid(v) { this.snapGrid = Number(v) || 0; },
     // Kích thước hiển thị (bbox) của layer — dùng cho căn/chia đều.
     _layerBox(l) { const w = Math.max(1, (Number(l.baseW) || 0) * (Number(l.scale) || 1)); const h = Math.max(1, (Number(l.baseH) || 0) * (Number(l.scale) || 1)); return { w, h, cx: (l.x || 0), cy: (l.y || 0) }; },
-    // Căn lề nhóm theo cạnh: left/hcenter/right/top/vcenter/bottom.
+    // ĐƠN VỊ căn/chia đều: mỗi NHÓM = 1 khối cứng (gồm toàn bộ thành viên), layer đơn lẻ = 1 khối.
+    _selectionUnits() {
+      const sels = this.selection; const byGroup = {}; const singles = [];
+      sels.forEach(l => { if (l.groupId) { (byGroup[l.groupId] = byGroup[l.groupId] || []).push(l); } else singles.push(l); });
+      const units = [];
+      Object.keys(byGroup).forEach(gid => {
+        const all = this.canvasLayers.filter(x => x.groupId === gid && x.visible !== false);
+        units.push({ type: 'group', gid, layers: all, box: this._unitBox(all) });
+      });
+      singles.forEach(l => units.push({ type: 'layer', id: l.id, layers: [l], box: this._layerBox(l) }));
+      return units;
+    },
+    _unitBox(layers) { let L = Infinity, R = -Infinity, T = Infinity, B = -Infinity; layers.forEach(l => { const b = this._layerBox(l); const cx = l.x || 0, cy = l.y || 0; L = Math.min(L, cx - b.w / 2); R = Math.max(R, cx + b.w / 2); T = Math.min(T, cy - b.h / 2); B = Math.max(B, cy + b.h / 2); }); return { w: R - L, h: B - T, cx: (L + R) / 2, cy: (T + B) / 2 }; },
+    _translateUnit(u, dx, dy) { u.layers.forEach(l => { if (dx) l.x = (l.x || 0) + dx; if (dy) l.y = (l.y || 0) + dy; }); },
+    // Căn lề theo ĐƠN VỊ (group là 1 khối): left/hcenter/right/top/vcenter/bottom.
     alignSelection(kind) {
-      const sels = this.selection; if (sels.length < 2) return;
-      const boxes = sels.map(l => this._layerBox(l));
-      const left = Math.min(...boxes.map(b => b.cx - b.w / 2)), right = Math.max(...boxes.map(b => b.cx + b.w / 2));
-      const top = Math.min(...boxes.map(b => b.cy - b.h / 2)), bottom = Math.max(...boxes.map(b => b.cy + b.h / 2));
-      const hc = (left + right) / 2, vc = (top + bottom) / 2;
+      const units = this._selectionUnits(); if (units.length < 2) return;
+      let L = Infinity, R = -Infinity, T = Infinity, B = -Infinity;
+      units.forEach(u => { L = Math.min(L, u.box.cx - u.box.w / 2); R = Math.max(R, u.box.cx + u.box.w / 2); T = Math.min(T, u.box.cy - u.box.h / 2); B = Math.max(B, u.box.cy + u.box.h / 2); });
+      const hc = (L + R) / 2, vc = (T + B) / 2;
       this.pushHistory();
-      sels.forEach((l, i) => { const b = boxes[i]; if (kind === 'left') l.x = left + b.w / 2; else if (kind === 'hcenter') l.x = hc; else if (kind === 'right') l.x = right - b.w / 2; else if (kind === 'top') l.y = top + b.h / 2; else if (kind === 'vcenter') l.y = vc; else if (kind === 'bottom') l.y = bottom - b.h / 2; });
+      units.forEach(u => { let dx = 0, dy = 0; if (kind === 'left') dx = (L + u.box.w / 2) - u.box.cx; else if (kind === 'hcenter') dx = hc - u.box.cx; else if (kind === 'right') dx = (R - u.box.w / 2) - u.box.cx; else if (kind === 'top') dy = (T + u.box.h / 2) - u.box.cy; else if (kind === 'vcenter') dy = vc - u.box.cy; else if (kind === 'bottom') dy = (B - u.box.h / 2) - u.box.cy; this._translateUnit(u, dx, dy); });
       this.saveLayerLayout();
     },
-    // Chia đều khoảng cách theo trục x (kind='x') hoặc y (kind='y') — giữ 2 layer đầu/cuối.
+    // Chia đều khoảng cách theo ĐƠN VỊ (group di chuyển nguyên khối, giữ VỊ TRÍ NỘI BỘ).
     distributeSelection(kind) {
-      const sels = this.selection; if (sels.length < 3) return;
+      const units = this._selectionUnits(); if (units.length < 3) return;
       const prop = kind === 'y' ? 'cy' : 'cx';
-      const sorted = sels.slice().sort((a, b) => this._layerBox(a)[prop] - this._layerBox(b)[prop]);
-      const first = this._layerBox(sorted[0])[prop], last = this._layerBox(sorted[sorted.length - 1])[prop];
+      const sorted = units.slice().sort((a, b) => a.box[prop] - b.box[prop]);
+      const first = sorted[0].box[prop], last = sorted[sorted.length - 1].box[prop];
       const step = (last - first) / (sorted.length - 1);
       this.pushHistory();
-      sorted.forEach((l, i) => { if (i === 0 || i === sorted.length - 1) return; if (kind === 'y') l.y = first + step * i; else l.x = first + step * i; });
+      sorted.forEach((u, i) => { if (i === 0 || i === sorted.length - 1) return; const target = first + step * i; this._translateUnit(u, kind === 'y' ? 0 : target - u.box[prop], kind === 'y' ? target - u.box[prop] : 0); });
       this.saveLayerLayout();
     },
     // Phím Delete → mở popup xác nhận xóa NHIỀU layer.
