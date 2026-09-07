@@ -270,6 +270,7 @@ class ProjectController extends Controller
                 'id' => $g->id, 'type' => $g->type, 'status' => $g->status,
                 'media_url' => $g->media_url, 'prompt' => $g->prompt,
                 'model' => $g->model, 'provider' => $g->provider,
+                'project_id' => $g->project_id, 'project' => $project->name,
                 'created_at' => $g->created_at?->format('d/m H:i'),
             ])->values();
 

@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useStudioStore } from './store.js';
 import { thumbUrl, onThumbError } from './composables/useStudioThumb.js';
 import GalleryModal from './components/GalleryModal.vue';
+import StudioIcon from './components/StudioIcon.vue';
 
 const store = useStudioStore();
 
@@ -70,6 +71,7 @@ async function runConfirm() {
 
 function onChangeType(e) { store.setLibraryFilter('type', e.target.value); }
 function onChangeStatus(e) { store.setLibraryFilter('status', e.target.value); }
+function onChangeProject(e) { store.setLibraryFilter('project_id', e.target.value); }
 function onChangeOldDays() { store.refreshLibraryScan(); }
 
 let searchTimer = null;
@@ -78,7 +80,7 @@ function onSearchInput(e) {
   searchTimer = setTimeout(() => store.setLibraryFilter('q', e.target.value || ''), 350);
 }
 
-function openViewer(g) { store.viewer = g; }
+function openViewer(g) { store.openViewer(g); }
 
 function switchTab(tab) {
   store.libraryTab = tab;
@@ -89,11 +91,33 @@ function refresh() {
   else { store.loadLibrary(true); store.refreshLibraryScan(); }
 }
 
+// ── Dự án helpers ──
+const activeProjectId = computed(() => store.libraryFilters.project_id);
+const filteredProject = computed(() => {
+  if (!activeProjectId.value || activeProjectId.value === 'none') return null;
+  return store.projects.find(p => Number(p.id) === Number(activeProjectId.value)) || null;
+});
+const canApplyFilteredProject = computed(() => {
+  return filteredProject.value && store.appliedProject?.id !== Number(activeProjectId.value);
+});
+function applyFilteredProject() {
+  if (filteredProject.value) store.applyProject(filteredProject.value);
+}
+function getProjectColor(g) {
+  if (!g || !g.project_id) return '#7aa2f7';
+  const p = store.projects.find(p => Number(p.id) === Number(g.project_id));
+  return p?.color || '#7aa2f7';
+}
+function clickProjectChip(g) {
+  store.setLibraryFilter('project_id', g.project_id);
+}
+
 onMounted(async () => {
   store.libraryManage = false;
   await store.loadLibrary(true);
   await store.refreshLibraryScan();
   store.loadUploads();
+  if (!store.projects.length && !store.projectLoaded) store.loadProjects();
 });
 </script>
 
@@ -103,18 +127,29 @@ onMounted(async () => {
       <!-- ══ Header ══ -->
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <h1 class="font-display text-xl font-semibold sm:text-2xl">🖼 Thư viện <span class="text-cream-300/50">({{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTotal) }})</span></h1>
+          <h1 class="font-display text-xl font-semibold sm:text-2xl">
+            <StudioIcon name="image" size="h-5 w-5" /> Thư viện <span class="text-cream-300/50">({{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTotal) }})</span>
+          </h1>
           <a href="/studio" class="rounded-xl bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-700">← Về Studio</a>
+          <!-- Chip "Dự án hiện tại" -->
+          <div v-if="store.appliedProject" class="flex items-center gap-1.5 rounded-full border border-brand-500/50 bg-brand-600/20 px-3 py-1 text-sm text-brand-100">
+            <StudioIcon name="pin" size="h-3.5 w-3.5" />
+            <span class="max-w-[160px] truncate" :title="store.appliedProject.name">{{ store.appliedProject.name }}</span>
+            <button @click="store.unapplyProject()" aria-label="Ngắt dự án hiện tại" class="ml-0.5 rounded-full p-0.5 text-brand-300 hover:bg-brand-500/30 hover:text-brand-100">
+              <StudioIcon name="x" size="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
         <div class="flex items-center gap-2">
           <button @click="refresh" :disabled="store.libraryLoading || store.uploadLoading"
                   class="rounded-xl bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
-            ⟳ Làm mới
+            <StudioIcon name="refresh" size="h-3.5 w-3.5" /> Làm mới
           </button>
           <button @click="store.libraryManage = !store.libraryManage"
                   class="rounded-xl px-3 py-1.5 text-xs font-semibold transition"
                   :class="store.libraryManage ? 'bg-brand-600 text-white hover:bg-brand-500' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'">
-            {{ store.libraryManage ? '✓ Đang quản lý' : '🗂 Quản lý / Dọn dẹp' }}
+            <template v-if="store.libraryManage"><StudioIcon name="check" size="h-3.5 w-3.5" /> Đang quản lý</template>
+            <template v-else><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Quản lý / Dọn dẹp</template>
           </button>
         </div>
       </div>
@@ -124,18 +159,18 @@ onMounted(async () => {
         <button @click="switchTab('generations')"
                 :class="store.libraryTab === 'generations' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-700'"
                 class="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition">
-          🖼 Ảnh đã tạo
+          <StudioIcon name="image" size="h-4 w-4" /> Ảnh đã tạo
         </button>
         <button @click="switchTab('uploads')"
                 :class="store.libraryTab === 'uploads' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-700'"
                 class="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition">
-          📁 File tải lên <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-[10px] text-red-100">{{ uploadStats.unused_count }}</span>
+          <StudioIcon name="folderOpen" size="h-4 w-4" /> File tải lên <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-[10px] text-red-100">{{ uploadStats.unused_count }}</span>
         </button>
       </div>
 
       <template v-if="store.libraryTab === 'generations'">
       <!-- ══ Thống kê ══ -->
-      <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Tổng mục</p>
           <p class="text-lg font-semibold text-cream-100">{{ fmtNum(stats.total ?? store.libraryTotal) }}</p>
@@ -143,6 +178,10 @@ onMounted(async () => {
         <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Hoàn tất</p>
           <p class="text-lg font-semibold text-emerald-300">{{ fmtNum(stats.completed ?? 0) }}</p>
+        </div>
+        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+          <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Đã gắn dự án</p>
+          <p class="text-lg font-semibold text-brand-300">{{ fmtNum(stats.project_linked_count ?? 0) }}</p>
         </div>
         <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Ảnh rác</p>
@@ -183,6 +222,30 @@ onMounted(async () => {
             <option v-for="s in statuses" :key="s.value" :value="s.value" :selected="store.libraryFilters.status === s.value">{{ s.label }}</option>
           </select>
         </div>
+        <div class="w-44">
+          <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Dự án</label>
+          <select @change="onChangeProject" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
+            <option value="" :selected="!store.libraryFilters.project_id">Tất cả dự án</option>
+            <option value="none" :selected="store.libraryFilters.project_id === 'none'">Chưa gắn dự án</option>
+            <option v-for="p in store.projects" :key="p.id" :value="p.id" :selected="String(store.libraryFilters.project_id) === String(p.id)">
+              {{ p.color ? '● ' : '' }}{{ p.name }}
+            </option>
+          </select>
+        </div>
+        <!-- Nút áp dụng nhanh / chip đã áp dụng -->
+        <div v-if="activeProjectId && activeProjectId !== 'none' && filteredProject" class="flex items-center">
+          <button v-if="canApplyFilteredProject" @click="applyFilteredProject"
+                  class="rounded-lg border border-brand-500/40 bg-brand-600/20 px-2.5 py-1.5 text-xs font-semibold text-brand-100 hover:bg-brand-500/30">
+            <StudioIcon name="pin" size="h-3.5 w-3.5" /> Áp dụng dự án này
+          </button>
+          <div v-else-if="store.appliedProject?.id === Number(activeProjectId)" class="flex items-center gap-1.5 rounded-full border border-brand-500/50 bg-brand-600/20 px-3 py-1 text-xs text-brand-100">
+            <StudioIcon name="pin" size="h-3.5 w-3.5" />
+            <span class="max-w-[120px] truncate" :title="store.appliedProject.name">{{ store.appliedProject.name }}</span>
+            <button @click="store.unapplyProject()" aria-label="Ngắt dự án hiện tại" class="ml-0.5 rounded-full p-0.5 text-brand-300 hover:bg-brand-500/30 hover:text-brand-100">
+              <StudioIcon name="x" size="h-3 w-3" />
+            </button>
+          </div>
+        </div>
         <div class="min-w-[200px] flex-1">
           <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Tìm prompt / model</label>
           <input :value="store.libraryFilters.q" @input="onSearchInput" type="text" placeholder="Nhập từ khóa…"
@@ -201,15 +264,15 @@ onMounted(async () => {
 
         <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
           <template v-if="confirmAction === ''">
-            <button @click="ask('bulk')" :disabled="!selectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40">🗑 Xóa đã chọn ({{ selectedCount }})</button>
+            <button @click="ask('bulk')" :disabled="!selectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ selectedCount }})</button>
             <span class="text-cream-300/40">·</span>
-            <button @click="ask('junk')" class="rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-500/15" :disabled="store.libraryCleaning">🧹 Dọn ảnh rác ({{ fmtNum(stats.junk_count ?? 0) }})</button>
-            <button @click="ask('old')" class="rounded-lg border border-sky-500/40 px-3 py-1.5 text-xs text-sky-200 hover:bg-sky-500/15" :disabled="store.libraryCleaning">⏳ Dọn ảnh cũ ({{ fmtNum(stats.old_count ?? 0) }})</button>
-            <button @click="ask('orphans')" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/15" :disabled="store.libraryCleaning">🧾 Dọn file mồ côi ({{ fmtNum(stats.orphan_count ?? 0) }})</button>
+            <button @click="ask('junk')" class="rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-500/15" :disabled="store.libraryCleaning"><StudioIcon name="brush" size="h-3.5 w-3.5" /> Dọn ảnh rác ({{ fmtNum(stats.junk_count ?? 0) }})</button>
+            <button @click="ask('old')" class="rounded-lg border border-sky-500/40 px-3 py-1.5 text-xs text-sky-200 hover:bg-sky-500/15" :disabled="store.libraryCleaning"><StudioIcon name="clock" size="h-3.5 w-3.5" /> Dọn ảnh cũ ({{ fmtNum(stats.old_count ?? 0) }})</button>
+            <button @click="ask('orphans')" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/15" :disabled="store.libraryCleaning"><StudioIcon name="unlink" size="h-3.5 w-3.5" /> Dọn file mồ côi ({{ fmtNum(stats.orphan_count ?? 0) }})</button>
           </template>
           <template v-else>
             <p class="text-xs font-semibold text-red-200">
-              ⚠
+              <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" />
               <span v-if="confirmAction === 'bulk'">Xóa vĩnh viễn {{ selectedCount }} ảnh đã chọn?</span>
               <span v-else-if="confirmAction === 'junk'">Xóa toàn bộ ảnh rác (lỗi / đã hủy)?</span>
               <span v-else-if="confirmAction === 'old'">Xóa ảnh cũ hơn {{ store.libraryFilters.old_days }} ngày?</span>
@@ -229,7 +292,8 @@ onMounted(async () => {
       </div>
 
       <div v-else-if="!store.libraryItems.length" class="rounded-2xl border border-ink-700 bg-ink-800 py-16 text-center">
-        <p class="text-sm text-cream-300/50">Chưa có ảnh / video nào khớp bộ lọc.</p>
+        <p v-if="activeProjectId && activeProjectId !== 'none'" class="text-sm text-cream-300/50">Dự án này chưa có ảnh/video nào.</p>
+        <p v-else class="text-sm text-cream-300/50">Chưa có ảnh / video nào khớp bộ lọc.</p>
         <a href="/studio" class="mt-2 inline-block text-xs text-brand-300 hover:text-brand-200">Tạo ảnh mới trong Studio →</a>
       </div>
 
@@ -253,7 +317,7 @@ onMounted(async () => {
                   }">
               {{ statusLabel(g.status) }}
             </span>
-            <span v-if="g.type === 'video'" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/80 text-white">▶</span>
+            <span v-if="g.type === 'video'" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/80 text-white"><StudioIcon name="play" size="h-3.5 w-3.5" /></span>
 
             <!-- Overlay hover -->
             <div class="absolute inset-0 bg-black/40 opacity-0 transition group-hover:opacity-100"></div>
@@ -262,11 +326,17 @@ onMounted(async () => {
             </div>
           </div>
 
+          <!-- Badge dự án -->
+          <div v-if="g.project" @click.stop="clickProjectChip(g)" class="absolute left-2 top-8 flex cursor-pointer items-center gap-1 rounded-full border border-ink-600/60 bg-ink-900/80 px-1.5 py-0.5 text-[9px] font-semibold text-cream-300 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-100 transition">
+            <span class="inline-block h-1.5 w-1.5 rounded-full flex-shrink-0" :style="{ backgroundColor: getProjectColor(g) }"></span>
+            <span class="max-w-[80px] truncate">{{ g.project }}</span>
+          </div>
+
           <!-- Checkbox chọn (luôn hiện ở chế độ quản lý) -->
           <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
                   class="absolute right-2 bottom-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
                   :class="isSelected(g.id) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
-            ✓
+            <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -311,12 +381,12 @@ onMounted(async () => {
           </div>
           <div class="flex flex-wrap items-center gap-2 border-t border-ink-700/60 pt-2">
             <template v-if="confirmAction === ''">
-              <button @click="ask('ubulk')" :disabled="!uploadSelectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40">🗑 Xóa đã chọn ({{ uploadSelectedCount }})</button>
-              <button @click="ask('uclean')" :disabled="!uploadUnusedCount" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/15">🧾 Dọn file mồ côi ({{ uploadUnusedCount }})</button>
+              <button @click="ask('ubulk')" :disabled="!uploadSelectedCount" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40"><StudioIcon name="trash" size="h-3.5 w-3.5" /> Xóa đã chọn ({{ uploadSelectedCount }})</button>
+              <button @click="ask('uclean')" :disabled="!uploadUnusedCount" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/15"><StudioIcon name="unlink" size="h-3.5 w-3.5" /> Dọn file mồ côi ({{ uploadUnusedCount }})</button>
             </template>
             <template v-else>
               <p class="text-xs font-semibold text-red-200">
-                ⚠
+                <StudioIcon name="alertTriangle" size="h-3.5 w-3.5" />
                 <span v-if="confirmAction === 'ubulk'">Xóa vĩnh viễn {{ uploadSelectedCount }} file đã chọn?</span>
                 <span v-else>Dọn toàn bộ file đã tải lên không còn dùng?</span>
               </p>
@@ -351,7 +421,7 @@ onMounted(async () => {
             <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
                     class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
                     :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
-              ✓
+              <StudioIcon name="check" size="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

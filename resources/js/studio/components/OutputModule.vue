@@ -1,29 +1,55 @@
 <script setup>
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
+import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
-function openGallery() { store.viewer = store.preview || store.generations[0] || null; }
+function openGallery() { store.openViewer(store.preview || store.visibleGenerations[0] || store.generations[0] || null); }
 function goLibrary() { window.location.href = '/studio/library'; }
 // Thumbnail URL lấy từ composable dùng chung (useStudioThumb) — cùng logic với PHP helper
 // studio_image_thumb_url(): giảm ~50x dung lượng so với ảnh gốc 2K; path đặc biệt → fallback ảnh gốc.
 // Ảnh gốc full-size vẫn dùng khi mở viewer (store.viewer = g → media_url gốc).
+function projectColor(pid) {
+  const p = store.projects.find(p => Number(p.id) === Number(pid));
+  return (p && p.color) || '#7aa2f7';
+}
+function projectName(pid, fallback) {
+  if (fallback) return fallback;
+  const p = store.projects.find(p => Number(p.id) === Number(pid));
+  return p ? p.name : '#' + pid;
+}
 </script>
 <template>
   <div class="card flex flex-1 flex-col p-3" style="min-height:0">
-    <div class="flex items-center justify-between gap-1"><p class="text-xs font-semibold text-cream-200">Outputs <span class="text-cream-300/50">({{ store.generations.length }})</span></p><button @click="goLibrary" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Xem thư viện"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></button></div>
+    <div class="flex items-center justify-between gap-1">
+      <p class="text-xs font-semibold text-cream-200">
+        Outputs
+        <span v-if="store.appliedProject && store.outputFilterProject" class="text-cream-300/50">({{ store.visibleGenerations.length }}/{{ store.generations.length }})</span>
+        <span v-else class="text-cream-300/50">({{ store.generations.length }})</span>
+      </p>
+      <div class="flex items-center gap-1">
+        <button v-if="store.appliedProject" @click="store.outputFilterProject = !store.outputFilterProject" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors" :class="store.outputFilterProject ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" :title="store.outputFilterProject ? 'Đang lọc theo dự án: ' + store.appliedProject.name : 'Chỉ hiện outputs của dự án đang áp dụng'">
+          <StudioIcon name="filter" size="h-3.5 w-3.5" />
+        </button>
+        <button @click="goLibrary" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700" title="Xem thư viện">
+          <StudioIcon name="grid" size="h-4 w-4" />
+        </button>
+      </div>
+    </div>
     <div class="scrollbar-hide mt-2 grid flex-1 auto-rows-min grid-cols-2 gap-1.5 overflow-y-auto">
-      <div v-for="g in store.generations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'">
+      <div v-for="g in store.visibleGenerations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg border-2" :class="store.previewId === g.id ? 'border-brand-500' : 'border-ink-700'">
+        <!-- Badge dự án -->
+        <span v-if="g.project_id" class="absolute top-1 left-1 z-10 h-2.5 w-2.5 rounded-full ring-1 ring-black/40" :style="{ background: projectColor(g.project_id) }" :title="'Dự án: ' + projectName(g.project_id, g.project)"></span>
         <!-- Ảnh hoàn tất -->
         <template v-if="g.status === 'completed' && g.media_url">
-          <button @click="store.viewer = g" class="absolute inset-0"><img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>
+          <button @click="store.openViewer(g)" class="absolute inset-0"><img :src="thumbUrl(g.media_url)" class="h-full w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)"></button>
         </template>
         <!-- Đang xử lý / chờ: skeleton shimmer + overlay tiến độ -->
         <template v-else>
           <div class="skeleton-shimmer absolute inset-0"></div>
           <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/40 text-[10px] text-cream-200">
             <span v-if="['pending','processing'].includes(g.status)" class="h-5 w-5 animate-spin rounded-full border-2 border-brand-300 border-t-transparent"></span>
-            <span v-else-if="g.status === 'failed'" class="text-base">⚠️</span>
-            <span v-else-if="g.status === 'cancelled'" class="text-base">🚫</span>
+            <span v-else-if="g.status === 'failed'" class="text-base"><StudioIcon name="alertTriangle" size="h-5 w-5" /></span>
+            <span v-else-if="g.status === 'cancelled'" class="text-base"><StudioIcon name="x" size="h-5 w-5" /></span>
             <span class="font-semibold">{{ store.statusLabel(g.status) }}</span>
             <span v-if="['pending','processing'].includes(g.status)" class="flex items-center gap-0.5">
               <span v-for="i in 3" :key="i" class="status-dot" :style="{ animationDelay: (i - 1) * 0.2 + 's' }"></span>
@@ -33,6 +59,7 @@ function goLibrary() { window.location.href = '/studio/library'; }
         <span v-if="g.media_url" class="absolute bottom-1 left-1 max-w-[92%] truncate rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] text-cream-100">{{ store.genName(g) }}</span>
       </div>
     </div>
+    <p v-if="store.appliedProject && store.outputFilterProject && !store.visibleGenerations.length" class="mt-2 text-center text-[10px] text-cream-300/40">Chưa có output nào thuộc dự án này.</p>
   </div>
 </template>
 

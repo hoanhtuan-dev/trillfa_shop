@@ -41,7 +41,12 @@ class StudioLibraryService
             $query->where('status', $filters['status']);
         }
         if (! empty($filters['project_id'])) {
-            $query->where('project_id', $filters['project_id']);
+            // 'none' = chỉ ảnh CHƯA gắn dự án; số id = lọc theo dự án đó.
+            if ((string) $filters['project_id'] === 'none') {
+                $query->whereNull('project_id');
+            } else {
+                $query->where('project_id', (int) $filters['project_id']);
+            }
         }
         if (! empty($filters['q'])) {
             $q = trim((string) $filters['q']);
@@ -84,6 +89,7 @@ class StudioLibraryService
             'processing' => (clone $base)->where('status', 'processing')->count(),
         ];
         $counts['junk_count'] = $counts['failed'] + $counts['cancelled'];
+        $counts['project_linked_count'] = (clone $base)->whereNotNull('project_id')->count();
         $counts['old_count'] = $user->generations()
             ->where('status', 'completed')
             ->whereNotNull('media_url')

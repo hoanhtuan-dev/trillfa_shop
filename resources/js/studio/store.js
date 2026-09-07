@@ -201,7 +201,7 @@ export const useStudioStore = defineStore('studio', {
     libraryItems: [],
     libraryTotal: 0,
     libraryStats: null,
-    libraryFilters: { type: '', status: '', q: '', page: 1, per_page: 48, old_days: 30 },
+    libraryFilters: { type: '', status: '', project_id: '', q: '', page: 1, per_page: 48, old_days: 30 },
     libraryHasMore: false,
     libraryLoading: false,
     librarySelection: [],   // danh sách id đang được chọn (checkbox)
@@ -226,9 +226,12 @@ export const useStudioStore = defineStore('studio', {
     projectStatuses: bootProjectStatuses() || {},  // metadata trạng thái workflow (từ studioBoot)
     projectLoading: false,
     projectLoaded: false,
-    activeProject: null,          // dự án đang xem chi tiết — cũng là "dự án hiện tại" được áp dụng cho phiên tạo ảnh/video
+    activeProject: null,          // dự án đang XEM chi tiết trong workspace (tách khỏi appliedProject)
     activeProjectGenerations: [], // generations của dự án đang xem
     activeProjectReviewOnly: false, // true khi mở dự án của NGƯỜI KHÁC (scope=pending, Super Admin duyệt) → KHÔNG áp dụng cho phiên tạo ảnh
+    appliedProject: null,         // "Dự án hiện tại" — được ÁP DỤNG cho phiên tạo ảnh/video; tồn tại độc lập với việc đang mở workspace
+    outputFilterProject: false,   // Outputs (Studio): chỉ hiện output thuộc dự án đang áp dụng
+    viewerList: null,             // danh sách tùy chỉnh cho GalleryModal (vd: outputs của 1 dự án) — ưu tiên cao nhất trong viewerItems
     projectView: 'board',         // 'board' (kanban) | 'list'
     projectsArchived: false,      // lọc dự án đã lưu trữ
     projectScope: 'own',          // 'own' (dự án của mình) | 'pending' (hàng đợi duyệt — Super Admin)
@@ -239,8 +242,18 @@ export const useStudioStore = defineStore('studio', {
     upscaleName() { if (this.activeLayerId) { const l = this.canvasLayers.find(x => x.id === this.activeLayerId); if (l) return l.name; } return (this.editSource && this.editSource.name) || (this.preview ? 'Ảnh kết quả #' + this.preview.id : 'Ảnh đang chọn'); },
 
     activeBatch() { return this.generations.filter(g => this.lastBatch.includes(g.id)); },
-    // Nguồn ảnh cho GalleryModal: ưu tiên danh sách thư viện (nếu đang ở /studio/library).
-    viewerItems() { return (this.libraryItems && this.libraryItems.length) ? this.libraryItems.filter(g => g.media_url) : this.generations.filter(g => g.media_url); },
+    // Nguồn ảnh cho GalleryModal: viewerList (context riêng, vd outputs của dự án) →
+    // thư viện (nếu đang ở /studio/library) → outputs Studio.
+    viewerItems() {
+      if (this.viewerList && this.viewerList.length) return this.viewerList.filter(g => g.media_url);
+      return (this.libraryItems && this.libraryItems.length) ? this.libraryItems.filter(g => g.media_url) : this.generations.filter(g => g.media_url);
+    },
+    // Outputs hiển thị ở Studio: lọc theo dự án đang áp dụng khi bật toggle.
+    visibleGenerations() {
+      const pid = this.appliedProjectId();
+      if (this.outputFilterProject && pid) return this.generations.filter(g => Number(g.project_id) === Number(pid));
+      return this.generations;
+    },
     activeLayer() { return this.canvasLayers.find(x => x.id === this.activeLayerId) || null; },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
     // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
@@ -988,6 +1001,7 @@ export const useStudioStore = defineStore('studio', {
         const qs = new URLSearchParams();
         if (this.libraryFilters.type) qs.set('type', this.libraryFilters.type);
         if (this.libraryFilters.status) qs.set('status', this.libraryFilters.status);
+        if (this.libraryFilters.project_id !== '' && this.libraryFilters.project_id != null) qs.set('project_id', String(this.libraryFilters.project_id));
         if (this.libraryFilters.q) qs.set('q', this.libraryFilters.q);
         qs.set('page', String(this.libraryFilters.page || 1));
         qs.set('per_page', String(this.libraryFilters.per_page || 48));
@@ -1169,6 +1183,8 @@ export const useStudioStore = defineStore('studio', {
         const d = await res.json();
         this.activeProject = d;
         this.activeProjectGenerations = d.generations || [];
+        // Mở dự án của mình = đang làm việc trên nó → tự ÁP DỤNG cho phiên tạo ảnh/video.
+        if (!this.activeProjectReviewOnly) this.appliedProject = d;
         return d;
       } catch (e) { this.toast(e.message || 'Lỗi tải dự án.', 'error'); return null; }
     },
@@ -1195,6 +1211,7 @@ export const useStudioStore = defineStore('studio', {
         await this.api('/studio/projects/' + id, { _method: 'DELETE' });
         this.projects = this.projects.filter(p => p.id !== id);
         if (this.activeProject && this.activeProject.id === id) { this.activeProject = null; this.activeProjectGenerations = []; this.activeProjectReviewOnly = false; }
+        if (this.appliedProject && this.appliedProject.id === id) this.appliedProject = null;
         this.toast('Đã xóa dự án (output được giữ lại).');
         return true;
       } catch (e) { this.toast(e.message || 'Lỗi xóa dự án.', 'error'); return false; }
@@ -1209,25 +1226,72 @@ export const useStudioStore = defineStore('studio', {
         return d;
       } catch (e) { this.toast(e.message || 'Không thể chuyển trạng thái.', 'error'); return null; }
     },
+    // Gắn/gỡ 1 generation khỏi dự án + ĐỒNG BỘ mọi state liên quan (library, outputs
+    // Studio, workspace đang mở, bộ đếm) — một nơi duy nhất để UI gọi.
     async attachGenerationToProject(projectId, generationId, action = 'attach') {
       try {
-        await this.api('/studio/projects/' + projectId + '/generations', { generation_id: generationId, action });
-        if (action === 'attach') this.toast('Đã gắn ảnh vào dự án.');
+        const res = await this.api('/studio/projects/' + projectId + '/generations', { generation_id: generationId, action });
+        const newPid = (res && res.generation) ? res.generation.project_id : (action === 'detach' ? null : projectId);
+        const proj = this.projects.find(p => Number(p.id) === Number(newPid))
+          || (this.appliedProject && Number(this.appliedProject.id) === Number(newPid) ? this.appliedProject : null)
+          || (this.activeProject && Number(this.activeProject.id) === Number(newPid) ? this.activeProject : null);
+        const pname = proj ? proj.name : null;
+        const sync = (g) => { if (g && Number(g.id) === Number(generationId)) { g.project_id = newPid; g.project = pname; } };
+        (this.libraryItems || []).forEach(sync);
+        (this.generations || []).forEach(sync);
+        if (this.viewer && Number(this.viewer.id) === Number(generationId)) { this.viewer.project_id = newPid; this.viewer.project = pname; }
+        // Workspace detail: gỡ ảnh khỏi lưới outputs của dự án đang mở.
+        if (this.activeProject) {
+          const inDetail = this.activeProjectGenerations.some(g => Number(g.id) === Number(generationId));
+          if (inDetail && Number(this.activeProject.id) !== Number(newPid)) {
+            this.activeProjectGenerations = this.activeProjectGenerations.filter(g => Number(g.id) !== Number(generationId));
+            this.activeProject.generations_count = Math.max(0, (this.activeProject.generations_count || 1) - 1);
+            // viewerList đang trỏ context outputs của dự án này → gỡ khỏi strip viewer luôn.
+            if (this.viewerList) this.viewerList = this.viewerList.filter(g => Number(g.id) !== Number(generationId));
+          }
+        }
+        // Bộ đếm trên card dự án trong board/list.
+        const bump = (pid, d) => { const p = this.projects.find(x => Number(x.id) === Number(pid)); if (p) p.generations_count = Math.max(0, (p.generations_count || 0) + d); };
+        if (action === 'detach') bump(projectId, -1); else bump(projectId, +1);
+        if (action === 'attach') this.toast(pname ? 'Đã gắn ảnh vào dự án "' + pname + '".' : 'Đã gắn ảnh vào dự án.');
         else this.toast('Đã gỡ ảnh khỏi dự án.');
         return true;
       } catch (e) { this.toast(e.message || 'Lỗi gắn ảnh.', 'error'); return false; }
     },
     // id dự án đang được ÁP DỤNG cho phiên tạo ảnh/video (Dự án hiện tại).
-    // null khi không có activeProject, hoặc đang ở chế độ duyệt (reviewOnly) —
-    // tránh output của reviewer chạy vào dự án của designer khác.
+    // Tách khỏi activeProject: áp dụng tồn tại độc lập, không mất khi đóng workspace.
     appliedProjectId() {
-      return (!this.activeProject || this.activeProjectReviewOnly) ? null : (this.activeProject.id || null);
+      return this.appliedProject ? (this.appliedProject.id || null) : null;
+    },
+    // ÁP DỤNG 1 dự án cụ thể cho phiên tạo ảnh/video — cơ chế tường minh,
+    // dùng được từ workspace / header / thư viện mà không cần mở detail.
+    applyProject(p) {
+      if (!p || !p.id) return false;
+      if (this.user && p.user_id && Number(p.user_id) !== Number(this.user.id)) {
+        this.toast('Chỉ áp dụng được dự án của chính bạn.', 'error');
+        return false;
+      }
+      this.appliedProject = p;
+      this.toast('Đã áp dụng dự án "' + (p.name || ('#' + p.id)) + '" — ảnh/video tạo mới sẽ tự gắn vào.');
+      return true;
     },
     // Ngắt "Dự án hiện tại" — gỡ khỏi phiên tạo ảnh, quay về không áp dụng dự án nào.
+    unapplyProject() {
+      if (!this.appliedProject) return;
+      this.appliedProject = null;
+      this.outputFilterProject = false;
+      this.toast('Đã ngắt dự án hiện tại.');
+    },
+    // Đóng detail trong workspace — CHỈ thoát chế độ xem, GIỮ dự án đang áp dụng.
     clearActiveProject() {
       this.activeProject = null;
       this.activeProjectGenerations = [];
       this.activeProjectReviewOnly = false;
+    },
+    // Mở GalleryModal với ngữ cảnh danh sách rõ ràng (mặc định: thư viện / outputs).
+    openViewer(g, list = null) {
+      this.viewerList = list;
+      this.viewer = g;
     },
     // Điều hướng chuẩn khi bấm "Chỉnh sửa" / "Tạo video" từ GalleryModal —
     // hoạt động ở MỌI nơi GalleryModal được mở (Studio 1 trang / Studio Library / …):

@@ -2,6 +2,7 @@
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
+import StudioIcon from './StudioIcon.vue';
 
 const store = useStudioStore();
 
@@ -18,7 +19,7 @@ function nav(d) {
 function close() { store.viewer = null; }
 
 // Đổi ảnh (mọi cách: nav / click thumbnail / xóa) → reset zoom + hủy confirm + scroll strip theo
-watch(() => current.value?.id, () => { resetZoom(); resetConfirm(); imgError.value = false; nextTick(scrollStripToActive); });
+watch(() => current.value?.id, () => { resetZoom(); resetConfirm(); imgError.value = false; attachOpen.value = false; attachBusy.value = false; nextTick(scrollStripToActive); });
 
 // ── Xóa an toàn: xác nhận 2 bước, tự reset sau 3.5s ──
 const confirming = ref(false);
@@ -138,10 +139,57 @@ const statusMeta = computed(() => {
 });
 
 const fields = [
+  { k: 'project', l: 'Dự án' },
   { k: 'model', l: 'Model' }, { k: 'provider', l: 'Provider' },
   { k: 'ratio', l: 'Tỷ lệ' }, { k: 'resolution', l: 'Độ phân giải' },
   { k: 'duration', l: 'Thời lượng' }, { k: 'created_at', l: 'Ngày' },
 ];
+
+// ── Gắn / gỡ dự án ──
+const attachOpen = ref(false);
+const attachBusy = ref(false);
+
+const projectLabel = computed(() => {
+  const c = current.value;
+  if (!c) return '—';
+  if (c.project) return c.project;
+  if (c.project_id) return 'Dự án #' + c.project_id;
+  return '—';
+});
+
+async function detachProject() {
+  const c = current.value;
+  if (!c || !c.project_id || attachBusy.value) return;
+  attachBusy.value = true;
+  try {
+    await store.attachGenerationToProject(c.project_id, c.id, 'detach');
+  } finally {
+    attachBusy.value = false;
+  }
+}
+
+async function attachToProject(p) {
+  if (attachBusy.value) return;
+  attachBusy.value = true;
+  try {
+    await store.attachGenerationToProject(p.id, current.value.id, 'attach');
+    attachOpen.value = false;
+  } finally {
+    attachBusy.value = false;
+  }
+}
+
+function toggleAttach() {
+  if (attachBusy.value) return;
+  attachOpen.value = !attachOpen.value;
+  if (attachOpen.value && !store.projects.length && !store.projectLoaded) {
+    store.loadProjects();
+  }
+}
+
+const filteredProjects = computed(() => {
+  return (store.projects || []).filter(p => !p.archived);
+});
 
 // ── Keyboard: Esc đóng · ←/→ chuyển ảnh (capture để ưu tiên khi modal mở) ──
 function onKey(e) {
@@ -169,9 +217,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-2 backdrop-blur-sm sm:p-5" @click.self="close">
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-2 backdrop-blur-sm sm:p-5" @click.self="close">
     <!-- Đóng -->
-    <button @click="close" class="absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-full bg-ink-900/90 text-cream-200 transition hover:bg-ink-700 hover:text-white" title="Đóng (Esc)" aria-label="Đóng">✕</button>
+    <button @click="close" class="absolute right-4 top-4 z-30 grid h-10 w-10 place-items-center rounded-full bg-ink-900/90 text-cream-200 transition hover:bg-ink-700 hover:text-white" title="Đóng (Esc)" aria-label="Đóng">
+      <StudioIcon name="x" size="h-5 w-5" />
+    </button>
     <!-- Chuyển ảnh -->
     <button v-if="items.length > 1" @click="nav(-1)" class="absolute left-2 top-1/2 z-30 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-ink-900/90 text-xl text-cream-100 transition hover:bg-brand-600 sm:h-10 sm:w-10" title="Ảnh trước (←)" aria-label="Ảnh trước">‹</button>
     <button v-if="items.length > 1" @click="nav(1)" class="absolute right-2 top-1/2 z-30 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-ink-900/90 text-xl text-cream-100 transition hover:bg-brand-600 sm:h-10 sm:w-10" title="Ảnh sau (→)" aria-label="Ảnh sau">›</button>
@@ -227,46 +277,105 @@ onBeforeUnmount(() => {
         <!-- Tiêu đề -->
         <div class="flex items-center justify-between">
           <p class="text-sm font-semibold text-cream-100">Ảnh #<span class="text-brand-300">{{ current?.id }}</span></p>
-          <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition hover:bg-ink-700 hover:text-white lg:hidden" title="Đóng" aria-label="Đóng">✕</button>
+          <button @click="close" class="grid h-8 w-8 place-items-center rounded-full bg-ink-800 text-cream-300 transition hover:bg-ink-700 hover:text-white lg:hidden" title="Đóng" aria-label="Đóng">
+            <StudioIcon name="x" size="h-4 w-4" />
+          </button>
         </div>
 
         <!-- Thông tin nhanh -->
         <div class="grid grid-cols-2 gap-1.5">
           <div v-for="f in fields" :key="f.k" class="rounded-xl bg-ink-800/70 px-2.5 py-1.5">
             <p class="text-[9px] uppercase tracking-wide text-cream-300/50">{{ f.l }}</p>
-            <p class="truncate text-xs font-medium text-cream-100">{{ current?.[f.k] ?? '—' }}</p>
+            <p class="truncate text-xs font-medium text-cream-100">{{ f.k === 'project' ? projectLabel : (current?.[f.k] ?? '—') }}</p>
           </div>
+        </div>
+
+        <!-- ══ Khối Dự án: gắn / gỡ ══ -->
+        <div class="rounded-xl border border-ink-700/60 bg-ink-800/70 p-2.5">
+          <!-- KHI đã có project_id: chip dự án + nút gỡ -->
+          <template v-if="current?.project_id">
+            <div class="flex items-center justify-between gap-2">
+              <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-500/40 bg-brand-500/15 px-2.5 py-1 text-[11px] font-semibold text-brand-200">
+                <StudioIcon name="pin" size="h-3 w-3" />
+                {{ projectLabel }}
+              </span>
+              <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500/40 hover:bg-red-600/10 hover:text-red-300" title="Gỡ khỏi dự án">
+                <StudioIcon name="unlink" size="h-3 w-3" />
+                Gỡ
+              </button>
+            </div>
+          </template>
+          <!-- KHI KHÔNG có project_id: nút gắn + panel chọn -->
+          <template v-else>
+            <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-ink-600 bg-transparent px-3 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-brand-500/40 hover:bg-brand-600/10 hover:text-brand-200">
+              <StudioIcon name="link" size="h-3.5 w-3.5" />
+              Gắn vào dự án
+            </button>
+            <!-- Panel chọn dự án -->
+            <div v-if="attachOpen && !attachBusy" class="mt-2 space-y-1">
+              <!-- Nút nhanh: gắn vào dự án đang áp dụng -->
+              <button v-if="store.appliedProject && store.appliedProject.id !== current?.project_id" @click="attachToProject(store.appliedProject)" class="flex w-full items-center gap-2 rounded-lg bg-brand-600/15 px-2.5 py-1.5 text-[11px] font-semibold text-brand-200 transition hover:bg-brand-600/25">
+                <StudioIcon name="pin" size="h-3.5 w-3.5" />
+                Gắn vào "{{ store.appliedProject.name }}" (dự án hiện tại)
+              </button>
+              <!-- Danh sách dự án -->
+              <template v-if="filteredProjects.length">
+                <button v-for="p in filteredProjects" :key="p.id" @click="attachToProject(p)" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] transition hover:bg-ink-700">
+                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ backgroundColor: p.color || '#7aa2f7' }"></span>
+                  <span class="flex-1 truncate text-left text-cream-200">{{ p.name }}</span>
+                  <span class="shrink-0 text-[10px] text-cream-300/50">{{ p.generations_count ?? 0 }}</span>
+                </button>
+              </template>
+              <p v-else class="py-1 text-center text-[10px] text-cream-300/50">Chưa có dự án nào — tạo dự án ở Studio.</p>
+            </div>
+          </template>
         </div>
 
         <!-- Prompt + copy -->
         <div class="rounded-xl border border-ink-700/60 bg-ink-800/70 p-2.5">
           <div class="mb-1 flex items-center justify-between">
             <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Prompt</p>
-            <button @click="copyPrompt" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-white" title="Sao chép prompt">📋 Sao chép</button>
+            <button @click="copyPrompt" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-white" title="Sao chép prompt">
+              <StudioIcon name="copy" size="h-3 w-3" />
+              Sao chép
+            </button>
           </div>
           <p class="max-h-24 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed text-cream-100">{{ current?.prompt || '—' }}</p>
         </div>
 
         <!-- Nhóm secondary: Tải xuống · Tạo video -->
         <div class="grid grid-cols-2 gap-1.5">
-          <a :href="current ? '/studio/generations/' + current.id + '/download' : '#'" class="btn-outline btn-sm w-full !py-2">⬇ Tải xuống</a>
-          <button v-if="!isVideo" @click="store.goVideo(current)" class="btn-outline btn-sm w-full !py-2">🎬 Tạo video</button>
+          <a :href="current ? '/studio/generations/' + current.id + '/download' : '#'" class="btn-outline btn-sm inline-flex items-center justify-center gap-1 w-full !py-2">
+            <StudioIcon name="download" size="h-3.5 w-3.5" />
+            Tải xuống
+          </a>
+          <button v-if="!isVideo" @click="store.goVideo(current)" class="btn-outline btn-sm inline-flex items-center justify-center gap-1 w-full !py-2">
+            <StudioIcon name="film" size="h-3.5 w-3.5" />
+            Tạo video
+          </button>
         </div>
         <!-- Nhóm primary: Chỉnh sửa (hành động chính) -->
-        <button v-if="!isVideo" @click="store.goEdit(current)" class="btn-brand btn-sm w-full !py-2.5">✏️ Chỉnh sửa → Fitting Room</button>
+        <button v-if="!isVideo" @click="store.goEdit(current)" class="btn-brand btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5">
+          <StudioIcon name="pencil" size="h-3.5 w-3.5" />
+          Chỉnh sửa → Fitting Room
+        </button>
 
         <!-- ══ Vùng nguy hiểm (tách biệt, xác nhận 2 bước) ══ -->
         <div class="mt-1 border-t border-ink-700/70 pt-3">
           <template v-if="!confirming">
-            <button @click="startConfirm" class="w-full rounded-xl border border-red-500/40 bg-transparent py-2 text-xs font-semibold text-red-300 transition hover:bg-red-600/10">
-              🗑 Xóa ảnh
+            <button @click="startConfirm" class="inline-flex items-center justify-center gap-1 w-full rounded-xl border border-red-500/40 bg-transparent py-2 text-xs font-semibold text-red-300 transition hover:bg-red-600/10">
+              <StudioIcon name="trash" size="h-3.5 w-3.5" />
+              Xóa ảnh
             </button>
           </template>
           <template v-else>
             <p class="mb-1.5 text-center text-[11px] font-medium text-red-200">⚠ Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
             <div class="flex gap-1.5">
               <button @click="resetConfirm" class="flex-1 rounded-xl border border-ink-600 bg-ink-800 py-2 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
-              <button @click="doDelete" class="flex-1 rounded-xl bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500">🗑 Xóa vĩnh viễn</button>
+              <button @click="doDelete" class="inline-flex items-center justify-center gap-1 flex-1 rounded-xl bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500">
+                <StudioIcon name="trash" size="h-3.5 w-3.5" />
+                Xóa vĩnh viễn
+              </button>
             </div>
           </template>
           <p class="mt-1.5 text-center text-[10px] text-cream-300/40">Nhấn Esc để đóng · dùng ← → để xem ảnh khác</p>
@@ -275,4 +384,3 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
-

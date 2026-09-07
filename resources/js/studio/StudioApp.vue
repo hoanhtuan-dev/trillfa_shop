@@ -18,6 +18,7 @@ import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
 import GalleryModal from './components/GalleryModal.vue';
 import ProjectWorkspace from './components/ProjectWorkspace.vue';
+import StudioIcon from './components/StudioIcon.vue';
 const store = useStudioStore();
 // CSRF token cho form Đăng xuất (Laravel route POST /dang-xuat).
 const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
@@ -29,6 +30,11 @@ const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
 const menuOpen = ref(false);
 const outputOpen = ref(false);
 const projectsOpen = ref(false);
+const applyOpen = ref(false);
+function openApplyPopover() {
+  applyOpen.value = !applyOpen.value;
+  if (applyOpen.value && !store.projectLoaded) store.loadProjects();
+}
 // Layer rename (inline edit)
 const renamingId = ref(null);
 const renameValue = ref('');
@@ -258,10 +264,33 @@ function onTouchEnd(e) {
         </template>
       </div>
       <div class="flex shrink-0 items-center gap-2">
-        <button @click="projectsOpen = true" class="inline-flex items-center gap-1.5 rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-xs font-semibold text-cream-200 transition hover:border-brand-500 hover:bg-ink-700" title="Mở bảng quản lý dự án thiết kế">🗂️ Dự án</button>
-        <span v-if="store.appliedProjectId()" class="hidden max-w-[13rem] items-center gap-1 rounded-full border border-brand-500/50 bg-brand-600/20 px-2.5 py-1 text-xs font-semibold text-brand-100 md:inline-flex" :title="'Dự án hiện tại: ' + store.activeProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào dự án này'">
-          <button type="button" @click="projectsOpen = true" class="truncate hover:text-white">📌 {{ store.activeProject.name }}</button>
-          <button type="button" @click="store.clearActiveProject()" class="ml-0.5 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại">✕</button>
+        <button @click="projectsOpen = true" class="inline-flex items-center gap-1.5 rounded-full border border-ink-700 bg-ink-800 px-3 py-1 text-xs font-semibold text-cream-200 transition hover:border-brand-500 hover:bg-ink-700" title="Mở bảng quản lý dự án thiết kế"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Dự án</button>
+        <!-- Quick-apply popover -->
+        <div class="relative">
+          <button @click="openApplyPopover" class="inline-flex items-center gap-1 rounded-full border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs font-semibold text-cream-200 transition hover:border-brand-500 hover:bg-ink-700" :class="store.appliedProject ? 'ring-1 ring-brand-500' : ''" title="Áp dụng nhanh một dự án"><StudioIcon name="pin" size="h-3.5 w-3.5" /></button>
+          <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-ink-700 bg-ink-900 shadow-xl">
+            <div class="p-2.5">
+              <p class="mb-2 text-[11px] font-semibold text-cream-200">Áp dụng dự án cho phiên tạo ảnh</p>
+              <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">Đang xem dự án chờ duyệt. Mở workspace để xem dự án của bạn.</div>
+              <div v-else class="max-h-64 overflow-y-auto">
+                <div v-for="p in store.projects.slice(0, 8)" :key="p.id" @click="store.applyProject(p); applyOpen = false" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-ink-800" :class="store.appliedProjectId() === p.id ? 'bg-brand-600/20 text-brand-100' : 'text-cream-200'">
+                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: p.color }"></span>
+                  <span class="min-w-0 flex-1 truncate text-xs">{{ p.name }}</span>
+                  <span class="shrink-0 text-[9px] text-cream-300/50">{{ p.status }}</span>
+                  <StudioIcon v-if="store.appliedProjectId() === p.id" name="pin" size="h-3 w-3" class="text-brand-400" />
+                </div>
+                <p v-if="!store.projects.length" class="px-2 py-1 text-[10px] text-cream-300/40">Chưa có dự án nào.</p>
+              </div>
+              <button v-if="store.appliedProject" @click="store.unapplyProject(); applyOpen = false" class="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/30 bg-red-600/10 px-2 py-1.5 text-[10px] font-semibold text-red-200 transition hover:bg-red-600/20">
+                <StudioIcon name="pinOff" size="h-3 w-3" /> Ngắt dự án hiện tại
+              </button>
+            </div>
+          </div>
+          <div v-if="applyOpen" class="fixed inset-0 z-40" @click="applyOpen = false"></div>
+        </div>
+        <span v-if="store.appliedProject" class="hidden max-w-[13rem] items-center gap-1 rounded-full border border-brand-500/50 bg-brand-600/20 px-2.5 py-1 text-xs font-semibold text-brand-100 md:inline-flex" :title="'Dự án hiện tại: ' + store.appliedProject.name + ' — ảnh/video tạo mới sẽ tự gắn vào dự án này'">
+          <button type="button" @click="projectsOpen = true" class="truncate hover:text-white"><StudioIcon name="pin" size="h-3.5 w-3.5" /> {{ store.appliedProject.name }}</button>
+          <button type="button" @click="store.unapplyProject()" class="ml-0.5 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </span>
         <span v-if="store.user" class="hidden rounded-full bg-ink-800 px-2.5 py-1 text-xs font-semibold text-cream-200 md:inline-block">Credit {{ store.creditsLeft }}</span>
         <a v-if="store.user && store.user.is_admin" href="/admin" class="inline-flex items-center gap-1 rounded-full border border-brand-500/40 bg-brand-600/20 px-3 py-1 text-xs font-semibold text-brand-200 transition hover:bg-brand-600 hover:text-white" title="Đi tới trang quản trị (Dashboard Manager)">⚙️ Quản trị shop</a>
@@ -279,7 +308,7 @@ function onTouchEnd(e) {
       <button @click="menuOpen = true" class="grid h-9 w-9 place-items-center rounded-lg bg-ink-700 text-cream-200">☰</button>
       <span class="font-display text-sm font-semibold">Studio</span>
       <div class="flex items-center gap-2">
-        <button @click="projectsOpen = true" class="rounded-lg bg-ink-700 px-2.5 py-1.5 text-xs font-semibold text-cream-200" :class="store.appliedProjectId() ? 'ring-2 ring-brand-500' : ''" :title="store.appliedProjectId() ? 'Dự án hiện tại: ' + store.activeProject.name : 'Dự án'">🗂️<span v-if="store.appliedProjectId()" class="ml-1">📌</span></button>
+        <button @click="projectsOpen = true" class="rounded-lg bg-ink-700 px-2.5 py-1.5 text-xs font-semibold text-cream-200" :class="store.appliedProject ? 'ring-2 ring-brand-500' : ''" :title="store.appliedProject ? 'Dự án hiện tại: ' + store.appliedProject.name : 'Dự án'"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
         <button @click="outputOpen = true" class="rounded-lg bg-ink-700 px-3 py-1.5 text-xs font-semibold text-cream-200">Kết quả ({{ store.generations.length }})</button>
       </div>
     </div>

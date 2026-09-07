@@ -915,8 +915,15 @@ class ShopFlowTest extends TestCase
         // Chip "Thử đồ" trong card Ảnh mới từ ảnh mẫu: gửi 1 ảnh trang phục + tryon=true →
         // 1 generation mode='refgen' (model sinh ảnh, KHÔNG edit), prompt chứa "WEAR THE EXACT GARMENT"
         // (bám mẫu trang phục). Kế thừa body directive khi có.
+        // Từ be3cfe7 (Phần L): refgen pre-validate ảnh nguồn → test cần fixture ảnh THẬT trên public disk
+        // (cùng pattern StudioReimagineTest), ảnh giả sẽ bị 422.
+        $fixtureRel = 'studio/test-garment-shopflow.png';
+        ob_start();
+        imagepng(imagecreatetruecolor(32, 32));
+        \Illuminate\Support\Facades\Storage::disk('public')->put($fixtureRel, (string) ob_get_clean());
+        try {
         $r = $this->postJson('/studio/refgen', [
-            'image' => '/storage/studio/garment.jpg',
+            'image' => '/storage/'.$fixtureRel,
             'prompt' => 'mặc trang phục lên người mẫu, pose đứng',
             'variants' => 1,
             'tryon' => true,
@@ -947,7 +954,7 @@ class ShopFlowTest extends TestCase
             'name' => 'Test Face', 'description' => 'young woman with round face and wispy bangs', 'ethnicity' => 'Vietnamese', 'image' => null, 'sort' => 0, 'enabled' => true,
         ]);
         $f = $this->postJson('/studio/refgen', [
-            'image' => '/storage/studio/garment.jpg',
+            'image' => '/storage/'.$fixtureRel,
             'prompt' => 'pose đứng tự nhiên',
             'variants' => 1,
             'tryon' => true,
@@ -963,7 +970,7 @@ class ShopFlowTest extends TestCase
             'name' => 'Test Pose', 'description' => 'standing with one hand on hip, full body head to toe', 'image' => null, 'sort' => 0, 'enabled' => true,
         ]);
         $pf = $this->postJson('/studio/refgen', [
-            'image' => '/storage/studio/garment.jpg',
+            'image' => '/storage/'.$fixtureRel,
             'prompt' => 'mặc trang phục lên người mẫu',
             'variants' => 1,
             'tryon' => true,
@@ -975,7 +982,7 @@ class ShopFlowTest extends TestCase
         // Tryon + Nền Studio: background_prompt được chuẩn hóa (bỏ "keep the subject unchanged;
         // replace the background with") rồi chèn vào prompt tryon.
         $tb = $this->postJson('/studio/refgen', [
-            'image' => '/storage/studio/garment.jpg',
+            'image' => '/storage/'.$fixtureRel,
             'prompt' => 'mặc trang phục lên người mẫu',
             'variants' => 1,
             'tryon' => true,
@@ -988,7 +995,7 @@ class ShopFlowTest extends TestCase
         // Không gửi tryon → refgen thường (prompt "Create a brand-new image based on the provided reference image").
         // Nền studio + góc chụp gửi RIÊNG (không nối vào prompt người dùng) → chèn vào prompt cuối.
         $c = $this->postJson('/studio/refgen', [
-            'image' => '/storage/studio/sample.jpg',
+            'image' => '/storage/'.$fixtureRel,
             'prompt' => '',
             'variants' => 1,
             'background_prompt' => 'replace the background with a pure-white seamless studio backdrop',
@@ -1001,6 +1008,9 @@ class ShopFlowTest extends TestCase
         $this->assertStringContainsString('Background: replace the background with a pure-white seamless studio backdrop', (string) $cg->prompt);
         $this->assertStringContainsString('Camera angle: shoot from a straight-on front view, eye-level camera', (string) $cg->prompt);
         $this->assertStringNotContainsString('WEARING THE EXACT GARMENT', (string) $cg->prompt);
+        } finally {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($fixtureRel);
+        }
     }
 
     public function test_studio_is_admin_only(): void

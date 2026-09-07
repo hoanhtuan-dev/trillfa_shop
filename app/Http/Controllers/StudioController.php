@@ -4558,6 +4558,7 @@ RULES:
                 'model' => $g->model, 'provider' => $g->provider,
                 'media_url' => $g->media_url, 'error' => $g->error,
                 'credits_cost' => $g->credits_cost, 'project_id' => $g->project_id,
+                'project' => $g->project?->name,
                 'prompts_history_id' => $g->prompts_history_id,
                 'created_at' => $g->created_at?->format('d/m H:i'),
                 'resolution' => $g->resolution, 'ratio' => $g->ratio, 'duration' => $g->duration,
