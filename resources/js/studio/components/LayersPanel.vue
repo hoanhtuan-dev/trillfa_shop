@@ -1,7 +1,7 @@
 <script setup>
 // LayersPanel — inspector "Layers" dock bên phải khung canvas (Designer Workspace).
 // Không props, không emit — đọc/ghi trực tiếp useStudioStore() (spec STUDIO_UI_REDESIGN §4.1).
-import { ref, watch, onBeforeUnmount } from 'vue';
+import { ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 
@@ -11,11 +11,8 @@ const store = useStudioStore();
 const blankMenuOpen = ref(false);
 const blankRatio = ref(store.imageRatio);
 const blankColor = ref('#4f9dff'); // màu tùy chỉnh cho layer màu mới
-// Thoát popup khi thoát tiêu điểm: bấm ra ngoài (mất focus) → tự đóng menu Thêm layer.
-const menuRoot = ref(null);
-function onDocPointer(e) { if (menuRoot.value && !menuRoot.value.contains(e.target)) blankMenuOpen.value = false; }
-watch(blankMenuOpen, (open) => { if (open) document.addEventListener('pointerdown', onDocPointer); else document.removeEventListener('pointerdown', onDocPointer); });
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer));
+// Chọn màu tùy chỉnh xong (@change đóng bảng màu) → tự thêm layer màu + đóng menu.
+function addBlankColorLayer() { store.addBlankLayer(blankColor.value, blankRatio.value); blankMenuOpen.value = false; }
 
 // Rename inline (double-click tên layer) — giữ logic cũ StudioApp.
 const renamingId = ref(null);
@@ -80,10 +77,12 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <span class="rounded bg-ink-800 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-cream-300/80">{{ store.canvasLayers.length }}</span>
       </p>
       <div class="flex shrink-0 items-center gap-1">
-        <div class="relative" ref="menuRoot">
+        <div class="relative">
           <button @click="blankMenuOpen = !blankMenuOpen" class="grid h-7 w-7 place-items-center rounded-md bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer mới" aria-label="Thêm layer mới">
             <StudioIcon name="plus" size="h-4 w-4" />
           </button>
+          <!-- Backdrop phủ toàn màn hình: bấm ra ngoài menu → tự thoát popup (thoát tiêu điểm) -->
+          <div v-if="blankMenuOpen" class="fixed inset-0 z-40" @pointerdown="blankMenuOpen = false"></div>
           <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-56 flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/95 p-3 shadow-2xl">
             <p class="px-1 text-[10px] font-semibold text-cream-300/70">Nền layer mới</p>
             <button @click="store.addBlankLayer(null, blankRatio); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-white/30" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
@@ -92,14 +91,15 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
               <button v-for="c in ['#ffffff','#000000','#ff4d4f','#4f9dff','#4ade80','#fbbf24']" :key="c" @click="store.addBlankLayer(c, blankRatio); blankMenuOpen = false" class="h-7 w-7 rounded-full border border-white/20 transition hover:scale-110" :style="{ background: c }" :title="c" :aria-label="'Layer nền màu ' + c"></button>
             </div>
 
-            <!-- Bảng chọn màu tùy chỉnh cho layer -->
-            <div class="flex items-center gap-2">
-              <label class="relative inline-flex h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full border border-white/20" title="Chọn màu tùy chỉnh">
+            <!-- Bảng chọn màu tùy chỉnh: 1 hàng rõ ràng — bấm mở bảng màu, chọn xong tự thêm layer -->
+            <label class="relative flex cursor-pointer items-center gap-2 rounded-lg bg-ink-800 px-2.5 py-1.5 transition hover:bg-ink-700" title="Mở bảng chọn màu — chọn màu xong tự thêm layer màu">
+              <span class="relative inline-flex h-6 w-6 shrink-0 overflow-hidden rounded-full border border-white/30">
                 <span class="absolute inset-0" :style="{ background: blankColor }"></span>
-                <input type="color" :value="blankColor" @input="blankColor = $event.target.value" class="absolute inset-0 cursor-pointer opacity-0">
-              </label>
-              <button @click="store.addBlankLayer(blankColor, blankRatio); blankMenuOpen = false" class="flex-1 rounded-lg bg-ink-800 px-2.5 py-1.5 text-[11px] font-medium text-cream-200 transition hover:bg-ink-700" title="Thêm layer màu theo màu tùy chỉnh">Thêm layer màu</button>
-            </div>
+              </span>
+              <span class="flex-1 truncate text-left text-[11px] text-cream-100">Chọn màu tùy chỉnh…</span>
+              <span class="text-cream-300/60"><StudioIcon name="chevronDown" size="h-3 w-3" /></span>
+              <input type="color" :value="blankColor" @input="blankColor = $event.target.value" @change="addBlankColorLayer" class="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+            </label>
 
             <div class="h-px w-full bg-ink-700"></div>
 

@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3m (2026-09-07) — Menu Thêm layer: fix nhầm nút chọn màu + thoát chắc khi bấm ngoài
+
+- **Bỏ nút "Thêm layer màu" gây nhầm**: thay bằng **1 hàng chọn màu rõ ràng** "Chọn màu tùy chỉnh…" (swatch + label + chevron) — bấm cả hàng mở bảng màu; chọn xong (`@change` đóng bảng màu) tự `addBlankLayer(blankColor, ratio)` + đóng menu.
+- **Thoát popup khi bấm ra ngoài (chắc chắn)**: dùng **backdrop `fixed inset-0 z-40`** phủ toàn màn hình khi menu mở (`@pointerdown → blankMenuOpen=false`), popover `z-50` nổi trên — thay cách document-listener cũ không hiệu quả.
+- Verify: vite build ✓ (782ms) · grep "Thêm layer màu"=0, "Chọn màu tùy chỉnh…"=1, backdrop=1, còn 0 doc-listener.
+
 ## Phiên UI-3l (2026-09-07) — Menu Thêm layer (LayersPanel): thoát khi mất tiêu điểm · bảng màu tùy chỉnh · giãn khoảng cách
 
 - **Thoát popup khi thoát tiêu điểm**: click-ra-ngoài (pointerdown) tự đóng menu Thêm layer (`menuRoot` + `onDocPointer` + watch; dọn listener onBeforeUnmount).
