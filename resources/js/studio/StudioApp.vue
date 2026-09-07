@@ -100,6 +100,8 @@ function onHistoryKeys(e) {
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
 const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [RefImageCard, InpaintCard, UpscaleCard] : [DirectorCard]); // TẠM ẨN ComposeCard — bỏ khỏi step 2
+// ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
+const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking);
 
 // ── Layer editor (composite + transform) ──
 const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode);
@@ -318,8 +320,8 @@ function onTouchEnd(e) {
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
         <div class="relative flex h-full flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-900">
-          <!-- ══ Toolbar dock (phía trên, full width) ══ -->
-          <div class="relative z-40 flex min-h-12 shrink-0 items-center justify-center gap-2 overflow-x-auto overflow-y-hidden border-b border-ink-700/40 px-3 py-1.5">
+          <!-- ══ Toolbar dock (phía trên, full width) — desktop only ══ -->
+          <div class="relative z-40 hidden min-h-12 shrink-0 items-center justify-center gap-2 overflow-x-auto overflow-y-hidden border-b border-ink-700/40 px-3 py-1.5 lg:flex">
             <ContextToolbar />
           </div>
           <!-- ══ Thân frame: vùng canvas + inspector Layers dock phải (desktop) ══ -->
@@ -415,12 +417,16 @@ function onTouchEnd(e) {
             <LayersPanel />
           </div>
           </div><!-- /flex row: canvas + inspector -->
+          <!-- ══ Toolbar ngữ cảnh floating trên mobile (12px trên status bar) ══ -->
+          <div v-if="toolActive" class="absolute bottom-12 left-1/2 z-40 max-w-[calc(100%-1rem)] -translate-x-1/2 lg:hidden">
+            <ContextToolbar />
+          </div>
           <!-- ══ Status bar dock dưới khung canvas ══ -->
           <CanvasStatusBar />
         </div>
       </main>
       <!-- Right outputs (desktop) -->
-      <aside class="scrollbar-hide hidden w-44 shrink-0 flex-col space-y-3 overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-2 lg:flex">
+      <aside class="scrollbar-hide hidden w-[115px] shrink-0 flex-col space-y-3 overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-2 lg:flex">
         <SourcePanel />
         <OutputModule />
       </aside>
@@ -438,7 +444,7 @@ function onTouchEnd(e) {
       </div>
     </div>
     <!-- Mobile outputs overlay -->
-    <div v-if="outputOpen" class="fixed inset-0 z-50 lg:hidden" @click="outputOpen=false">
+    <div v-if="outputOpen" class="fixed inset-0 z-50 lg:hidden">
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Outputs <span class="text-cream-300/50">({{ store.generations.length }})</span></span><button @click="outputOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button></div>

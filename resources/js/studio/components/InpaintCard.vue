@@ -115,7 +115,7 @@ const defaultEditLabel = computed(() => {
 });
 </script>
 <template>
-  <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
+  <div class="card p-5" style="background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="pencil" /> Sửa ảnh</h2>
 
     <!-- Ảnh đang chọn -->

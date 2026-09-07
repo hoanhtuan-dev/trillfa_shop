@@ -6,6 +6,15 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3 (2026-09-07) — Layer theo tỷ lệ khung hình · border đồng nhất ink-700 · mobile tối giản · right dock 115px
+
+- **Provider**: CHỈ `deepseek-official` — workflow 4 agent (store-ratio + layers-ratio = `deepseek-v4-pro` · border-ink700 + source-1col = `deepseek-v4-flash`), 4/4 thành công, 0 fail; điều phối tự làm StudioApp.
+- **Layer tôn trọng tỷ lệ khung hình settings**: store `+ratioToSize(r)` (base 1024 cạnh dài, map 8 tỷ lệ) · `addBlankLayer(bg, ratio)` bỏ đo kích thước theo activeLayer, thay bằng `ratioToSize(ratio || imageRatio)` · `baseW/baseH = w/h` · LayersPanel `+blankRatio` (mặc định `store.imageRatio`) + menu thêm 7 preset tỷ lệ (1:1·4:3·3:4·9:16·16:9·4:5·21:9), nút Trong suốt/màu gọi `addBlankLayer(..., blankRatio)`.
+- **Border đồng nhất ink-700**: xóa `border:1px solid var(--color-brand-500)` inline ở 9 card (Concept/Inpaint/RefImage/Suggest/Stylist/Director/Upscale/Swap/Compose) — viền lấy từ `.card` = `border-ink-700`; giữ gradient nền. Grep `--color-brand-500` inline = **0**.
+- **Mobile tối giản**: ContextToolbar dock → `hidden lg:flex` (desktop only) · thêm `toolActive` computed · floating ContextToolbar `absolute bottom-12` (12px trên status bar) khi có tool active · outputs drawer chỉ đóng bằng nút close (bỏ `@click="outputOpen=false"` overlay).
+- **Right dock → 115px**: aside `w-44 → w-[115px]` (người dùng đính chính: là right dock chứa outputs, không phải left) · SourcePanel 2 nút Tải lên/Sản phẩm xếp dọc `flex-col` (1 cột).
+- **Verify**: vite build ✓ (1.25s) · đọc diff 100% · grep border inline = 0.
+
 ## Phiên UI-2 (2026-09-07) — Đồng bộ chrome: right bar 1 cột · header tool-btn · chips seg · mobile (PHẦN II STUDIO_UI_REDESIGN.md)
 
 - **Provider**: CHỈ `deepseek-official` / `deepseek-v4-pro` (yêu cầu người dùng) — workflow 5 agent (concept · inpaint · refimage · langcards · rightbar), 5/5 thành công, 0 fail.

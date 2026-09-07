@@ -22,7 +22,7 @@ async function runUpscale() {
 function setv(field, val) { store[field] = Number(val); store.saveUpscaleMemory(); }
 </script>
 <template>
-  <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,150,120,.13), rgba(74,122,144,.06));">
+  <div class="card p-5" style="background: linear-gradient(160deg, rgba(232,150,120,.13), rgba(74,122,144,.06));">
     <div class="flex items-center justify-between">
       <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="maximize" /> Nâng cấp ảnh</h2>
       <button @click="popupOpen = true" title="Cài đặt & presets nâng cấp ảnh" class="btn-outline btn-sm whitespace-nowrap"><StudioIcon name="gear" size="h-3.5 w-3.5" /> Cài đặt</button>

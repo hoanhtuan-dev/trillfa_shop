@@ -38,7 +38,7 @@ const sortedProducts = computed(() => {
       <button v-if="store.editSource" @click="store.removeEditSource()" class="icon-btn text-red-300 hover:bg-red-600 hover:text-white" title="Bỏ ảnh nguồn khỏi canvas" :aria-label="'Bỏ ảnh nguồn khỏi canvas'"><StudioIcon name="x" size="h-3.5 w-3.5"/></button>
     </div>
     <div v-if="store.editSource" class="mt-2 flex items-center gap-2 p-2"><img :src="store.editSource.url" class="h-10 w-10 rounded-lg bg-ink-900 object-cover"><span class="truncate text-[10px] text-cream-200">{{ store.editSource.name }}</span></div>
-    <div class="mt-2 flex gap-1.5 p-2">
+    <div class="mt-2 flex flex-col gap-1.5 p-2">
       <button @click="uploadOpen = true" class="tool-btn flex-1 justify-center" title="Thư viện ảnh đã tải lên"><StudioIcon name="imagePlus" size="h-4 w-4"/><span class="text-[10px] font-medium">Tải lên</span></button>
       <button @click="openProducts" class="tool-btn flex-1 justify-center" title="Chọn ảnh từ sản phẩm"><StudioIcon name="shirt" size="h-4 w-4"/><span class="text-[10px] font-medium">Sản phẩm</span></button>
     </div>

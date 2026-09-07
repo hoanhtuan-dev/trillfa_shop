@@ -25,7 +25,7 @@ function applyPrompt() {
 }
 </script>
 <template>
-  <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(80,150,150,.13), rgba(74,122,144,.06));">
+  <div class="card p-5" style="background: linear-gradient(160deg, rgba(80,150,150,.13), rgba(74,122,144,.06));">
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="lightbulb" /> Gợi ý từ ảnh</h2>
     <div v-if="!store.suggestEnabled" class="mt-3 rounded-2xl border border-red-500/40 bg-red-900/25 p-2.5 text-xs text-red-100">Tính năng đang tắt — bật lại trong <b>Cài đặt Studio → Gợi ý từ ảnh</b>.</div>
     <div v-if="store.upscaleSrc" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5"><img :src="store.upscaleSrc" class="h-16 w-16 rounded-xl bg-ink-900 object-cover"><span class="truncate text-xs text-cream-200">{{ store.upscaleName }}</span></div>

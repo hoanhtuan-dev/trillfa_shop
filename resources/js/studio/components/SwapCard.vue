@@ -81,7 +81,7 @@ async function addAsset() {
 async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' } }); if (r.ok) { assets.value = assets.value.filter(x => x.id !== a.id); const id = String(a.id); if (store.swapModelIds.includes(id)) { store.swapModelIds = store.swapModelIds.filter(x => x !== id); } if (store.swapPoseIds.includes(id)) { store.swapPoseIds = store.swapPoseIds.filter(x => x !== id); } store.toast('Đã xóa.'); } }
 </script>
 <template>
-  <div class="card p-4" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(232,87,125,.08), rgba(74,122,144,.05));">
+  <div class="card p-4" style="background: linear-gradient(160deg, rgba(232,87,125,.08), rgba(74,122,144,.05));">
     <div class="flex items-center justify-between gap-2">
       <div class="min-w-0">
         <h2 class="font-display text-sm font-semibold text-brand-300">🪄 Thay Đổi Người Mẫu</h2>

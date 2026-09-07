@@ -54,7 +54,7 @@ function applyToGenerate() {
 function openSettings() { settingsOpen.value = true; }
 </script>
 <template>
-  <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
+  <div class="card p-5" style="background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
     <div class="flex items-center gap-2">
       <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
         <span class="min-w-0 flex-1"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Trợ lý thiết kế</span></span>

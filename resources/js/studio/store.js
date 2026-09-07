@@ -1323,17 +1323,20 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
       this._positionByImageSize(id, image);
     },
+    // Map tỷ lệ khung hình sang kích thước layer (base = 1024 cho cạnh DÀI hơn).
+    ratioToSize(r) {
+      const map = { '1:1': [1, 1], '4:3': [4, 3], '3:4': [3, 4], '9:16': [9, 16], '16:9': [16, 9], '4:5': [4, 5], '21:9': [21, 9], '2:3': [2, 3] };
+      const [rw, rh] = map[r] || [1, 1];
+      const base = 1024;
+      const w = Math.round(rw >= rh ? base : base * (rw / rh));
+      const h = Math.round(rh >= rw ? base : base * (rh / rw));
+      return { w, h };
+    },
     // Thêm 1 layer TRỐNG (trong suốt) để vẽ — nền tảng cho hiệu ứng sau (brush/vẽ tự do GIMP/PS).
-    async addBlankLayer(bg = null) {
+    async addBlankLayer(bg = null, ratio = null) {
       this.pushHistory();
-      let w = 1024, h = 1024;
       const src = this.activeLayer;
-      if (src && src.image) {
-        try {
-          const img = await this._loadImageSrc(src.image);
-          if (img.naturalWidth && img.naturalHeight) { w = img.naturalWidth; h = img.naturalHeight; }
-        } catch (e) { /* giữ kích thước mặc định */ }
-      }
+      const { w, h } = this.ratioToSize(ratio || this.imageRatio);
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       if (bg) {
@@ -1351,7 +1354,7 @@ export const useStudioStore = defineStore('studio', {
         scale: src ? (src.scale || 1) : 1, rotation: src ? (src.rotation || 0) : 0,
         opacity: src ? (src.opacity != null ? src.opacity : 1) : 1,
         blend: src ? (src.blend || 'normal') : 'normal', flipX: false, flipY: false,
-        baseW: src ? src.baseW : undefined, baseH: src ? src.baseH : undefined,
+        baseW: w, baseH: h,
       });
       this.saveLayerLayout();
       // Highlight layer mới (viền nổi bật) rồi tự tắt sau 2.5s hoặc khi người dùng chọn layer khác.

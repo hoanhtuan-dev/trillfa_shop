@@ -5,7 +5,7 @@ const store = useStudioStore();
 const scenes = [{label:'Catwalk', value:'catwalk'},{label:'Quay chậm', value:'slow'},{label:'Cận cảnh', value:'closeup'}];
 </script>
 <template>
-  <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(74,122,144,.12), rgba(124,58,237,.06));">
+  <div class="card p-5" style="background: linear-gradient(160deg, rgba(74,122,144,.12), rgba(124,58,237,.06));">
     <h2 class="mb-3 flex items-center gap-2 font-display text-base font-semibold text-cream-200"><StudioIcon name="film" /> Ghế Đạo Diễn</h2>
     <label class="label">Thời lượng</label>
     <select v-model="store.videoDuration" class="input !py-2"><option v-for="d in ['5','8','10','15','20']" :key="d" :value="d">{{ d }}</option></select>

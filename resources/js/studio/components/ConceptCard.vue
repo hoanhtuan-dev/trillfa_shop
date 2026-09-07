@@ -437,7 +437,7 @@ const bodyHipsLabel = computed(() => {
 </script>
 
 <template>
-  <div class="card p-5" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
+  <div class="card p-5" style="background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
     <!-- Header card: click mở modal -->
     <button @click="openPrompt" class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-brand-400 hover:bg-white/[0.07] group">
       <span class="min-w-0 flex-1 overflow-hidden">

@@ -9,6 +9,7 @@ const store = useStudioStore();
 
 // Menu "Thêm layer" (Trong suốt / 6 swatch nền) — logic y hệt blankMenuOpen cũ (StudioApp :406-415).
 const blankMenuOpen = ref(false);
+const blankRatio = ref(store.imageRatio);
 
 // Rename inline (double-click tên layer) — giữ logic cũ StudioApp.
 const renamingId = ref(null);
@@ -77,11 +78,15 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           <button @click="blankMenuOpen = !blankMenuOpen" class="grid h-7 w-7 place-items-center rounded-md bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer mới" aria-label="Thêm layer mới">
             <StudioIcon name="plus" size="h-4 w-4" />
           </button>
-          <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-44 flex-col gap-1 rounded-xl border border-ink-700 bg-ink-900/95 p-2 shadow-2xl">
+          <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-56 flex-col gap-1 rounded-xl border border-ink-700 bg-ink-900/95 p-2 shadow-2xl">
             <p class="px-1 text-[10px] font-semibold text-cream-300/70">Nền layer mới</p>
-            <button @click="store.addBlankLayer(); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2 py-1 text-left text-[11px] text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-white/30" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
+            <button @click="store.addBlankLayer(null, blankRatio); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2 py-1 text-left text-[11px] text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-white/30" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
             <div class="grid grid-cols-6 gap-1 px-1">
-              <button v-for="c in ['#ffffff','#000000','#ff4d4f','#4f9dff','#4ade80','#fbbf24']" :key="c" @click="store.addBlankLayer(c); blankMenuOpen = false" class="h-6 w-6 rounded-full border border-white/20" :style="{ background: c }" :title="c" :aria-label="'Layer nền màu ' + c"></button>
+              <button v-for="c in ['#ffffff','#000000','#ff4d4f','#4f9dff','#4ade80','#fbbf24']" :key="c" @click="store.addBlankLayer(c, blankRatio); blankMenuOpen = false" class="h-6 w-6 rounded-full border border-white/20" :style="{ background: c }" :title="c" :aria-label="'Layer nền màu ' + c"></button>
+            </div>
+            <p class="px-1 text-[10px] font-semibold text-cream-300/70">Tỷ lệ khung hình</p>
+            <div class="flex flex-wrap gap-1 px-1">
+              <button v-for="r in ['1:1','4:3','3:4','9:16','16:9','4:5','21:9']" :key="r" @click="blankRatio = r" class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition" :class="blankRatio === r ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'">{{ r }}</button>
             </div>
           </div>
         </div>

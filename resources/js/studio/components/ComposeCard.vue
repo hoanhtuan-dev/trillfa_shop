@@ -221,7 +221,7 @@ function saveSettings() {
 }
 </script>
 <template>
-  <div class="card p-4" style="border:1px solid var(--color-brand-500); background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
+  <div class="card p-4" style="background: linear-gradient(160deg, rgba(255,170,120,.13), rgba(74,122,144,.06));">
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
 
     <!-- Chọn chế độ: segmented tabs 1 hàng (lean) -->
