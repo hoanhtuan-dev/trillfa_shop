@@ -124,14 +124,21 @@ onMounted(async () => {
 <template>
   <div class="studio-dark min-h-screen bg-ink-900 p-4 text-cream-100 sm:p-6">
     <div class="mx-auto max-w-7xl">
-      <!-- ══ Header ══ -->
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <h1 class="font-display text-xl font-semibold sm:text-2xl">
-            <StudioIcon name="image" size="h-5 w-5" /> Thư viện <span class="text-cream-300/50">({{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTotal) }})</span>
+      <!-- ══ Thanh điều hướng (header) ══ -->
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-700 bg-ink-900/70 px-3 py-2.5 shadow-lg shadow-black/20 sm:px-4">
+        <!-- Trái: thương hiệu + tiêu đề + điều hướng + dự án hiện tại -->
+        <div class="flex min-w-0 flex-wrap items-center gap-2.5">
+          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-600/20 text-brand-300 ring-1 ring-brand-500/30">
+            <StudioIcon name="image" size="h-4 w-4" />
+          </div>
+          <h1 class="font-display text-lg font-semibold leading-tight sm:text-xl">
+            Thư viện
+            <span class="ml-1.5 rounded-full border border-ink-700 bg-ink-800 px-2 py-0.5 text-[11px] font-semibold text-cream-300/80">{{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTotal) }}</span>
           </h1>
-          <a href="/studio" class="rounded-xl bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-700">← Về Studio</a>
-          <!-- Chip "Dự án hiện tại" -->
+          <a href="/studio" class="tool-btn !px-3 !py-1.5" title="Quay lại studio thiết kế">
+            <span class="rotate-180"><StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></span> Về Studio
+          </a>
+          <!-- Chip dự án hiện tại (gọn) -->
           <div v-if="store.appliedProject" class="flex items-center gap-1.5 rounded-full border border-brand-500/50 bg-brand-600/20 px-3 py-1 text-sm text-brand-100">
             <StudioIcon name="pin" size="h-3.5 w-3.5" />
             <span class="max-w-[160px] truncate" :title="store.appliedProject.name">{{ store.appliedProject.name }}</span>
@@ -140,31 +147,31 @@ onMounted(async () => {
             </button>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <!-- Phải: hành động -->
+        <div class="flex items-center gap-1.5">
           <button @click="refresh" :disabled="store.libraryLoading || store.uploadLoading"
-                  class="rounded-xl bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
-            <StudioIcon name="refresh" size="h-3.5 w-3.5" /> Làm mới
+                  class="icon-btn !h-9 !w-9 rounded-xl border border-ink-700 bg-ink-800 disabled:opacity-40"
+                  title="Làm mới thư viện" aria-label="Làm mới thư viện">
+            <StudioIcon name="refresh" size="h-4 w-4" />
           </button>
           <button @click="store.libraryManage = !store.libraryManage"
-                  class="rounded-xl px-3 py-1.5 text-xs font-semibold transition"
-                  :class="store.libraryManage ? 'bg-brand-600 text-white hover:bg-brand-500' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'">
-            <template v-if="store.libraryManage"><StudioIcon name="check" size="h-3.5 w-3.5" /> Đang quản lý</template>
-            <template v-else><StudioIcon name="kanban" size="h-3.5 w-3.5" /> Quản lý / Dọn dẹp</template>
+                  class="tool-btn" :class="store.libraryManage ? 'is-active' : ''"
+                  :title="store.libraryManage ? 'Đang quản lý — bấm để thoát' : 'Chọn & dọn dẹp ảnh'">
+            <StudioIcon name="kanban" size="h-3.5 w-3.5" />
+            <template v-if="store.libraryManage">Đang quản lý</template>
+            <template v-else>Quản lý / Dọn dẹp</template>
           </button>
         </div>
       </div>
 
-      <!-- ══ Tab: Ảnh đã tạo / File tải lên ══ -->
-      <div class="mb-4 flex gap-1 rounded-2xl border border-ink-700 bg-ink-800 p-1">
-        <button @click="switchTab('generations')"
-                :class="store.libraryTab === 'generations' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-700'"
-                class="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition">
-          <StudioIcon name="image" size="h-4 w-4" /> Ảnh đã tạo
+      <!-- ══ Tab điều hướng: Ảnh đã tạo / File tải lên ══ -->
+      <div class="seg mb-4 !p-1">
+        <button @click="switchTab('generations')" class="seg-btn !py-2" :class="store.libraryTab === 'generations' ? 'is-active' : ''" title="Ảnh AI đã tạo">
+          <StudioIcon name="image" size="h-4 w-4"/> Ảnh đã tạo
         </button>
-        <button @click="switchTab('uploads')"
-                :class="store.libraryTab === 'uploads' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-700'"
-                class="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition">
-          <StudioIcon name="folderOpen" size="h-4 w-4" /> File tải lên <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-[10px] text-red-100">{{ uploadStats.unused_count }}</span>
+        <button @click="switchTab('uploads')" class="seg-btn !py-2" :class="store.libraryTab === 'uploads' ? 'is-active' : ''" title="File đã tải lên">
+          <StudioIcon name="folderOpen" size="h-4 w-4"/> File tải lên
+          <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-red-100">{{ uploadStats.unused_count }}</span>
         </button>
       </div>
 

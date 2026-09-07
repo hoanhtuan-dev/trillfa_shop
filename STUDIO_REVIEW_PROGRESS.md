@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3f (2026-09-07) — Redesign thanh điều hướng (header) trang /studio/library
+
+- **Header (`LibraryApp.vue`)**: card bo tròn viền ink-700 + bóng · trái: ô icon thương hiệu (image, nền brand + ring) + tiêu đề "Thư viện" + badge đếm; nút điều hướng "← Về Studio" rõ ràng (tool-btn, mũi tên xoay 180°); chip dự án hiện tại. Phải: nút **Làm mới** (icon-btn tròn sạch + tooltip) · **Quản lý / Dọn dẹp** là tool-btn toggle (`is-active` khi bật).
+- **Thanh tab**: chuyển thành `.seg` (Ảnh đã tạo / File tải lên + badge unused_count) — đồng bộ chrome studio.
+- **Verify**: vite build ✓ (695ms) · chuỗi header có trong chunk `library-*`.
+
 ## Phiên UI-3e (2026-09-07) — GalleryModal: lưới "Thông tin ảnh" thu gọn · tô xanh ưu tiên trả về nút Chỉnh sửa
 
 - **Lưới thông tin ảnh thu gọn được** (`fieldsOpen`): header "Thông tin ảnh" + nút chevron (xoay 180° khi đóng) → ẩn/hiện các dòng Dự án · Model · Provider · Tỷ lệ · Độ phân giải · Thời lượng · Ngày (Transition cf).
