@@ -292,7 +292,7 @@ const selectedGroupOutlines = computed(() => {
   store.selection.forEach(l => { if (l.groupId) gids.add(l.groupId); });
   const el = store.canvasZoom; if (!el) return [];
   const r = el.getBoundingClientRect(); const z = store.zoom || 1, pan = store.pan; const out = [];
-  gids.forEach(gid => { const g = store.layerGroups.find(x => x.id === gid); if (!g || !g.layerIds.every(id => store.selectedIds.includes(id))) return; const b = store.groupBox(gid); if (!b) return; const left = r.left + r.width / 2 + ((b.x - b.w / 2) * z + pan.x); const top = r.top + r.height / 2 + ((b.y - b.h / 2) * z + pan.y); out.push({ gid, style: { left: left + 'px', top: top + 'px', width: (b.w * z) + 'px', height: (b.h * z) + 'px' } }); });
+  gids.forEach(gid => { const g = store.layerGroups.find(x => x.id === gid); if (!g || !g.layerIds.every(id => store.selectedIds.includes(id))) return; const b = store.groupBox(gid); if (!b) return; const left = r.width / 2 + ((b.x - b.w / 2) * z + pan.x); const top = r.height / 2 + ((b.y - b.h / 2) * z + pan.y); out.push({ gid, style: { left: left + 'px', top: top + 'px', width: (b.w * z) + 'px', height: (b.h * z) + 'px' } }); });
   return out;
 });
 // ── Đổi tên nhóm (nhấn đúp badge group trên canvas) ──

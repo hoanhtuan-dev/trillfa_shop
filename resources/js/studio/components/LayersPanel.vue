@@ -136,7 +136,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       <template v-for="l in store.layersFrontFirst" :key="l.id">
         <!-- Folder nhóm (hiện trước layer đại diện) -->
         <template v-if="isGroupTop(l)">
-          <div class="group flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-ink-800/60 px-1.5 py-1" @click="store.selectGroup(l.groupId)">
+          <div class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1" :class="store.isGroupActive(l.groupId) ? 'border-brand-500 bg-brand-600/20' : 'border-brand-500/40 bg-ink-800/60'" @click="store.selectGroup(l.groupId)">
             <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300/70 hover:bg-ink-700 hover:text-cream-100" :title="openGroups.has(l.groupId) ? 'Thu gọn nhóm' : 'Mở rộng nhóm'"><StudioIcon :name="openGroups.has(l.groupId) ? 'chevronDown' : 'chevronUp'" size="h-3.5 w-3.5" /></button>
             <StudioIcon name="group" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
             <template v-if="groupRenameId === l.groupId">
@@ -176,14 +176,14 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <span v-if="renamingId !== l.id" class="min-w-0 flex-1 truncate text-[11px] text-cream-100" :title="l.name" @dblclick.stop="startRename(l)">{{ l.name }}</span>
         <input v-else v-model="renameValue" class="min-w-0 flex-1 rounded bg-ink-950 px-1 py-0.5 text-[11px] text-cream-100 outline-none ring-1 ring-brand-500" aria-label="Đổi tên layer" @keyup.enter="commitRename()" @keyup.esc="cancelRename()" @blur="commitRename()" @click.stop>
         <div class="flex shrink-0 items-center gap-0.5">
-          <button @click.stop="store.toggleLayerLock(l.id)" class="grid h-6 w-6 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-amber-300' : 'text-cream-300 hover:bg-ink-700'" :title="l.locked ? 'Mở khóa' : 'Khóa layer'" :aria-label="l.locked ? 'Mở khóa' : 'Khóa layer'">
+          <button @click.stop="l.groupId ? store.toggleGroupLock(l.groupId) : store.toggleLayerLock(l.id)" class="grid h-6 w-6 place-items-center rounded" :class="l.locked ? 'bg-amber-500/20 text-amber-300' : 'text-cream-300 hover:bg-ink-700'" :title="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')" :aria-label="l.groupId ? 'Khóa/Mở khóa nhóm' : (l.locked ? 'Mở khóa' : 'Khóa layer')">
             <StudioIcon :name="l.locked ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" />
           </button>
           <div class="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-            <button @click.stop="store.duplicateLayer(l.id)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Nhân đôi layer" aria-label="Nhân đôi layer">
+            <button @click.stop="l.groupId ? store.duplicateGroup(l.groupId) : store.duplicateLayer(l.id)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'" :aria-label="l.groupId ? 'Nhân đôi nhóm' : 'Nhân đôi layer'">
               <StudioIcon name="copy" size="h-3.5 w-3.5" />
             </button>
-            <button @click.stop="store.deleteLayer(l)" :disabled="l.locked" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600 disabled:opacity-30" :title="l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)'" :aria-label="l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)'">
+            <button @click.stop="l.groupId ? store.deleteGroup(l.groupId) : store.deleteLayer(l)" :disabled="l.locked" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600 disabled:opacity-30" :title="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')" :aria-label="l.groupId ? 'Xóa nhóm' : (l.locked ? 'Đang khóa' : 'Gỡ khỏi canvas (không xóa kết quả)')">
               <StudioIcon name="trash" size="h-3.5 w-3.5" />
             </button>
           </div>

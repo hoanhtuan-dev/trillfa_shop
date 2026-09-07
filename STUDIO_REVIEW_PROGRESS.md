@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3ab (2026-09-07) — Fix bbox group lệch + chọn group highlight folder (nhân đôi/xóa/khóa theo group)
+
+- **Fix khung bbox lệch**: outline group dùng toạ độ local (`r.width/2`, `r.height/2`), bỏ cộng `r.left/r.top` (toạ độ viewport) → khung khớp đúng vị trí group.
+- **Chọn group highlight FOLDER**: `store.isGroupActive(gid)` — khi nhóm được chọn trọn, folder nhóm trong Layers sáng `border-brand-500 bg-brand-600/20` (thay vì nhìn như chọn layer thành viên).
+- **Thao tác member nhóm = thao tác group**: nút khóa/nhân đôi/xóa của layer thuộc nhóm giờ gọi `toggleGroupLock/duplicateGroup/deleteGroup` (nhân đôi theo group).
+- Verify: vite build ✓ (784ms).
+
 ## Phiên UI-3aa (2026-09-07) — Hoàn thiện GROUP=1 đối tượng: xóa cũng theo ĐỐI TƯỢNG
 
 - **Xóa theo đối tượng**: `deleteSelection`/`confirmDeleteSelection` xóa theo `_selectionUnits()` (nguyên nhóm + layer đơn), đồng thời xóa nhóm khỏi `layerGroups`; toast + modal đếm "N đối tượng" (`selectionUnitCount`).
