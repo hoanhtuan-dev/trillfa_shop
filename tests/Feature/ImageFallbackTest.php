@@ -49,14 +49,20 @@ class ImageFallbackTest extends TestCase
         return [$rel, $abs];
     }
 
-    /** Fake DashScope edit success whose "remote" result image is a local file:// URL. */
+    /** Fake DashScope edit success trỏ tới URL https giả lập (sau vá S3, file:// bị chặn đúng). */
     private function editSuccessResponse(string $absFile): \GuzzleHttp\Promise\PromiseInterface
     {
         return Http::response([
             'output' => ['choices' => [['message' => ['content' => [
-                ['image' => 'file://'.$absFile],
+                ['image' => 'https://cdn.test/edit-out.png'],
             ]]]]],
         ], 200);
+    }
+
+    /** Fake CDN trả bytes ảnh thật cho URL edit-out (khớp SSRF guard mới — chỉ http/https). */
+    private function cdnFake(string $absFile): \GuzzleHttp\Promise\PromiseInterface
+    {
+        return Http::response((string) file_get_contents($absFile), 200);
     }
 
     public function test_qwen_key_failure_falls_back_to_gemini(): void
@@ -172,6 +178,7 @@ class ImageFallbackTest extends TestCase
 
         Http::fake([
             'dashscope-intl.aliyuncs.com*' => $this->editSuccessResponse($outAbs),
+            'cdn.test*' => $this->cdnFake($outAbs),
         ]);
 
         $service = app(ImageAIService::class);
@@ -202,6 +209,9 @@ class ImageFallbackTest extends TestCase
         [, $outAbs] = $this->makeRealPng('failover-out-'.uniqid().'.png');
 
         Http::fake(function ($request) use ($outAbs) {
+            if (str_contains($request->url(), 'cdn.test')) {
+                return $this->cdnFake($outAbs);
+            }
             $auth = (string) ($request->header('Authorization')[0] ?? '');
             if (str_contains($auth, 'sk-ws-key-one')) {
                 return Http::response(['code' => 'Throttling.AllocationQuota', 'message' => 'Allocation quota exhausted'], 429);
@@ -220,8 +230,9 @@ class ImageFallbackTest extends TestCase
 
         $this->assertIsString($url);
         $this->assertSame('qwen-image-3.0-pro', $service->lastModel());
-        // Cả 2 key đều được gọi: key 1 (429) rồi key 2 (thành công).
-        Http::assertSentCount(2);
+        // Cả 2 key đều được gọi: key 1 (429) rồi key 2 (thành công); +1 request tải ảnh kết
+        // quả từ URL provider trả về (sau vá S3 việc tải đi qua Http client nên đếm luôn).
+        Http::assertSentCount(3);
         Http::assertSent(function ($request) {
             return str_contains((string) ($request->header('Authorization')[0] ?? ''), 'sk-ws-key-two')
                 && $request['model'] === 'qwen-image-3.0-pro';
@@ -239,6 +250,9 @@ class ImageFallbackTest extends TestCase
         [, $outAbs] = $this->makeRealPng('fallback-out-'.uniqid().'.png');
 
         Http::fake(function ($request) use ($outAbs) {
+            if (str_contains($request->url(), 'cdn.test')) {
+                return $this->cdnFake($outAbs);
+            }
             if (($request->data()['model'] ?? '') === 'qwen-image-3.0-pro') {
                 return Http::response(['code' => 'Throttling.AllocationQuota', 'message' => 'quota exhausted'], 429);
             }

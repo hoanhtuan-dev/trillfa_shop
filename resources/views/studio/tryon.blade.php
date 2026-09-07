@@ -7,7 +7,7 @@
 @endphp
 
 @section('content')
-<div x-data="{ prompt:'', person:null, personUrl:null, busy:false, items: {{ Js::from($items) }}, _t:{},
+<div x-data="{ prompt:'', person:null, personUrl:null, busy:false, items: {{ Js::from($items) }}, _t:{}, projectId:null, projects:[], projectsOk:false,
     onFile(e){ const f=e.target.files&&e.target.files[0]; if(!f) return; if(this.personUrl&&this.personUrl.startsWith('blob:')) URL.revokeObjectURL(this.personUrl); this.person=f; this.personUrl=URL.createObjectURL(f); },
     addGen(g){ const e = this.items.find(x=>x.id===g.id); if(e) Object.assign(e,g); else this.items.unshift(g); if(g.status==='pending'||g.status==='processing') this.poll(g.id); },
     async gen(){
@@ -15,14 +15,17 @@
         try {
             const form = new FormData(); form.append('prompt', this.prompt);
             if(this.person) form.append('image', this.person);
+            if(this.projectId) form.append('project_id', this.projectId);
             const res = await fetch('/studio/tryon', { method:'POST', headers:{ 'X-CSRF-TOKEN':(document.querySelector('meta[name=csrf-token]')||{}).content||'', Accept:'application/json' }, body: form });
             const d = await res.json().catch(()=>({})); if(!res.ok) throw new Error(d.message||'Lỗi.');
             this.addGen({ id:d.generation_id, status:d.status, media_url:d.media_url, error:d.error, created:'Vừa gửi' });
         } catch(e){ Alpine.store('toast').show(e.message,'error'); }
         finally { this.busy=false; }
     },
-    poll(id){ if(this._t[id]) return; this._t[id]=setInterval(async()=>{ try{ const res=await fetch('/studio/generations/'+id,{headers:{Accept:'application/json'}}); const g=await res.json(); const it=this.items.find(x=>x.id===Number(g.id)); if(it){it.status=g.status;it.media_url=g.media_url;it.error=g.error;} if(['completed','failed','cancelled'].includes(g.status)){clearInterval(this._t[id]); delete this._t[id];} }catch(e){} },3000); }
-}">
+    poll(id){ if(this._t[id]) return; this._t[id]=setInterval(async()=>{ try{ const res=await fetch('/studio/generations/'+id,{headers:{Accept:'application/json'}}); const g=await res.json(); const it=this.items.find(x=>x.id===Number(g.id)); if(it){it.status=g.status;it.media_url=g.media_url;it.error=g.error;} if(['completed','failed','cancelled'].includes(g.status)){clearInterval(this._t[id]); delete this._t[id];} }catch(e){} },3000); },
+    async loadProjects(){ try{ const res=await fetch('/studio/projects',{headers:{Accept:'application/json'}}); if(!res.ok) throw new Error(); const d=await res.json(); this.projects=Array.isArray(d.items)?d.items:[]; this.projectsOk=true; }catch(e){ this.projects=[]; this.projectsOk=false; } },
+    init(){ this.loadProjects(); }
+}" x-init="init()">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="font-display text-2xl font-bold text-ink-900">Virtual Try-On</h1>
@@ -43,6 +46,13 @@
                 <label class="label">Trang phục cần thử</label>
                 <textarea x-model="prompt" rows="4" class="input" placeholder="VD: váy lụa màu kem dáng chữ A, tay ngắn"></textarea>
             </div>
+        </div>
+        <div x-show="projectsOk && projects.length" class="mt-3">
+            <label class="label">Gắn vào dự án (không bắt buộc)</label>
+            <select x-model="projectId" class="input">
+                <option value="">-- Không gắn --</option>
+                <template x-for="p in projects" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+            </select>
         </div>
         <button @click="gen()" :disabled="busy || !prompt" class="btn-brand mt-3 w-full whitespace-nowrap"><span x-show="!busy">Thử đồ</span><span x-show="busy">Đang xử lý…</span></button>
     </div>

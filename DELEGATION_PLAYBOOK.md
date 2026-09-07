@@ -5,10 +5,10 @@
 > **Bộ ba file** — đọc theo thứ tự này:
 > 1. `STUDIO_REVIEW_PROGRESS.md` — **trạng thái + QUEUE** (~9 KB). Đọc ĐẦU TIÊN khi chạy bền bỉ.
 > 2. `DELEGATION_PLAYBOOK.md` — **quy trình** (file này, ~24 KB). Việc dài nhiều lượt → đọc thêm **mục 10**.
-> 3. `STUDIO_REVIEW.md` — **kết quả** (~106 KB). Chỉ đọc Phần cần trích dẫn, đừng đọc hết.
+> 3. `STUDIO_REVIEW.md` — **kết quả, BẢN GỘP v2** (§0–§7: nhiệm vụ mở T1–T7 · bảng đã vá · high/critical còn lại · backlog một dòng/mục). Bằng chứng nguyên văn Phần A–L: `git show 8817f85:STUDIO_REVIEW.md`.
 >
 > Mọi con số/nguyên nhân dưới đây đã đo và kiểm chứng bằng smoke-test thật trên máy này.
-> Template ở mục 5 **đã chạy 5 lần, 0 fail** (provider `qwen-token-plan`): smoke-test 6/6 · `ctrl-1` nguyên văn 7/7 · 2-model 8/8 + 8/8 · per-task model 8/8 + 7/7 · QUEUE A đợt 1 (Phần H) 6/6 task, 41 finding parse sạch.
+> Template ở mục 5 **đã chạy 6 lần, 0 fail** (provider `qwen-token-plan`): smoke-test 6/6 · `ctrl-1` nguyên văn 7/7 · 2-model 8/8 + 8/8 · per-task model 8/8 + 7/7 · QUEUE A đợt 1 (Phần H) 6/6 task, 41 finding parse sạch · **`kimi-k3` smoke 1/1** (2026-09-07, scope 3 file Vue 46,5 KB: 8 finding parse sạch, đúng format 4-field, 6/8 đúng · 1/8 sai · 0/5 bẫy "đã fix").
 
 ---
 
@@ -29,13 +29,15 @@ Task càng lớn → JSON output càng dài → xác suất model bọc fence c�
 |---|---|---|---|---|
 | **`qwen-token-plan`** | **`qwen3.8-max`** | 262.144 | 4.817 input · 3.546 output · **2 step** | ✅ **MẶC ĐỊNH** — rẻ nhất, bám format chuẩn |
 | **`qwen-token-plan`** | **`glm-5.2`** | 262.144 | 23.076 input · 1.658 output · **6 step** | Task cần **suy luận liên file** (authz/route/config precedence) — tự xác minh, đắt ~4,8× input |
+| **`qwen-token-plan`** | **`kimi-k3`** | 262.144 | 24.772 input · 6.280 output · **3 step** (scope KHÁC: 3 file Vue 46,5 KB/708 dòng) | ✅ Review **frontend chiều sâu** (Vue lifecycle/listener leak/race/a11y) — 6/8 finding đúng, cơ chế+dòng chính xác; **phồng severity** (xem bullet dưới) |
 | `qwen-token-plan` | `deepseek-v4-pro` | 262.144 | đã chạy tốt ở đợt trước | Dự phòng / task cần output dài |
 | `deepseek-official` | `deepseek-v4-pro` | 1.000.000 | — | ⏸ tạm dừng theo chính sách tiết kiệm hạn mức |
 
 - `agent-default-model` hiện là **`qwen-token-plan` / `qwen3.8-max`** → chính điều phối cũng chạy model này.
-- Cả 3 model của route `qwen-token-plan` đều **không khai `contextWindow`** → cùng resolve về `defaultContextWindow` = **262.144** → **cùng một ngân sách chia task (mục 3) áp dụng cho cả 3**.
+- Mọi model của route `qwen-token-plan` (hiện **5**, gồm `kimi-k3`) đều **không khai `contextWindow`** → cùng resolve về `defaultContextWindow` = **262.144** → **cùng một ngân sách chia task (mục 3) áp dụng cho tất cả**.
 - **Bằng chứng chất lượng (đo được, cùng scope `StylistDataController`):** `qwen3.8-max` khẳng định SAI rằng "`page()` serves the admin UI to any visitor"; thực tế route `/stylist-data` (`routes/web.php:128`) và các route mutating (:192-196) nằm TRONG group `[auth, admin, nostore]`. `glm-5.2` tự đọc `routes/web.php` và mô tả đúng. → **finding `high`/`critical` của `qwen3.8-max` bắt buộc xác minh**; `glm-5.2` đáng tin hơn ở suy luận liên file.
 - `glm-5.2` hay thêm **đoạn dạo đầu** trước `AREA:` và **bỏ dấu ` | ` trước `fix:`** (chỉ 3 field) → parser PHẢI bao dung (mục 5). Đừng kết luận model "hỏng" khi parser trượt.
+- **`kimi-k3` — bằng chứng đo được (smoke 2026-09-07, scope = Phần I.4 trên tree hiện tại, cài sẵn 5 bẫy "đã fix"):** đúng cơ chế + đúng dòng **6/8** finding — M6 listener leak (`CanvasMaskTools:63-70,149`) · M8 Ctrl+Z hijack (`:142-146`) · a11y modal (`GalleryModal:220`) · `doDelete` không pending flag (`:29-40`) · SourcePanel load-fail → empty state gây hiểu lầm (`:11`) · **tìm ra bug MỚI THẬT trong code phiên M vừa viết**: `clipboard.writeText` không await (`GalleryModal:126`) → toast thành công giả. **0/5 bẫy** (không claim: res.ok thiếu · toDataURL · watch(items) · keydown không gỡ · catch pointer-capture cố ý). Hai lỗi: (1) **1/8 claim SAI** — "unhandled rejection" ở `doDelete`, vì KHÔNG đọc phụ thuộc chéo `store.deleteGen` (catch nội bộ + return `false`, `store.js:963`); (2) bỏ qua **comment chủ đích ngay cạnh** (`GalleryModal:194` "capture để ưu tiên khi modal mở") → bẫy mục 8. Format: đúng 4-field, có **dạo đầu trước `AREA:`** như `glm-5.2` (parser bao dung phủ). **Hiệu chỉnh severity kém** (gán `[high]`×2 cho thứ thật là medium/low, `[low]` cho M8 thật là medium) → bước xác minh điều phối vẫn BẮT BUỘC.
 - `qwen-token-plan` = DashScope compatible-mode `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`, key `QWEN_TOKEN_PLAN_API_KEY` (rẻ hơn).
 - **Đính chính:** đợt trước tôi quy kết `deepseek-official` bị rate-limit là SAI. Route đó không hỏng; thủ phạm là `schema` (mục 0).
 - Credential nằm ở `~/.dsh/.credentials.yaml` (mục `refs:`), KHÔNG nằm trong env của bash tool → đừng chẩn đoán provider bằng `env`.
@@ -126,6 +128,7 @@ Toàn module: PHP 551.842 B + JS/Vue 559.228 B ≈ **1,11 MB ≈ 337k token** �
 ```js
 const ROUTE = { provider: "qwen-token-plan", model: "qwen3.8-max" }; // mặc định: rẻ nhất
 const DEEP = "glm-5.2"; // task cần suy luận liên file: gán `model: DEEP` cho task đó
+const KIMI = "kimi-k3"; // task frontend chiều sâu (Vue lifecycle/listener/race/a11y): gán `model: KIMI` — phồng severity, xác minh bắt buộc
 const BASE = "/home/anhtuan/DEV/TrillfaShop";
 
 function promptFor(t) {
@@ -230,9 +233,10 @@ grep -nE "^- \*\*\[(critical|high|medium|low|info)\]\*\*" STUDIO_REVIEW.md
 | Phạm vi task quá lớn | output dài → dễ bọc fence, dễ lạc phạm vi | ≤60 KB / ≤1.200 dòng / ≤10 file / ≤8 finding |
 | Agent vượt phạm vi `offset`/`limit` | finding trích dẫn dòng ngoài chunk được giao (vd giao 1-950, trích 3186) | luôn `read` lại đúng dòng trước khi tin |
 | Finding của subagent sai/phóng đại | 0/3 claim high-medium mới đúng nguyên văn | xác minh 100% finding high/critical; ghi rõ mức độ đã hiệu chỉnh và lý do |
-| Tin chẩn đoán của subagent về "credit/auth" | subagent bỏ qua comment nghiệp vụ ngay cạnh code (vd `:1499` "never hard-block on credits") | đọc cả comment/docblock quanh dòng bị chỉ ra |
+| Tin chẩn đoán của subagent về "credit/auth" | subagent bỏ qua comment nghiệp vụ ngay cạnh code (vd `:1499` "never hard-block on credits" · `kimi-k3` bỏ qua `GalleryModal:194` "capture để ưu tiên khi modal mở") | đọc cả comment/docblock quanh dòng bị chỉ ra |
 | Parser quá chặt → tưởng model hỏng | `glm-5.2` bỏ dấu ` | ` trước `fix:` → 0 finding khớp, dù nó vẫn trả đủ 8 finding | dùng parser bao dung mục 5; khi parse ra 0 finding hãy đọc RAW text trước khi kết luận |
 | Model khẳng định sai về authz | `qwen3.8-max` bảo route public, thực tế nằm trong group `[auth,admin,nostore]` | giao task authz/route cho `glm-5.2`, hoặc luôn tự đọc `routes/web.php` để xác minh |
+| Khẳng định hành vi của hàm phụ thuộc mà KHÔNG đọc nó | `kimi-k3` báo `doDelete` "unhandled rejection" — thực tế `store.deleteGen` catch nội bộ + return `false` (`store.js:963`) | finding về hành vi cross-file: đọc body hàm callee/phụ thuộc trước khi ghi nhận |
 | `glm-5.2` báo XSS ở blade | **3/3 claim XSS là dương tính giả** — Blade `{{ }}` tự escape, `@json` có HEX flags, `$service` là mảng hardcode (`StudioController.php:4352`) | trước khi tin claim XSS: grep `{!!` và truy nguồn biến |
 | `qwen3.8-max` báo "DDL mỗi request" | `Schema::create` chỉ chạy khi `! $hasAll` (`StylistCatalog.php:30`); mỗi request chỉ tốn 3 lệnh `Schema::hasTable`, và là thiết kế có chủ đích (docblock :18-19) | đọc cả docblock ngay trên hàm trước khi kết luận |
 | Mỗi model sai đúng chỗ model kia đúng | `qwen3.8-max` sai authz/DDL, `glm-5.2` sai XSS | **không có model nào đáng tin tuyệt đối** — xác minh là bắt buộc bất kể model |

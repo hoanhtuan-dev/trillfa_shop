@@ -3376,36 +3376,9 @@ RULES:
      */
     protected function safeLocalFile(string $path): ?string
     {
-        $path = ltrim($path, '/');
-
-        if ($path === '' || in_array('..', explode('/', $path), true)) {
-            return null;
-        }
-        if (! preg_match('#^[A-Za-z0-9/_.\-]+$#', $path)) {
-            return null;
-        }
-
-        $roots = [public_path(), storage_path('app/public')];
-        $candidates = [
-            public_path($path),
-            storage_path('app/public/'.$path),
-            storage_path('app/public/'.ltrim(str_replace('storage/', '', $path), '/')),
-        ];
-
-        foreach ($candidates as $candidate) {
-            $real = realpath($candidate);
-            if ($real === false || ! is_file($real)) {
-                continue;
-            }
-            foreach ($roots as $root) {
-                $rootReal = realpath($root);
-                if ($rootReal !== false && str_starts_with($real, $rootReal.DIRECTORY_SEPARATOR)) {
-                    return $real;
-                }
-            }
-        }
-
-        return null;
+        // Logic containment tập trung tại helper dùng chung (S1) — giữ method để
+        // không phá 21 call-site hiện có.
+        return studio_safe_public_file($path);
     }
 
     /**
@@ -3653,7 +3626,12 @@ RULES:
      */
     public function libraryCleanup(Request $request): \Illuminate\Http\JsonResponse
     {
-        $scope = (string) $request->input('scope', '');
+        // Whitelist scope (S8) — scope lạ trước đây rơi vào match default {deleted:0}
+        // nhưng response vẫn ok:true (thành công giả); giờ 422 rõ ràng.
+        $data = $request->validate([
+            'scope' => ['required', 'string', 'in:orphans,junk,old'],
+        ]);
+        $scope = $data['scope'];
         $oldDays = max(1, min(365, (int) ($request->input('old_days', 30))));
         $result = app(\App\Services\StudioLibraryService::class)->cleanup(auth()->user(), $scope, $oldDays);
 

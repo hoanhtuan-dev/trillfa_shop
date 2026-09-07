@@ -292,27 +292,34 @@ onBeforeUnmount(() => {
 
         <!-- ══ Khối Dự án: gắn / gỡ ══ -->
         <div class="rounded-xl border border-ink-700/60 bg-ink-800/70 p-2.5">
-          <!-- KHI đã có project_id: chip dự án + nút gỡ -->
+          <!-- KHI đã có project_id: chip dự án + nút chuyển + nút gỡ -->
           <template v-if="current?.project_id">
             <div class="flex items-center justify-between gap-2">
               <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-500/40 bg-brand-500/15 px-2.5 py-1 text-[11px] font-semibold text-brand-200">
                 <StudioIcon name="pin" size="h-3 w-3" />
                 {{ projectLabel }}
               </span>
-              <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500/40 hover:bg-red-600/10 hover:text-red-300" title="Gỡ khỏi dự án">
-                <StudioIcon name="unlink" size="h-3 w-3" />
-                Gỡ
-              </button>
+              <div class="flex items-center gap-1.5">
+                <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-brand-500/40 hover:bg-brand-600/10 hover:text-brand-200" title="Chuyển sang dự án khác (1 chạm)">
+                  <StudioIcon name="link" size="h-3 w-3" />
+                  Chuyển
+                </button>
+                <button @click="detachProject" :disabled="attachBusy" class="inline-flex items-center gap-1 rounded-full border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-300 transition hover:border-red-500/40 hover:bg-red-600/10 hover:text-red-300" title="Gỡ khỏi dự án">
+                  <StudioIcon name="unlink" size="h-3 w-3" />
+                  Gỡ
+                </button>
+              </div>
             </div>
           </template>
-          <!-- KHI KHÔNG có project_id: nút gắn + panel chọn -->
+          <!-- KHI KHÔNG có project_id: nút gắn -->
           <template v-else>
             <button @click="toggleAttach" :disabled="attachBusy" class="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-ink-600 bg-transparent px-3 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-brand-500/40 hover:bg-brand-600/10 hover:text-brand-200">
               <StudioIcon name="link" size="h-3.5 w-3.5" />
               Gắn vào dự án
             </button>
-            <!-- Panel chọn dự án -->
-            <div v-if="attachOpen && !attachBusy" class="mt-2 space-y-1">
+          </template>
+          <!-- Panel chọn dự án (dùng chung cho gắn mới + chuyển 1-chạm) -->
+          <div v-if="attachOpen && !attachBusy" class="mt-2 space-y-1">
               <!-- Nút nhanh: gắn vào dự án đang áp dụng -->
               <button v-if="store.appliedProject && store.appliedProject.id !== current?.project_id" @click="attachToProject(store.appliedProject)" class="flex w-full items-center gap-2 rounded-lg bg-brand-600/15 px-2.5 py-1.5 text-[11px] font-semibold text-brand-200 transition hover:bg-brand-600/25">
                 <StudioIcon name="pin" size="h-3.5 w-3.5" />
@@ -328,7 +335,6 @@ onBeforeUnmount(() => {
               </template>
               <p v-else class="py-1 text-center text-[10px] text-cream-300/50">Chưa có dự án nào — tạo dự án ở Studio.</p>
             </div>
-          </template>
         </div>
 
         <!-- Prompt + copy -->

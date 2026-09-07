@@ -246,7 +246,67 @@ if (! function_exists('studio_image_decode')) {
         // Decode thật bằng GD. (Đã sửa lỗi [critical]: dòng này từng đệ quy vào
         // chính studio_image_decode() → tràn stack/OOM giết worker tại 43 call-site.)
         $gd = @imagecreatefromstring((string) $data);
-        return $gd === false ? false : $gd;
+        if ($gd === false) {
+            return false;
+        }
+
+        // Cap SỐ PIXEL (decompression bomb): file PNG/JPEG nén vài chục KB có thể giải nén
+        // thành ảnh hàng trăm MP → OOM worker ngay tại decode, trước mọi vòng lặp per-pixel.
+        // Mặc định 30 MP (~8192×3660) — ảnh 4K (16,7 MP) vẫn qua; 0 = tắt cap.
+        $maxPixels = (int) (function_exists('studio_config') ? studio_config('image_max_pixels', 30000000) : 30000000);
+        if ($maxPixels > 0 && imagesx($gd) * imagesy($gd) > $maxPixels) {
+            \Illuminate\Support\Facades\Log::warning('studio_image_decode: từ chối ảnh vượt ngưỡng pixel', [
+                'w' => imagesx($gd), 'h' => imagesy($gd), 'max' => $maxPixels,
+            ]);
+            unset($gd);
+
+            return false;
+        }
+
+        return $gd;
+    }
+}
+
+if (! function_exists('studio_safe_public_file')) {
+    /**
+     * Containment-checked local file lookup cho path kiểu /storage/... do người dùng cung cấp:
+     * loại segment '..', chỉ cho ký tự [A-Za-z0-9/_.-], rồi bắt buộc realpath() của file
+     * nằm TRONG public/ hoặc storage/app/public (symlink được resolve trước khi so).
+     *
+     * Nguồn dùng chung duy nhất — StudioController::safeLocalFile() và các resolver của
+     * ImageAIService (resolveSamplePath/resolveImageBinary/imageDataUri) đều đi qua đây.
+     */
+    function studio_safe_public_file(string $path): ?string
+    {
+        $path = ltrim($path, '/');
+
+        if ($path === '' || in_array('..', explode('/', $path), true)) {
+            return null;
+        }
+        if (! preg_match('#^[A-Za-z0-9/_.\-]+$#', $path)) {
+            return null;
+        }
+
+        $roots = array_filter([realpath(public_path()), realpath(storage_path('app/public'))]);
+        $candidates = [
+            public_path($path),
+            storage_path('app/public/'.$path),
+            storage_path('app/public/'.ltrim(str_replace('storage/', '', $path), '/')),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $real = realpath($candidate);
+            if ($real === false || ! is_file($real)) {
+                continue;
+            }
+            foreach ($roots as $root) {
+                if (str_starts_with($real, $root.DIRECTORY_SEPARATOR)) {
+                    return $real;
+                }
+            }
+        }
+
+        return null;
     }
 }
 
@@ -399,10 +459,8 @@ if (! function_exists('studio_vision_image_data_uri')) {
         }
 
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        $file = null;
-        foreach ([public_path($path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
-            if (is_file($c)) { $file = $c; break; }
-        }
+        // Containment dùng chung (S1/S6 residual): chặn traversal ra ngoài 2 root public.
+        $file = studio_safe_public_file($path);
         if (! $file) {
             return null;
         }

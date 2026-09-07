@@ -466,8 +466,9 @@ class ImageAIService
     protected function resolveSamplePath(?string $preferred): ?string
     {
         if ($preferred && str_starts_with($preferred, '/storage/')) {
-            $p = public_path(ltrim((string) parse_url($preferred, PHP_URL_PATH), '/'));
-            if (is_file($p)) {
+            // Containment chống traversal (/storage/../../.env → null) — S1.
+            $p = studio_safe_public_file((string) parse_url($preferred, PHP_URL_PATH));
+            if ($p) {
                 return $p;
             }
         }
@@ -675,13 +676,8 @@ class ImageAIService
         if (str_starts_with($path, 'studio/image/')) {
             $path = substr($path, strlen('studio/image/'));
         }
-        $file = null;
-        foreach ([public_path($path), storage_path('app/public/'.$path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
-            if (is_file($c)) {
-                $file = $c;
-                break;
-            }
-        }
+        // Containment chống traversal — chỉ đọc file trong public/ hoặc storage/app/public (S1).
+        $file = studio_safe_public_file($path);
         if (! $file) {
             return null;
         }
@@ -1082,8 +1078,39 @@ class ImageAIService
 
     protected function storeRemoteImage(string $url, ?bool $postprocess = null): ?string
     {
-        $contents = @file_get_contents($url);
-        if (! $contents) {
+        // SSRF guard (S3): URL đến từ response của provider (hoặc host admin tự cấu hình)
+        // — chỉ http/https, timeout rõ ràng, giới hạn redirect + kích thước, tùy chọn
+        // allowlist host qua setting studio 'remote_image_hosts' (CSV, rỗng = không chặn).
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+        $allowedHosts = array_filter(array_map('trim', explode(',', (string) studio_config('remote_image_hosts', ''))));
+        if ($allowedHosts) {
+            $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+            $hostOk = false;
+            foreach ($allowedHosts as $allowed) {
+                $allowed = strtolower(ltrim($allowed, '.'));
+                if ($host === $allowed || str_ends_with($host, '.'.$allowed)) { $hostOk = true; break; }
+            }
+            if (! $hostOk) {
+                return null;
+            }
+        }
+        try {
+            $res = Http::timeout(30)
+                ->withOptions(['connect_timeout' => 10, 'allow_redirects' => ['max' => 2, 'protocols' => ['http', 'https']]])
+                ->get($url);
+            if (! $res->successful()) {
+                return null;
+            }
+            $contents = $res->body();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+        if (! $contents || strlen($contents) > 52428800) { // cap 50 MiB
             return null;
         }
 
@@ -1370,10 +1397,10 @@ class ImageAIService
     protected function resolveImageBinary(string $url): ?string
     {
         $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        foreach ([public_path($path), storage_path('app/public/'.str_replace('storage/', '', $path))] as $c) {
-            if (is_file($c)) {
-                return (string) file_get_contents($c);
-            }
+        // Containment chống traversal — chỉ đọc file trong public/ hoặc storage/app/public (S1).
+        $file = studio_safe_public_file($path);
+        if ($file) {
+            return (string) file_get_contents($file);
         }
         return null;
     }

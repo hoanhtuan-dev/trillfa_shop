@@ -1037,21 +1037,23 @@ PROMPT;
         $descStyle = $style ?: 'tối giản, tinh tế, hiện đại';
         $descGarment = $category ?: 'sản phẩm thời trang/phong cách sống';
 
+        // Escape mọi biến nguồn user/AI trước khi ghép HTML (S4 — chống stored XSS;
+        // description render bằng v-html/{!! !!} ở storefront).
         $description = '<h3>Phong cách</h3>'
-            .'<p>'.$base.' mang phong cách '.$descStyle.', tôn dáng và thoải mái — dễ dàng kết hợp trong nhiều hoàn cảnh.</p>'
+            .'<p>'.e($base).' mang phong cách '.e($descStyle).', tôn dáng và thoải mái — dễ dàng kết hợp trong nhiều hoàn cảnh.</p>'
             .'<h3>Loại trang phục &amp; dáng</h3>'
-            .'<p>'.$descGarment.' với đường cắt tối giản, form cân đối, phù hợp vóc dáng người Việt.</p>'
+            .'<p>'.e($descGarment).' với đường cắt tối giản, form cân đối, phù hợp vóc dáng người Việt.</p>'
             .'<h3>Chất liệu &amp; chất lượng</h3>'
-            .'<ul><li>'.$descFabric.', tạo cảm giác dễ chịu khi mặc</li><li>Đường may chắc chắn, bền bỉ theo thời gian</li></ul>'
+            .'<ul><li>'.e($descFabric).', tạo cảm giác dễ chịu khi mặc</li><li>Đường may chắc chắn, bền bỉ theo thời gian</li></ul>'
             .'<h3>Màu sắc &amp; họa tiết</h3>'
-            .'<p>'.$descColor.($subject ? ', phù hợp với ' . $subject : '').'.</p>'
+            .'<p>'.e($descColor).($subject ? ', phù hợp với ' . e($subject) : '').'.</p>'
             .'<h3>Thiết kế chi tiết</h3>'
             .'<ul><li>Chi tiết tối giản, tinh tế, dễ phối đồ</li><li>Form dáng tôn dáng, thoải mái khi vận động</li></ul>'
             .'<h3>Phù hợp</h3>'
             .'<p>Dễ phối cho công sở, dạo phố hoặc những buổi gặp gỡ nhẹ nhàng.</p>'
             .'<h3>Bảo quản &amp; lưu ý</h3>'
             .'<ul><li>Giặt nhẹ, tránh nước tẩy mạnh</li><li>Ủi ở nhiệt độ thấp để giữ form</li><li>Đổi trả trong 7 ngày</li></ul>'
-            .'<blockquote>"'.($feeling ?: 'Tối giản không phải là ít, mà là đủ.').' — '.$brand.'"</blockquote>';
+            .'<blockquote>"'.e($feeling ?: 'Tối giản không phải là ít, mà là đủ.').' — '.e($brand).'"</blockquote>';
 
         return [
             'suggested_name' => $base,
@@ -1120,7 +1122,7 @@ PROMPT;
                     [
                         'label' => 'Chất liệu & bảo quản',
                         'short_description' => $name.' với chất liệu cao cấp, bền bỉ, thoáng mát.',
-                        'description' => '<h3>Chất liệu</h3><p>'.($imageAnalysis['fabric'] ?? 'Chất liệu cao cấp, thoáng mát').'</p><h3>Bảo quản</h3><ul><li>Giặt nhẹ, tránh nước tẩy mạnh</li><li>Ủi ở nhiệt độ thấp</li><li>Đổi trả trong 7 ngày</li></ul>',
+                        'description' => '<h3>Chất liệu</h3><p>'.e($imageAnalysis['fabric'] ?? 'Chất liệu cao cấp, thoáng mát').'</p><h3>Bảo quản</h3><ul><li>Giặt nhẹ, tránh nước tẩy mạnh</li><li>Ủi ở nhiệt độ thấp</li><li>Đổi trả trong 7 ngày</li></ul>',
                     ],
                 ],
             ],
@@ -1150,13 +1152,13 @@ PROMPT;
         $color = $imageAnalysis['colors'] ?? '';
 
         return '<h3>Phong cách</h3>'
-            .'<p>'.$name.' mang phong cách '.($style ?: 'tối giản, tinh tế, hiện đại').', tôn dáng và thoải mái — dễ dàng kết hợp trong nhiều hoàn cảnh.</p>'
+            .'<p>'.e($name).' mang phong cách '.e($style ?: 'tối giản, tinh tế, hiện đại').', tôn dáng và thoải mái — dễ dàng kết hợp trong nhiều hoàn cảnh.</p>'
             .'<h3>Loại trang phục &amp; dáng</h3>'
-            .'<p>'.($category ?: 'Sản phẩm thời trang/phong cách sống').' với đường cắt tối giản, form cân đối, phù hợp vóc dáng người Việt.</p>'
+            .'<p>'.e($category ?: 'Sản phẩm thời trang/phong cách sống').' với đường cắt tối giản, form cân đối, phù hợp vóc dáng người Việt.</p>'
             .'<h3>Chất liệu &amp; chất lượng</h3>'
-            .'<ul><li>'.($fabric ?: 'Chất liệu cao cấp, thoáng mát và bền bỉ').'</li><li>Đường may chắc chắn, bền bỉ theo thời gian</li></ul>'
+            .'<ul><li>'.e($fabric ?: 'Chất liệu cao cấp, thoáng mát và bền bỉ').'</li><li>Đường may chắc chắn, bền bỉ theo thời gian</li></ul>'
             .'<h3>Màu sắc &amp; họa tiết</h3>'
-            .'<p>'.($color ?: 'Tông màu trung tính dễ phối đồ').'.</p>'
+            .'<p>'.e($color ?: 'Tông màu trung tính dễ phối đồ').'.</p>'
             .'<h3>Bảo quản &amp; lưu ý</h3>'
             .'<ul><li>Giặt nhẹ, tránh nước tẩy mạnh</li><li>Ủi ở nhiệt độ thấp để giữ form</li><li>Đổi trả trong 7 ngày</li></ul>';
     }

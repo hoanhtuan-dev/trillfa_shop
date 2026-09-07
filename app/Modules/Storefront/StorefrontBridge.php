@@ -537,9 +537,9 @@ class StorefrontBridge
                 'body' => setting('about_body', ''),
             ],
             'contact' => [
-                'title' => 'Liên hệ với chúng tôi',
-                'intro' => 'Chúng tôi luôn sẵn sàng hỗ trợ bạn.',
-                'body' => '',
+                'title' => setting('contact_heading', 'Liên hệ với chúng tôi'),
+                'intro' => setting('contact_intro', 'Chúng tôi luôn sẵn sàng hỗ trợ bạn.'),
+                'body' => setting('contact_body', ''),
             ],
             'faq' => [
                 'title' => 'Câu hỏi thường gặp',

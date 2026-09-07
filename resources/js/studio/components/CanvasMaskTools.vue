@@ -60,14 +60,15 @@ const brushCanvasSize = computed(() => {
 
 // Bấm ngoài box (container) → tạo vùng mới; brush → vẽ mask; freehand → vẽ tự do. Chỉ khi ĐANG chỉnh.
 function onFhMove(e) { store.freehandMove(e); }
-function onFhUp() { window.removeEventListener('pointermove', onFhMove); window.removeEventListener('pointerup', onFhUp); store.freehandStop(); }
+function onFhEnd() { window.removeEventListener('pointermove', onFhMove); window.removeEventListener('pointerup', onFhEnd); window.removeEventListener('pointercancel', onFhEnd); store.freehandStop(); }
 function onPointerDown(e) {
   if (!editing.value) return;
   e.preventDefault();
   if (store.inpaintMaskMode === 'freehand') {
     store.freehandStart(e);
     window.addEventListener('pointermove', onFhMove);
-    window.addEventListener('pointerup', onFhUp);
+    window.addEventListener('pointerup', onFhEnd);
+    window.addEventListener('pointercancel', onFhEnd);
     return;
   }
   if (store.inpaintMaskMode === 'path') {
@@ -141,12 +142,16 @@ watch(brushCanvasSize, () => {
 
 function onKeyDown(e) {
   if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-    if (store.inpaintMaskMode === 'brush') { e.preventDefault(); store.undoInpaintBrush(); }
+    if (store.inpaintMaskMode === 'brush') {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      e.preventDefault(); store.undoInpaintBrush();
+    }
   }
 }
 function onResize() { nextTick(() => { metricsTick.value++; }); }
 onMounted(() => { window.addEventListener('keydown', onKeyDown); window.addEventListener('resize', onResize); });
-onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window.removeEventListener('keydown', onKeyDown); window.removeEventListener('resize', onResize); });
+onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window.removeEventListener('keydown', onKeyDown); window.removeEventListener('resize', onResize); window.removeEventListener('pointermove', onFhMove); window.removeEventListener('pointerup', onFhEnd); window.removeEventListener('pointercancel', onFhEnd); });
 </script>
 <template>
   <div v-if="visible" class="absolute inset-0 z-31 select-none" :class="editing ? 'cursor-crosshair' : 'cursor-default'"

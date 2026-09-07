@@ -36,7 +36,7 @@ async function save() {
       <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div><label class="label">Provider</label><select v-model="form.key_provider" class="input !py-2"><option v-for="(p,pid) in data?.providers" :key="pid" :value="pid">{{ pid }}</option></select></div>
         <div><label class="label">Nhãn</label><input v-model="form.key_label" class="input !py-2" placeholder="VD: Qwen Token-Plan"></div>
-        <div><label class="label">Key</label><input v-model="form.key_value" class="input !py-2" placeholder="sk-..."></div>
+        <div><label class="label">Key</label><input type="password" v-model="form.key_value" autocomplete="new-password" class="input !py-2" placeholder="sk-..."></div>
         <div><label class="label">Loại</label><input v-model="form.key_kind" class="input !py-2" placeholder="plan/paygo"></div>
         <div><label class="label">Ưu tiên</label><input type="number" v-model.number="form.key_priority" min="0" max="100" class="input !py-2"></div>
       </div>

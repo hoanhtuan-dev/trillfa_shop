@@ -173,6 +173,12 @@ class StorefrontController extends Controller
      */
     public function staticPage(string $key, ?string $slug = null)
     {
+        // Route /trang/{slug} binds the slug to $key — treat non-static keys as slugs.
+        $knownKeys = ['about', 'contact', 'faq', 'privacy', 'terms'];
+        if ($slug === null && ! in_array($key, $knownKeys, true)) {
+            $slug = $key;
+            $key = '';
+        }
         $payload = $this->bridge->staticPage($key, $slug);
         $title = $payload['page']['title'] ?? 'Trang';
 
@@ -277,6 +283,13 @@ class StorefrontController extends Controller
             ->description($p['short_description'] ?: setting('site_name'))
             ->canonical($p['url'])
             ->image($p['image']);
+
+        // Khôi phục LD+JSON Product server-side (mất khi chuyển SPA — chỉ bổ sung,
+        // không đổi payload Vue). Truyền URL sẵn có thay vì gọi route() lại.
+        $productModel = \App\Models\Product::where('slug', $slug)->first();
+        if ($productModel) {
+            seo()->product($productModel, $p['url']);
+        }
 
         return view('storefront.product', [
             'boot' => $payload,

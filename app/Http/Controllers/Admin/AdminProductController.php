@@ -282,14 +282,9 @@ class AdminProductController extends Controller
 
     protected function resolveImagePath(string $url): ?string
     {
-        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        foreach ([public_path($path), storage_path('app/public/'.$path)] as $candidate) {
-            if (is_file($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return null;
+        // Containment dùng chung (S5): image_url từ request có thể chứa traversal
+        // (/../.env → is_file khớp → bytes nhạy cảm bị gửi lên AI provider).
+        return studio_safe_public_file((string) parse_url($url, PHP_URL_PATH));
     }
 
     /**
