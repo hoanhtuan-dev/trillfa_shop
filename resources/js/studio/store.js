@@ -84,7 +84,7 @@ export const useStudioStore = defineStore('studio', {
     drawSoftness: 15,    // độ mềm mép (0-60)
     drawHardness: 80,   // độ cứng cọ 0-100 (%)
     drawFlow: 1,        // lượng mực 0.01-1 (thấp = nét nhạt, tô dày dần)
-    drawSpacing: 0.15,  // khoảng cách giữa các chấm cọ (tỉ lệ đường kính 0.03-1)
+    drawSpacing: 0.08,  // khoảng cách giữa các chấm cọ (tỉ lệ đường kính 0.03-1) — gần => mịn, không hạt
     drawSmoothing: 0,   // làm mượt nét 0-100 (0 = tắt)
     drawBlend: 'normal', // chế độ hòa trộn nét vẽ
     _drawCanvas: null,
@@ -1899,12 +1899,12 @@ export const useStudioStore = defineStore('studio', {
       const w = this._drawCanvas.width, h = this._drawCanvas.height, r = this._drawRadius();
       const op = Math.max(0.01, Math.min(1, (Number(this.drawOpacity) || 1) * (Number(this.drawFlow) || 1))); // opacity × flow
       const feather = Math.max(0, Math.min(1, (Number(this.drawSoftness) || 0) / 60)); // 0..1
-      const core = Math.max(0, Math.min(1, (Number(this.drawHardness) || 80) / 100));   // 0..1
-      const edge = Math.min(1, core + (1 - core) * feather);
+      // Plateau (độ cứng) = hardness trừ bớt phần mềm; rồi GAUSS smooth ramp tới mép — KHÔNG có mid-stop
+      // (mid-stop tạo vòng/banding). Hardness cao = mép sắc; thấp = mềm mượt.
+      const core = Math.max(0.03, Math.min(0.98, (Number(this.drawHardness) || 80) / 100 * (1 - feather * 0.5)));
       const g = c.createRadialGradient(p.nx * w, p.ny * h, 0, p.nx * w, p.ny * h, r);
       const stops = [[0, op]];
-      if (core > 0.01) stops.push([core, op]);
-      if (edge > core + 0.01) stops.push([edge, op * 0.3]);
+      if (core > 0.05) stops.push([core, op]);
       stops.push([1, 0]);
       stops.forEach((s) => g.addColorStop(s[0], this._hexToRgba(this.inpaintFillColor, s[1])));
       c.save();

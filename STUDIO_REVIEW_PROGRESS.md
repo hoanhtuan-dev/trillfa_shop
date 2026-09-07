@@ -7,7 +7,7 @@
 
 ## Trạng thái hiện tại
 
-- **Brush tool nâng cấp (UI-4)**: Hardness · Flow · Spacing · Smoothing · Blend mode · con trỏ cọ (vòng preview) — tiến tới Krita/GIMP/Photoshop. **ContextToolbar redesign GUI chuyên nghiệp** (pill: icon + nhãn + slider + giá trị; +6 icon Lucide droplet/feather/hardness/betweenDots/waves/blend). Đã commit + deploy live.
+- **Brush tool nâng cấp (UI-4)**: Hardness · Flow · Spacing · Smoothing · Blend mode · con trỏ cọ (vòng preview) — tiến tới Krita/GIMP/Photoshop. ContextToolbar GUI chuyên nghiệp (pill icon+nhãn+slider+giá trị; +6 icon Lucide) + **thu gọn** (pill/slider nhỏ hơn). **Fix banding/pattern nét vẽ** (bỏ mid-stop gradient gây vòng + spacing gần hơn 0.08). Đã commit + deploy live.
 - PHẦN I (UI/UX Redesign) — ĐÃ GỘP bên dưới (37 phiên UI-1 → UI-3aj); mọi commit đã push + deploy live.
 - Audit code: 214 findings · đã vá ~60 · full suite 210 pass / 0 FAIL (phiên N).
 
