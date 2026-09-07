@@ -557,9 +557,9 @@ function onTouchEnd(e) {
       <div class="w-full max-w-sm rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl">
         <div class="mb-2 flex items-center gap-2">
           <div class="grid h-8 w-8 place-items-center rounded-xl bg-red-600/15 text-red-300"><StudioIcon name="trash" size="h-4 w-4"/></div>
-          <p class="text-sm font-semibold text-cream-100">Xóa {{ store.selectionCount }} layer?</p>
+          <p class="text-sm font-semibold text-cream-100">Xóa {{ store.selectionUnitCount }} đối tượng?</p>
         </div>
-        <p class="text-xs leading-relaxed text-cream-300/60">Hành động này sẽ xóa {{ store.selectionCount }} layer khỏi canvas. (Ctrl+Z để hoàn tác).</p>
+        <p class="text-xs leading-relaxed text-cream-300/60">Hành động này sẽ xóa {{ store.selectionUnitCount }} đối tượng khỏi canvas (mỗi group tính là 1 đối tượng). (Ctrl+Z để hoàn tác).</p>
         <div class="mt-4 flex justify-end gap-2">
           <button @click="store.confirmDeleteOpen = false" class="rounded-xl border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
           <button @click="store.confirmDeleteSelection()" class="flex items-center gap-1 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa layer</button>

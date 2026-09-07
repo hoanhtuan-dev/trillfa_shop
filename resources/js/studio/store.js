@@ -2139,12 +2139,16 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
     },
     // Phím Delete → mở popup xác nhận xóa NHIỀU layer.
-    deleteSelection() { if (this.selectedIds.length) this.confirmDeleteOpen = true; },
+    deleteSelection() { if (this.selectionUnitCount) this.confirmDeleteOpen = true; },
     confirmDeleteSelection() {
-      const ids = this.selectedIds; if (!ids.length) { this.confirmDeleteOpen = false; return; }
+      // GROUP = 1 đối tượng: xóa theo ĐƠN VỊ (nguyên nhóm + layer đơn), không phải từng layer.
+      const units = this._selectionUnits(); if (!units.length) { this.confirmDeleteOpen = false; return; }
+      const ids = new Set(); const delGids = new Set();
+      units.forEach(u => { u.layers.forEach(l => ids.add(l.id)); if (u.type === 'group') delGids.add(u.gid); });
       const wasActive = this.activeLayerId;
       this.pushHistory();
-      this.canvasLayers = this.canvasLayers.filter(l => !ids.includes(l.id));
+      this.canvasLayers = this.canvasLayers.filter(l => !ids.has(l.id));
+      this.layerGroups = this.layerGroups.filter(g => !delGids.has(g.id));
       const rest = this.canvasLayers.filter(l => l.visible !== false);
       const at = rest.findIndex(l => l.id === wasActive);
       const next = rest[at] || rest[rest.length - 1] || null;
@@ -2152,7 +2156,7 @@ export const useStudioStore = defineStore('studio', {
       this.selectedLayerIds = [];
       this.confirmDeleteOpen = false;
       this.saveLayerLayout();
-      this.toast('Đã xóa ' + ids.length + ' layer.');
+      this.toast('Đã xóa ' + units.length + ' đối tượng.');
     },
     // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
     deselectAll() {

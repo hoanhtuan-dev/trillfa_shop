@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3aa (2026-09-07) — Hoàn thiện GROUP=1 đối tượng: xóa cũng theo ĐỐI TƯỢNG
+
+- **Xóa theo đối tượng**: `deleteSelection`/`confirmDeleteSelection` xóa theo `_selectionUnits()` (nguyên nhóm + layer đơn), đồng thời xóa nhóm khỏi `layerGroups`; toast + modal đếm "N đối tượng" (`selectionUnitCount`).
+- Giờ TRỌN BỘ hành động đều coi group = 1 đối tượng: chọn/move/scale/rotate/duplicate/delete/căn lề/chia đều; shift toggle nguyên nhóm; khung bbox khi chọn nhóm; thao tác đa đối tượng (group + layer đơn) nhất quán.
+- Verify: vite build ✓ (690ms) · store delete-unit 4, modal 2.
+
 ## Phiên UI-3z (2026-09-07) — Tái định hướng tầm nhìn GROUP (group = 1 đối tượng, dễ đoán, như Figma)
 
 - **Group = 1 đối tượng**: `shiftSelectLayer` giờ **toggle TOÀN BỘ nhóm** (không còn để lẻ thành viên → hết xáo trộn khó đoán); chọn nhóm hiện **khung bbox dashed** quanh nhóm (`selectedGroupOutlines` + `store.groupBox`) thay vì tưởng như nhiều layer riêng lẻ.
