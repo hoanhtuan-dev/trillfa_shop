@@ -105,11 +105,11 @@ const freehandPaths = computed(() => store.inpaintFreehandPaths.map((pts) => pat
 const pathSmooth = (pts) => {
   const f = frame.value;
   if (!f || !pts || pts.length < 2) return '';
-  const P = pts.map((p) => ({ x: p.nx * f.w, y: p.ny * f.h, hx: (p.hx || 0) * f.w, hy: (p.hy || 0) * f.h }));
+  const P = pts.map((p) => ({ x: p.nx * f.w, y: p.ny * f.h, ox: (p.ox || 0) * f.w, oy: (p.oy || 0) * f.h, ix: (p.ix || 0) * f.w, iy: (p.iy || 0) * f.h }));
   const n = P.length, SAMPLES = 20, out = [];
   for (let i = 0; i < n; i++) {
     const a = P[i], b = P[(i + 1) % n];
-    const c1x = a.x + a.hx, c1y = a.y + a.hy, c2x = b.x - b.hx, c2y = b.y - b.hy;
+    const c1x = a.x + a.ox, c1y = a.y + a.oy, c2x = b.x + b.ix, c2y = b.y + b.iy;
     for (let s = 0; s < SAMPLES; s++) {
       const t = s / SAMPLES, mt = 1 - t;
       const x = mt * mt * mt * a.x + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * b.x;
@@ -198,12 +198,12 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
           <polyline v-if="store.inpaintPathPoints.length > 1" :points="pathSmoothPixels" fill="none" stroke="#a78bfa" :stroke-width="2 * invScale" stroke-linejoin="round" stroke-linecap="round" />
           <polygon v-if="store.inpaintPathPoints.length > 2" :points="pathSmoothPixels" fill="rgba(167,139,250,0.12)" stroke="none" />
           <template v-for="(p, i) in store.inpaintPathPoints" :key="'p'+i">
-            <!-- Tay điều khiển Bezier (Krita): neo + 2 control point (ra + vào phản chiếu) -->
-            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.hx||0)) * anchor.w" :y2="(p.ny + (p.hy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
-            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx - (p.hx||0)) * anchor.w" :y2="(p.ny - (p.hy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
-            <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)" :r="circleR" fill="#a78bfa" />
-            <circle :cx="(p.nx + (p.hx||0)) * anchor.w" :cy="(p.ny + (p.hy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" />
-            <circle :cx="(p.nx - (p.hx||0)) * anchor.w" :cy="(p.ny - (p.hy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" />
+            <!-- Tay điều khiển Bezier (Krita): out (xanh) + in (hồng); kéo node/tay để chỉnh, right-click node = xóa -->
+            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ox||0)) * anchor.w" :y2="(p.ny + (p.oy||0)) * anchor.h" stroke="#38bdf8" :stroke-width="1.5 * invScale" stroke-linecap="round" />
+            <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ix||0)) * anchor.w" :y2="(p.ny + (p.iy||0)) * anchor.h" stroke="#f0abfc" :stroke-width="1.5 * invScale" stroke-linecap="round" />
+            <circle :cx="(p.nx + (p.ox||0)) * anchor.w" :cy="(p.ny + (p.oy||0)) * anchor.h" :r="circleR * 0.7" fill="#38bdf8" style="pointer-events:auto; cursor:move" />
+            <circle :cx="(p.nx + (p.ix||0)) * anchor.w" :cy="(p.ny + (p.iy||0)) * anchor.h" :r="circleR * 0.7" fill="#f0abfc" style="pointer-events:auto; cursor:move" />
+            <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)" :r="circleR" fill="#a78bfa" stroke="#111" :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
           </template>
         </svg>
 

@@ -7,7 +7,7 @@
 
 ## Trạng thái hiện tại
 
-- **Brush tool nâng cấp (UI-4)**: Hardness · Flow · Spacing · Smoothing · Blend mode · con trỏ cọ — ContextToolbar GUI chuyên nghiệp (pill) + thu gọn + fix banding nét vẽ. Fix shift chọn đa layer ổn định. **Bezier curve selection (Krita Pen tool)**: `pathDown/pathMove/pathUp` (click = neo, kéo = tay điều khiển cong) + `pathClose` dùng cubic bezier thật + preview tay điều khiển màu xanh; thay path AddPoint/Catmull-Rom cũ. Đã commit + deploy live.
+- **Brush tool nâng cấp (UI-4)**: Hardness · Flow · Spacing · Smoothing · Blend mode · con trỏ cọ — ContextToolbar GUI chuyên nghiệp (pill) + thu gọn + fix banding nét vẽ. Fix shift chọn đa layer ổn định. **Bezier curve selection (Krita Pen tool)**: click=neo/kéo=handle, **kéo node để di chuyển**, **kéo 2 tay điều khiển out(in xanh/in hồng) riêng** (symmetric + Alt phá đối xứng), **right-click node = xóa**, click khoảng trống = thêm neo; pathClose 2-handle cubic bézier. Đã commit + deploy live.
 - PHẦN I (UI/UX Redesign) — ĐÃ GỘP bên dưới (37 phiên UI-1 → UI-3aj); mọi commit đã push + deploy live.
 - Audit code: 214 findings · đã vá ~60 · full suite 210 pass / 0 FAIL (phiên N).
 

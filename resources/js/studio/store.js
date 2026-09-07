@@ -2671,29 +2671,54 @@ export const useStudioStore = defineStore('studio', {
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
     },
     // ── Path (curve) select: click thêm điểm neo → đường cong mượt → đóng để tạo vùng chọn ──
-    // ── Bezier curve selection (giống Krita Pen tool): click = neo, KÉO = tay điều khiển cong ──
+    // ── Bezier curve selection (Krita Pen tool): click=neo (kéo=handle), kéo NODE/HANDLE để chỉnh, right-click=xóa ──
+    _pathHit(p) {
+      const m = this.canvasMetrics();
+      if (!m) return null;
+      const d = (nx, ny) => Math.hypot((p.nx - nx) * m.vw, (p.ny - ny) * m.vh);
+      const R = 12; // bán kính grab (px màn hình, chia theo vw/vh)
+      for (let i = this.inpaintPathPoints.length - 1; i >= 0; i--) {
+        const nd = this.inpaintPathPoints[i];
+        if (d(nd.nx + (nd.ox || 0), nd.ny + (nd.oy || 0)) < R) return { type: 'handle', i, side: 'out' };
+        if (d(nd.nx + (nd.ix || 0), nd.ny + (nd.iy || 0)) < R) return { type: 'handle', i, side: 'in' };
+      }
+      for (let i = this.inpaintPathPoints.length - 1; i >= 0; i--) {
+        const nd = this.inpaintPathPoints[i];
+        if (d(nd.nx, nd.ny) < R + 2) return { type: 'node', i };
+      }
+      return null;
+    },
     pathDown(e) {
       if (this.inpaintMaskMode !== 'path') return;
       e.stopPropagation();
       const p = this.inpaintMaskPointer(e); if (!p) return;
-      this._pathPending = { nx: p.nx, ny: p.ny, hx: 0, hy: 0 };
+      const hit = this._pathHit(p);
+      if (hit) { this._pathDrag = { ...hit, broke: false }; return; }
+      // Khoảng trống → neo mới (kéo để tạo tay điều khiển đối xứng).
+      this._pathDrag = { type: 'pending', nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true };
     },
     pathMove(e) {
-      if (this.inpaintMaskMode !== 'path' || !this._pathPending) return;
+      if (this.inpaintMaskMode !== 'path' || !this._pathDrag) return;
       const p = this.inpaintMaskPointer(e); if (!p) return;
-      // Tay điều khiển cạnh ra = (con trỏ - neo) * 0.5 (normalized) — neo tới sẽ phản chiếu ngược (Krita).
-      this._pathPending.hx = (p.nx - this._pathPending.nx) * 0.5;
-      this._pathPending.hy = (p.ny - this._pathPending.ny) * 0.5;
+      const dr = this._pathDrag;
+      if (dr.type === 'pending') { dr.ox = (p.nx - dr.nx) * 0.5; dr.oy = (p.ny - dr.ny) * 0.5; dr.ix = -dr.ox; dr.iy = -dr.oy; dr.sym = true; return; }
+      if (dr.type === 'node') { const nd = this.inpaintPathPoints[dr.i]; if (nd) { nd.nx = p.nx; nd.ny = p.ny; } return; }
+      if (dr.type === 'handle') {
+        const nd = this.inpaintPathPoints[dr.i]; if (!nd) return;
+        const dx = p.nx - nd.nx, dy = p.ny - nd.ny;
+        if (e.altKey) dr.broke = true; // Alt = phá đối xứng (asymmetric)
+        if (dr.side === 'out') { nd.ox = dx; nd.oy = dy; if (nd.sym !== false && !dr.broke) { nd.ix = -dx; nd.iy = -dy; } }
+        else { nd.ix = dx; nd.iy = dy; if (nd.sym !== false && !dr.broke) { nd.ox = -dx; nd.oy = -dy; } }
+        if (dr.broke) nd.sym = false;
+      }
     },
     pathUp() {
-      if (this.inpaintMaskMode !== 'path' || !this._pathPending) return;
-      const p = this._pathPending; this._pathPending = null;
-      this.inpaintPathPoints.push({ nx: p.nx, ny: p.ny, hx: p.hx || 0, hy: p.hy || 0 });
-    },
-    pathUndoPoint() {
       if (this.inpaintMaskMode !== 'path') return;
-      this.inpaintPathPoints.pop();
+      const dr = this._pathDrag; this._pathDrag = null;
+      if (dr && dr.type === 'pending') this.inpaintPathPoints.push({ nx: dr.nx, ny: dr.ny, ox: dr.ox || 0, oy: dr.oy || 0, ix: dr.ix || 0, iy: dr.iy || 0, sym: dr.sym !== false });
     },
+    pathDeleteNode(i) { if (this.inpaintMaskMode !== 'path') return; if (i >= 0 && i < this.inpaintPathPoints.length) this.inpaintPathPoints.splice(i, 1); },
+    pathUndoPoint() { if (this.inpaintMaskMode !== 'path') return; this.inpaintPathPoints.pop(); },
     pathClose() {
       if (this.inpaintMaskMode !== 'path') return;
       const pts = this.inpaintPathPoints;
@@ -2703,22 +2728,22 @@ export const useStudioStore = defineStore('studio', {
       if (!c || !ctx) return;
       const w = c.width, h = c.height;
       if (this.inpaintSelectMode === 'new') { ctx.clearRect(0, 0, w, h); this.inpaintPathRegions = []; }
-      // Bézier thật: c1 = neo a + tay ra(a) · c2 = neo b - tay ra(b) (phản chiếu) — giống Krita.
-      const P = pts.map((p) => ({ x: p.nx * w, y: p.ny * h, hx: (p.hx || 0) * w, hy: (p.hy || 0) * h }));
+      // Bézier với 2 tay điều khiển riêng (out/in): c1 = a + a.out · c2 = b + b.in.
+      const P = pts.map((p) => ({ x: p.nx * w, y: p.ny * h, ox: (p.ox || 0) * w, oy: (p.oy || 0) * h, ix: (p.ix || 0) * w, iy: (p.iy || 0) * h }));
       const n = P.length;
       ctx.globalCompositeOperation = this.inpaintSelectMode === 'subtract' ? 'destination-out' : 'source-over';
       ctx.beginPath();
       ctx.moveTo(P[0].x, P[0].y);
       for (let i = 0; i < n; i++) {
         const a = P[i], b = P[(i + 1) % n];
-        ctx.bezierCurveTo(a.x + a.hx, a.y + a.hy, b.x - b.hx, b.y - b.hy, b.x, b.y);
+        ctx.bezierCurveTo(a.x + a.ox, a.y + a.oy, b.x + b.ix, b.y + b.iy, b.x, b.y);
       }
       ctx.closePath();
       ctx.fillStyle = 'rgba(220,38,38,0.6)';
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
       this._finalizeInpaintBrush();
-      this.inpaintPathRegions.push(pts.map((p) => ({ nx: p.nx, ny: p.ny, hx: p.hx || 0, hy: p.hy || 0 })));
+      this.inpaintPathRegions.push(pts.map((p) => ({ nx: p.nx, ny: p.ny, ox: p.ox || 0, oy: p.oy || 0, ix: p.ix || 0, iy: p.iy || 0, sym: p.sym !== false })));
       this.inpaintPathPoints = [];
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
       this.toast('Đã tạo vùng chọn Bezier — vẽ tiếp hoặc bấm Xóa/Tô/Nhân đôi/Xong.');
