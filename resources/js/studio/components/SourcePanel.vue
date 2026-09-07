@@ -17,7 +17,7 @@ const pickerOpen = ref(false);
     <div class="p-2">
       <!-- Slot duy nhất: icon (trống) | ảnh nguồn (đã có) — bấm mở popup 2 tab -->
       <div
-        @click="pickerOpen = true"
+        @click="pickerOpen = true; store.exitCanvasTools()"
         role="button"
         tabindex="0"
         @keydown.enter.prevent="pickerOpen = true"

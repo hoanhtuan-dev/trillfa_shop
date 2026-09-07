@@ -1782,6 +1782,17 @@ export const useStudioStore = defineStore('studio', {
     finishDraw() { if (!this.drawMode) return; this.applyDraw().then(() => { this.drawMode = false; }); },
     cancelDraw() { if (!this.drawMode) return; this.drawMode = false; this.toast('Đã hủy vẽ.'); },
     exitErase() { if (this.eraseMode) { this.eraseMode = false; this.applyErase(); } },
+    // "Thoát công cụ" thông minh: gọi khi CHUYỂN SANG TÁC VỤ KHÁC / THOÁT ẢNH TIÊU ĐIỂM
+    // (đổi bước, mở trình xem ảnh, mở popup Prompt Tạo Ảnh, mở popup tải ảnh nguồn, bỏ chọn layer…).
+    exitCanvasTools() {
+      if (this.drawMode) this.finishDraw();
+      if (this.eraseMode) this.exitErase();
+      if (this.inpaintMaskMode !== 'none') this.clearInpaintMask();
+      this.reframeOpen = false;
+      this.cropMode = false;
+      if (this._cropStop) this._cropStop(null);
+      this.filmOpen = false;
+    },
     // ── Chuẩn hoá transform layer (xoay/lật) trước khi sửa pixel ──
     // Overlay vẽ/xóa/lasso tính theo khung hiển thị (chưa kể rotation/flip) nên trên layer bị XOAY
     // hoặc LẬT, nét cọ/đường lasso và vùng áp dụng LỆCH khỏi nội dung người dùng nhìn thấy (khi

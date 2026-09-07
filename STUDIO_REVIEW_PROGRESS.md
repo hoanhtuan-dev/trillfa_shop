@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3g (2026-09-07) — Toolbar canvas (RegionTools) đơn sắc đồng nhất + thoát công cụ thông minh
+
+- **Đơn sắc đồng nhất**: 7 nút công cụ (crop · 4 kiểu vùng chọn · vẽ · xóa · film) bỏ màu brand → active = pill sáng monochrome (`bg-cream-100 text-ink-950 border-cream-300/40`), inactive = `text-cream-300 hover:bg-ink-700 hover:text-cream-100`; giữ nguyên size h-9/h-11 + icon 20/22px + tooltip nhất quán, 1 hướng (desktop cột dọc · mobile hàng ngang).
+- **Thoát công cụ thông minh**: `store.exitCanvasTools()` (finishDraw + exitErase + clearInpaintMask + đóng reframe/crop/film) — tự gọi khi: đổi bước (`step`), bỏ chọn layer (`activeLayerId = ''` = thoát ảnh tiêu điểm), mở viewer (`viewer`), mở popup Prompt Tạo Ảnh (`promptOpen`), bấm slot tải ảnh nguồn (SourcePanel `@click`).
+- **Verify**: vite build ✓ (746ms) · RegionTools còn 0 `bg-brand-600` (đơn sắc) · 6 điểm gọi `exitCanvasTools`.
+
 ## Phiên UI-3f (2026-09-07) — Redesign thanh điều hướng (header) trang /studio/library
 
 - **Header (`LibraryApp.vue`)**: card bo tròn viền ink-700 + bóng · trái: ô icon thương hiệu (image, nền brand + ring) + tiêu đề "Thư viện" + badge đếm; nút điều hướng "← Về Studio" rõ ràng (tool-btn, mũi tên xoay 180°); chip dự án hiện tại. Phải: nút **Làm mới** (icon-btn tròn sạch + tooltip) · **Quản lý / Dọn dẹp** là tool-btn toggle (`is-active` khi bật).
