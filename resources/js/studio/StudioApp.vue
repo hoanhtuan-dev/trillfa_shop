@@ -414,8 +414,8 @@ function onTouchEnd(e) {
             <button @click="store.removeEditSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas" aria-label="Bỏ ảnh nguồn khỏi canvas"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
           </div>
           <div ref="canvasZoom" class="absolute inset-0" :class="store.selectTool ? 'cursor-crosshair active:cursor-crosshair' : 'cursor-grab active:cursor-grabbing'" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="onCanvasBgMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="onCanvasBgUp($event)" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
-            <!-- Chế độ isolate (crop/inpaint/erase): layer active GIỮ ĐÚNG vị trí/scale như stack — không xê dịch -->
-            <div v-if="isolateActive" class="absolute inset-0">
+            <!-- Chế độ isolate (crop/inpaint/erase): chỉ khi có layer active — không có layer thì hiện composite (không ẩn hết) -->
+            <div v-if="isolateActive && store.activeLayer" class="absolute inset-0">
               <div v-if="store.upscaleSrc" class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div class="absolute left-0 top-0" :style="isolateLayerStyle">
                   <img ref="cvImg" :src="store.upscaleSrc" class="block max-h-[512px] max-w-[512px] min-w-0 select-none" :class="store.activeLayerId === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : ''" draggable="false" @load="store.onCanvasImgLoad()" />

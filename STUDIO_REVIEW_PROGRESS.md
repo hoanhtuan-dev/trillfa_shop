@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3w (2026-09-07) — Căn/chia đều tôn trọng group (single-group sắp thành viên) · fix ẩn hết layer khi chọn tool không có layer
+
+- **Căn/chia đều theo group**: giữ nguyên khối khi chọn ≥2 unit (group/layer đơn); nếu chỉ chọn DUY NHẤT 1 group → sắp xếp các thành viên bên trong group (không còn no-op).
+- **Fix ẩn hết layer khi chọn công cụ không có layer active**: chế độ isolate (crop/inpaint/erase) chỉ chạy khi `store.activeLayer` tồn tại; nếu không → hiển thị composite (tất cả layer vẫn hiện).
+- Verify: vite build ✓ (783ms).
+
 ## Phiên UI-3v (2026-09-07) — Fix chia đều/căn giữa các group không phá vị trí nội bộ
 
 - Căn lề (`alignSelection`) & chia đều (`distributeSelection`) giờ xử lý theo **ĐƠN VỊ** (`_selectionUnits`): mỗi NHÓM = 1 khối cứng (gồm toàn bộ thành viên, `_unitBox` hộp bao của group), layer đơn lẻ = 1 khối; di chuyển bằng `_translateUnit` → **giữ nguyên vị trí tương đối giữa các thành viên trong group** khi chia đều/căn giữa các nhóm.
