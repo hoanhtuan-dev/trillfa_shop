@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3o (2026-09-07) — Popup ngữ cảnh đẹp mắt (icon chuẩn Lucide) + tạo nhóm layer
+
+- **MultiSelectBar redesign**: đổi sang **icon chuẩn ngành (Lucide)** — căn lề 6 hướng (`alignStart/Center/EndHorizontal/Vertical`), chia đều X/Y (`distributeHorizontal/Vertical`), nhóm (`group`), bắt điểm, xóa — dạng icon-button mono `h-7 w-7`, tooltip, kèm số layer & nhãn nhỏ; gọn & đẹp hơn.
+- **Tạo nhóm layer**: store `layerGroups` + `groupSelection()` (chọn ≥2 → gán `groupId`, chọn cả nhóm) · `ungroupSelection()` (tách nhóm) · `selectLayerWithGroup(id)` (click 1 layer thuộc nhóm = chọn cả nhóm) — nút **Nhóm** / **Tách** trong popup; nhóm di chuyển như một khối (đã hỗ trợ kéo nhóm).
+- **Icon mới trong StudioIcon.vue**: align*Horizontal/Vertical (6), distribute* (2), group (1) — kiểu Lucide.
+- **Verify**: vite build ✓ (720ms) · grep group methods = 7, icons = 9, bar có Nhóm/Tách.
+
 ## Phiên UI-3n (2026-09-07) — Đa chọn & thao tác canvas nâng cao (shift+click, kéo nhóm, snap preset, căn/chia đều, Delete→xác nhận)
 
 - **Chọn nhiều layer (shift+click)**: store thêm `selectedLayerIds` + `selectedIds`/`selection`/`selectionCount`/`isSelected` + `shiftSelectLayer`/`clearSelection`; `setActiveLayer` refactor thành `_setActive` (giữ nhóm) + clear selection. Hoạt động trên canvas (`onLayerPointerDown` shift) lẫn panel Layers (`onRowClick` shift) — row/ảnh được chọn có ring brand mờ.

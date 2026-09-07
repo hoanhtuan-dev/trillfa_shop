@@ -180,7 +180,7 @@ function onLayerPointerDown(l, e) {
   if (e.shiftKey) { store.shiftSelectLayer(l.id); return; } // shift+click: thêm/bỏ vào nhóm chọn nhiều
   if (l.locked) { store.selectLayer(l); return; }
   // Click thường: nếu layer không thuộc nhóm đang chọn → chọn riêng nó; nếu thuộc nhóm → giữ nhóm.
-  if (!store.isSelected(l.id)) store.setActiveLayer(l.id);
+  if (!store.isSelected(l.id)) store.selectLayerWithGroup(l.id); // chọn cả nhóm nếu thuộc nhóm
   store.beginLayerDrag(l.id, e);
   const move = (ev) => store.layerDragMove(ev);
   const up = () => { store.endLayerDrag(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };

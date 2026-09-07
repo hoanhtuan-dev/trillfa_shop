@@ -47,7 +47,7 @@ function onRowDragLeave(e, l) {
   if (dropTargetId.value === l.id) { dropTargetId.value = null; dropBelow.value = false; }
 }
 // Nhấn 1 layer = chọn riêng; shift+click = thêm/bỏ vào nhóm chọn nhiều (đồng bộ canvas).
-function onRowClick(l, e) { if (e && e.shiftKey) store.shiftSelectLayer(l.id); else store.selectLayer(l); }
+function onRowClick(l, e) { if (e && e.shiftKey) store.shiftSelectLayer(l.id); else store.selectLayerWithGroup(l); }
 function onRowDrop(e, l) {
   e.preventDefault();
   if (dragId.value && dragId.value !== l.id) {

@@ -218,6 +218,7 @@ export const useStudioStore = defineStore('studio', {
     uploadSelection: [],    // danh sách rel đang được chọn
     uploadCleaning: false,
     canvasLayers: [],
+    layerGroups: [], // nhóm layer (group): { id, name, layerIds:[] } — mỗi layer có groupId
     activeLayerId: '',
     selectedLayerIds: [], // các layer được chọn (shift+click) ngoài active — hỗ trợ chọn/di chuyển nhiều layer
     // Panel Layers: dock phải khung canvas trên desktop, drawer đè canvas trên mobile.
@@ -1451,6 +1452,36 @@ export const useStudioStore = defineStore('studio', {
     isSelected(id) { return this.selectedIds.includes(id); },
     shiftSelectLayer(id) { const l = this.canvasLayers.find(x => x.id === id); if (!l) return; if (id === this.activeLayerId) { const rest = this.selectedLayerIds.slice(); this.selectedLayerIds = []; if (rest.length) this._setActive(rest[rest.length - 1]); else this._setActive(''); } else { const idx = this.selectedLayerIds.indexOf(id); if (idx >= 0) this.selectedLayerIds.splice(idx, 1); else { if (this.activeLayerId) this.selectedLayerIds.push(this.activeLayerId); this._setActive(id); } } this.saveLayerLayout(); },
     clearSelection() { this.selectedLayerIds = []; if (this.activeLayerId) this.saveLayerLayout(); },
+    // Trả về layer của một nhóm (nếu layer thuộc nhóm) cho thao tác "chọn cả nhóm".
+    selectLayerWithGroup(id) {
+      const l = this.canvasLayers.find(x => x.id === id); if (!l) return;
+      const g = l.groupId ? this.layerGroups.find(x => x.id === l.groupId) : null;
+      if (g && g.layerIds.length > 1) { this._setActive(g.layerIds[g.layerIds.indexOf(id)]); this.selectedLayerIds = g.layerIds.filter(x => x !== id); }
+      else this.setActiveLayer(id);
+      this.saveLayerLayout();
+    },
+    // Tạo NHÓM từ các layer đang chọn (≥2) — tiền đề cho tính năng group đầy đủ sau.
+    groupSelection() {
+      const ids = this.selectedIds; if (ids.length < 2) { this.toast('Chọn ít nhất 2 layer để tạo nhóm.', 'error'); return; }
+      if (ids.some(id => { const l = this.canvasLayers.find(x => x.id === id); return l && l.groupId; })) { this.toast('Đã có layer thuộc nhóm — chọn các layer chưa nhóm.', 'error'); return; }
+      const gid = 'g-' + Date.now();
+      this.layerGroups.push({ id: gid, name: 'Nhóm ' + (this.layerGroups.length + 1), layerIds: ids });
+      this.canvasLayers.forEach(l => { if (ids.includes(l.id)) l.groupId = gid; });
+      this._setActive(ids[0]);
+      this.selectedLayerIds = ids.filter(x => x !== ids[0]);
+      this.saveLayerLayout();
+      this.toast('Đã tạo nhóm ' + ids.length + ' layer — click 1 layer trong nhóm sẽ chọn cả nhóm.');
+    },
+    // Tách nhóm: bỏ groupId của các layer đang chọn + xóa nhóm rỗng.
+    ungroupSelection() {
+      const gids = new Set();
+      this.selectedIds.forEach(id => { const l = this.canvasLayers.find(x => x.id === id); if (l && l.groupId) gids.add(l.groupId); });
+      if (!gids.size) { this.toast('Không có nhóm nào để tách.', 'error'); return; }
+      this.canvasLayers.forEach(l => { if (l.groupId && gids.has(l.groupId)) l.groupId = ''; });
+      this.layerGroups = this.layerGroups.filter(g => !gids.has(g.id));
+      this.saveLayerLayout();
+      this.toast('Đã tách nhóm — các layer trở về độc lập.');
+    },
     selectLayer(item) { if (!item) return; this.setActiveLayer(item.id); },
     // Gỡ layer KHỎI CANVAS (chỉ ảnh hưởng hiển thị) — KHÔNG xóa output/ảnh kết quả hay file nguồn.
     deleteLayer(item) {
