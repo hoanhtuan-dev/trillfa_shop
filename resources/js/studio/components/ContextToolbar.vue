@@ -11,6 +11,8 @@ const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.in
 // ── Chuyên nghiệp: từng thông số = "pill" (icon + nhãn + slider + giá trị), giống Krita/PS ──
 const I = 'h-4 w-4';
 const primary = 'bg-cream-100 text-ink-900 hover:bg-cream-200';
+// Nút "Hoàn thành" (chỉnh sửa vùng) — màu KHÁC hẳn (xanh lục) để phân biệt với nút "Xong" thoát (kem).
+const confirm = 'bg-emerald-600 text-white hover:bg-emerald-500';
 const btn = 'bg-ink-800 text-cream-200 hover:bg-ink-700';
 // Nút ĐANG ĐƯỢC CHỌN (toggle/mode): nền sáng + vòng brand + bóng → rõ là đang active.
 const on = '!bg-cream-100 !text-ink-900 ring-2 ring-brand-300 shadow';
@@ -35,7 +37,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <template v-if="store.inpaintMaskMode === 'path'">
         <!-- Đang CHỈNH SỬA vùng đã đóng → nút "Xong" để hoàn thành việc sửa (cập nhật vùng + re-bake). -->
-        <button v-if="store._pathEditingRegion >= 0" @click="store.pathClose()" :class="[lbl, primary]" title="Hoàn thành chỉnh sửa vùng chọn này"><StudioIcon name="check" :size="I"/>Hoàn thành</button>
+        <button v-if="store._pathEditingRegion >= 0" @click="store.pathClose()" :class="[lbl, confirm]" title="Hoàn thành chỉnh sửa vùng chọn này"><StudioIcon name="check" :size="I"/>Hoàn thành</button>
         <!-- Tự động đóng kín khi quay lại điểm bắt đầu (Krita) → không cần nút "Đóng" nữa. -->
         <button @click="store.pathUndoPoint()" :class="iconBtn" title="Bỏ điểm neo cuối" aria-label="Bỏ điểm neo cuối"><StudioIcon name="undo" :size="I"/></button>
       </template>

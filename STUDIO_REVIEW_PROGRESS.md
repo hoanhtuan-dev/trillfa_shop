@@ -232,3 +232,14 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (716ms) · push `12333b1` · SSH pull + `optimize:clear` ✓ · asset `app-CKEvp2pM.js` + `GalleryModal-BuP0n266.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên V (2026-09-07) — Đổi tên nút "Xong" (2 mục đích) + mask canvas khớp khung layer 1:1
+
+**Yêu cầu:** "nút xong đang gây hiểu nhầm vì cùng tên nút nhưng 2 mục đích khác nhau · tỷ lệ vùng chọn chưa đúng".
+
+**Đã sửa (commit `f1613a1`):**
+- **Đổi tên nút:** nút hoàn thành CHỈNH SỬA vùng đã đóng đổi từ "Xong" → **"Hoàn thành"** (gọi `pathClose` cập nhật vùng + re-bake); nút "Xong" thoát toàn bộ (confirmInpaintMask) giữ nguyên — hết nhầm lẫn 2 mục đích.
+- **Tỷ lệ vùng chọn:** `_initInpaintBrush` + `brushCanvasSize` giờ dùng **đúng kích thước khung layer** (`frameLayout` = baseW/baseH, cap 1024) thay vì chỉ lấy tỷ lệ rồi ép 512. Kết quả: **1 px mask = 1 px khung vẽ** → vùng chọn (preview) & màu tô (`inpaintBrushData`) khớp 100% với vùng đã vẽ, không còn lệch/nhỏ hơn.
+
+**Xác minh:** vite build ✓ (774ms) · push `f1613a1` · SSH pull + `optimize:clear` ✓ · asset `app-CtK06bRF.js` + `GalleryModal-W6ypwzMD.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

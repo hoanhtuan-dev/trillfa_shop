@@ -3358,8 +3358,10 @@ export const useStudioStore = defineStore('studio', {
         const id = tctx.getImageData(0, 0, w, h);
         const d = id.data;
         for (let i = 0; i < d.length; i += 4) {
-          const a = 255 - d[i]; // mask grayscale: đen(0)=vùng chọn → alpha 255
-          d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; d[i + 3] = a;
+          // Cứng hoá mép (ngưỡng) để Xóa/Tô/Nhân đôi/Nâng che khuất TRỌN vùng chọn —
+          // bỏ viền mờ do anti-alias (mép bán trong suốt làm màu tô lộ ảnh nền một ít).
+          const sel = 255 - d[i];
+          d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; d[i + 3] = sel >= 128 ? 255 : 0;
         }
         sctx.putImageData(id, 0, 0);
       }
