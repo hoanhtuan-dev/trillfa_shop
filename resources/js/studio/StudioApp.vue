@@ -234,6 +234,17 @@ function onRotatePointerDown(l, e) {
 // ── Quét chọn nhiều layer (marquee) trên vùng trống · pan khi giữ Ctrl/Space/Cmd ──
 const marquee = ref(null); // {x0,y0,x1,y1} toạ độ client
 let bgDownPos = null;
+// Kéo-thả ảnh từ dock Outputs vào canvas: thả = thêm layer, hover = highlight khung thả.
+const dropOver = ref(false);
+function onCanvasDrop(e) {
+  dropOver.value = false;
+  try {
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (d && d.url) store.addImagesToCanvas([{ url: d.url, name: d.name || 'Ảnh kéo thả' }]);
+  } catch (err) { /* không phải dữ liệu kéo thả của studio */ }
+}
 function marqueeClientOn(e) { if (!store.canvasZoom) return 0; const r = store.canvasZoom.getBoundingClientRect(); void r; return 0; }
 function onCanvasBgDown(e) {
   store.panStart(e);
@@ -389,7 +400,9 @@ function onTouchEnd(e) {
           <!-- ══ Thân frame: vùng canvas + inspector Layers dock phải (desktop) ══ -->
           <div class="flex min-h-0 flex-1">
           <!-- ══ Vùng canvas (trái, flex-1) ══ -->
-          <div class="relative flex-1 overflow-hidden" :class="bgClass">
+          <div class="relative flex-1 overflow-hidden" :class="bgClass" @dragover.prevent="dropOver = true" @dragleave="dropOver = false" @drop.prevent="onCanvasDrop($event)">
+            <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
+            <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-2xl border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
             <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
             <MultiSelectBar v-if="store.selectionCount > 1" class="absolute left-1/2 top-3 z-50 -translate-x-1/2" />
           <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->

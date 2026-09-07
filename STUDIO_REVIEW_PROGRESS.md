@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3u (2026-09-07) — Kéo-thả ảnh từ dock Outputs vào canvas + chỉ báo khi hover
+
+- **Kéo-thả vào canvas**: thumbnail hoàn tất trong `OutputModule` set `draggable` + `onThumbDrag` (dataTransfer text/plain JSON {type,url,name}); canvas (`StudioApp` bg container) thêm `dragover/dragleave/drop` → `onCanvasDrop` → `store.addImagesToCanvas([{url,name}])` (thêm layer).
+- **Chỉ báo khi hover**: mỗi ảnh output có overlay "Kéo thả" hiện khi hover + tooltip "Kéo thả vào canvas để thêm · nhấn để xem lớn"; khi kéo vào canvas hiện khung dashed brand (dropOver).
+- Verify: vite build ✓ (767ms) · OutputModule 3, StudioApp 5.
+
 ## Phiên UI-3t (2026-09-07) — Nút Save vật lý (icon chuẩn) · lưu/khôi phục đầy đủ nhóm & lựa chọn sau refresh
 
 - **Nút Save**: `store.saveNow()` (flush layout + toast "Đã lưu trang") — nút icon `save` (floppy, chuẩn ngành) trong `CanvasStatusBar`.
