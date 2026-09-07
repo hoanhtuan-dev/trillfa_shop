@@ -209,3 +209,15 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (762ms) · push `1b00426` · SSH pull + `optimize:clear` ✓ · asset `app-PwMHRIGd.js` + `GalleryModal-CFpBKWkc.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên T (2026-09-07) — Nút "Sửa" có icon + độ trễ ẩn · icon +/− vùng chọn chuẩn ngành
+
+**Yêu cầu:** "đã nổi nút sửa nhưng thiếu icon · không thể chọn vì không có độ trễ khi ẩn nút · tạo 2 icon đúng chuẩn ngành cho + vùng chọn | − vùng chọn, dùng cho các tool tương tự kể cả tô sáng khi chọn".
+
+**Đã sửa (commit `69e0bab`):**
+- **Nút "Sửa" thêm icon bút chì** (pencil SVG) + giữ chữ "Sửa", đặt cạnh nút.
+- **Độ trễ khi ẩn:** `pathHover` giờ dùng `_regionHoverHit` trả `{region, x, y}` (điểm GẦN NHẤT trên đường bao); khi rời vùng → `setTimeout 450ms` rồi mới ẩn (`_pathHoverTimer`), anchor nút tại đúng điểm đang hover → di tới bấm luôn kịp, không biến mất.
+- **+ / − vùng chọn:** thêm icon `selectAdd` (square+plus) và `selectSubtract` (square+minus) vào StudioIcon; ContextToolbar dùng cho add/subtract (freehand/path/magic) — các nút này vẫn **tô sáng (ring brand) khi chọn** như trước.
+
+**Xác minh:** vite build ✓ (721ms) · push `69e0bab` · SSH pull + `optimize:clear` ✓ · asset `app-ApSJmrui.js` + `GalleryModal-cWpBsaW-.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

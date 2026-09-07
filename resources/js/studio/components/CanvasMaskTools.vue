@@ -61,8 +61,9 @@ const brushCanvasSize = computed(() => {
   const base = 512;
   const img = store.cvImg, f = frame.value;
   let ia = 1;
-  if (img && img.naturalWidth > 1 && img.naturalHeight > 1) ia = img.naturalWidth / img.naturalHeight;
-  else if (f) ia = f.w / f.h;
+  // Ưu tiên TỈ LỆ KHUNG LAYER (frameLayout = baseW/baseH) — khớp hệ toạ độ nx/ny & mask canvas (đúng tỷ lệ).
+  if (f && f.w && f.h) ia = f.w / f.h;
+  else if (img && img.naturalWidth > 1 && img.naturalHeight > 1) ia = img.naturalWidth / img.naturalHeight;
   if (ia >= 1) return { width: base, height: Math.max(1, Math.round(base / ia)) };
   return { width: Math.max(1, Math.round(base * ia)), height: base };
 });

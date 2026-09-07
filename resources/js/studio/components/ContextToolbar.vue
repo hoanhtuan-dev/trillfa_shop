@@ -34,6 +34,8 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   <div v-if="store.inpaintMaskMode !== 'none'" class="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <template v-if="store.inpaintMaskMode === 'path'">
+        <!-- Đang CHỈNH SỬA vùng đã đóng → nút "Xong" để hoàn thành việc sửa (cập nhật vùng + re-bake). -->
+        <button v-if="store._pathEditingRegion >= 0" @click="store.pathClose()" :class="[lbl, primary]" title="Hoàn thành chỉnh sửa vùng chọn này"><StudioIcon name="check" :size="I"/>Xong</button>
         <!-- Tự động đóng kín khi quay lại điểm bắt đầu (Krita) → không cần nút "Đóng" nữa. -->
         <button @click="store.pathUndoPoint()" :class="iconBtn" title="Bỏ điểm neo cuối" aria-label="Bỏ điểm neo cuối"><StudioIcon name="undo" :size="I"/></button>
       </template>
@@ -41,7 +43,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
         <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="sliders" size="h-3 w-3" class="text-brand-300"/><input type="range" min="1" max="128" step="1" :value="store.magicTolerance" @input="store.magicTolerance = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 text-right text-[9px] tabular-nums text-cream-100">{{ store.magicTolerance }}</span></div>
         <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="feather" size="h-3 w-3" class="text-brand-300"/><input type="range" min="0" max="20" step="1" :value="store.magicFeather" @input="store.magicFeather = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 text-right text-[9px] tabular-nums text-cream-100">{{ store.magicFeather }}</span></div>
       </template>
-      <button @click="store.confirmInpaintMask()" :class="[lbl, primary]" :title="store.inpaintMaskSource === 'canvas' ? 'Thoát vùng chọn' : 'Áp dụng vùng chọn và thoát'"><StudioIcon name="check" :size="I"/>Xong</button>
+      <button v-if="!(store.inpaintMaskMode === 'path' && store._pathEditingRegion >= 0)" @click="store.confirmInpaintMask()" :class="[lbl, primary]" :title="store.inpaintMaskSource === 'canvas' ? 'Thoát vùng chọn' : 'Áp dụng vùng chọn và thoát'"><StudioIcon name="check" :size="I"/>Xong</button>
     </template>
     <template v-else>
       <button @click="store.inpaintErase = false" :class="[lbl, store.inpaintErase ? on : btn]" class="rounded-full px-3 py-1 text-xs font-semibold transition-colors" title="Vẽ thêm vùng cần sửa"><StudioIcon name="brush" :size="I"/>Vẽ</button>

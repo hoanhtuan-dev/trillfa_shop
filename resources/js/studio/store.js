@@ -3238,12 +3238,16 @@ export const useStudioStore = defineStore('studio', {
       return null;
     },
     _initInpaintBrush() {
-      // Canvas theo TỈ LỆ ẢNH GỐC (không vuông 512×512) — nếu vuông thì mask bị ép méo & lệch vị trí.
+      // Canvas theo TỈ LỆ KHUNG ẢNH LAYER (frameLayout = baseW/baseH) — khớp hệ toạ độ nx/ny mà con trỏ
+      // dùng để vẽ (tránh mask bị ép méo/tỷ lệ sai khi hiển thị hoặc tô màu). Vuông 512×512 chỉ là mặc định.
       const m = this.canvasMetrics();
+      const fl = this.frameLayout;
       const base = 512;
       let w = base, h = base;
-      if (m && m.iw && m.ih) {
-        const ia = m.iw / m.ih;
+      const iw = (fl && fl.w) || (m && m.iw) || 0;
+      const ih = (fl && fl.h) || (m && m.ih) || 1;
+      if (iw && ih) {
+        const ia = iw / ih;
         if (ia >= 1) { w = base; h = Math.max(1, Math.round(base / ia)); }
         else { w = Math.max(1, Math.round(base * ia)); h = base; }
       }
