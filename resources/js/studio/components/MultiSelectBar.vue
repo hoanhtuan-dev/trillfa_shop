@@ -22,7 +22,7 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
 <template>
   <div class="pointer-events-auto flex flex-wrap items-center gap-0.5 rounded-2xl border border-ink-700/80 bg-ink-900/95 px-1.5 py-1 shadow-2xl ring-1 ring-ink-700/40 backdrop-blur">
     <!-- Số layer -->
-    <span class="flex items-center gap-1.5 px-2 text-[11px] font-semibold text-cream-300/80"><StudioIcon name="layers" size="h-3.5 w-3.5" class="text-brand-300"/> {{ store.selectionCount }}</span>
+    <span class="flex items-center gap-1.5 px-2 text-[11px] font-semibold text-cream-300/80"><StudioIcon name="layers" size="h-3.5 w-3.5" class="text-brand-300"/> {{ store.selectionUnitCount }} đối tượng</span>
     <span :class="sep"></span>
 
     <!-- Căn lề -->
@@ -30,8 +30,8 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
     <span :class="sep"></span>
 
     <!-- Chia đều khoảng cách X/Y -->
-    <button @click="store.distributeSelection('x')" :class="ico" :disabled="store.selectionCount < 3" title="Chia đều khoảng cách theo trục X"><StudioIcon name="distributeHorizontal" size="h-3.5 w-3.5"/></button>
-    <button @click="store.distributeSelection('y')" :class="ico" :disabled="store.selectionCount < 3" title="Chia đều khoảng cách theo trục Y"><StudioIcon name="distributeVertical" size="h-3.5 w-3.5"/></button>
+    <button @click="store.distributeSelection('x')" :class="ico" :disabled="store.selectionUnitCount < 3" title="Chia đều khoảng cách theo trục X"><StudioIcon name="distributeHorizontal" size="h-3.5 w-3.5"/></button>
+    <button @click="store.distributeSelection('y')" :class="ico" :disabled="store.selectionUnitCount < 3" title="Chia đều khoảng cách theo trục Y"><StudioIcon name="distributeVertical" size="h-3.5 w-3.5"/></button>
     <span :class="sep"></span>
 
     <!-- Tạo nhóm / Tách nhóm -->

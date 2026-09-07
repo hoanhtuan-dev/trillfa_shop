@@ -267,6 +267,7 @@ export const useStudioStore = defineStore('studio', {
     selectedIds() { const a = [this.activeLayerId, ...this.selectedLayerIds].filter(Boolean); return [...new Set(a)]; },
     selection() { return this.canvasLayers.filter(l => this.selectedIds.includes(l.id) && l.visible !== false); },
     selectionCount() { return this.selection.length; },
+    selectionUnitCount() { return this._selectionUnits().length; },
     visibleLayers() { return this.canvasLayers.filter(l => l.visible !== false); },
     // Danh sách layer hiển thị front-first (layer TRƯỚC NHẤT ở trên cùng) — chuẩn trình chỉnh
     // ảnh. canvasLayers giữ thứ tự vẽ (zIndex), getter này chỉ đảo để hiển thị panel.
@@ -2116,10 +2117,7 @@ export const useStudioStore = defineStore('studio', {
     },
     // Căn lề theo ĐƠN VỊ (group là 1 khối): left/hcenter/right/top/vcenter/bottom.
     alignSelection(kind) {
-      let units = this._selectionUnits();
-      // Nếu chỉ chọn DUY NHẤT 1 group → sắp xếp các thành viên BÊN TRONG group.
-      if (units.length === 1 && units[0].type === 'group') units = units[0].layers.map(l => ({ type: 'layer', id: l.id, layers: [l], box: this._layerBox(l) }));
-      if (units.length < 2) return;
+      const units = this._selectionUnits(); if (units.length < 2) return;
       let L = Infinity, R = -Infinity, T = Infinity, B = -Infinity;
       units.forEach(u => { L = Math.min(L, u.box.cx - u.box.w / 2); R = Math.max(R, u.box.cx + u.box.w / 2); T = Math.min(T, u.box.cy - u.box.h / 2); B = Math.max(B, u.box.cy + u.box.h / 2); });
       const hc = (L + R) / 2, vc = (T + B) / 2;
@@ -2129,10 +2127,7 @@ export const useStudioStore = defineStore('studio', {
     },
     // Chia đều khoảng cách theo ĐƠN VỊ (group di chuyển nguyên khối, giữ VỊ TRÍ NỘI BỘ).
     distributeSelection(kind) {
-      let units = this._selectionUnits();
-      // Nếu chỉ chọn DUY NHẤT 1 group → chia đều các thành viên BÊN TRONG group.
-      if (units.length === 1 && units[0].type === 'group') units = units[0].layers.map(l => ({ type: 'layer', id: l.id, layers: [l], box: this._layerBox(l) }));
-      if (units.length < 3) return;
+      const units = this._selectionUnits(); if (units.length < 3) return;
       const prop = kind === 'y' ? 'cy' : 'cx';
       const sorted = units.slice().sort((a, b) => a.box[prop] - b.box[prop]);
       const first = sorted[0].box[prop], last = sorted[sorted.length - 1].box[prop];

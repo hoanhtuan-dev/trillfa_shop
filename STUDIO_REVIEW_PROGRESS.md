@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3y (2026-09-07) — Đa-đối-tượng chạy đúng: đếm theo ĐỐI TƯỢNG (group=1), căn/chia đều theo đơn vị
+
+- Thêm `selectionUnitCount` (group = 1 đối tượng). Bar ngữ cảnh hiện khi chọn ≥2 ĐỐI TƯỢNG; nhãn "N đối tượng"; nút **Chia đều** disabled khi <3 đối tượng.
+- Bỏ fallback "1 group → sắp thành viên" (gây nhầm group thành nhiều layer) — `alignSelection`/`distributeSelection` chạy **thuần theo đơn vị**: group là 1 khối, layer đơn là 1 khối.
+- Giờ: chọn hỗn hợp group + layer đơn (≥2/≥3 đối tượng) → Căn lề / Chia đều hoạt động đúng giữa các ĐỐI TƯỢNG.
+- Verify: vite build ✓ (791ms) · selectionUnitCount: store1/StudioApp1/Bar3 · align/distribute const units ×2.
+
 ## Phiên UI-3x (2026-09-07) — Hệ thống hóa hành động đa-đối-tượng theo chuẩn Figma (group = 1 khối)
 
 - **Group = 1 đơn vị** cho mọi thao tác: di chuyển (kéo nhóm) · căn/chia đều (unit-based) · **scale/rotate CẢ group quanh tâm** (`scaleSelectionBy`/`rotateSelectionBy` + `_editUnitLayers`/`_editUnitCenter`, handle scale/rotate giờ tác động lên đơn vị đang chọn thay vì chỉ layer active) · **duplicate group** (Ctrl+D → `duplicateActiveUnit`).

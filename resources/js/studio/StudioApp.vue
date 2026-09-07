@@ -402,7 +402,7 @@ function onTouchEnd(e) {
             <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
             <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-2xl border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
             <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
-            <MultiSelectBar v-if="store.selectionCount > 1" class="absolute left-1/2 top-3 z-50 -translate-x-1/2" />
+            <MultiSelectBar v-if="store.selectionUnitCount > 1" class="absolute left-1/2 top-3 z-50 -translate-x-1/2" />
           <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->
           <RegionTools />
           <!-- Inpaint mask overlay on canvas -->
