@@ -8,6 +8,24 @@
 > - Phần L (đợt vá production-refgen): chưa có trong git — đã gộp **đầy đủ** vào T1, §2, §6; backup nguyên bản gộp: `/tmp/STUDIO_REVIEW_pre-merge_2026-09-07.md` (tạm).
 > Trạng thái từng mục dưới đây được kiểm chứng **trực tiếp trên working tree** (grep/read) lúc gộp, không dựa vào trí nhớ báo cáo cũ.
 
+## PHẦN I — Studio UI/UX Redesign (2026-09-07, gộp 37 phiên UI-1 → UI-3aj)
+
+> Track **GUI/UX/UI** chạy song song với audit code (ngoài phạm vi review). Spec gốc: `STUDIO_UI_REDESIGN.md` (PHẦN I phân tích + PHẦN II chrome). Provider: **CHỈ `deepseek-official`** (`deepseek-v4-pro` logic · `deepseek-v4-flash` cơ học) — workflow fan-out ≤6 agent, text contract, điều phối xác minh 100% bằng read/grep/build. Deploy: `scripts/deploy.sh` → SSH `ssh -p 65002 u310846799@145.79.25.57` (app `~/domains/trillfa.shop`).
+
+**1. Chrome & layout** (UI-1/2/3): vá CSS production thiếu `ink-600/ink-950/cream-400` trong `@theme` · đồng bộ 1 hệ icon (StudioIcon 90+ Lucide) · thêm bộ class chrome `.seg/.seg-btn/.tool-btn/.icon-btn/.panel-head/.panel-title` · **right bar 1 cột** (`w-44→w-[115px]` theo đính chính người dùng) · header tool-btn/icon-btn · chips → `.seg` · mobile top bar + badge đếm · **mobile tối giản** (ContextToolbar desktop-only + floating `bottom-12` khi tool active; outputs drawer chỉ đóng bằng nút close; RegionTools luôn nổi) · **layer theo tỷ lệ khung hình** `addBlankLayer(bg,ratio)` + 7 preset tỷ lệ + màu tùy chỉnh + thoát popup khi bấm ngoài.
+
+**2. Nguồn + Thư viện** (UI-3b/3c/3f): card Nguồn = **1 slot** → `SourcePickerPopup.vue` gộp 2 nguồn **2 tab** · `LibraryCard.vue` icon thư viện cuối dock · header `/studio/library` redesign.
+
+**3. Toolbar canvas** (UI-3g→3j/3p/3r): RegionTools + ContextToolbar **đơn sắc theme** (cream/ink, bỏ brand), icon/cỡ nhất quán, nhóm chuẩn UX, dải phân cách ngang · thêm **tool Lựa chọn (Select)** đầu dock (icon cursor) — **quét/marquee chỉ khi bật Select** (hết đua pan) · **snap xuống status bar** (mặc định 8px, 8/16/24/32) · `exitCanvasTools()` thoát tool khi chuyển tác vụ/thoát ảnh tiêu điểm.
+
+**4. Viewer GalleryModal** (UI-3d/3e/3s/3t): chuyển ảnh **mượt không chớp** (probe + cache `loadedUrls` + crossfade) · info thu gọn · nút **Sử dụng → Prompt Tạo Ảnh** · dải thumbnail cuộn/chọn được (fix pointer-capture) · lưu/khôi phục layer+nhóm+lựa chọn sau refresh · cài đặt status bar tự lưu.
+
+**5. Đa chọn & GROUP = 1 đối tượng** (UI-3n→3aj): shift+click toggle nguyên nhóm · **quét chọn** · `MultiSelectBar.vue` (căn lề 6 hướng · chia đều X/Y · nhóm/tách · tải hàng loạt · xóa) icon Lucide · `selectionUnitCount` (đếm đối tượng) · khung **bbox tím** quanh nhóm · ring layer **xanh sky inner** (outline offset âm) · hệ thống `layerGroups` + `groupId` với rotation/scale cấp group (reset rotation hoàn nguyên) + z-order cả nhóm + thu gọn folder + edit-in-group (Alt+click) · kéo-thả ảnh Outputs vào canvas.
+
+**6. Fix gốc lỗi dai dẳng**: **chọn layer panel** — root cause truyền nhầm **object** thay vì **id** vào `selectLayerWithGroup` → normalize + truyền `l.id` (UI-3aj) · `isSelected` getter→action (fix TypeError màn hình trắng) · bbox lệch (viewport vs local) · `ring-inset` bị che sau ảnh → `outline`.
+
+**Verify:** vite build ✓ mỗi phiên · grep/diff 100% · deploy SSH + verify live asset HTTP 200.
+
 ## 0. Tổng kết
 
 - Ghi nhận gốc: **30 area · 214 findings** (gồm 6 bug phát hiện & vá ngay trong các đợt vá: K.4 ×2 · K.8 ×2 · L.2 ×2).
