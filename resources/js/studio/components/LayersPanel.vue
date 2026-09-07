@@ -51,13 +51,13 @@ function onRowClick(l, e) { if (e && e.shiftKey) { store.shiftSelectLayer(l.id);
 // ── Nhóm layer: hiển thị dưới dạng folder riêng trong panel ──
 const openGroups = ref(new Set());
 function toggleGroup(gid) { const s = new Set(openGroups.value); s.has(gid) ? s.delete(gid) : s.add(gid); openGroups.value = s; }
-function isGroupTop(l) { if (!l.groupId) return false; const m = store.canvasLayers.filter(x => x.groupId === l.groupId && x.visible !== false); return (m[m.length - 1]?.id === l.id); }
+function isGroupTop(l) { if (!l.groupId) return false; const m = store.canvasLayers.filter(x => x.groupId === l.groupId); return (m[m.length - 1]?.id === l.id); }
 const groupRenameId = ref(null), groupRenameVal = ref('');
 function startGroupRename(gid) { const g = store.layerGroups.find(x => x.id === gid); if (!g) return; groupRenameId.value = gid; groupRenameVal.value = g.name || ''; }
 function commitGroupRename() { if (groupRenameId.value) store.renameGroup(groupRenameId.value, groupRenameVal.value); groupRenameId.value = null; }
 function cancelGroupRename() { groupRenameId.value = null; }
 const groupName = (gid) => { const g = store.layerGroups.find(x => x.id === gid); return g ? g.name : 'Nhóm'; };
-const groupCount = (gid) => store.canvasLayers.filter(x => x.groupId === gid && x.visible !== false).length;
+const groupCount = (gid) => store.canvasLayers.filter(x => x.groupId === gid).length;
 const groupLocked = (gid) => store.canvasLayers.filter(x => x.groupId === gid).every(x => x.locked);
 function onRowDrop(e, l) {
   e.preventDefault();

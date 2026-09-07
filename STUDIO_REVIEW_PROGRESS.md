@@ -6,6 +6,14 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3s (2026-09-07) — cursor theo select tool · hint edit-in-group · fix group tách khi ẩn hết · auto-save trước khi thoát
+
+- **Cursor theo tool**: khi bật Select → con trỏ **crosshair** (quét chọn), còn lại grab/grabbing như cũ.
+- **Hint edit-in-group**: title trên layer thuộc nhóm + badge nhóm kèm "Alt+click layer trong nhóm để chỉnh sửa riêng".
+- **Fix group tự tách khi ẩn hết**: `groupLabel`/`isGroupTop`/`groupCount` dùng TẤT CẢ thành viên (kể cả ẩn) → folder nhóm giữ nguyên khi mọi layer trong nhóm bị ẩn.
+- **Auto-save trước khi thoát**: `beforeunload` → `store.saveLayerLayout()` (flush layout trước khi rời trang).
+- Verify: vite build ✓ (730ms).
+
 ## Phiên UI-3r (2026-09-07) — Select tool (đầu dock, luôn nổi) · marquee chỉ khi chọn Select (hết đua pan) · edit in group
 
 - **Tool Lựa chọn**: `store.selectTool` — nút đầu toolbar (icon cursor chuẩn ngành, đơn sắc). Dock toolbar **LUÔN nổi** (bỏ `v-if=upscaleSrc`). Các tool khác tự tắt selectTool.

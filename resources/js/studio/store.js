@@ -1555,7 +1555,7 @@ export const useStudioStore = defineStore('studio', {
     groupLabel(l) {
       if (!l || !l.groupId) return '';
       const g = this.layerGroups.find(x => x.id === l.groupId); if (!g) return '';
-      const members = this.canvasLayers.filter(x => x.groupId === l.groupId && x.visible !== false);
+      const members = this.canvasLayers.filter(x => x.groupId === l.groupId);
       const top = members[members.length - 1];
       return (top && top.id === l.id) ? (g.name || 'Nhóm') : '';
     },
