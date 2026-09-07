@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3e (2026-09-07) — GalleryModal: lưới "Thông tin ảnh" thu gọn · tô xanh ưu tiên trả về nút Chỉnh sửa
+
+- **Lưới thông tin ảnh thu gọn được** (`fieldsOpen`): header "Thông tin ảnh" + nút chevron (xoay 180° khi đóng) → ẩn/hiện các dòng Dự án · Model · Provider · Tỷ lệ · Độ phân giải · Thời lượng · Ngày (Transition cf).
+- **Tô xanh (btn-brand) trả về "Chỉnh sửa → Fitting Room"** (hành động chính, `v-if=!isVideo`); nút "Sử dụng prompt · Tạo ảnh mới" hạ xuống `btn-outline`.
+- **Verify**: vite build ✓ (764ms).
+
 ## Phiên UI-3d (2026-09-07) — GalleryModal: chuyển ảnh mượt không chớp · info thu gọn · nút Sử dụng → Prompt Tạo Ảnh
 
 - **Không chớp + crossfade khi chuyển ảnh**: `GalleryModal` giữ ảnh cũ tới khi ảnh mới `load` xong (probe Image + `loadedUrls` cache) rồi mới đổi `shown` → `Transition cf` opacity 0.18s; prefetch 2 ảnh láng giềng để bấm mũi tên gần như tức thì. Bỏ `:key='img-'+current.id` cũ (nguồn chớp trắng).

@@ -14,6 +14,7 @@ const imgError = ref(false);
 
 // ── Bảng "thông tin ảnh" thu gọn / mở rộng ──
 const infoOpen = ref(true);
+const fieldsOpen = ref(true); // lưới "Thông tin ảnh" (Dự án · Model · Provider …) thu gọn được
 
 // ── Hiển thị ảnh KHÔNG chớp khi chuyển: giữ ảnh cũ đến khi ảnh mới load xong, rồi crossfade ──
 const shown = ref({ id: store.viewer?.id ?? null, url: store.viewer?.media_url || '' });
@@ -354,13 +355,24 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <!-- Thông tin nhanh -->
-        <div class="grid grid-cols-2 gap-1.5">
-          <div v-for="f in fields" :key="f.k" class="rounded-xl bg-ink-800/70 px-2.5 py-1.5">
-            <p class="text-[9px] uppercase tracking-wide text-cream-300/50">{{ f.l }}</p>
-            <p class="truncate text-xs font-medium text-cream-100">{{ f.k === 'project' ? projectLabel : (current?.[f.k] ?? '—') }}</p>
-          </div>
+        <!-- Thông tin ảnh (thu gọn được): Dự án · Model · Provider · Tỷ lệ · Độ phân giải · Thời lượng · Ngày -->
+        <div class="flex items-center justify-between">
+          <p class="text-[9px] font-semibold uppercase tracking-wide text-cream-300/50">Thông tin ảnh</p>
+          <button @click="fieldsOpen = !fieldsOpen"
+                  class="icon-btn !h-5 !w-5"
+                  :title="fieldsOpen ? 'Thu gọn thông tin ảnh' : 'Mở rộng thông tin ảnh'"
+                  :aria-label="fieldsOpen ? 'Thu gọn thông tin ảnh' : 'Mở rộng thông tin ảnh'">
+            <StudioIcon name="chevronDown" size="h-3.5 w-3.5" :class="fieldsOpen ? '' : 'rotate-180'" />
+          </button>
         </div>
+        <Transition name="cf">
+          <div v-if="fieldsOpen" key="fields" class="grid grid-cols-2 gap-1.5">
+            <div v-for="f in fields" :key="f.k" class="rounded-xl bg-ink-800/70 px-2.5 py-1.5">
+              <p class="text-[9px] uppercase tracking-wide text-cream-300/50">{{ f.l }}</p>
+              <p class="truncate text-xs font-medium text-cream-100">{{ f.k === 'project' ? projectLabel : (current?.[f.k] ?? '—') }}</p>
+            </div>
+          </div>
+        </Transition>
 
         <!-- ══ Khối Dự án: gắn / gỡ ══ -->
         <div class="rounded-xl border border-ink-700/60 bg-ink-800/70 p-2.5">
@@ -433,16 +445,17 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <!-- Nút Sử dụng: copy prompt → mở popup Prompt Tạo Ảnh để tạo ảnh mới -->
-        <button @click="usePrompt" :disabled="!canUsePrompt" class="btn-brand btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5"
+        <!-- Nhóm primary: Chỉnh sửa → Fitting Room (hành động chính, tô xanh ưu tiên) -->
+        <button v-if="!isVideo" @click="store.goEdit(current)" class="btn-brand btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5">
+          <StudioIcon name="pencil" size="h-3.5 w-3.5" />
+          Chỉnh sửa → Fitting Room
+        </button>
+
+        <!-- Nút Sử dụng: copy prompt → mở popup Prompt Tạo Ảnh để tạo ảnh mới -->
+        <button @click="usePrompt" :disabled="!canUsePrompt" class="btn-outline btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5"
           :title="canUsePrompt ? 'Copy prompt & mở popup Prompt Tạo Ảnh để tạo ảnh mới' : 'Ảnh này không có prompt để sử dụng'">
           <StudioIcon name="sparkles" size="h-3.5 w-3.5" />
           Sử dụng prompt · Tạo ảnh mới
-        </button>
-
-        <!-- Nhóm primary: Chỉnh sửa (hành động chính) -->
-        <button v-if="!isVideo" @click="store.goEdit(current)" class="btn-outline btn-sm inline-flex items-center justify-center gap-1 w-full !py-2.5">
-          <StudioIcon name="pencil" size="h-3.5 w-3.5" />
-          Chỉnh sửa → Fitting Room
         </button>
 
         <!-- ══ Vùng nguy hiểm (tách biệt, xác nhận 2 bước) ══ -->
