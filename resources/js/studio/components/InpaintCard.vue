@@ -44,16 +44,27 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trên <b>canvas</b> (Nguồn / Kết quả / sản phẩm) để sửa.</div>
 
     <!-- Vẽ Mask: DUY NHẤT 1 công cụ = vùng chọn bằng đường cong (Bezier). Vẽ xong & đóng → tự lấy làm mask. -->
-    <div v-if="activeImg" class="mt-3 flex flex-wrap items-center gap-1.5">
+    <div v-if="activeImg" class="mt-3 space-y-2">
       <button @click="store.toggleInpaintMask('path')" title="Vẽ vùng cần sửa bằng đường cong — đóng kín để làm mask"
-              :class="store.inpaintMaskMode === 'path' ? 'is-active' : ''"
-              class="seg-btn">
-        <StudioIcon name="penTool" size="h-3.5 w-3.5" /> Vẽ mask
+              class="group flex w-full items-center justify-center gap-2.5 rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-200"
+              :class="store.inpaintMaskMode === 'path'
+                ? 'border-emerald-400 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-900/30'
+                : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400/80 hover:bg-emerald-500/20 hover:shadow-md hover:shadow-emerald-900/20 active:scale-[.98]'">
+        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors"
+              :class="store.inpaintMaskMode === 'path' ? 'bg-white/20' : 'bg-emerald-500/20 group-hover:bg-emerald-500/30'">
+          <StudioIcon name="penTool" size="h-4 w-4" />
+        </span>
+        <span class="flex flex-col items-start text-left leading-tight">
+          <span class="text-[13px] font-bold">{{ store.inpaintMaskMode === 'path' ? 'Đang vẽ mask — đóng kín để hoàn tất' : 'Vẽ mask' }}</span>
+          <span class="text-[10px] opacity-80">Vùng chọn bằng đường cong (Bezier)</span>
+        </span>
       </button>
-      <button v-if="maskActive || store.inpaintMaskDone" @click="store.clearInpaintMask()" title="Bỏ mask hiện tại"
-              class="rounded-full bg-red-600/25 px-2 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">
-        Bỏ mask
-      </button>
+      <div v-if="maskActive || store.inpaintMaskDone" class="flex justify-center">
+        <button @click="store.clearInpaintMask()" title="Bỏ mask hiện tại"
+                class="rounded-full bg-red-600/25 px-3 py-1 text-[10px] font-semibold text-red-200 transition-colors hover:bg-red-600 hover:text-white">
+          Bỏ mask
+        </button>
+      </div>
     </div>
     <div v-if="maskActive" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">
       Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.

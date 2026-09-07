@@ -254,3 +254,16 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (763ms) · push `b0ba642` · SSH pull + `optimize:clear` ✓ · asset `app-DOIWj1aF.js` + `GalleryModal-Chgr3H0O.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên X (2026-09-07) — Nâng cấp card Sửa ảnh: 1 công cụ Vẽ Mask (path) + nhận mọi ảnh canvas
+
+**Yêu cầu:** "loại bỏ Render đa góc|Model chỉnh sửa (clean) · loại bỏ Chọn vùng, Vẽ tự do, Vẽ mask · tạo Nút Vẽ Mask mới chỉ gọi đúng 1 công cụ 'Vùng chọn bằng đường cong' → vẽ xong & đóng đồng thời lấy vùng chọn làm mask · card nhận tất cả ảnh từ nhiều nguồn/chọn trong canvas".
+
+**Đã sửa (commit `3e056d0`):**
+- **Backend:** tách `inpaint(Request, Generation)` → `inpaint()` + `inpaintSource(Request)` + `handleInpaint(Request, ?Generation)`; thêm route `POST /studio/inpaint` (name `studio.inpaint.source`) — source-agnostic, chỉ cần `source_url`, không cần generation cha.
+- **Store:** `inpaint()` nguồn = `upscaleSrc` (ảnh đang chọn trên canvas), gọi `/studio/inpaint`; bỏ yêu cầu `previewId`. `pathClose()` khi `inpaintMaskSource==='inpaint'` → **tự finalize mask** (`_inpaintMaskKind='brush'`, `inpaintMaskDone=true`, `inpaintMaskMode='none'`) ngay khi đóng.
+- **InpaintCard:** XÓA "Render đa góc" (toàn bộ script + modal), "Model chỉnh sửa" (select), 3 nút "Chọn vùng/Vẽ tự do/Vẽ mask". Thêm **1 nút "Vẽ mask"** (icon penTool) gọi `toggleInpaintMask('path')` duy nhất. "Chỉnh lại" cũng mở lại path. Hiển thị ảnh đang chọn = `activeImg` (`upscaleSrc`), chấp nhận mọi nguồn.
+- `canSubmit` giờ chỉ cần `activeImg` + prompt (không cần previewId).
+
+**Xác minh:** php -l ✓ (controller + routes) · vite build ✓ (732ms) · push `3e056d0` · SSH pull + `optimize:clear` ✓ · asset `app-DMqx4PoW.js` + `GalleryModal-DqbqwFah.js` + manifest + `/studio` = HTTP 200 trên `trillfa.shop`.
+
