@@ -35,7 +35,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <template v-if="store.inpaintMaskMode === 'path'">
         <!-- Đang CHỈNH SỬA vùng đã đóng → nút "Xong" để hoàn thành việc sửa (cập nhật vùng + re-bake). -->
-        <button v-if="store._pathEditingRegion >= 0" @click="store.pathClose()" :class="[lbl, primary]" title="Hoàn thành chỉnh sửa vùng chọn này"><StudioIcon name="check" :size="I"/>Xong</button>
+        <button v-if="store._pathEditingRegion >= 0" @click="store.pathClose()" :class="[lbl, primary]" title="Hoàn thành chỉnh sửa vùng chọn này"><StudioIcon name="check" :size="I"/>Hoàn thành</button>
         <!-- Tự động đóng kín khi quay lại điểm bắt đầu (Krita) → không cần nút "Đóng" nữa. -->
         <button @click="store.pathUndoPoint()" :class="iconBtn" title="Bỏ điểm neo cuối" aria-label="Bỏ điểm neo cuối"><StudioIcon name="undo" :size="I"/></button>
       </template>

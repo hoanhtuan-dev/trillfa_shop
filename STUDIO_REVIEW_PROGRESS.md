@@ -221,3 +221,14 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (721ms) · push `69e0bab` · SSH pull + `optimize:clear` ✓ · asset `app-ApSJmrui.js` + `GalleryModal-cWpBsaW-.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên U (2026-09-07) — Nút "Xong" khi chỉnh sửa vùng + sửa tỷ lệ vùng chọn/tô màu
+
+**Yêu cầu:** "khi vào chỉnh sửa nổi thêm nút xông để hoàn thành · tỷ lệ vùng chọn bây giờ không đúng · khi tô màu bị nhỏ hơn".
+
+**Đã sửa (commit `12333b1`):**
+- **Nút "Xong" khi chỉnh sửa:** ContextToolbar branch path — khi `_pathEditingRegion >= 0` (đang sửa vùng đã đóng) hiện nút **Xong** (primary, check) gọi `store.pathClose()` để hoàn thành chỉnh sửa (cập nhật vùng + re-bake); ẩn nút "Xong" thoát (confirmInpaintMask) trong lúc sửa để tránh 2 nút "Xong".
+- **Sửa tỷ lệ vùng chọn / tô màu nhỏ hơn:** gốc rễ — mask canvas (`_initInpaintBrush`) dùng tỷ lệ `cvImg` (ảnh nguồn) trong khi con trỏ vùng chọn chuẩn hoá theo `frameLayout` (baseW/baseH của LAYER đang active). Khi layer tỷ lệ khác ảnh nguồn → mask bị ép méo → preview/tô màu lệch. Sửa: `_initInpaintBrush` + `brushCanvasSize` ưu tiên tỷ lệ KHUNG LAYER (`frameLayout`) → mask & overlay cùng hệ toạ độ, tô màu đúng kích thước.
+
+**Xác minh:** vite build ✓ (716ms) · push `12333b1` · SSH pull + `optimize:clear` ✓ · asset `app-CKEvp2pM.js` + `GalleryModal-BuP0n266.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

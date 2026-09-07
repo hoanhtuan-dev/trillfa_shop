@@ -56,16 +56,17 @@ const showDimOverlay = computed(() => {
 });
 const invertedRect = computed(() => store.inpaintMaskMode === 'rect' && !!store.inpaintBrushData);
 
-// Kích thước buffer canvas brush theo TỈ LỆ ẢNH (cạnh dài 512), không vuông cứng để không méo.
+// Kích thước buffer canvas brush = ĐÚNG kích thước khung layer (baseW/baseH, cap 1024) → khớp mask & vùng chọn.
 const brushCanvasSize = computed(() => {
-  const base = 512;
-  const img = store.cvImg, f = frame.value;
-  let ia = 1;
-  // Ưu tiên TỈ LỆ KHUNG LAYER (frameLayout = baseW/baseH) — khớp hệ toạ độ nx/ny & mask canvas (đúng tỷ lệ).
-  if (f && f.w && f.h) ia = f.w / f.h;
-  else if (img && img.naturalWidth > 1 && img.naturalHeight > 1) ia = img.naturalWidth / img.naturalHeight;
-  if (ia >= 1) return { width: base, height: Math.max(1, Math.round(base / ia)) };
-  return { width: Math.max(1, Math.round(base * ia)), height: base };
+  const f = frame.value;
+  let w = 512, h = 512;
+  if (f && f.w && f.h) {
+    const cap = 1024;
+    const s = Math.min(1, cap / f.w, cap / f.h);
+    w = Math.max(1, Math.round(f.w * s));
+    h = Math.max(1, Math.round(f.h * s));
+  }
+  return { width: w, height: h };
 });
 
 // Bấm ngoài box (container) → tạo vùng mới; brush → vẽ mask; freehand → vẽ tự do. Chỉ khi ĐANG chỉnh.
