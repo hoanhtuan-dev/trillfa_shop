@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3x (2026-09-07) — Hệ thống hóa hành động đa-đối-tượng theo chuẩn Figma (group = 1 khối)
+
+- **Group = 1 đơn vị** cho mọi thao tác: di chuyển (kéo nhóm) · căn/chia đều (unit-based) · **scale/rotate CẢ group quanh tâm** (`scaleSelectionBy`/`rotateSelectionBy` + `_editUnitLayers`/`_editUnitCenter`, handle scale/rotate giờ tác động lên đơn vị đang chọn thay vì chỉ layer active) · **duplicate group** (Ctrl+D → `duplicateActiveUnit`).
+- StudioApp: `unitCenterScreen` (tâm đơn vị) dùng cho scale/rotate; history snapshot lúc kéo, push khi xong.
+- Verify: vite build ✓ (778ms) · store 7, StudioApp 6.
+
 ## Phiên UI-3w (2026-09-07) — Căn/chia đều tôn trọng group (single-group sắp thành viên) · fix ẩn hết layer khi chọn tool không có layer
 
 - **Căn/chia đều theo group**: giữ nguyên khối khi chọn ≥2 unit (group/layer đơn); nếu chỉ chọn DUY NHẤT 1 group → sắp xếp các thành viên bên trong group (không còn no-op).

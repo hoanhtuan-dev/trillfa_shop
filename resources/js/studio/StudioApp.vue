@@ -95,7 +95,7 @@ function onLayerKeys(e) {
   }
   const l = store.activeLayer;
   if (!l || l.locked) return;
-  if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); store.duplicateLayer(l.id); return; }
+  if ((e.key === 'd' || e.key === 'D') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); store.duplicateActiveUnit(); return; }
   const step = e.shiftKey ? 10 : 1;
   let dx = 0, dy = 0;
   if (e.key === 'ArrowLeft') dx = -step;
@@ -191,6 +191,13 @@ function onLayerPointerDown(l, e) {
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
 }
+function unitCenterScreen() {
+  const c = store._editUnitCenter();
+  if (!c) return null;
+  const el = store.canvasZoom; if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return { cx: r.left + r.width / 2 + (c.x * (store.zoom || 1) + store.pan.x), cy: r.top + r.height / 2 + (c.y * (store.zoom || 1) + store.pan.y) };
+}
 function layerCenterScreen(l) {
   const el = store.canvasZoom;
   if (!el) return { cx: 0, cy: 0 };
@@ -202,31 +209,22 @@ function layerCenterScreen(l) {
 }
 function onScalePointerDown(l, e) {
   e.stopPropagation();
-  const c = layerCenterScreen(l);
+  const c = unitCenterScreen(); if (!c) return;
   const startDist = Math.hypot(e.clientX - c.cx, e.clientY - c.cy) || 1;
-  const startScale = l.scale || 1;
-  const move = (ev) => {
-    const d = Math.hypot(ev.clientX - c.cx, ev.clientY - c.cy) / startDist;
-    l.scale = Math.max(0.05, Math.min(8, startScale * d));
-  };
-  const up = () => { store.saveLayerLayout(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+  const snap = store._snapshot(); let lastRatio = 1;
+  const move = (ev) => { const ratio = Math.hypot(ev.clientX - c.cx, ev.clientY - c.cy) / startDist; const k = ratio / lastRatio; lastRatio = ratio; store.scaleSelectionBy(k); };
+  const up = () => { if (snap) { store.undoStack.push(snap); if (store.undoStack.length > 50) store.undoStack.shift(); store.redoStack = []; } store.saveLayerLayout(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
 }
 function onRotatePointerDown(l, e) {
   e.stopPropagation();
-  const c = layerCenterScreen(l);
+  const c = unitCenterScreen(); if (!c) return;
   const startAngle = Math.atan2(e.clientY - c.cy, e.clientX - c.cx);
-  const startRotation = l.rotation || 0;
-  const move = (ev) => {
-    const a = Math.atan2(ev.clientY - c.cy, ev.clientX - c.cx);
-    let r = startRotation + (a - startAngle) * (180 / Math.PI);
-    r = ((r % 360) + 360) % 360;
-    if (r > 180) r -= 360;
-    l.rotation = Math.round(r);
-  };
-  const up = () => { store.saveLayerLayout(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+  const snap = store._snapshot(); let lastAng = startAngle;
+  const move = (ev) => { const a = Math.atan2(ev.clientY - c.cy, ev.clientX - c.cx); let d = (a - lastAng) * 180 / Math.PI; lastAng = a; store.rotateSelectionBy(d); };
+  const up = () => { if (snap) { store.undoStack.push(snap); if (store.undoStack.length > 50) store.undoStack.shift(); store.redoStack = []; } store.saveLayerLayout(); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);

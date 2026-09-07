@@ -2078,6 +2078,42 @@ export const useStudioStore = defineStore('studio', {
     },
     _unitBox(layers) { let L = Infinity, R = -Infinity, T = Infinity, B = -Infinity; layers.forEach(l => { const b = this._layerBox(l); const cx = l.x || 0, cy = l.y || 0; L = Math.min(L, cx - b.w / 2); R = Math.max(R, cx + b.w / 2); T = Math.min(T, cy - b.h / 2); B = Math.max(B, cy + b.h / 2); }); return { w: R - L, h: B - T, cx: (L + R) / 2, cy: (T + B) / 2 }; },
     _translateUnit(u, dx, dy) { u.layers.forEach(l => { if (dx) l.x = (l.x || 0) + dx; if (dy) l.y = (l.y || 0) + dy; }); },
+    // ── Đơn vị đang được xử lý (group = 1 khối) cho scale/rotate/duplicate ──
+    _editUnitLayers() {
+      const a = this.activeLayer; if (!a) return [];
+      if (a.groupId) {
+        const g = this.layerGroups.find(x => x.id === a.groupId);
+        if (g && g.layerIds.length > 1 && this.selectedIds.length === g.layerIds.length) {
+          return this.canvasLayers.filter(l => l.groupId === g.id && l.visible !== false);
+        }
+      }
+      return [a];
+    },
+    _editUnitCenter() {
+      const layers = this._editUnitLayers(); if (!layers.length) return null;
+      const b = this._unitBox(layers); return { x: b.cx, y: b.cy };
+    },
+    // Scale CẢ đơn vị (nguyên nhóm) quanh tâm — factor k (không push history, gọi trong drag).
+    scaleSelectionBy(k) {
+      const layers = this._editUnitLayers(); if (!layers.length || !Number.isFinite(k) || k <= 0) return;
+      const c = this._unitBox(layers);
+      layers.forEach(l => { const dx = (l.x || 0) - c.cx, dy = (l.y || 0) - c.cy; l.x = c.cx + dx * k; l.y = c.cy + dy * k; l.scale = Math.max(0.05, Math.min(8, (l.scale || 1) * k)); });
+      this.saveLayerLayout();
+    },
+    // Xoay CẢ đơn vị (nguyên nhóm) quanh tâm — deg (không push history, gọi trong drag).
+    rotateSelectionBy(deg) {
+      const layers = this._editUnitLayers(); if (!layers.length) return;
+      const c = this._unitBox(layers); const a = (deg * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
+      layers.forEach(l => { const dx = (l.x || 0) - c.cx, dy = (l.y || 0) - c.cy; l.x = c.cx + dx * cos - dy * sin; l.y = c.cy + dx * sin + dy * cos; let r = ((l.rotation || 0) + deg) % 360; if (r > 180) r -= 360; if (r < -180) r += 360; l.rotation = Math.round(r); });
+      this.saveLayerLayout();
+    },
+    // Nhân đôi ĐƠN VỊ đang active: nếu group được chọn trọn → nhân đôi nhóm, ngược lại nhân đôi layer.
+    duplicateActiveUnit() {
+      const a = this.activeLayer; if (!a) return;
+      const g = a.groupId ? this.layerGroups.find(x => x.id === a.groupId) : null;
+      if (g && g.layerIds.length > 1 && this.selectedIds.length === g.layerIds.length) { this.duplicateGroup(g.id); return; }
+      this.duplicateLayer(a.id);
+    },
     // Căn lề theo ĐƠN VỊ (group là 1 khối): left/hcenter/right/top/vcenter/bottom.
     alignSelection(kind) {
       let units = this._selectionUnits();
