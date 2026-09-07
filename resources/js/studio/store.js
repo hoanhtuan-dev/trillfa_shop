@@ -2701,11 +2701,39 @@ export const useStudioStore = defineStore('studio', {
       const s = this.inpaintPathPoints[0];
       this.inpaintPathCloseHover = this._pathScreenDist(p.nx, p.ny, s.nx, s.ny) < 20;
     },
+    // Hit node (KHÔNG xét tay điều khiển) — dùng cho Ctrl+click đổi kiểu node.
+    _pathNodeHit(p) {
+      const m = this.canvasMetrics(); if (!m) return -1;
+      for (let i = this.inpaintPathPoints.length - 1; i >= 0; i--) {
+        const nd = this.inpaintPathPoints[i];
+        if (Math.hypot((p.nx - nd.nx) * m.vw, (p.ny - nd.ny) * m.vh) < 14) return i;
+      }
+      return -1;
+    },
+    // Ctrl+click node → xoay vòng kiểu: smooth (mượt) → cusp (góc cong lệch) → sharp (góc nhọn).
+    pathSetNodeKind(i) {
+      if (this.inpaintMaskMode !== 'path') return;
+      const nd = this.inpaintPathPoints[i]; if (!nd) return;
+      const order = ['smooth', 'cusp', 'sharp'];
+      const cur = nd.kind || 'smooth';
+      const next = order[(order.indexOf(cur) + 1) % order.length];
+      nd.kind = next;
+      if (next === 'smooth') { nd.sym = true; }
+      if (next === 'cusp') { nd.sym = false; }
+      if (next === 'sharp') { nd.ox = 0; nd.oy = 0; nd.ix = 0; nd.iy = 0; nd.sym = false; }
+      this.toast(next === 'smooth' ? 'Node: Mượt' : next === 'cusp' ? 'Node: Cusp' : 'Node: Góc nhọn');
+    },
     pathDown(e) {
       if (this.inpaintMaskMode !== 'path') return;
       e.stopPropagation();
       const p = this.inpaintMaskPointer(e); if (!p) return;
       const pts = this.inpaintPathPoints;
+      // Ctrl(hoặc ⌘)+click node → đổi kiểu node (không thêm điểm mới, không đóng).
+      if (e.ctrlKey || e.metaKey) {
+        const ni = this._pathNodeHit(p);
+        if (ni >= 0) { this.pathSetNodeKind(ni); }
+        return;
+      }
       // Snap/đóng kín: >=3 điểm & nhấp gần điểm BẮT ĐẦU → tap = đóng, kéo = di chuyển node đầu.
       if (pts.length >= 3 && this._pathScreenDist(p.nx, p.ny, pts[0].nx, pts[0].ny) < 22) {
         this.inpaintPathCloseHover = false;
@@ -2716,8 +2744,8 @@ export const useStudioStore = defineStore('studio', {
       if (hit) { this._pathDrag = { ...hit, broke: false, sx: p.nx, sy: p.ny, moved: false }; return; }
       // Khoảng trống → neo mới, push NGAY vào mảng (hiển thị ngay ở lần nhấp đầu).
       // Kéo (move) chỉnh tay điều khiển của chính node này in-place để preview sống.
-      const i = this.inpaintPathPoints.push({ nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true }) - 1;
-      this._pathDrag = { type: 'pending', i, nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true, sx: p.nx, sy: p.ny, moved: false };
+      const i = this.inpaintPathPoints.push({ nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true, kind: 'smooth' }) - 1;
+      this._pathDrag = { type: 'pending', i, nx: p.nx, ny: p.ny, ox: 0, oy: 0, ix: 0, iy: 0, sym: true, kind: 'smooth', sx: p.nx, sy: p.ny, moved: false };
     },
     pathMove(e) {
       if (this.inpaintMaskMode !== 'path' || !this._pathDrag) return;

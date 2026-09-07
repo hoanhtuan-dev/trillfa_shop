@@ -156,3 +156,17 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (789ms) · push `5f8d7bf` · SSH pull + `php artisan optimize:clear` ✓ · asset `app-By6qjKLN.js` + `GalleryModal-CUY1aRgV.js` + manifest = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên P (2026-09-07) — Path vẽ theo kiểu Krita: mở đường bao · snap-đóng tự động · bỏ nút "Đóng" · hint ở status bar
+
+**Yêu cầu:** "cải tiến giống krita: không tạo đường bao đóng ngay từ đầu · snap ở điểm bắt đầu để đóng kín · tự đóng hoàn thành vùng chọn rồi bắt đầu vùng khác · thiết kế lại ContextToolbar bỏ nút Đóng (gây hiểu nhầm) · thêm hướng dẫn ở status bar".
+
+**Đã sửa (commit `116fa42`):**
+- `pathSmooth(pts, closed=true)`: đang vẽ `closed=false` → **ĐƯỜNG MỞ** (chỉ nối các điểm kế tiếp, KHÔNG quay về đầu); vùng đã đóng vẫn preview kín. Bỏ polygon fill đang vẽ (trước đây hiện vùng đóng sẵn ngay từ đầu).
+- **Snap-đóng Krita:** `pathDown` khi ≥3 điểm & nhấp gần node 0 (<22px) → `type:'close'`; `pathUp` nếu KHÔNG kéo → gọi `pathClose()` (bake mask, push region, clear points, chuyển sang 'add' → vẽ vùng mới). Kéo >4px → chuyển thành di chuyển node đầu (vẫn chỉnh được).
+- **Hover snap:** thêm `pathHover` (container `@pointermove`) cập nhật `inpaintPathCloseHover` khi gần điểm đầu (<20px). SVG: node 0 phóng to + đổi xanh (#34d399) khi hover, + guide line nét đứt nối điểm cuối → điểm đầu.
+- **Bỏ nút "Đóng"** trong ContextToolbar (path) — vì đóng tự động khi quay lại điểm đầu.
+- **Hướng dẫn ở status bar:** `CanvasStatusBar` thêm `toolHint` theo `inpaintMaskMode` (path/freehand/rect/brush/magic) — dùng icon `info` mới thêm vào StudioIcon.
+
+**Xác minh:** vite build ✓ (775ms) · push `116fa42` · SSH pull + `optimize:clear` ✓ · asset `app-cGbGBF60.js` + `GalleryModal-C_JwzfFG.js` + manifest = HTTP 200 trên `trillfa.shop`.
+

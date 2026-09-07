@@ -15,7 +15,7 @@ const toolHint = computed(() => {
     if (n === 0) return 'Đường cong: bấm để đặt điểm neo · kéo để chỉnh tay điều khiển';
     if (n < 3) return `Đặt thêm điểm neo (${n}/3 tối thiểu) — quay lại điểm đầu (xanh) để đóng kín`;
     if (store.inpaintPathCloseHover) return 'Bấm điểm đầu để đóng kín vùng chọn · kéo sẽ di chuyển thay vì đóng';
-    return 'Bấm điểm đầu (xanh) để đóng kín · kéo neo/tay để chỉnh · Alt = phá đối xứng · click phải = xóa';
+    return 'Bấm điểm đầu (xanh) để đóng kín · kéo neo/tay chỉnh · Ctrl+click node = đổi kiểu (mượt/cusp/nhọn) · Alt = phá đối xứng · click phải = xóa';
   }
   if (m === 'freehand') return 'Vẽ tự do quanh vùng cần chọn — thả chuột để tự đóng kín';
   if (m === 'rect') return 'Kéo để tạo vùng chữ nhật · kéo góc để chỉnh · kéo giữa để di chuyển';

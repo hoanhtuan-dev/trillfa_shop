@@ -31,6 +31,14 @@ const invScale = computed(() => {
 });
 // Bán kính điểm neo (path/curve) giữ ~3px màn hình bất kể zoom/scale.
 const circleR = computed(() => Math.max(0.5, 3 * invScale.value));
+// Màu node theo KIỂU: smooth (tím) · cusp (cam) · sharp (hồng); node 0 highlight xanh khi hover snap.
+function nodeFill(p, i) {
+  if (i === 0 && store.inpaintPathCloseHover) return '#34d399';
+  if (p.kind === 'cusp') return '#fb923c';
+  if (p.kind === 'sharp') return '#f43f5e';
+  return '#a78bfa';
+}
+function nodeKindLabel(p) { return p.kind === 'cusp' ? 'Cusp' : p.kind === 'sharp' ? 'Góc nhọn' : 'Mượt'; }
 
 // Style vùng chữ nhật (mask box / crop-like) theo % KHUNG ẢNH — không cần metrics container.
 function boxFrameStyle() {
@@ -219,10 +227,11 @@ onBeforeUnmount(() => { store.attachBrushCanvas(null); attachedEl = null; window
               <line :x1="p.nx * (anchor.w)" :y1="p.ny * (anchor.h)" :x2="(p.nx + (p.ix||0)) * anchor.w" :y2="(p.ny + (p.iy||0)) * anchor.h" stroke="#f0abfc" :stroke-width="1.5 * invScale" stroke-linecap="round" />
               <circle :cx="(p.nx + (p.ix||0)) * anchor.w" :cy="(p.ny + (p.iy||0)) * anchor.h" :r="circleR * 0.7" fill="#f0abfc" style="pointer-events:auto; cursor:move" />
             </template>
-            <!-- Node: node 0 = điểm BẮT ĐẦU (đóng kín) → highlight xanh khi hover snap -->
+            <!-- Node: node 0 = điểm BẮT ĐẦU (đóng kín) → highlight xanh khi hover snap; Ctrl+click node = đổi kiểu -->
             <circle :cx="p.nx * (anchor.w)" :cy="p.ny * (anchor.h)"
               :r="i === 0 && store.inpaintPathCloseHover ? circleR * 1.5 : circleR"
-              :fill="i === 0 && store.inpaintPathCloseHover ? '#34d399' : '#a78bfa'"
+              :fill="nodeFill(p, i)"
+              :title="'Kiểu: ' + nodeKindLabel(p) + ' — Ctrl+click để đổi · click phải để xóa'"
               stroke="#111" :stroke-width="1" style="pointer-events:auto; cursor:move" @contextmenu.prevent="store.pathDeleteNode(i)" />
           </template>
         </svg>
