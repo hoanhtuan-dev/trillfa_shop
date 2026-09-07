@@ -49,8 +49,8 @@ function onRowDragLeave(e, l) {
 // Nhấn 1 layer = chọn riêng; shift+click = thêm/bỏ vào nhóm chọn nhiều (đồng bộ canvas).
 function onRowClick(l, e) { if (e && e.shiftKey) { store.shiftSelectLayer(l.id); return; } if (e && e.altKey && l.groupId) { store.setActiveLayer(l.id); return; } store.selectLayerWithGroup(l); }
 // ── Nhóm layer: hiển thị dưới dạng folder riêng trong panel ──
-const openGroups = ref(new Set());
-function toggleGroup(gid) { const s = new Set(openGroups.value); s.has(gid) ? s.delete(gid) : s.add(gid); openGroups.value = s; }
+const collapsedGroups = ref(new Set()); // mặc định rỗng = tất cả nhóm MỞ (hiển thị member); thu gọn mới ẩn hết
+function toggleGroup(gid) { const s = new Set(collapsedGroups.value); s.has(gid) ? s.delete(gid) : s.add(gid); collapsedGroups.value = s; }
 function isGroupTop(l) { if (!l.groupId) return false; const m = store.canvasLayers.filter(x => x.groupId === l.groupId); return (m[m.length - 1]?.id === l.id); }
 const groupRenameId = ref(null), groupRenameVal = ref('');
 function startGroupRename(gid) { const g = store.layerGroups.find(x => x.id === gid); if (!g) return; groupRenameId.value = gid; groupRenameVal.value = g.name || ''; }
@@ -137,7 +137,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <!-- Folder nhóm (hiện trước layer đại diện) -->
         <template v-if="isGroupTop(l)">
           <div class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1" :class="store.isGroupActive(l.groupId) ? 'border-brand-500 bg-brand-600/20' : 'border-brand-500/40 bg-ink-800/60'" @click="store.selectGroup(l.groupId)">
-            <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300/70 hover:bg-ink-700 hover:text-cream-100" :title="openGroups.has(l.groupId) ? 'Thu gọn nhóm' : 'Mở rộng nhóm'"><StudioIcon :name="openGroups.has(l.groupId) ? 'chevronDown' : 'chevronUp'" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300/70 hover:bg-ink-700 hover:text-cream-100" :title="collapsedGroups.has(l.groupId) ? 'Mở rộng nhóm' : 'Thu gọn nhóm'"><StudioIcon :name="collapsedGroups.has(l.groupId) ? 'chevronUp' : 'chevronDown'" size="h-3.5 w-3.5" /></button>
             <StudioIcon name="group" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
             <template v-if="groupRenameId === l.groupId">
               <input v-model="groupRenameVal" @keydown.enter.prevent="commitGroupRename" @keydown.esc="cancelGroupRename" @blur="commitGroupRename" class="min-w-0 flex-1 rounded bg-ink-950 px-1 py-0.5 text-[10px] text-cream-100 outline-none ring-1 ring-brand-500" aria-label="Đổi tên nhóm" @click.stop>
@@ -153,7 +153,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           </div>
         </template>
         <!-- Row layer; ẩn các thành viên khi thu gọn nhóm (chỉ giữ đại diện) -->
-        <div v-if="!l.groupId || openGroups.has(l.groupId)"
+        <div v-if="!l.groupId || !collapsedGroups.has(l.groupId)"
         class="group flex items-center gap-1.5 rounded-lg border px-1.5 py-1"
         :class="[
           store.activeLayerId === l.id ? 'border-brand-500 bg-brand-600/15' : (store.isSelected(l.id) ? 'border-brand-500/60 bg-brand-600/10' : 'border-transparent hover:bg-ink-800/70'),

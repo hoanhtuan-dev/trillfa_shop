@@ -411,7 +411,7 @@ function onTouchEnd(e) {
             <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
             <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-2xl border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
             <!-- Khung chọn nhóm (mỗi nhóm được chọn trọn = 1 đối tượng) -->
-            <template v-for="o in selectedGroupOutlines" :key="o.gid"><div class="pointer-events-none absolute z-40 rounded-lg border-2 border-dashed border-brand-400/80" :style="o.style"></div></template>
+            <template v-for="o in selectedGroupOutlines" :key="o.gid"><div class="pointer-events-none absolute z-40 rounded-lg border-2 border-dashed border-violet-400 bg-violet-400/10" :style="o.style"></div></template>
             <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
             <MultiSelectBar v-if="store.selectionUnitCount > 1" class="absolute left-1/2 top-3 z-50 -translate-x-1/2" />
           <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->
@@ -436,7 +436,7 @@ function onTouchEnd(e) {
             <div v-else class="absolute inset-0">
               <div class="absolute left-1/2 top-1/2" :style="{ transform: 'translate(-50%, -50%) translate(' + store.pan.x + 'px, ' + store.pan.y + 'px) scale(' + store.zoom + ')' }">
                 <div v-for="(l, i) in store.visibleLayers" :key="l.id" class="absolute left-0 top-0" :style="layerStyle(l, i)" @pointerdown.stop="onLayerPointerDown(l, $event)">
-                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'ring-2 ring-brand-400' : (store.isSelected(l.id) ? 'ring-2 ring-brand-400/60' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
+                  <img :src="l.image" class="relative block max-h-[512px] max-w-[512px] cursor-move select-none" :title="l.groupId ? 'Thuộc nhóm — Alt+click để chỉnh sửa riêng layer này' : l.name" :class="[l.id === store.activeLayerId ? 'ring-2 ring-inset ring-brand-300' : (store.isSelected(l.id) ? 'ring-2 ring-inset ring-brand-400/70' : ''), l.id === store.highlightLayerId ? 'outline-2 outline-dashed outline-red-500' : '']" draggable="false" />
                   <template v-if="l.id === store.activeLayerId && !l.locked">
                     <div class="absolute -bottom-3 -right-3 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onScalePointerDown(l, $event)" title="Kéo để phóng to/thu nhỏ"></div>
                     <div class="absolute -top-7 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-brand-400 shadow" @pointerdown.stop="onRotatePointerDown(l, $event)" title="Kéo để xoay"></div>

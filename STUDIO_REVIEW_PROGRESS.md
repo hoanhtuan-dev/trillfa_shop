@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3ad (2026-09-07) — Rà soát group: collapse mở mặc định (chọn được layer) · bbox tím · ring inner nổi bật
+
+- **Fix chọn được layer trong bảng layer**: đổi `openGroups` → `collapsedGroups` (mặc định rỗng = mọi nhóm MỞ, hiển thị member); chỉ ẩn hết khi bấm thu gọn. Trước đó nhóm mặc định thu gọn → không thấy/chọn được layer.
+- **Bbox group màu tím** (`border-violet-400` + nền violet/10) — khác biệt rõ với layer.
+- **Ring layer inner** (`ring-inset ring-brand-300` active · `ring-brand-400/70` selected) — nằm bên trong layer, bám đúng để snap chính xác, nét nổi bật hơn.
+- Verify: vite build ✓ (753ms).
+
 ## Phiên UI-3ac (2026-09-07) — Fix nhân đôi nhóm (cả nhóm) + bản sao không dính group nguồn + thu gọn ẩn hết layer
 
 - **Nhân đôi nhóm đúng cả nhóm**: nút "Nhân đôi" trong phần Thuộc tính chuyển sang `duplicateActiveUnit()` (group → `duplicateGroup` cả nhóm). Mọi lối vào (folder · member · thuộc tính · Ctrl+D) giờ đều nhân đôi TOÀN BỘ nhóm.
