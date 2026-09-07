@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3b (2026-09-07) — Card Nguồn 1 slot + popup gộp 2 nguồn thành 2 tab
+
+- **Card Nguồn = 1 slot duy nhất**: `SourcePanel.vue` viết lại — slot trống = icon tải ảnh + "Thêm ảnh nguồn" (viền dashed); slot có ảnh = hiển thị ảnh nguồn đang dùng (`store.editSource`, aspect-square + tên) + nút thay ảnh nhỏ ở góc; header giữ nút X bỏ ảnh nguồn. Bỏ 2 nút cũ (Tải lên/Sản phẩm).
+- **Popup gộp 2 nguồn → 2 tab trong 1 popup**: `SourcePickerPopup.vue` (MỚI) — header + tab `.seg` (Thư viện ảnh / Sản phẩm) + footer chung cộng dồn lựa chọn cả 2 tab → `store.addImagesToCanvas` (GIỮ NGUYÊN ngữ nghĩa thêm nhiều ảnh thành layer — người dùng đã chốt). Tab Thư viện = copy logic `SourceLibraryPicker` multi (/studio/ref-images, upload `/studio/upload-ref` → tự chọn ảnh vừa tải, xóa, output library); tab Sản phẩm = copy popup sản phẩm cũ (/studio/references). Accent đồng bộ brand (thay emerald cũ của tab sản phẩm).
+- **Verify**: vite build ✓ (1.35s) · chuỗi "Thêm ảnh nguồn"/"Thư viện ảnh"/"Sản phẩm" có trong bundle · `SourceLibraryPicker.vue` vẫn dùng ở ComposeCard (không đụng).
+
 ## Phiên UI-3 (2026-09-07) — Layer theo tỷ lệ khung hình · border đồng nhất ink-700 · mobile tối giản · right dock 115px
 
 - **Provider**: CHỈ `deepseek-official` — workflow 4 agent (store-ratio + layers-ratio = `deepseek-v4-pro` · border-ink700 + source-1col = `deepseek-v4-flash`), 4/4 thành công, 0 fail; điều phối tự làm StudioApp.
