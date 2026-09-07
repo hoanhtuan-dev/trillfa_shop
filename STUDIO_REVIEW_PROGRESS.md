@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3i (2026-09-07) — ContextToolbar (option ngữ cảnh): đơn sắc theo theme, cỡ chữ/icon nhất quán
+
+- **Đơn sắc theo theme**: mọi ngữ cảnh (vùng chọn · đã lưu vùng · xóa · vẽ · crop · film) dùng chung token `primary` (cream-100/ink-900) + `btn` (ink-800) + `on` (toggle) + `iconBtn`/`iconBtnDanger` (tròn h-7) + `chipOn/Off` (tỷ lệ/look) + `ring` trung tính (`ring-ink-600/70`); bỏ brand/violet/amber/emerald/sky/red accent → grep accent = 0.
+- **Cỡ chữ/icon thống nhất**: icon mọi nút `size="I" = h-4 w-4` (31 chỗ) · label `text-xs`, nhãn nhỏ `text-[10px]`, chip `text-[11px]` · slider `accent-cream-300` (mono).
+- **Order chuẩn UX**: Xong/Áp dụng (chính, mono) → tùy chọn công cụ (Ngưỡng/Độ mịn/Feather/Cọ) → hành động vùng (Cộng/Trừ/Đảo/Nâng/Nhân đôi/Tô/Xóa) → Bỏ mask/Đóng (iconBtnDanger).
+- **Verify**: vite build ✓ (745ms) · bundle chứa `bg-cream-100 text-ink-900`, `accent-cream-300`; grep accent = 0, dup :class = 0.
+
 ## Phiên UI-3h (2026-09-07) — Toolbar canvas: đơn sắc theo theme, icon/cỡ nhất quán, thứ tự nhóm chuẩn UX
 
 - **Đơn sắc theo theme**: 7 nút dùng chung cặp `mono.on` (pill sáng cream-100/ink-900) / `mono.off` (text-cream-300/70 hover ink-700) — không còn màu thương hiệu (grep brand = 0).
