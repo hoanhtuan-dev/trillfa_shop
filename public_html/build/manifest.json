@@ -171,7 +171,7 @@
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
-    "file": "assets/app-yNGmV23t.css",
+    "file": "assets/app-clCWIBmU.css",
     "name": "app",
     "names": [
       "app.css"
@@ -352,7 +352,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-BNOn1lNF.js",
+    "file": "assets/app-7FV6iO2f.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,

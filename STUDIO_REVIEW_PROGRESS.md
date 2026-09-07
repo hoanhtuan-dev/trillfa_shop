@@ -6,6 +6,13 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3h (2026-09-07) — Toolbar canvas: đơn sắc theo theme, icon/cỡ nhất quán, thứ tự nhóm chuẩn UX
+
+- **Đơn sắc theo theme**: 7 nút dùng chung cặp `mono.on` (pill sáng cream-100/ink-900) / `mono.off` (text-cream-300/70 hover ink-700) — không còn màu thương hiệu (grep brand = 0).
+- **Icon cùng cỡ**: mọi nút dùng `ICON = 'h-5 w-5'` (bỏ biến thể lg), nút `h-9 w-9`/`lg:h-11 lg:w-11` — size nhất quán.
+- **Thứ tự nhóm chuẩn UX** (desktop cột dọc · mobile hàng ngang): Cắt khung (Crop) | Vùng chọn ×4 (rect · lasso · path · magic) | Vẽ + Xóa | Film Look — mỗi nhóm 1 dải phân cách (3 separators).
+- **Verify**: vite build ✓ (777ms) · grep brand=0 · 7 `:size="ICON"` · 3 separators.
+
 ## Phiên UI-3g (2026-09-07) — Toolbar canvas (RegionTools) đơn sắc đồng nhất + thoát công cụ thông minh
 
 - **Đơn sắc đồng nhất**: 7 nút công cụ (crop · 4 kiểu vùng chọn · vẽ · xóa · film) bỏ màu brand → active = pill sáng monochrome (`bg-cream-100 text-ink-950 border-cream-300/40`), inactive = `text-cream-300 hover:bg-ink-700 hover:text-cream-100`; giữ nguyên size h-9/h-11 + icon 20/22px + tooltip nhất quán, 1 hướng (desktop cột dọc · mobile hàng ngang).
