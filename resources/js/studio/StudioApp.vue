@@ -16,6 +16,7 @@ import ContextToolbar from './components/ContextToolbar.vue';
 import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
 import OutputModule from './components/OutputModule.vue';
+import LibraryCard from './components/LibraryCard.vue';
 import GalleryModal from './components/GalleryModal.vue';
 import ProjectWorkspace from './components/ProjectWorkspace.vue';
 import StudioIcon from './components/StudioIcon.vue';
@@ -429,6 +430,7 @@ function onTouchEnd(e) {
       <aside class="scrollbar-hide hidden w-[115px] shrink-0 flex-col space-y-3 overflow-y-auto border-l border-ink-700 bg-ink-900/70 p-2 lg:flex">
         <SourcePanel />
         <OutputModule />
+        <LibraryCard />
       </aside>
     </div>
 
@@ -450,6 +452,7 @@ function onTouchEnd(e) {
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Outputs <span class="text-cream-300/50">({{ store.generations.length }})</span></span><button @click="outputOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button></div>
         <SourcePanel />
         <OutputModule />
+        <LibraryCard />
       </div>
     </div>
     <GalleryModal v-if="store.viewer" />

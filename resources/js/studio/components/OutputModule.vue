@@ -4,7 +4,6 @@ import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 function openGallery() { store.openViewer(store.preview || store.visibleGenerations[0] || store.generations[0] || null); }
-function goLibrary() { window.location.href = '/studio/library'; }
 // Thumbnail URL lấy từ composable dùng chung (useStudioThumb) — cùng logic với PHP helper
 // studio_image_thumb_url(): giảm ~50x dung lượng so với ảnh gốc 2K; path đặc biệt → fallback ảnh gốc.
 // Ảnh gốc full-size vẫn dùng khi mở viewer (store.viewer = g → media_url gốc).
@@ -28,9 +27,6 @@ function projectName(pid, fallback) {
       <div class="flex items-center gap-1">
         <button v-if="store.appliedProject" @click="store.outputFilterProject = !store.outputFilterProject" class="icon-btn" :class="store.outputFilterProject ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-200 hover:bg-ink-700'" :title="store.outputFilterProject ? 'Đang lọc theo dự án: ' + store.appliedProject.name : 'Chỉ hiện outputs của dự án đang áp dụng'">
           <StudioIcon name="filter" size="h-3.5 w-3.5" />
-        </button>
-        <button @click="goLibrary" class="icon-btn" title="Xem thư viện">
-          <StudioIcon name="grid" size="h-4 w-4" />
         </button>
       </div>
     </div>

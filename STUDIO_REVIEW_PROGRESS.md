@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3c (2026-09-07) — Card Nguồn tối giản tuyệt đối + tách card icon Thư viện xuống đáy
+
+- **Card Nguồn chỉ còn slot** (`SourcePanel.vue`): xóa tiêu đề "Nguồn" + caption "Thư viện · Sản phẩm" (người dùng chốt: "chỉ giữ slot, tên hiện khi hover") — slot trống = icon imagePlus; có ảnh = ảnh nguồn (`store.editSource`) + nút X bỏ ảnh (overlay góc, `@click.stop`); mọi mô tả qua `title` (hover). Bấm slot → `SourcePickerPopup` (2 tab) như cũ.
+- **Tách nút "Xem thư viện"**: bỏ icon grid khỏi header card Outputs (`OutputModule.vue` — xóa luôn hàm goLibrary) · tạo `LibraryCard.vue` (MỚI): card riêng chỉ 1 icon library (grid) làm slot, bấm → `/studio/library` (giữ hành vi cũ, người dùng chốt), title chỉ hiện khi hover · chèn dưới cùng right dock (desktop aside) + dưới cùng drawer Outputs mobile trong `StudioApp.vue`.
+- **Verify**: vite build ✓ (725ms) · grep xác nhận OutputModule không còn goLibrary · `LibraryCard` xuất hiện 3 lần (import + aside + drawer).
+
 ## Phiên UI-3b (2026-09-07) — Card Nguồn 1 slot + popup gộp 2 nguồn thành 2 tab
 
 - **Card Nguồn = 1 slot duy nhất**: `SourcePanel.vue` viết lại — slot trống = icon tải ảnh + "Thêm ảnh nguồn" (viền dashed); slot có ảnh = hiển thị ảnh nguồn đang dùng (`store.editSource`, aspect-square + tên) + nút thay ảnh nhỏ ở góc; header giữ nút X bỏ ảnh nguồn. Bỏ 2 nút cũ (Tải lên/Sản phẩm).
