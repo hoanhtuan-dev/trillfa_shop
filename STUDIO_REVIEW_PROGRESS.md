@@ -6,6 +6,11 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3j (2026-09-07) — RegionTools: dải phân cách nhóm xoay NGANG 90° (bỏ bản dọc trên desktop)
+
+- `sep` đổi từ `h-px w-6 ... lg:h-6 lg:w-px` → chỉ còn `h-px w-6` (luôn nằm ngang): trên desktop (cột dọc) phân cách nhóm là đường ngang thay vì đường dọc.
+- Verify: vite build ✓ (752ms).
+
 ## Phiên UI-3i (2026-09-07) — ContextToolbar (option ngữ cảnh): đơn sắc theo theme, cỡ chữ/icon nhất quán
 
 - **Đơn sắc theo theme**: mọi ngữ cảnh (vùng chọn · đã lưu vùng · xóa · vẽ · crop · film) dùng chung token `primary` (cream-100/ink-900) + `btn` (ink-800) + `on` (toggle) + `iconBtn`/`iconBtnDanger` (tròn h-7) + `chipOn/Off` (tỷ lệ/look) + `ring` trung tính (`ring-ink-600/70`); bỏ brand/violet/amber/emerald/sky/red accent → grep accent = 0.

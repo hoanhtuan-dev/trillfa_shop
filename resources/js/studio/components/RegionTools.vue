@@ -9,8 +9,8 @@ const mono = {
   on: 'bg-cream-100 text-ink-900 border-cream-300/40 shadow-cream-100/10',
   off: 'text-cream-300/70 border-transparent hover:bg-ink-700 hover:text-cream-100',
 };
-// Dải phân cách giữa nhóm (ngang trên mobile, dọc trên desktop).
-const sep = 'h-px w-6 shrink-0 bg-ink-700 lg:h-6 lg:w-px';
+// Dải phân cách giữa nhóm — luôn NGANG (xoay ngang 90°), không đổi thành dọc trên desktop.
+const sep = 'h-px w-6 shrink-0 bg-ink-700';
 // Cỡ icon thống nhất cho mọi nút.
 const ICON = 'h-5 w-5';
 </script>
