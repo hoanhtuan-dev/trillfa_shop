@@ -39,6 +39,10 @@ const sep = 'h-4 w-px shrink-0 bg-ink-600';
     <button @click="store.ungroupSelection()" :class="[lblBtn, 'text-cream-200 hover:bg-ink-700']" title="Tách nhóm — trả các layer về độc lập"><StudioIcon name="unlink" size="h-3.5 w-3.5"/>Tách</button>
     <span :class="sep"></span>
 
+    <!-- Tải hàng loạt -->
+    <button @click="store.downloadSelection()" :class="[lblBtn, 'text-cream-200 hover:bg-ink-700']" title="Tải tất cả các layer đang chọn về máy"><StudioIcon name="download" size="h-3.5 w-3.5"/>Tải</button>
+    <span :class="sep"></span>
+
     <!-- Xóa -->
     <button @click="store.deleteSelection()" :class="[lblBtn, 'text-red-300 hover:bg-red-600/25 hover:text-red-200']" title="Xóa các layer đang chọn (Delete)"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa</button>
   </div>

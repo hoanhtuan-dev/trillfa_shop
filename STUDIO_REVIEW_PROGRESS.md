@@ -6,6 +6,12 @@
 > (`dsh-goal-round-driver/README.md`: "no fresh agent or copied conversation prefix").
 
 ## Trạng thái hiện tại
+## Phiên UI-3q (2026-09-07) — Group dùng được khóa/nhân đôi/xóa + nút tải hàng loạt trong popup chọn nhiều
+
+- **Tính năng layer cho group**: `toggleGroupLock` (khóa/mở khóa toàn bộ thành viên) · `duplicateGroup` (nhân đôi nhóm thành nhóm mới, lệch +40px) · `deleteGroup` (xóa toàn bộ thành viên) — thêm nút khóa/copy/trash trong folder nhóm (hover) tại LayersPanel + helper `groupLocked`.
+- **Tải hàng loạt**: `downloadSelection()` (tải lần lượt từng layer đang chọn, `_downloadLayerImage`) + nút **Tải** trong `MultiSelectBar`.
+- Verify: vite build ✓ (710ms) · markers: store 6, LayersPanel 4, MultiSelectBar 1.
+
 ## Phiên UI-3p (2026-09-07) — Snap→status bar (mặc định 8px) · group fold trong Layers · quét chọn nhiều layer
 
 - **Snap xuống status bar**: `CanvasStatusBar` thêm nút bật/tắt snap (target, mặc định BẬT 8px) + select 8/16/24/32; bỏ phần "Bắt điểm" khỏi `MultiSelectBar`. `snapGrid` mặc định = 8.

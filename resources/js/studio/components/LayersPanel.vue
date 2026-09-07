@@ -58,6 +58,7 @@ function commitGroupRename() { if (groupRenameId.value) store.renameGroup(groupR
 function cancelGroupRename() { groupRenameId.value = null; }
 const groupName = (gid) => { const g = store.layerGroups.find(x => x.id === gid); return g ? g.name : 'Nhóm'; };
 const groupCount = (gid) => store.canvasLayers.filter(x => x.groupId === gid && x.visible !== false).length;
+const groupLocked = (gid) => store.canvasLayers.filter(x => x.groupId === gid).every(x => x.locked);
 function onRowDrop(e, l) {
   e.preventDefault();
   if (dragId.value && dragId.value !== l.id) {
@@ -135,7 +136,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       <template v-for="l in store.layersFrontFirst" :key="l.id">
         <!-- Folder nhóm (hiện trước layer đại diện) -->
         <template v-if="isGroupTop(l)">
-          <div class="flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-ink-800/60 px-1.5 py-1" @click="store.selectGroup(l.groupId)">
+          <div class="group flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-ink-800/60 px-1.5 py-1" @click="store.selectGroup(l.groupId)">
             <button @click.stop="toggleGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300/70 hover:bg-ink-700 hover:text-cream-100" :title="openGroups.has(l.groupId) ? 'Thu gọn nhóm' : 'Mở rộng nhóm'"><StudioIcon :name="openGroups.has(l.groupId) ? 'chevronDown' : 'chevronUp'" size="h-3.5 w-3.5" /></button>
             <StudioIcon name="group" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
             <template v-if="groupRenameId === l.groupId">
@@ -144,6 +145,11 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
             <span v-else class="min-w-0 flex-1 truncate text-[11px] font-semibold text-cream-100" :title="'Nhóm: ' + groupName(l.groupId) + ' — nhấn đúp để đổi tên'" @dblclick.stop="startGroupRename(l.groupId)">{{ groupName(l.groupId) }}</span>
             <span class="shrink-0 rounded bg-ink-700 px-1 text-[9px] text-cream-300/70">{{ groupCount(l.groupId) }}</span>
             <button @click.stop="store.ungroupGroup(l.groupId)" class="grid h-6 w-6 shrink-0 place-items-center rounded text-cream-300 hover:bg-red-600/25 hover:text-red-200" :title="'Tách nhóm ' + groupName(l.groupId)"><StudioIcon name="unlink" size="h-3.5 w-3.5" /></button>
+            <div class="flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+              <button @click.stop="store.toggleGroupLock(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" :title="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'" :aria-label="groupLocked(l.groupId) ? 'Mở khóa nhóm' : 'Khóa nhóm'"><StudioIcon :name="groupLocked(l.groupId) ? 'lock' : 'lockOpen'" size="h-3.5 w-3.5" /></button>
+              <button @click.stop="store.duplicateGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded text-cream-300 hover:bg-ink-700" title="Nhân đôi nhóm" aria-label="Nhân đôi nhóm"><StudioIcon name="copy" size="h-3.5 w-3.5" /></button>
+              <button @click.stop="store.deleteGroup(l.groupId)" class="grid h-6 w-6 place-items-center rounded bg-red-600/25 text-red-200 hover:bg-red-600" title="Xóa nhóm" aria-label="Xóa nhóm"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            </div>
           </div>
         </template>
         <!-- Row layer; ẩn các thành viên khi thu gọn nhóm (chỉ giữ đại diện) -->

@@ -27,8 +27,8 @@
     "file": "assets/GalleryModal-DVFIplWF.css",
     "src": "_GalleryModal-DVFIplWF.css"
   },
-  "_GalleryModal-VKo8rzNv.js": {
-    "file": "assets/GalleryModal-VKo8rzNv.js",
+  "_GalleryModal-DgCetsSI.js": {
+    "file": "assets/GalleryModal-DgCetsSI.js",
     "name": "GalleryModal",
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
@@ -352,7 +352,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DHA8N2ir.js",
+    "file": "assets/app-DyQnya1x.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -361,15 +361,15 @@
       "_pinia-CVAjlcja.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_useStudioThumb-BeLv8od7.js",
-      "_GalleryModal-VKo8rzNv.js",
+      "_GalleryModal-DgCetsSI.js",
       "_StylistDataManager-ClLSjC0F.js"
     ],
     "css": [
-      "assets/app-BCk7Zz4J.css"
+      "assets/app-DswyGmb8.css"
     ]
   },
   "resources/js/studio/library.js": {
-    "file": "assets/library-oa6XLcia.js",
+    "file": "assets/library-DA_sox-c.js",
     "name": "library",
     "src": "resources/js/studio/library.js",
     "isEntry": true,
@@ -377,7 +377,7 @@
       "_runtime-dom.esm-bundler-JCahQlAg.js",
       "_pinia-CVAjlcja.js",
       "_useStudioThumb-BeLv8od7.js",
-      "_GalleryModal-VKo8rzNv.js"
+      "_GalleryModal-DgCetsSI.js"
     ]
   },
   "resources/js/studio/settings.js": {

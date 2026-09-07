@@ -1486,6 +1486,63 @@ export const useStudioStore = defineStore('studio', {
     selectGroup(gid) { const g = this.layerGroups.find(x => x.id === gid); if (!g) return; const ids = g.layerIds.filter(id => this.canvasLayers.some(l => l.id === id)); if (!ids.length) return; this._setActive(ids[ids.length - 1]); this.selectedLayerIds = ids.filter(x => x !== ids[ids.length - 1]); this.saveLayerLayout(); },
     // Tách riêng một nhóm (nút trong dock thuộc tính).
     ungroupGroup(gid) { const g = this.layerGroups.find(x => x.id === gid); if (!g) return; this.canvasLayers.forEach(l => { if (l.groupId === gid) l.groupId = ''; }); this.layerGroups = this.layerGroups.filter(x => x.id !== gid); this.saveLayerLayout(); this.toast('Đã tách nhóm.'); },
+    // ── Nhóm layer: khóa / nhân đôi / xóa (giống tính năng của layer) ──
+    toggleGroupLock(gid) {
+      const g = this.layerGroups.find(x => x.id === gid); if (!g) return;
+      const members = this.canvasLayers.filter(l => g.layerIds.includes(l.id));
+      if (!members.length) return;
+      const anyUnlocked = members.some(l => !l.locked);
+      members.forEach(l => { l.locked = anyUnlocked; });
+      this.saveLayerLayout();
+      this.toast(anyUnlocked ? 'Đã khóa nhóm.' : 'Đã mở khóa nhóm.');
+    },
+    duplicateGroup(gid) {
+      const g = this.layerGroups.find(x => x.id === gid); if (!g) return;
+      const originals = g.layerIds.map(id => this.canvasLayers.find(l => l.id === id)).filter(Boolean);
+      if (!originals.length) return;
+      this.pushHistory();
+      const ts = Date.now(), gid2 = 'g2-' + ts, newIds = [];
+      originals.forEach(l => {
+        const cid = l.id + '-dup-' + ts + '-' + newIds.length;
+        this.canvasLayers.push({ id: cid, kind: l.kind, name: (l.name || 'Ảnh') + ' (bản sao)', image: l.image, genId: l.genId, visible: true, locked: false, x: (l.x || 0) + 40, y: (l.y || 0) + 40, scale: l.scale || 1, rotation: l.rotation || 0, opacity: l.opacity != null ? l.opacity : 1, blend: l.blend || 'normal', flipX: !!l.flipX, flipY: !!l.flipY, baseW: l.baseW, baseH: l.baseH, groupId: gid2 });
+        newIds.push(cid);
+      });
+      this.layerGroups.push({ id: gid2, name: 'Nhóm ' + (this.layerGroups.length + 1), layerIds: newIds });
+      this._setActive(newIds[newIds.length - 1]);
+      this.selectedLayerIds = newIds.filter(x => x !== newIds[newIds.length - 1]);
+      this.saveLayerLayout();
+      this.toast('Đã nhân đôi nhóm (' + newIds.length + ' layer).');
+    },
+    deleteGroup(gid) {
+      const g = this.layerGroups.find(x => x.id === gid); if (!g) return;
+      this.pushHistory();
+      if (g.layerIds.includes(this.activeLayerId)) this._setActive('');
+      this.canvasLayers = this.canvasLayers.filter(l => l.groupId !== gid);
+      this.layerGroups = this.layerGroups.filter(x => x.id !== gid);
+      this.selectedLayerIds = [];
+      this.saveLayerLayout();
+      this.toast('Đã xóa nhóm.');
+    },
+    // ── Tải ảnh một layer về máy (dùng cho tải hàng loạt) ──
+    async _downloadLayerImage(l) {
+      if (!l || !l.image) return false;
+      try {
+        const res = await fetch(l.image); if (!res.ok) throw new Error();
+        const blob = await res.blob();
+        const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : blob.type === 'image/gif' ? 'gif' : 'jpg';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = (((l.name || 'anh').replace(/\.[^.]+$/, '') || 'anh') + '.' + ext);
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return true;
+      } catch (e) { return false; }
+    },
+    // Tải HÀNG LOẠT các layer đang chọn (popup chọn nhiều).
+    downloadSelection() {
+      const sels = this.selection; if (!sels.length) { this.toast('Chưa chọn layer.', 'error'); return; }
+      let ok = 0;
+      sels.forEach((l, i) => setTimeout(async () => { if (await this._downloadLayerImage(l)) ok++; if (i === sels.length - 1) this.toast('Đã tải ' + ok + '/' + sels.length + ' layer.'); }, i * 300));
+    },
     // Đổi tên nhóm (có thể rename trên canvas).
     renameGroup(gid, name) {
       const g = this.layerGroups.find(x => x.id === gid); if (!g) return;
