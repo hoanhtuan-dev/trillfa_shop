@@ -407,3 +407,17 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (771ms) · push `6ad4fa3` · SSH pull + `optimize:clear` ✓ · asset `app-CbYbVB5W.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AJ (2026-09-08) — PWA toàn diện cho /studio + icon AI riêng
+
+**Yêu cầu:** "làm cho /studio đáp ứng tiêu chí web tiến bộ toàn diện và có icon riêng".
+
+**Đã sửa (commit `2850630`):**
+- **Icon riêng (AI sparkle):** sinh 5 icon bằng Python PIL — gradient xanh đậm brand (#2d6f4d→#0d2619) + ngôi sao sparkle kem + 2 sparkle nhỏ: `studio-icon-192/512`, `studio-maskable-512`, `studio-apple-touch-icon`, `studio-favicon-32`.
+- **Manifest riêng:** `public_html/manifest-studio.webmanifest` (name "Trillfa Studio — AI Fashion Design", `id/start_url/scope = /studio`, `display: standalone`, theme #193d2b, bg #0e0d09, categories design/productivity/graphics, 4 icon + 3 shortcut).
+- **Service worker:** `public_html/sw-studio.js` (scope /studio): navigation network-first (fallback cache), asset /build//icons//images/ stale-while-revalidate; cache `trillfa-studio-v1`.
+- **Head studio.blade.php:** bỏ `remove-service-worker`; thêm `<link rel=manifest>`, apple-touch-icon, favicon, theme-color #193d2b, color-scheme dark light, đăng ký SW `scope:/studio`.
+- **Storefront cleanup:** `remove-service-worker` giờ BỎ QUA SW scope /studio + cache `trillfa-studio` (không nuke SW Studio khi duyệt storefront).
+
+**Xác minh:** manifest JSON valid ✓ · sw syntax ok ✓ · deploy SSH + `optimize:clear` ✓ · tất cả asset (manifest/sw/5 icon) = HTTP 200 trên `trillfa.shop`.
+
