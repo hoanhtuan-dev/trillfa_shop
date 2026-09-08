@@ -28,8 +28,8 @@ const store = useStudioStore();
 const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 // Activity bar (VSCode-style): mỗi icon mở 1 nhóm card trong sidebar.
 const activityNav = [
+  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [StylistCard, SuggestCard, ConceptCard] },
   { id: 'ref', icon: 'shirt', label: 'Fitting Room', cards: [RefImageCard] },
-  { id: 'concept', icon: 'bot', label: 'Tạo ảnh', cards: [StylistCard, SuggestCard, ConceptCard] },
   { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
   { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
   { id: 'director', icon: 'film', label: 'Video', cards: [DirectorCard] },
@@ -421,7 +421,7 @@ function onTouchEnd(e) {
     <div class="flex flex-1 overflow-hidden">
       <!-- Activity bar (VSCode-style) + Sidebar card của activity đang chọn (desktop) -->
       <nav class="activity-bar hidden md:flex" aria-label="Công cụ">
-        <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-400" title="Studio"><StudioIcon name="sparkles" size="h-5 w-5" /></div>
+        <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-400" title="Studio"><StudioIcon name="bot" size="h-5 w-5" /></div>
         <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" :class="activeActivity === a.id ? 'is-active' : ''" class="activity-btn" :title="a.label" :aria-label="a.label">
           <StudioIcon :name="a.icon" size="h-5 w-5" />
         </button>
