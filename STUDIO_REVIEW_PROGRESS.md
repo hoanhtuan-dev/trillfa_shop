@@ -366,3 +366,16 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (785ms) · push `71a3b3f` · SSH pull + `optimize:clear` ✓ · asset `app-mDh6euOg.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AG (2026-09-08) — Right dock giống left (activity bar phải) + Outputs xuống đáy
+
+**Yêu cầu:** "làm cho dock bên phải giống dock bên trái (hành vi giữ nguyên) · chuyển nút outputs xuống dưới cùng · khi nhấn danh sách outputs mở ra giống dock trái · bảo toàn kéo thả · màu nền giống bên trái kể cả card".
+
+**Đã sửa (commit `a29f44d`):**
+- Right dock giờ có **right activity bar** (rail icon dọc bên phải, `activity-bar.right` — viền trái + indicator active bên phải), mirror left dock.
+- **Nút Outputs (grid) ở ĐÁY** rail (`mt-auto`) + badge đếm `generations`; bấm → toggle panel `store.toggleOutputDock()` (mở/đóng danh sách như dock trái).
+- Panel giữ nguyên Source (cố định) + Outputs (cuộn `flex-1 min-h-0`) + Library (cố định) — **kéo-thả OutputModule nguyên vẹn**.
+- Bỏ header chevron + gradient cũ; panel dùng **`bg-ink-900/70`** (giống sidebar trái), card trong dùng `card` (`bg-ink-800`) như bên trái.
+
+**Xác minh:** vite build ✓ (759ms) · push `a29f44d` · SSH pull + `optimize:clear` ✓ · asset `app-C0adBcfp.js` = HTTP 200 trên `trillfa.shop`.
+
