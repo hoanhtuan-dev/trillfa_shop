@@ -517,3 +517,20 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** php -l ✓ · vite build ✓ (765ms) · push `7aba074` · SSH pull + `optimize:clear` ✓ · app JS `app-CepAIZ1E.js` 200.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AQ)' && git push origin main 2>&1 | tail -1
+
+## Phiên AR (2026-09-08) — Thiết kế lại GUI card "Kịch bản quay" đồng bộ + icon SVG
+
+**Ghi nhận quy trình:** từ nay mọi tính năng/phần tử thêm mới BẮT BUỘC thiết kế lại GUI đồng bộ đẹp mắt + icon SVG (không để người dùng nhắc lại).
+
+**Đã sửa (commit `a0d083a`):**
+- Card **Kịch bản quay (DirectorCard)** viết lại theo chuẩn card hiện đại (giống RefImageCard/InpaintCard):
+  - Header icon-badge SVG (film) + nhãn "video".
+  - **Thời lượng / Độ phân giải** = segmented control (`.seg/.seg-btn`).
+  - **Kịch bản quay** = lưới preset (2 cột) kèm icon film + tooltip prompt; empty-state hướng dẫn.
+  - **Nguồn ảnh** preview rounded-2xl; **Prompt video** textarea.
+  - Nút **Render Video** có icon SVG + spinner quay khi đang gửi.
+- Dùng icon SVG sẵn có (film/clock/scan/sliders/image/pencil/refresh).
+
+**Xác minh:** vite build ✓ (936ms) · push `a0d083a` · SSH pull + `optimize:clear` ✓ · app JS `app-Dzj5NqCz.js` 200.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AR)' && git push origin main 2>&1 | tail -1
