@@ -342,3 +342,15 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (725ms) · push `4d14557` · SSH pull + `optimize:clear` ✓ · asset `app-BcfrBdYF.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AE (2026-09-08) — Icon AI cho "Tạo ảnh" + toggle card khi bấm icon + right dock gradient
+
+**Yêu cầu:** "đổi icon đầu tiên cột trái (icon thể hiện tinh thần AI, tránh nhầm với icon card) · thêm toggle bật/tắt card khi nhấn icon · right dock vẫn như cũ chỉ đổi màu nền gradient + tắt mở được + nút bấm rõ ràng".
+
+**Đã sửa (commit `5b61136`):**
+- **Icon AI:** thêm icon **bot** (robot — tinh thần AI) vào StudioIcon; đổi icon activity "Tạo ảnh" `sparkles → bot` (không còn trùng với logo Studio/card).
+- **Toggle card:** `selectActivity` giờ kiểu VSCode — bấm icon ĐANG CHỌN → đóng/mở card; bấm icon KHÁC → đổi card + mở. (tablet dùng drawer, desktop dùng `leftPanelOpen`).
+- **Right dock:** giữ layout `w-60` + nội dung, chỉ thêm **gradient nền** kiểu card (`linear-gradient(160deg, green→blue)`) + nút chevron-right có **viền + hover rõ** (dễ bấm). Nút chevron-left bảng trái cũng làm rõ tương tự.
+
+**Xác minh:** vite build ✓ (786ms) · push `5b61136` · SSH pull + `optimize:clear` ✓ · asset `app-DRan4OKF.js` = HTTP 200 trên `trillfa.shop`.
+
