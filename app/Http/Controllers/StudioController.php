@@ -87,6 +87,7 @@ class StudioController extends Controller
             'body_hips' => ['nullable', 'integer', 'min:1', 'max:10'],
             'hair_style' => ['nullable', 'string', 'max:100'],
             'hair_color' => ['nullable', 'string', 'max:100'],
+            'seed' => ['nullable', 'integer', 'min:1', 'max:2147483647'],
         ]);
 
         $userPrompt = (string) $data['prompt'];
@@ -1541,6 +1542,7 @@ RULES:
             'mask_image' => $data['mask_image'] ?? null,
             'credits_cost' => $cost,
             'meta' => array_filter([
+                'seed' => ($type === 'image' && ! empty($data['seed'])) ? (int) $data['seed'] : null,
                 'camera' => ($type === 'video' && ! empty($data['camera'])) ? $data['camera'] : null,
                 'region_op' => $data['region_meta']['region_op'] ?? null,
                 'source' => $data['region_meta']['source'] ?? null,
@@ -1767,7 +1769,20 @@ RULES:
         // Containment + image/video-extension allowlist — see studioServePath().
         $file = $this->studioServePath($path);
         if (! $file) {
-            return response()->json(['error' => 'not found', 'path' => $path], 404);
+            // File không tồn tại (có thể đã bị xóa) → trả ảnh placeholder trong suốt
+            // để tránh lỗi 500/img-broken trên UI, thay vì JSON 404.
+            $placeholder = storage_path('app/public/studio/thumb/placeholder.png');
+            if (! is_file($placeholder)) {
+                @mkdir(dirname($placeholder), 0775, true);
+                $img = imagecreatetruecolor(1, 1);
+                imagealphablending($img, false);
+                imagesavealpha($img, true);
+                $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
+                imagefill($img, 0, 0, $transparent);
+                imagepng($img, $placeholder);
+                imagedestroy($img);
+            }
+            return response()->file($placeholder, ['Cache-Control' => 'public, max-age=3600']);
         }
 
         // Ảnh siêu lớn (>4096px) → bỏ qua thumbnail (trả ảnh gốc) để tránh memory spike/OOM trên host.

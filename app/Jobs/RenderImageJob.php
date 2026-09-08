@@ -54,6 +54,8 @@ class RenderImageJob implements ShouldQueue
                 $refImages,
                 // mode='refgen' (card "Tạo ảnh mới từ ảnh mẫu"): i2i qua model sinh ảnh, KHÔNG edit.
                 $generation->meta['mode'] ?? null,
+                // seed (gieo quẻ): để tạo ảnh nhất quán giữa các lần chạy
+                isset($generation->meta['seed']) ? (int) $generation->meta['seed'] : null,
             );
 
             // DEEP REDESIGN (region): AI đã sửa trên CROP — paste lại vào ẢNH GỐC đúng vị trí

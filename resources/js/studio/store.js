@@ -100,6 +100,7 @@ export const useStudioStore = defineStore('studio', {
     variantCount: 1,
     imageRatio: '1:1',
     imageRes: '1K',
+    imageSeed: '',          // Gieo quẻ: seed cố định để tạo ảnh nhất quán (để trống = random)
     generating: false,
     generateProgress: 0,      // 0-100 tiến trình generate (hoạt ảnh)
     generateStage: '',        // 'preparing' | 'enriching' | 'rendering' | 'done'
@@ -443,6 +444,8 @@ export const useStudioStore = defineStore('studio', {
           // "Dự án hiện tại": ảnh tạo ra sẽ tự gắn vào dự án đang áp dụng
           // (null khi đang ở chế độ duyệt → không gắn vào dự án người khác).
           project_id: this.appliedProjectId(),
+          // Gieo quẻ (seed): nếu có → gửi lên backend để tạo ảnh nhất quán
+          seed: this.imageSeed || null,
         });
         const items = Array.isArray(d.items) ? d.items : (d.generation_id ? [d] : []);
         items.forEach((it) => this.addGen({ id: it.generation_id, type: 'image', status: it.status, model: it.model, provider: it.provider, media_url: it.media_url, error: it.error, credits_cost: 1, created_at: 'Vừa gửi' }));
