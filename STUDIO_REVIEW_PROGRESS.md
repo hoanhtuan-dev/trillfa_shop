@@ -392,3 +392,18 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (834ms) · push `29634cf` · SSH pull + `optimize:clear` ✓ · asset `app-hNnTH51N.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AI (2026-09-08) — Nguồn ảnh & Thư viện thành nút hành động (popup/điều hướng)
+
+**Yêu cầu:** "xóa nút bật tắt dock outputs ở status bar · làm cho 2 nút nguồn ảnh|thư viện khi nhấn bật popup và chuyển đến trang đích (không phải mở dock)".
+
+**Đã sửa (commit `6ad4fa3`):**
+- Xóa nút toggle dock Outputs ở **status bar** (CanvasStatusBar).
+- Right activity bar:
+  - **Nguồn ảnh** (`imagePlus`) → mở **popup chọn nguồn** trực tiếp (state `store.sourcePickerOpen`; `SourcePickerPopup` chuyển lên render GLOBAL ở StudioApp).
+  - **Thư viện** (`library`) → **điều hướng** `window.location.href = '/studio/library'`.
+  - **Outputs** (`grid`) → vẫn **toggle dock**.
+- Right panel giờ chỉ hiển thị **Outputs** (SourcePanel/LibraryCard không còn mở dock). SourcePanel dùng `store.sourcePickerOpen` (bỏ local ref + import popup thừa).
+
+**Xác minh:** vite build ✓ (771ms) · push `6ad4fa3` · SSH pull + `optimize:clear` ✓ · asset `app-CbYbVB5W.js` = HTTP 200 trên `trillfa.shop`.
+
