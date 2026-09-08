@@ -33,7 +33,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
 </script>
 <template>
   <!-- ══ Vùng chọn (rect/freehand/path/magic/brush) ══ -->
-  <div v-if="store.inpaintMaskMode !== 'none'" class="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-if="store.inpaintMaskMode !== 'none'" class="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <template v-if="store.inpaintMaskMode === 'rect' || store.inpaintMaskMode === 'freehand' || store.inpaintMaskMode === 'path' || store.inpaintMaskMode === 'magic'">
       <template v-if="store.inpaintMaskMode === 'path'">
         <!-- Đang CHỈNH SỬA vùng đã đóng → nút "Xong" để hoàn thành việc sửa (cập nhật vùng + re-bake). -->
@@ -82,7 +82,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Xóa vùng (erase) ══ -->
-  <div v-else-if="store.eraseMode" class="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.eraseMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="brush" size="h-3 w-3" class="text-brand-300"/><input type="range" min="3" max="150" step="1" :value="store.eraseBrushSize" @input="store.eraseBrushSize = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-8 text-right text-[9px] tabular-nums text-cream-100">{{ store.eraseBrushSize }}px</span></div>
     <div class="flex items-center justify-center gap-0.5 rounded-lg bg-ink-800/70 px-1.5 py-0.5"><StudioIcon name="feather" size="h-3 w-3" class="text-brand-300"/><input type="range" min="0" max="60" step="1" :value="store.eraseFeather" @input="store.eraseFeather = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-6 text-right text-[9px] tabular-nums text-cream-100">{{ store.eraseFeather }}</span></div>
     <span :class="sep"></span>
@@ -92,7 +92,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Vẽ tự do (paint brush) — tiến tới Krita/PS ══ -->
-  <div v-else-if="store.drawMode" class="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.drawMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1"><StudioIcon name="brush" size="h-3 w-3" class="shrink-0 text-brand-300"/><input type="range" min="3" max="150" step="1" :value="store.drawBrushSize" @input="store.drawBrushSize = Number($event.target.value)" class="h-1 w-14 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-[8px] tabular-nums text-cream-100">{{ store.drawBrushSize }}px</span></label>
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1"><StudioIcon name="droplet" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-[9px] text-cream-300/60">Đậm</span><input type="range" min="0.05" max="1" step="0.05" :value="store.drawOpacity" @input="store.drawOpacity = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-7 shrink-0 text-right text-[8px] tabular-nums text-cream-100">{{ Math.round(store.drawOpacity * 100) }}%</span></label>
     <label class="flex items-center gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1"><StudioIcon name="feather" size="h-3 w-3" class="shrink-0 text-brand-300"/><span class="text-[9px] text-cream-300/60">Mềm</span><input type="range" min="0" max="60" step="1" :value="store.drawSoftness" @input="store.drawSoftness = Number($event.target.value)" class="h-1 w-12 cursor-pointer accent-cream-300"><span class="w-5 shrink-0 text-right text-[8px] tabular-nums text-cream-100">{{ store.drawSoftness }}</span></label>
@@ -108,7 +108,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Crop ══ -->
-  <div v-else-if="store.reframeOpen || store.cropMode" class="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.reframeOpen || store.cropMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <span class="flex items-center gap-1 text-cream-200"><StudioIcon name="crop" :size="I"/>Crop</span>
     <button v-for="r in reframeRatios" :key="r" type="button" @click="store.reframeRatio = r" class="rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors" :class="store.reframeRatio === r ? chipOn : chipOff">{{ r }}</button>
     <span class="h-4 w-px bg-ink-600"></span>
@@ -119,7 +119,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
   </div>
 
   <!-- ══ Film Look ══ -->
-  <div v-else-if="store.filmOpen || store.looking" class="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+  <div v-else-if="store.filmOpen || store.looking" class="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
     <span class="flex items-center gap-1 text-cream-200"><StudioIcon name="palette" :size="I"/>Look</span>
     <button v-for="p in looks" :key="p[0]" type="button" @click="store.lookPreset = p[0]" class="rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors" :class="store.lookPreset === p[0] ? chipOn : chipOff">{{ p[1] }}</button>
     <span class="h-4 w-px bg-ink-600"></span>

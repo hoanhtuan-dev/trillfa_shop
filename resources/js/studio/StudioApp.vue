@@ -460,7 +460,7 @@ function onTouchEnd(e) {
           <StudioIcon :name="a.icon" size="h-5 w-5" />
         </button>
       </nav>
-      <aside v-if="store.leftPanelOpen" class="scrollbar-hide hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 lg:flex">
+      <aside v-if="store.leftPanelOpen" class="scrollbar-hide hidden w-72 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 lg:flex">
         <div class="panel-head border-b border-ink-700">
           <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-400" /> {{ activeActivityDef.label }}</span>
           <div class="flex shrink-0 items-center gap-1.5">
@@ -468,7 +468,7 @@ function onTouchEnd(e) {
             <button @click="store.leftPanelOpen = false" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:bg-ink-700 hover:text-white" title="Ẩn bảng trái" aria-label="Ẩn bảng trái"><StudioIcon name="chevronLeft" size="h-4 w-4" /></button>
           </div>
         </div>
-        <div class="scrollbar-hide space-y-3 p-3">
+        <div class="scrollbar-hide space-y-2.5 p-2.5">
           <component :is="c" v-for="(c,i) in panel" :key="i" />
         </div>
       </aside>

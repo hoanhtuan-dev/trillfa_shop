@@ -30,7 +30,7 @@ const invScale = computed(() => {
   return 1 / sc;
 });
 // Bán kính điểm neo (path/curve) giữ ~3px màn hình bất kể zoom/scale.
-const circleR = computed(() => { const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches; return Math.max(0.5, (coarse ? 4.5 : 3) * invScale.value); });
+const circleR = computed(() => Math.max(0.5, 3 * invScale.value));
 // Màu node theo KIỂU: smooth (tím) · cusp (cam) · sharp (hồng); node 0 highlight xanh khi hover snap.
 function nodeFill(p, i) {
   if (i === 0 && store.inpaintPathCloseHover) return '#34d399';

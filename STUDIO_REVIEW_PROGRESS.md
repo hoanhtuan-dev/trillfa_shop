@@ -476,3 +476,16 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** vite build ✓ (869ms) · push `db45496` · SSH pull + `optimize:clear` ✓ · app JS `app-CGrqMYTU.js` 200.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AN)' && git push origin main 2>&1 | tail -1
+
+## Phiên AO (2026-09-08) — Tối ưu GUI/kích thước cho tablet + touch/stylus
+
+**Yêu cầu:** "tối ưu gui|kích thước cho máy tính bảng|cải thiện thao tác bằng ngón tay|bút stylus".
+
+**Đã sửa (commit `0e89baa`):**
+- **Vùng chạm lớn hơn trên touch** (`@media (pointer: coarse)` trong app.css): activity-bar w-16 · activity-btn 48px · icon-btn 40px · seg-btn/tool-btn padding+font to hơn · indicator active cao hơn.
+- **Bán kính grab path lớn hơn trên touch:** thêm `_grabR()` (22px touch / 12px chuột) áp cho `_pathHit`, `_pathNodeHit`, `_regionNodeHit`, hover đóng kín + snap-close → dễ bấm node/tay bằng ngón tay/bút.
+- **Node hình tròn to hơn trên touch:** `circleR` 3→4.5px (×invScale) khi pointer: coarse.
+
+**Xác minh:** vite build ✓ (745ms) · push `0e89baa` · SSH pull + `optimize:clear` ✓ · app JS `app-DvEAFP6n.js` 200.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AO)' && git push origin main 2>&1 | tail -1
