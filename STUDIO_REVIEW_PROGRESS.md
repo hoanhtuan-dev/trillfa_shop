@@ -580,3 +580,25 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** php -l ✓ · push `8ad1721` · SSH pull + `optimize:clear` ✓ · redirect /settings → presets (auth) ✓.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AU)' && git push origin main 2>&1 | tail -1
+
+## Phiên AV (2026-09-08) — Khôi phục trang Cài đặt + chuyển preset Inpaint vào /studio/presets
+
+**Yêu cầu:** "trả lại trang cài đặt, chuyển cài đặt preset Inpaint vào studio/presets".
+
+**Đã làm (commit `7b9a9a4`):**
+- **Khôi phục** trang Cài đặt: revert `/settings` redirect → `Route::get('/settings', settings)`; `/api` redirect → `route('studio.settings')`; sidebar "Cài đặt"/"Trợ giúp" nav → `/studio/settings`; active map khôi phục.
+- **Preset Inpaint → /studio/presets**: add category `inpaint` vào `StudioController::presets()` ($categories) + `presets.blade.php` ($catLabels "Sửa ảnh (Inpaint)" + $catColors) → quản lý quick presets của card Sửa ảnh ngay trên trang Prompt Templates.
+
+**Xác minh:** php -l ✓ (routes + controller) · push `7b9a9a4` · SSH pull + `optimize:clear` ✓ · /studio/settings 302 (auth→login, restored).
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AV)' && git push origin main 2>&1 | tail -1
+
+## Phiên AW (2026-09-08) — Gộp PHẦN I.3 vào STUDIO_REVIEW.md (AB–AV) + commit báo cáo
+
+**Việc:** ghi "PHẦN I.3 — Workspace VSCode-style + PWA + Inpaint/Kịch bản quay" (22 phiên AB–AV, commit `8e2b9a1`→`7b9a9a4`) vào `STUDIO_REVIEW.md` (mục PHẦN I), cập nhật sổ cái.
+
+**Nội dung gộp:** (A) Activity bar VS Code + left/right dock ẩn được + tối ưu không gian + title động. (B) PWA /studio (manifest .json, icon sparkle, sw-studio, đăng ký đúng vue.blade.php). (C) Kịch bản quay đọc preset video_scene + card Sửa ảnh (chip Đổi màu/Thay nền popup, preset inpaint từ Prompt Templates, Ctrl+Enter, undo/redo mask) + quản lý preset inpaint ở /studio/presets.
+
+**T7 — commit báo cáo:** `STUDIO_REVIEW.md` (PHẦN I.3) + `STUDIO_REVIEW_PROGRESS.md` (Phiên AB–AW) đã commit cùng đợt này.
+
+EOF && git add STUDIO_REVIEW.md STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs(studio): write PHẦN I.3 (AB–AV) into STUDIO_REVIEW.md; update ledger Phiên AW.' && git log --oneline -1

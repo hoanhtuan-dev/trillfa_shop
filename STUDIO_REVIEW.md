@@ -48,6 +48,29 @@
 
 **Verify:** php -l ✓ (controller/routes) · vite build ✓ mỗi phiên · deploy SSH + verify live asset HTTP 200 (commit `2ec903b` mới nhất).
 
+
+### PHẦN I.3 — Workspace VSCode-style + PWA + Inpaint/Kịch bản quay (2026-09-08 · 22 phiên AB–AV · commit `8e2b9a1` → `7b9a9a4`)
+
+> Nối tiếp PHẦN I.2. Chi tiết từng phiên trong `STUDIO_REVIEW_PROGRESS.md` (mục "## Phiên AB…AV").
+
+**A. Workspace VSCode-style (left card / right dock):**
+- **Activity bar kiểu VS Code**: thanh icon dọc cố định (w-14) thay step-nav 1/2/3; mỗi icon mở 1 nhóm card (Tạo ảnh · Fitting Room · Sửa ảnh · Upscale · Kịch bản quay). Bấm icon ĐANG CHỌN → toggle card. Icon AI: logo Studio=bot, Tạo ảnh=sparkles (hoán đổi). Thứ tự: Tạo ảnh trên cùng.
+- **Left card + Right dock ẩn được** (`leftPanelOpen`/`outputDockOpen`, lưu `trillfa.bar`); nút chevron rõ ràng. Right dock **viết lại kiểu left** (panel-head + collapsible): icon Nguồn ảnh (mở popup), Thư viện (điều hướng /studio/library), Outputs (toggle dock); panel chỉ hiện Outputs.
+- **Kích thước tối ưu không gian**: sidebar `w-80→w-72`, padding thắt; giãn gap nút (activity gap-2, toolbar gap-1.5); `_grabR()` bán kính grab 22px touch/12px chuột (vô hình, dễ bấm).
+- **Quản lý title**: `document.title` động theo activity + dự án (`"Sửa ảnh · Dự án · Trillfa Studio"`).
+
+**B. PWA cho /studio:**
+- Manifest riêng `manifest-studio.json` (`application/json`, scope /studio) + **icon AI sparkle riêng** (192/512/maskable/apple/favicon).
+- Service worker `sw-studio.js` (scope /studio): navigation network-first, asset SWR; KHÔNG cache HTML no-store (fix SW không activate → không installable).
+- Đăng ký SW đúng file **`studio/vue.blade.php`** (trang /studio thật, không phải layouts/studio cũ). Prompt cài đặt (`beforeinstallprompt` + banner + nút top bar). Storefront cleanup bỏ qua scope /studio.
+
+**C. Cards + presets:**
+- **Kịch bản quay (DirectorCard)**: đổi từ "Video/Ghế Đạo Diễn"; đọc preset `video_scene` từ Prompt Templates (endpoint `/studio/defaults` trả `video_scenes`); GUI thiết kế lại chuẩn card (seg duration/resolution, lưới preset, icon SVG).
+- **Card Sửa ảnh (Inpaint)**: chip chỉnh nhanh — **Đổi màu** popup chọn màu · **Thay nền** popup nhập prompt · preset `inpaint` từ Prompt Templates (seed 5: Xóa tạp chất/Làm sạch/Chỉnh dáng/Chất liệu/Xóa vật thể); checkbox giữ mặt/nền; mask lưới mini preview; **Ctrl+Enter gửi**; **undo/redo mask** (snapshot stack 30).
+- **Settings/presets**: `inpaint` category thêm vào trang `/studio/presets` (Prompt Templates) để quản lý quick preset Inpaint; trang Cài đặt `/studio/settings` được khôi phục (sau khi thử gộp redirect → hoàn tác).
+
+**Verify:** php -l ✓ · vite build ✓ mỗi phiên · db:seed PresetSeeder ✓ (5 inpaint presets) · deploy SSH + `optimize:clear` ✓ · asset live HTTP 200 (commit `7b9a9a4` mới nhất).
+
 ## 0. Tổng kết
 
 - Ghi nhận gốc: **30 area · 214 findings** (gồm 6 bug phát hiện & vá ngay trong các đợt vá: K.4 ×2 · K.8 ×2 · L.2 ×2).
