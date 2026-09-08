@@ -141,6 +141,14 @@ function onHistoryKeys(e) {
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
 const activeActivityDef = computed(() => activityNav.find(a => a.id === activeActivity.value) || activityNav[0]);
 const panel = computed(() => activeActivityDef.value.cards); // ComposeCard vẫn tạm ẩn
+// Quản lý title cho /studio: cập nhật document.title theo activity + dự án đang áp dụng.
+watch([activeActivity, () => store.appliedProject?.name], () => {
+  const parts = [];
+  if (activeActivityDef.value) parts.push(activeActivityDef.value.label);
+  if (store.appliedProject && store.appliedProject.name) parts.push(store.appliedProject.name);
+  parts.push('Trillfa Studio');
+  document.title = parts.join(' · ');
+}, { immediate: true });
 // Chọn activity: trên tablet/mobile (sidebar ẩn) mở drawer để hiện card; desktop chỉ đổi card sidebar.
 // Toggle kiểu VSCode: bấm icon ĐANG CHỌN → đóng/mở card; bấm icon KHÁC → đổi card + mở.
 function selectActivity(id) {

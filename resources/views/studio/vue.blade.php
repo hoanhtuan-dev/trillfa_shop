@@ -16,7 +16,7 @@
             });
         }
     </script>
-    <title>Studio — Trillfa</title>
+    <title>Trillfa Studio</title>
     @vite(['resources/css/app.css', 'resources/js/studio/app.js'])
 </head>
 <body class="h-screen overflow-hidden bg-ink-900 text-cream-100 antialiased">

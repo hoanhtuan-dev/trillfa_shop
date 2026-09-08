@@ -450,3 +450,17 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Cách kiểm tra (Chrome):** Ctrl+Shift+R → đợi SW đăng ký → **tải lại lần 2** → nút "Cài đặt" hiện trên top bar / thanh địa chỉ.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AL)' && git push origin main 2>&1 | tail -1
+
+## Phiên AM (2026-09-08) — Fix PWA Studio: đúng file blade (vue.blade.php)
+
+**Vấn đề:** nút cài đặt vẫn không hiện dù manifest đã .json. `/` cài đặt được nhưng `/studio` thì không.
+
+**Gốc rễ THẬT:** `/studio` do `StudioController::index` render **`studio/vue.blade.php`** (Vue SPA), KHÔNG phải `layouts/studio.blade.php` (Alpine cũ) mà mình đã sửa trước đó. Vì vậy manifest/icon/SW chưa hề nằm trong HTML của `/studio`.
+
+**Đã sửa (commit `6a38216`):**
+- Thêm manifest + apple-touch-icon + favicon + theme-color #193d2b + color-scheme dark light + đăng ký SW `scope:/studio` vào **`studio/vue.blade.php`**.
+- Bỏ `remove-service-worker` khỏi trang Vue (không unregister SW của chính nó).
+
+**Xác minh (curl /studio):** HTML giờ chứa `theme-color #193d2b` · `rel=manifest /manifest-studio.json` · apple-touch-icon · favicon · SW registration ✓ · deploy + `optimize:clear` ✓.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AM)' && git push origin main 2>&1 | tail -1
