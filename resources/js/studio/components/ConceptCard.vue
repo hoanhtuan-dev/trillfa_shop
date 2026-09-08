@@ -565,10 +565,19 @@ const bodyHipsLabel = computed(() => {
             <select v-model="store.imageRes" class="input !py-2.5 !text-sm !rounded-xl" title="Độ phân giải ảnh đầu ra"><option value="1K">1K</option><option value="2K">2K</option></select>
           </div>
 
-          <!-- Texture -->
-          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Mức độ chi tiết chất liệu vải hiển thị trong ảnh">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="layers" size="h-3.5 w-3.5" /> Texture</span><span class="font-semibold text-brand-300">{{ textureLabel }}</span></p>
-            <input type="range" min="0" max="10" step="1" v-model.number="localTexture" class="w-full cursor-pointer accent-brand-500">
+          <!-- Texture + Gieo quẻ (Seed) -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Mức độ chi tiết chất liệu vải hiển thị trong ảnh">
+              <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="layers" size="h-3.5 w-3.5" /> Texture</span><span class="font-semibold text-brand-300">{{ textureLabel }}</span></p>
+              <input type="range" min="0" max="10" step="1" v-model.number="localTexture" class="w-full cursor-pointer accent-brand-500">
+            </div>
+            <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Seed cố định để tạo ảnh nhất quán. Để trống = random.">
+              <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><span class="text-sm">🎲</span> Gieo quẻ</span></p>
+              <div class="flex gap-1">
+                <input v-model="store.imageSeed" type="text" inputmode="numeric" class="input !text-xs !py-1.5 !rounded-lg flex-1" placeholder="Seed..." title="Nhập số seed để tạo ảnh nhất quán">
+                <button @click="store.imageSeed = String(Math.floor(Math.random() * 2147483647) + 1)" class="shrink-0 rounded-lg bg-brand-600 px-2 py-1 text-xs text-white hover:bg-brand-500 transition" title="Tạo seed ngẫu nhiên">🎲</button>
+              </div>
+            </div>
           </div>
 
           <!-- Enrich Preview -->
@@ -662,16 +671,6 @@ const bodyHipsLabel = computed(() => {
             <textarea v-model="store.negativePromptEn" rows="3" class="input !text-sm !py-2 !rounded-xl" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..." title="Nhập các yếu tố bạn muốn AI tránh tạo ra trong ảnh"></textarea>
           </div>
 
-          <!-- Gieo quẻ (Seed) -->
-          <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
-            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Gieo quẻ (Seed)</label>
-            <p class="mb-2 text-[10px] text-cream-300/50">Số seed cố định để tạo ảnh nhất quán. Để trống = random mỗi lần tạo. Dùng số nguyên dương bất kỳ.</p>
-            <div class="flex gap-2">
-              <input v-model="store.imageSeed" type="text" inputmode="numeric" class="input !text-sm !py-2 !rounded-xl flex-1" placeholder="VD: 123456789" title="Nhập số seed để tạo ảnh nhất quán. Cùng seed + cùng prompt = cùng ảnh.">
-              <button @click="store.imageSeed = ''" class="rounded-xl bg-ink-700 px-3 py-2 text-xs text-cream-200 hover:bg-red-600 transition" title="Xóa seed, quay về chế độ random">✕</button>
-              <button @click="store.imageSeed = String(Math.floor(Math.random() * 2147483647) + 1)" class="rounded-xl bg-brand-600 px-3 py-2 text-xs text-white hover:bg-brand-500 transition" title="Tạo seed ngẫu nhiên mới">🎲 Ngẫu nhiên</button>
-            </div>
-          </div>
 
           <!-- Enrich Preview trong tab nâng cao -->
           <button @click="openEnrichPreview" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800 px-4 py-2.5 text-xs font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10" title="Xem trước prompt sau khi được làm giàu bởi AI">
@@ -753,7 +752,6 @@ const bodyHipsLabel = computed(() => {
         <div class="sticky bottom-0 z-10 -mx-1 mt-4 border-t border-ink-700/50 bg-ink-900/95 backdrop-blur-sm px-1 pb-1 pt-3">
           <div class="flex items-center justify-between mb-2">
             <button @click="resetToDefaults" class="text-xs text-cream-300/50 underline hover:text-brand-300" title="Đưa tất cả cài đặt về mặc định hệ thống">Đặt lại mặc định</button>
-            <span v-if="store.imageSeed" class="text-[10px] text-brand-300/70 flex items-center gap-1" title="Seed đang dùng"><StudioIcon name="sparkles" size="h-3 w-3" /> Seed: {{ store.imageSeed }}</span>
           </div>
           <button @click="store.promptOpen = false; store.generateImage()" :disabled="store.generating || !store.imagePromptEn" class="btn-brand w-full whitespace-nowrap !py-3.5 !text-sm !rounded-2xl !font-bold tracking-wide"
             :title="store.generating ? 'Đang tạo ảnh, vui lòng chờ…' : !store.imagePromptEn ? 'Vui lòng nhập prompt trước' : 'Gửi prompt và tạo ảnh'">
