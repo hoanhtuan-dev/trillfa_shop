@@ -534,3 +534,17 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** vite build ✓ (936ms) · push `a0d083a` · SSH pull + `optimize:clear` ✓ · app JS `app-Dzj5NqCz.js` 200.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AR)' && git push origin main 2>&1 | tail -1
+
+## Phiên AS (2026-09-08) — Đánh giá + nâng cấp card "Sửa ảnh" (Inpaint)
+
+**Đánh giá nhanh:** card đã tốt — nhận mọi nguồn ảnh canvas, nút "Vẽ mask" (Bezier) đẹp, tự finalize mask khi đóng, đủ state (progress/success/error/cancel + so sánh).
+
+**Đề xuất & đã thêm:**
+- **Chip chỉnh nhanh** (6 mẫu mô tả phổ biến, bấm điền thẳng vào prompt): 🎨 Đổi màu · 🗑️ Xóa tạp chất · ✨ Làm sạch · 👕 Chỉnh dáng · 🪶 Chất liệu · 🪄 Thay nền (icon SVG + grid 2 cột).
+- **Header icon-badge SVG** (pencil) + nhãn "AI".
+- **Toggle chip** thay checkbox: "Giữ khuôn mặt & dáng" · "Giữ nền" (icon user/background).
+- Đề xuất mở (chưa làm): presets prompt tự dùng chung với Prompt Templates; xem trước mask dạng lưới; undo/redo riêng cho mask; phím tắt Ctrl+Enter gửi.
+
+**Xác minh:** vite build ✓ (734ms) · push `7d3d5b0` · SSH pull + `optimize:clear` ✓ · app JS `app-CGbqsc17.js` 200.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AS)' && git push origin main 2>&1 | tail -1

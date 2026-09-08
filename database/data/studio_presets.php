@@ -179,4 +179,10 @@ return [
     ["pose", "The Squat (Ngồi xổm cá tính)", "stylish editorial deep squat pose, knees apart, hands resting on knees, intense gaze, streetwear aesthetic", "Hypebeast, Techwear, khoe form giày sneakers và quần cargo."],
     ["pose", "Pocket Confidence (Tay đút túi)", "torso crop shot, hands confidently placed in pockets, focusing on the waistline, belt, and hip construction", "Quần tây, quần jeans, áo khoác có thiết kế túi hộp."],
     ["pose", "Collar Detail (Chạm cổ áo)", "tight close-up on collar and neck, face partially cropped out, hands gently adjusting the collar, sharp focus on fabric", "Áo sơ mi cách điệu, chi tiết đính kết quanh cổ, trang sức."],
+    // ── Card "Sửa ảnh" (Inpaint) — preset chỉnh sửa phổ biến từ Prompt Templates ──
+    ["inpaint", "Xóa tạp chất", "xóa các chi tiết, đốm, vật/người thừa trong vùng chọn, lấp đầy bằng nền phù hợp.", "Bỏ chi tiết không mong muốn trong vùng chọn."],
+    ["inpaint", "Làm sạch", "tăng độ sắc nét, làm sạch vùng chọn, bỏ nhiễu, hạt và đốm mờ.", "Tăng chất lượng vùng chọn."],
+    ["inpaint", "Chỉnh dáng", "điều chỉnh dáng và độ ôm của trang phục trong vùng chọn cho vừa vặn, đẹp hơn.", "Sửa form trang phục."],
+    ["inpaint", "Chất liệu", "tăng độ chi tiết, độ mịn của chất liệu vải/dệt trong vùng chọn.", "Tăng chi tiết vải."],
+    ["inpaint", "Xóa vật thể", "xóa vật thể trong vùng chọn, lấp đầy bằng nền phù hợp, giữ nguyên chủ thể chính.", "Xóa object trong vùng chọn."],
 ];

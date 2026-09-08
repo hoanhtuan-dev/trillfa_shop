@@ -4,17 +4,34 @@ import { useStudioStore } from '../store.js';
 import CompareSlider from './CompareSlider.vue';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
+import BaseModal from './BaseModal.vue';
 const store = useStudioStore();
 
-const beforeUrl = ref('');   // ảnh gốc trước khi sửa (để so sánh)
+const beforeUrl = ref('');
 const compareOpen = ref(false);
 function submitInpaint() {
   beforeUrl.value = store.upscaleSrc || '';
   store.inpaint(store.inpaintPrompt);
 }
 
-// Ảnh ĐANG CHỌN TRÊN CANVAS — nhận MỌI nguồn: upload / sản phẩm / kết quả / đã chỉnh sửa.
 const activeImg = computed(() => store.upscaleSrc || '');
+
+// ── Chip "Đổi màu" → popup chọn màu target ──
+const colorPickerOpen = ref(false);
+const editColor = ref('#e11d48');
+const colorNames = { '#e11d48':'đỏ','#f97316':'cam','#facc15':'vàng','#22c55e':'xanh lá','#06b6d4':'xanh lơ','#2563eb':'xanh dương','#7c3aed':'tím','#ec4899':'hồng','#0f172a':'đen','#f8fafc':'trắng','#6b7280':'xám' };
+const colorName = (hex) => colorNames[hex] || hex;
+
+// ── Chip "Thay nền" → popup nhập mô tả nền ──
+const bgPromptOpen = ref(false);
+const bgPromptInput = ref('');
+
+// ── Preset chỉnh sửa từ Prompt Templates (category inpaint) ──
+function applyPreset(p) { store.inpaintPrompt = p.prompt; store.toast('Đã điền: ' + p.label); }
+function chipIcon(p) { const l = (p.label || '').toLowerCase(); if (l.includes('tạp chất') || l.includes('vật thể')) return 'trash'; if (l.includes('làm sạch')) return 'sparkles'; if (l.includes('dáng')) return 'shirt'; if (l.includes('chất liệu')) return 'feather'; if (l.includes('đổi màu')) return 'palette'; return 'wand'; }
+
+// ── Ctrl/Cmd + Enter để gửi ──
+function onPromptKeydown(e) { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (canSubmit.value) submitInpaint(); } }
 
 const now = ref(Date.now());
 let timer = null;
@@ -28,17 +45,6 @@ const activeGen = computed(() => store.inpaintGenId ? store.generations.find(g =
 const canSubmit = computed(() => !!activeImg.value && !store.inpainting && !!store.inpaintPrompt.trim());
 const running = computed(() => store.inpaintStage === 'send' || store.inpaintStage === 'processing');
 const maskActive = computed(() => store.inpaintMaskMode !== 'none');
-
-// Chip chỉnh nhanh: mẫu mô tả phổ biến → bấm điền thẳng vào ô "Mô tả chỉnh sửa".
-const quickChips = [
-  { icon: 'palette', label: 'Đổi màu', prompt: 'đổi màu quần áo trong vùng chọn sang màu khác, giữ nguyên chi tiết, chất liệu và phong cách.' },
-  { icon: 'trash', label: 'Xóa tạp chất', prompt: 'xóa các chi tiết, đốm, vật/người thừa trong vùng chọn, lấp đầy bằng nền phù hợp.' },
-  { icon: 'sparkles', label: 'Làm sạch', prompt: 'tăng độ sắc nét, làm sạch vùng chọn, bỏ nhiễu, hạt và đốm mờ.' },
-  { icon: 'shirt', label: 'Chỉnh dáng', prompt: 'điều chỉnh dáng và độ ôm của trang phục trong vùng chọn cho vừa vặn, đẹp hơn.' },
-  { icon: 'feather', label: 'Chất liệu', prompt: 'tăng độ chi tiết, độ mịn của chất liệu vải/dệt trong vùng chọn.' },
-  { icon: 'wand', label: 'Thay nền', prompt: 'thay đổi phông nền trong vùng chọn theo mô tả, giữ nguyên chủ thể.' },
-];
-function applyChip(c) { store.inpaintPrompt = c.prompt; store.toast('Đã điền nhanh: ' + c.label); }
 </script>
 <template>
   <div class="card p-5" style="background: linear-gradient(160deg, rgba(124,200,90,.13), rgba(74,122,144,.06));">
@@ -48,9 +54,9 @@ function applyChip(c) { store.inpaintPrompt = c.prompt; store.toast('Đã điề
       <span class="rounded-full bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">AI</span>
     </h2>
 
-    <!-- Ảnh đang chọn (mọi nguồn: upload / sản phẩm / kết quả / đã chỉnh sửa) -->
+    <!-- Ảnh đang chọn -->
     <div v-if="activeImg" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-2.5">
-      <img :src="activeImg" class="h-14 w-14 rounded-xl bg-ink-900 object-cover">
+      <img :src="activeImg" class="h-14 w-14 shrink-0 rounded-xl bg-ink-900 object-cover">
       <div class="min-w-0 text-xs text-cream-200">
         <p class="truncate font-semibold">{{ store.upscaleName || 'Ảnh đang chọn' }}</p>
         <p class="text-cream-300/60">Sẽ sửa trực tiếp trên ảnh này</p>
@@ -58,9 +64,9 @@ function applyChip(c) { store.inpaintPrompt = c.prompt; store.toast('Đã điề
     </div>
     <div v-else class="mt-3 rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-xs text-cream-300/60">Chọn một ảnh trên <b>canvas</b> (Nguồn / Kết quả / sản phẩm) để sửa.</div>
 
-    <!-- Vẽ Mask: DUY NHẤT 1 công cụ = vùng chọn bằng đường cong (Bezier). Vẽ xong & đóng → tự lấy làm mask. -->
+    <!-- Vẽ mask -->
     <div v-if="activeImg" class="mt-3 space-y-2">
-      <button @click="store.toggleInpaintMask('path')" title="Vẽ vùng cần sửa bằng đường cong — đóng kín để làm mask"
+      <button @click="store.toggleInpaintMask('path')"
               class="group flex w-full items-center justify-center gap-2.5 rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-200"
               :class="store.inpaintMaskMode === 'path'
                 ? 'border-emerald-400 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-900/30'
@@ -74,57 +80,57 @@ function applyChip(c) { store.inpaintPrompt = c.prompt; store.toast('Đã điề
           <span class="text-[10px] opacity-80">Vùng chọn bằng đường cong (Bezier)</span>
         </span>
       </button>
+      <!-- Undo / Redo riêng cho mask -->
+      <div v-if="store.inpaintMaskMode === 'path'" class="flex justify-center gap-1.5">
+        <button @click="store.inpaintPathUndo()" class="flex items-center gap-1 rounded-full border border-ink-600 px-2.5 py-1 text-[10px] font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-800" title="Hoàn tác (Ctrl+Z)"><StudioIcon name="undo" size="h-3 w-3" /> Hoàn tác</button>
+        <button @click="store.inpaintPathRedo()" class="flex items-center gap-1 rounded-full border border-ink-600 px-2.5 py-1 text-[10px] font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-ink-800" title="Làm lại (Ctrl+Y)"><StudioIcon name="redo" size="h-3 w-3" /> Làm lại</button>
+      </div>
       <div v-if="maskActive || store.inpaintMaskDone" class="flex justify-center">
-        <button @click="store.clearInpaintMask()" title="Bỏ mask hiện tại"
-                class="rounded-full bg-red-600/25 px-3 py-1 text-[10px] font-semibold text-red-200 transition-colors hover:bg-red-600 hover:text-white">
-          Bỏ mask
-        </button>
+        <button @click="store.clearInpaintMask()" class="rounded-full bg-red-600/25 px-3 py-1 text-[10px] font-semibold text-red-200 transition-colors hover:bg-red-600 hover:text-white">Bỏ mask</button>
       </div>
     </div>
-    <div v-if="maskActive" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">
-      Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.
-    </div>
-    <!-- Trạng thái mask ĐÃ LƯU (bấm Xong, overlay tắt): hiển thị vùng sẽ xử lý + thumbnail -->
+    <div v-if="maskActive" class="mt-1.5 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] text-brand-200">Vẽ đường cong quanh vùng cần sửa — quay lại điểm đầu để đóng kín, vùng chọn tự thành mask.</div>
+    <!-- Trạng thái mask đã lưu: lưới mini preview -->
     <div v-else-if="store.inpaintMaskDone" class="mt-1.5 rounded-xl border border-emerald-500/30 bg-emerald-900/20 px-2.5 py-2 text-[10px] text-emerald-200">
-      <div class="flex items-center gap-2.5">
-        <!-- Thumbnail vùng đã chọn: rect (ô đen trên nền trắng) / brush (mask đen-trắng) -->
-        <div v-if="store._inpaintMaskKind === 'rect'" class="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/20 bg-white">
-          <div class="absolute bg-black/85" :style="{ left: (store.inpaintMaskBox.x || 0) * 100 + '%', top: (store.inpaintMaskBox.y || 0) * 100 + '%', width: (store.inpaintMaskBox.w || 0) * 100 + '%', height: (store.inpaintMaskBox.h || 0) * 100 + '%' }"></div>
+      <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/20 bg-[repeating-conic-gradient(#d8d2c4_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
+          <img v-if="store.inpaintBrushData" :src="'data:image/png;base64,' + store.inpaintBrushData" class="h-full w-full object-contain" alt="Mask" />
+          <span v-else class="text-[9px] text-ink-500">Xóa hộp chọn</span>
         </div>
-        <img v-else-if="store.inpaintBrushData" :src="'data:image/png;base64,' + store.inpaintBrushData" class="h-12 w-12 shrink-0 rounded-lg border border-white/20 bg-white object-contain" alt="Mask" />
-        <div class="min-w-0 flex-1">
-          <p class="font-semibold">{{ store._inpaintMaskKind === 'rect' ? 'Đã chọn vùng ' + Math.round((store.inpaintMaskBox.w || 0) * 100) + '% × ' + Math.round((store.inpaintMaskBox.h || 0) * 100) + '%' : 'Đã vẽ mask' }}</p>
-          <p class="mt-0.5 text-emerald-200/70">AI sẽ chỉ sửa trong vùng tô đen bên cạnh.</p>
+        <div class="min-w-0">
+          <p class="font-semibold">Đã vẽ mask — AI chỉ sửa vùng đen.</p>
+          <p class="mt-0.5 text-emerald-200/70">Quay lại điểm đầu để đóng, hoặc vẽ vùng mới.</p>
         </div>
         <button @click="store.toggleInpaintMask('path')" class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 font-semibold hover:bg-white/20">Chỉnh lại</button>
       </div>
     </div>
 
-    <label class="label mt-4"><StudioIcon name="zap" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Chỉnh nhanh</label>
+    <!-- Chỉnh nhanh: 2 chip đặc biệt (đổi màu / thay nền) + preset từ Prompt Templates -->
+    <p class="label mt-4"><StudioIcon name="zap" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Chỉnh nhanh</p>
     <div class="mt-1 grid grid-cols-2 gap-1.5">
-      <button v-for="c in quickChips" :key="c.label" @click="applyChip(c)"
+      <button @click="colorPickerOpen = true" class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all" :class="store.inpaintPrompt.startsWith('đổi màu quần áo') ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+        <StudioIcon name="palette" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" /> <span class="truncate">Đổi màu…</span>
+      </button>
+      <button @click="bgPromptOpen = true" class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all" :class="store.inpaintPrompt.startsWith('thay đổi phông nền') ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+        <StudioIcon name="wand" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" /> <span class="truncate">Thay nền…</span>
+      </button>
+    </div>
+    <div v-if="store.inpaintEditPresets.length" class="mt-1.5 grid grid-cols-2 gap-1.5">
+      <button v-for="p in store.inpaintEditPresets" :key="p.id" @click="applyPreset(p)" :title="p.prompt"
               class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
-              :class="store.inpaintPrompt === c.prompt ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
-        <StudioIcon :name="c.icon" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
-        <span class="truncate">{{ c.label }}</span>
+              :class="store.inpaintPrompt === p.prompt ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
+        <StudioIcon :name="chipIcon(p)" size="h-3.5 w-3.5" class="shrink-0 text-brand-300" />
+        <span class="truncate">{{ p.label }}</span>
       </button>
     </div>
 
     <label class="label mt-4">Mô tả chỉnh sửa</label>
-    <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước…"></textarea>
+    <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" @keydown="onPromptKeydown" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước… (Ctrl+Enter để gửi)"></textarea>
     <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ store.inpaintPrompt.length }}/1000</p>
 
-    <div class="mt-2 flex flex-wrap gap-1.5">
-      <button @click="store.inpaintPreserveFace = !store.inpaintPreserveFace"
-              :class="store.inpaintPreserveFace ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"
-              class="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition">
-        <StudioIcon name="user" size="h-3 w-3" class="-mt-0.5 mr-1 inline" /> Giữ khuôn mặt & dáng
-      </button>
-      <button @click="store.inpaintPreserveBg = !store.inpaintPreserveBg"
-              :class="store.inpaintPreserveBg ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-ink-700 text-cream-200 hover:border-brand-400'"
-              class="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition">
-        <StudioIcon name="background" size="h-3 w-3" class="-mt-0.5 mr-1 inline" /> Giữ nền
-      </button>
+    <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-cream-200">
+      <label class="flex cursor-pointer items-center gap-1.5"><input type="checkbox" v-model="store.inpaintPreserveFace" class="h-3.5 w-3.5 accent-brand-500"> Giữ nguyên khuôn mặt & dáng</label>
+      <label class="flex cursor-pointer items-center gap-1.5"><input type="checkbox" v-model="store.inpaintPreserveBg" class="h-3.5 w-3.5 accent-brand-500"> Giữ nguyên nền</label>
     </div>
 
     <button @click="submitInpaint" :disabled="!canSubmit" class="btn-brand mt-3 w-full whitespace-nowrap">
@@ -135,12 +141,8 @@ function applyChip(c) { store.inpaintPrompt = c.prompt; store.toast('Đã điề
 
     <!-- Tiến độ -->
     <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
-      <LoadingSpinner
-        :text="store.inpaintStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang chỉnh sửa ảnh…'"
-        :subtext="fmt(elapsedSec) + ' · Nhiệm vụ #' + store.inpaintGenId + (activeGen?.model ? ' · Model: ' + activeGen.model : '')" />
-      <div class="mt-2 flex justify-end">
-        <button @click="store.cancelInpaint()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">Hủy</button>
-      </div>
+      <LoadingSpinner :text="store.inpaintStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang chỉnh sửa ảnh…'" :subtext="fmt(elapsedSec) + ' · Nhiệm vụ #' + store.inpaintGenId + (activeGen?.model ? ' · Model: ' + activeGen.model : '')" />
+      <div class="mt-2 flex justify-end"><button @click="store.cancelInpaint()" class="rounded-full bg-red-600/25 px-2.5 py-1 text-[10px] font-semibold text-red-200 hover:bg-red-600">Hủy</button></div>
     </div>
 
     <!-- Thành công -->
@@ -166,7 +168,24 @@ function applyChip(c) { store.inpaintPrompt = c.prompt; store.toast('Đã điề
       <button @click="store.clearInpaintStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
-    <!-- So sánh Trước/Sau -->
     <CompareSlider v-model="compareOpen" :before="beforeUrl" :after="activeGen?.media_url || ''" />
+
+    <!-- Popup chọn màu target -->
+    <BaseModal v-model="colorPickerOpen" title="Chọn màu target">
+      <div class="flex flex-col items-center gap-3">
+        <div class="h-12 w-full rounded-xl border border-white/20" :style="{ background: editColor }"></div>
+        <div class="flex flex-wrap justify-center gap-1.5">
+          <button v-for="(name, hex) in colorNames" :key="hex" @click="editColor = hex" :title="'Màu ' + name" class="h-8 w-8 rounded-full border border-white/20 transition" :class="editColor === hex ? 'ring-2 ring-brand-400 ring-offset-2 ring-offset-ink-900' : 'hover:scale-110'" :style="{ background: hex }"></button>
+        </div>
+        <input type="color" v-model="editColor" class="h-9 w-full cursor-pointer rounded-lg border border-ink-700 bg-ink-800" title="Chọn màu tùy ý" />
+        <button @click="store.inpaintPrompt = 'đổi màu quần áo trong vùng chọn sang màu ' + colorName(editColor) + ' (' + editColor + '), giữ nguyên chi tiết, chất liệu và phong cách.'; store.toast('Đã điền: Đổi màu → ' + colorName(editColor)); colorPickerOpen = false" class="btn-brand btn-sm w-full">Áp dụng màu</button>
+      </div>
+    </BaseModal>
+
+    <!-- Popup nhập mô tả nền mới -->
+    <BaseModal v-model="bgPromptOpen" title="Thay nền — nhập mô tả">
+      <textarea v-model="bgPromptInput" rows="3" class="input !text-xs" placeholder="VD: phông studio màu pastel, gradient xanh dương, nền biển…"></textarea>
+      <button @click="store.inpaintPrompt = 'thay đổi phông nền trong vùng chọn: ' + (bgPromptInput.trim() || 'theo mô tả') + ', giữ nguyên chủ thể.'; store.toast('Đã điền: Thay nền'); bgPromptOpen = false" class="btn-brand mt-2 w-full">Áp dụng</button>
+    </BaseModal>
   </div>
 </template>

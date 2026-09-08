@@ -4551,6 +4551,13 @@ RULES:
                 'prompt' => $p->prompt_injection,
                 'note' => $p->note,
             ])->values(),
+            // Card "Sửa ảnh" (Inpaint): preset chỉnh sửa từ Prompt Templates (category inpaint).
+            'inpaint_presets' => Preset::category('inpaint')->get()->map(fn ($p) => [
+                'id' => $p->id,
+                'label' => $p->ui_label,
+                'prompt' => $p->prompt_injection,
+                'note' => $p->note,
+            ])->values(),
         ]);
     }
 

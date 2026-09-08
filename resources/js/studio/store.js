@@ -122,6 +122,7 @@ export const useStudioStore = defineStore('studio', {
     videoModel: '',
     videoScenes: [],      // Kịch bản quay — preset video_scene từ Prompt Templates (Cài đặt)
     videoScene: '',
+    inpaintEditPresets: [], // Sửa ảnh — preset chỉnh sửa (category inpaint) từ Prompt Templates
     videoDuration: '5',
     videoRes: '720',
     videoPromptEn: '',
@@ -351,6 +352,8 @@ export const useStudioStore = defineStore('studio', {
       if (Array.isArray(defaults.inpaint_models)) this.inpaintModels = defaults.inpaint_models;
       // Card "Kịch bản quay": preset video_scene từ Prompt Templates (Cài đặt).
       if (Array.isArray(defaults.video_scenes)) this.videoScenes = defaults.video_scenes;
+      // Card "Sửa ảnh": preset chỉnh sửa (category inpaint) từ Prompt Templates (Cài đặt).
+      if (Array.isArray(defaults.inpaint_presets)) this.inpaintEditPresets = defaults.inpaint_presets;
     },
     applyDefaults() {
       // Re-fetch and apply default values (used by reset button)
@@ -2819,6 +2822,7 @@ export const useStudioStore = defineStore('studio', {
     pathSetNodeKind(i) {
       if (this.inpaintMaskMode !== 'path') return;
       const nd = this.inpaintPathPoints[i]; if (!nd) return;
+      this._snapshotInpaintPath();
       const order = ['smooth', 'cusp', 'sharp'];
       const cur = nd.kind || 'smooth';
       const next = order[(order.indexOf(cur) + 1) % order.length];
@@ -2903,6 +2907,7 @@ export const useStudioStore = defineStore('studio', {
         this._pathDrag = { type: 'close', i: 0, sx: p.nx, sy: p.ny, moved: false };
         return;
       }
+      this._snapshotInpaintPath();
       const hit = this._pathHit(p);
       if (hit) { this._pathDrag = { ...hit, broke: false, sx: p.nx, sy: p.ny, moved: false }; return; }
       // Khoảng trống → neo mới, push NGAY vào mảng (hiển thị ngay ở lần nhấp đầu).
@@ -2943,11 +2948,44 @@ export const useStudioStore = defineStore('studio', {
       if (dr && dr.type === 'close' && !dr.moved) { this.pathClose(); return; }
       // Neo đã push ở pathDown; chỉ kết thúc kéo (giữ node + tay điều khiển vừa chỉnh).
     },
-    pathDeleteNode(i) { if (this.inpaintMaskMode !== 'path') return; if (i >= 0 && i < this.inpaintPathPoints.length) this.inpaintPathPoints.splice(i, 1); },
-    pathUndoPoint() { if (this.inpaintMaskMode !== 'path') return; this.inpaintPathPoints.pop(); },
+    // ── Undo/Redo riêng cho mask path ──
+    _snapshotInpaintPath() {
+      this._inpaintPathUndo = this._inpaintPathUndo || [];
+      this._inpaintPathRedo = [];
+      this._inpaintPathUndo.push({ points: this.inpaintPathPoints.map((p) => ({ ...p })), regions: this.inpaintPathRegions.map((r) => r.map((p) => ({ ...p }))) });
+      if (this._inpaintPathUndo.length > 30) this._inpaintPathUndo.shift();
+    },
+    _applyInpaintSnap(snap) {
+      this.inpaintPathPoints = snap.points.map((p) => ({ ...p }));
+      this.inpaintPathRegions = snap.regions.map((r) => r.map((p) => ({ ...p })));
+      this._pathEditingRegion = -1;
+      this._rebakePathRegions();
+      this._finalizeInpaintBrush();
+    },
+    inpaintPathUndo() {
+      if (this.inpaintMaskMode !== 'path') return;
+      const snap = (this._inpaintPathUndo || []).pop();
+      if (!snap) { this.toast('Không còn gì để hoàn tác.', 'info'); return; }
+      this._inpaintPathRedo = this._inpaintPathRedo || [];
+      this._inpaintPathRedo.push({ points: this.inpaintPathPoints.map((p) => ({ ...p })), regions: this.inpaintPathRegions.map((r) => r.map((p) => ({ ...p }))) });
+      this._applyInpaintSnap(snap);
+      this.toast('Đã hoàn tác.');
+    },
+    inpaintPathRedo() {
+      if (this.inpaintMaskMode !== 'path') return;
+      const snap = (this._inpaintPathRedo || []).pop();
+      if (!snap) { this.toast('Không còn gì để làm lại.', 'info'); return; }
+      this._inpaintPathUndo = this._inpaintPathUndo || [];
+      this._inpaintPathUndo.push({ points: this.inpaintPathPoints.map((p) => ({ ...p })), regions: this.inpaintPathRegions.map((r) => r.map((p) => ({ ...p }))) });
+      this._applyInpaintSnap(snap);
+      this.toast('Đã làm lại.');
+    },
+    pathDeleteNode(i) { if (this.inpaintMaskMode !== 'path') return; this._snapshotInpaintPath(); if (i >= 0 && i < this.inpaintPathPoints.length) this.inpaintPathPoints.splice(i, 1); },
+    pathUndoPoint() { if (this.inpaintMaskMode !== 'path') return; this._snapshotInpaintPath(); this.inpaintPathPoints.pop(); },
     pathClose() {
       if (this.inpaintMaskMode !== 'path') return;
       this.inpaintPathCloseHover = false;
+      this._snapshotInpaintPath();
       const pts = this.inpaintPathPoints;
       if (pts.length < 3) { this.toast('Cần ít nhất 3 điểm để tạo vùng chọn.', 'error'); return; }
       const mode = this.inpaintSelectMode === 'subtract' ? 'subtract' : 'add';
