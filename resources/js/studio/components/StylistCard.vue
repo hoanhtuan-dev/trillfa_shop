@@ -64,6 +64,7 @@ function openSettings() { settingsOpen.value = true; }
     </div>
 
     <BaseModal v-model="open" title="Trợ lý thiết kế" wide>
+      <div class="p-5">
       <!-- step: type -->
       <template v-if="step === 'type'">
         <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-cream-300/60">Chọn loại trang phục</p>
@@ -111,10 +112,11 @@ function openSettings() { settingsOpen.value = true; }
         <button @click="refine" :disabled="loading" title="Tinh chỉnh & nâng cấp prompt bằng AI" class="btn-outline btn-sm mt-2 w-full">{{ loading ? 'Đang tinh chỉnh…' : 'Tinh chỉnh & nâng cấp' }}</button>
         <button @click="applyToGenerate" title="Đưa prompt vào ô Prompt Tạo Ảnh" class="btn-brand mt-2 w-full">Đưa vào Tạo Ảnh</button>
       </template>
+      </div>
     </BaseModal>
 
     <BaseModal v-model="settingsOpen" title="Quản lý data Trợ lý thiết kế" wide>
-      <StylistDataManager />
+      <div class="p-5"><StylistDataManager /></div>
     </BaseModal>
   </div>
 </template>

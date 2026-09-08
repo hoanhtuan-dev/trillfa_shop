@@ -172,7 +172,7 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 
     <!-- Popup chọn màu target -->
     <BaseModal v-model="colorPickerOpen" title="Chọn màu target">
-      <div class="flex flex-col items-center gap-3">
+      <div class="flex flex-col items-center gap-3 p-5">
         <div class="h-12 w-full rounded-xl border border-white/20" :style="{ background: editColor }"></div>
         <div class="flex flex-wrap justify-center gap-1.5">
           <button v-for="(name, hex) in colorNames" :key="hex" @click="editColor = hex" :title="'Màu ' + name" class="h-8 w-8 rounded-full border border-white/20 transition" :class="editColor === hex ? 'ring-2 ring-brand-400 ring-offset-2 ring-offset-ink-900' : 'hover:scale-110'" :style="{ background: hex }"></button>
@@ -184,8 +184,10 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
 
     <!-- Popup nhập mô tả nền mới -->
     <BaseModal v-model="bgPromptOpen" title="Thay nền — nhập mô tả">
+      <div class="p-5">
       <textarea v-model="bgPromptInput" rows="3" class="input !text-xs" placeholder="VD: phông studio màu pastel, gradient xanh dương, nền biển…"></textarea>
       <button @click="store.inpaintPrompt = 'thay đổi phông nền trong vùng chọn: ' + (bgPromptInput.trim() || 'theo mô tả') + ', giữ nguyên chủ thể.'; store.toast('Đã điền: Thay nền'); bgPromptOpen = false" class="btn-brand mt-2 w-full">Áp dụng</button>
+      </div>
     </BaseModal>
   </div>
 </template>

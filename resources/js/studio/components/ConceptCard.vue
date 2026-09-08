@@ -466,14 +466,14 @@ const bodyHipsLabel = computed(() => {
     </div>
 
     <!-- ===== MODAL ===== -->
-    <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="Prompt Tạo Ảnh" wide>
+    <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="Prompt Tạo Ảnh" wide height="82vh">
       <div v-if="promptLoading" class="py-16 text-center">
         <div class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></div>
         <p class="text-sm text-cream-300/60">Đang tải cài đặt mặc định…</p>
       </div>
       <template v-else>
         <!-- ── Tab navigation (sticky — cố định dưới header khi cuộn nội dung) ── -->
-        <div class="sticky top-14 z-10 -mx-5 -mt-5 mb-4 border-b border-ink-700 bg-ink-900 px-5 py-2.5">
+        <div class="sticky top-14 z-10 border-b border-ink-700 bg-ink-900 px-5 py-2.5">
           <div class="seg">
             <button v-for="tab in [
               { id: 'prompt', icon: 'pencil', label: 'Prompt', tooltip: 'Nhập và chỉnh sửa prompt tạo ảnh' },
@@ -487,6 +487,8 @@ const bodyHipsLabel = computed(() => {
             </button>
           </div>
         </div>
+
+        <div class="p-5">
 
         <!-- ===== TAB: PROMPT ===== -->
         <div v-show="activeTab === 'prompt'" class="space-y-3">
@@ -748,6 +750,7 @@ const bodyHipsLabel = computed(() => {
             <StudioIcon name="zap" size="h-4 w-4" /> Tạo Ảnh 2D
           </span>
         </button>
+        </div>
       </template>
     </BaseModal>
   </div>

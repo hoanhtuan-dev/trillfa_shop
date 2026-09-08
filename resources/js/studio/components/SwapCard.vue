@@ -143,6 +143,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <button @click="store.clearSwapStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
     <BaseModal v-model="open" title="🪄 Chọn người mẫu / dáng / bối cảnh" wide>
+      <div class="p-5">
         <!-- Khuôn mặt -->
         <template v-if="changeFace">
         <p class="mb-2 text-xs font-semibold text-cream-200">👩 Khuôn mặt</p>
@@ -179,6 +180,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
           </div>
         </div>
         <button @click="open=false" class="btn-brand mt-4 w-full">✅ Chọn xong</button>
+      </div>
     </BaseModal>
   </div>
 </template>
