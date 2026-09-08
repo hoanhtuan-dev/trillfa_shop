@@ -39,6 +39,18 @@ const activeActivity = ref('concept');
 const menuOpen = ref(false);
 const outputOpen = ref(false);
 const projectsOpen = ref(false);
+// PWA install prompt (beforeinstallprompt) — hiện nút cài đặt khi trình duyệt cho phép.
+const installPrompt = ref(null);
+const showInstall = ref(false);
+function onBeforeInstallPrompt(e) { e.preventDefault(); installPrompt.value = e; showInstall.value = true; }
+function onAppInstalled() { showInstall.value = false; installPrompt.value = null; }
+async function doInstall() {
+  if (!installPrompt.value) return;
+  installPrompt.value.prompt();
+  const choice = await installPrompt.value.userChoice;
+  if (choice && choice.outcome === 'accepted') showInstall.value = false;
+  installPrompt.value = null;
+}
 // Popup "Prompt Tạo Ảnh" (ConceptCard) mở từ bất kỳ nơi nào (vd GalleryModal > nút "Sử dụng"):
 // trên mobile ConceptCard chỉ mount trong drawer menu → mở drawer + đóng drawer Outputs cho gọn.
 watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; menuOpen.value = true; } });
@@ -56,8 +68,8 @@ function openApplyPopover() {
 }
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
-onMounted(async () => { await store.load(); activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
-onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
+onMounted(async () => { await store.load(); activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt); window.addEventListener('appinstalled', onAppInstalled); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt); window.removeEventListener('appinstalled', onAppInstalled); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
 // Template refs -> store: StudioApp owns the canvas DOM; the store needs the elements for crop geometry.
@@ -412,6 +424,16 @@ function onTouchEnd(e) {
     </div>
     <!-- toast (copy/status) -->
     <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
+    <!-- Prompt cài đặt PWA (hiện khi trình duyệt báo beforeinstallprompt) -->
+    <div v-if="showInstall" class="fixed bottom-5 left-1/2 z-[95] flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-brand-500/40 bg-ink-900/95 px-4 py-3 shadow-2xl backdrop-blur">
+      <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-5 w-5" /></span>
+      <div class="min-w-0 text-xs">
+        <p class="font-semibold text-cream-100">Cài đặt Trillfa Studio</p>
+        <p class="text-cream-300/60">Thêm vào màn hình chính để mở nhanh hơn</p>
+      </div>
+      <button @click="doInstall" class="shrink-0 rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-500">Cài đặt</button>
+      <button @click="showInstall = false" class="icon-btn !h-7 !w-7 shrink-0" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+    </div>
     <!-- Mobile top bar -->
     <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>

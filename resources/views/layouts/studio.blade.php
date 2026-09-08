@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#193d2b">
     <meta name="color-scheme" content="dark light">
     <!-- PWA Studio: manifest riêng + icon riêng + service worker scope /studio -->
-    <link rel="manifest" href="/manifest-studio.webmanifest">
+    <link rel="manifest" href="/manifest-studio.json">
     <link rel="apple-touch-icon" href="/icons/studio-apple-touch-icon.png">
     <link rel="icon" type="image/png" href="/icons/studio-favicon-32.png">
     <script>
