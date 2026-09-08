@@ -26,17 +26,25 @@ import CanvasStatusBar from './components/CanvasStatusBar.vue';
 const store = useStudioStore();
 // CSRF token cho form Đăng xuất (Laravel route POST /dang-xuat).
 const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
-const stepNav = [['1','Concept'],['2','Fitting Room'],['3','Director']];
+// Activity bar (VSCode-style): mỗi icon mở 1 nhóm card trong sidebar.
+const activityNav = [
+  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [StylistCard, SuggestCard, ConceptCard] },
+  { id: 'ref', icon: 'shirt', label: 'Fitting Room', cards: [RefImageCard] },
+  { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
+  { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
+  { id: 'director', icon: 'film', label: 'Video', cards: [DirectorCard] },
+];
+const activeActivity = ref('concept');
 const menuOpen = ref(false);
 const outputOpen = ref(false);
 const projectsOpen = ref(false);
 // Popup "Prompt Tạo Ảnh" (ConceptCard) mở từ bất kỳ nơi nào (vd GalleryModal > nút "Sử dụng"):
 // trên mobile ConceptCard chỉ mount trong drawer menu → mở drawer + đóng drawer Outputs cho gọn.
-watch(() => store.promptOpen, (v) => { if (v) { outputOpen.value = false; menuOpen.value = true; } });
+watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; menuOpen.value = true; } });
 // Lưu cài đặt status bar khi thay đổi (snap · nền canvas · inspector).
 watch([() => store.snapGrid, () => store.canvasBg, () => store.inspectorOpen], () => store.saveBarSettings());
 // ── Thoát công cụ thông minh khi chuyển tác vụ / thoát ảnh tiêu điểm ──
-watch(() => store.step, () => store.exitCanvasTools());
+watch(activeActivity, () => { store.exitCanvasTools(); store.step = activeActivity.value === 'director' ? 3 : activeActivity.value === 'concept' ? 1 : 2; });
 watch(() => store.activeLayerId, (id) => { if (!id) store.exitCanvasTools(); });
 watch(() => !!store.viewer, (v) => { if (v) store.exitCanvasTools(); });
 watch(() => !!store.promptOpen, (v) => { if (v) store.exitCanvasTools(); });
@@ -47,7 +55,7 @@ function openApplyPopover() {
 }
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
-onMounted(async () => { store.load(); store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
+onMounted(async () => { await store.load(); activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
@@ -118,7 +126,10 @@ function onHistoryKeys(e) {
   else if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); store.redo(); }
 }
 const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white: 'bg-white', cream: 'bg-cream-100' }[store.canvasBg] || 'cvs-checker'));
-const panel = computed(() => store.step === 1 ? [StylistCard, SuggestCard, ConceptCard] : store.step === 2 ? [RefImageCard, InpaintCard, UpscaleCard] : [DirectorCard]); // TẠM ẨN ComposeCard — bỏ khỏi step 2
+const activeActivityDef = computed(() => activityNav.find(a => a.id === activeActivity.value) || activityNav[0]);
+const panel = computed(() => activeActivityDef.value.cards); // ComposeCard vẫn tạm ẩn
+// Chọn activity: trên tablet/mobile (sidebar ẩn) mở drawer để hiện card; desktop chỉ đổi card sidebar.
+function selectActivity(id) { activeActivity.value = id; if (window.innerWidth < 1024) menuOpen.value = true; }
 // ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
 const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking);
 
@@ -389,7 +400,7 @@ function onTouchEnd(e) {
     <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
     <!-- Mobile top bar -->
     <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
-      <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
+      <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
       <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span>
       <div class="flex items-center gap-1.5">
         <button @click="projectsOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" :title="store.appliedProject ? 'Dự án hiện tại: ' + store.appliedProject.name : 'Dự án'" aria-label="Dự án"><StudioIcon name="kanban" size="h-4 w-4" /><span v-if="store.appliedProject" class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand-400"></span></button>
@@ -397,13 +408,19 @@ function onTouchEnd(e) {
       </div>
     </div>
     <div class="flex flex-1 overflow-hidden">
-      <!-- Left sidebar (desktop) -->
-      <aside class="scrollbar-hide hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 p-3 lg:flex">
-        <div class="mb-3 flex items-center justify-between"><span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><span class="text-[10px] text-cream-300/50">Credit {{ store.creditsLeft }}</span></div>
-        <div class="mb-3 seg">
-          <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0])" class="seg-btn" :class="store.step === Number(s[0]) ? 'is-active' : ''">{{ s[1] }}</button>
+      <!-- Activity bar (VSCode-style) + Sidebar card của activity đang chọn (desktop) -->
+      <nav class="activity-bar hidden md:flex" aria-label="Công cụ">
+        <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-400" title="Studio"><StudioIcon name="sparkles" size="h-5 w-5" /></div>
+        <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" :class="activeActivity === a.id ? 'is-active' : ''" class="activity-btn" :title="a.label" :aria-label="a.label">
+          <StudioIcon :name="a.icon" size="h-5 w-5" />
+        </button>
+      </nav>
+      <aside class="scrollbar-hide hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 lg:flex">
+        <div class="panel-head border-b border-ink-700">
+          <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-400" /> {{ activeActivityDef.label }}</span>
+          <span class="shrink-0 text-[10px] text-cream-300/50">Credit {{ store.creditsLeft }}</span>
         </div>
-        <div class="scrollbar-hide space-y-3">
+        <div class="scrollbar-hide space-y-3 p-3">
           <component :is="c" v-for="(c,i) in panel" :key="i" />
         </div>
       </aside>
@@ -547,8 +564,10 @@ function onTouchEnd(e) {
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
-        <div class="mb-3 seg">
-          <button v-for="s in stepNav" :key="s[0]" @click="store.step = Number(s[0]); menuOpen=false" class="seg-btn" :class="store.step === Number(s[0]) ? 'is-active' : ''">{{ s[1] }}</button>
+        <div class="mb-3 flex gap-1.5 overflow-x-auto">
+          <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" class="flex shrink-0 flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'">
+            <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
+          </button>
         </div>
         <div class="space-y-3"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
       </div>

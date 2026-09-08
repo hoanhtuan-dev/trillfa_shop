@@ -197,6 +197,21 @@
     /* Header chuẩn của panel/card trong workspace */
     .panel-head { @apply flex shrink-0 items-center justify-between gap-2 px-2.5 py-2; }
     .panel-title { @apply flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-cream-100; }
+    /* Activity bar (VSCode-style) — thanh icon cố định bên trái, mỗi icon mở 1 card */
+    .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-1.5 border-r border-ink-700 bg-ink-900 py-2.5; }
+    .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-xl text-cream-300/60 transition-colors hover:bg-ink-800 hover:text-cream-100; }
+    .activity-btn.is-active { @apply bg-ink-800 text-brand-200; }
+    .activity-btn.is-active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 18px;
+        width: 3px;
+        border-radius: 9999px;
+        background: var(--color-brand-400);
+    }
 }
 
 /* --- Elegant scrollbars (thin, subtle, animated) --- */
