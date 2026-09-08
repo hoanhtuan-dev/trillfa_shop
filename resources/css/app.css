@@ -199,6 +199,8 @@
     .panel-title { @apply flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-cream-100; }
     /* Activity bar (VSCode-style) — thanh icon cố định bên trái, mỗi icon mở 1 card */
     .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-1.5 border-r border-ink-700 bg-ink-900 py-2.5; }
+    .activity-bar.right { @apply border-l border-r-0; }
+    .activity-bar.right .activity-btn.is-active::before { left: auto; right: 0; }
     .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-xl text-cream-300/60 transition-colors hover:bg-ink-800 hover:text-cream-100; }
     .activity-btn.is-active { @apply bg-ink-800 text-brand-200; }
     .activity-btn.is-active::before {

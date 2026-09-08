@@ -565,16 +565,18 @@ function onTouchEnd(e) {
           <CanvasStatusBar />
         </div>
       </main>
-      <!-- Right outputs dock (desktop): fixed size như cũ (w-115), header/source/library cố định, CHỈ cuộn outputs -->
-      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[115px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex" style="background-image: linear-gradient(160deg, rgba(124,200,90,.07), rgba(74,122,144,.05));">
-        <div class="flex shrink-0 items-center justify-between gap-1 border-b border-ink-700 px-2 py-1.5">
-          <span class="flex min-w-0 items-center gap-1 text-[10px] font-semibold text-cream-200"><StudioIcon name="grid" size="h-3.5 w-3.5" class="shrink-0 text-brand-400" /> Outputs</span>
-          <button @click="store.outputDockOpen = false" class="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:bg-ink-700 hover:text-white" title="Ẩn dock phải" aria-label="Ẩn dock phải"><StudioIcon name="chevronRight" size="h-3.5 w-3.5" /></button>
-        </div>
+      <!-- Right outputs dock (desktop): panel (Source/Outputs/Library) + right activity bar (Outputs icon ở đáy) -->
+      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[115px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex">
         <div class="shrink-0 p-2 pb-0"><SourcePanel /></div>
         <div class="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-2"><OutputModule /></div>
         <div class="shrink-0 p-2 pt-0"><LibraryCard /></div>
       </aside>
+      <nav class="activity-bar right hidden lg:flex" aria-label="Outputs">
+        <button @click="store.toggleOutputDock()" class="activity-btn mt-auto" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
+          <StudioIcon name="grid" size="h-5 w-5" />
+          <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
+        </button>
+      </nav>
     </div>
 
     <!-- Mobile menu overlay -->

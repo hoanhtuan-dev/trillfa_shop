@@ -354,3 +354,15 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (786ms) · push `5b61136` · SSH pull + `optimize:clear` ✓ · asset `app-DRan4OKF.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AF (2026-09-08) — Hoán đổi icon Studio ↔ Tạo ảnh + đưa Tạo ảnh lên đầu
+
+**Yêu cầu:** "hoán đổi icon nút tạo ảnh cho icon studio, sau đó đưa nút tạo ảnh lên trên nút fitting room".
+
+**Đã sửa (commit `71a3b3f`):**
+- Logo **Studio** (đỉnh activity bar): `sparkles → bot`.
+- Icon **"Tạo ảnh"** (`concept`): `bot → sparkles`.
+- Thứ tự activity: **Tạo ảnh (sparkles) → Fitting Room (shirt) → Sửa ảnh (pencil) → Upscale (maximize) → Video (film)** (Tạo ảnh lên trên Fitting Room).
+
+**Xác minh:** vite build ✓ (785ms) · push `71a3b3f` · SSH pull + `optimize:clear` ✓ · asset `app-mDh6euOg.js` = HTTP 200 trên `trillfa.shop`.
+
