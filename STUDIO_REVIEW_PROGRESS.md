@@ -314,3 +314,17 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 - **B. Card Sửa ảnh (clean):** bỏ Render đa góc + Model chỉnh sửa + Chọn vùng/Vẽ tự do/Vẽ mask · 1 nút "Vẽ mask" (path) + tự lấy vùng chọn làm mask khi đóng · nhận MỌI ảnh canvas (backend `POST /studio/inpaint` source-agnostic, store dùng `upscaleSrc`).
 
 **T7 — commit báo cáo:** ĐÓNG — `STUDIO_REVIEW.md` (PHẦN I.2) + `STUDIO_REVIEW_PROGRESS.md` (Phiên O–AB) đã commit cùng đợt này.
+
+## Phiên AC (2026-09-08) — Activity bar kiểu VSCode (left side) + tối ưu tablet
+
+**Yêu cầu:** "tối ưu sâu giao diện cho máy tính bảng · đồng nhất quan điểm thiết kế, cỡ chữ, icon · left side giống VS Code · các card chỉ mở khi nhấn icon ở thanh bên cố định · hòa trộn VS Code + trình thiết kế hiện đại".
+
+**Đã sửa (commit `674dec7`):**
+- **Left side = Activity bar VSCode-style**: thanh icon dọc cố định (w-14) thay thế step-nav. 5 icon: **Tạo ảnh** (Stylist/Suggest/Concept) · **Fitting Room** (RefImage) · **Sửa ảnh** (Inpaint) · **Upscale** · **Video** (Director). Bấm icon → sidebar hiện đúng card; nút active có **vạch nhấn brand** bên trái (::before).
+- **Card mở theo icon**: bỏ bước 1/2/3, `activityNav` + `activeActivity` + `activeActivityDef`; `panel` = cards của activity đang chọn. `selectActivity()` đồng bộ `store.step` (deep-link ?step= · LayersPanel palette · GalleryModal prompt).
+- **Tablet (md 768px)**: activity bar hiện từ `md`, bấm icon → mở drawer card (sidebar < lg); nút menu ẩn trên md (activity bar thay thế). Drawer/mobile dùng icon activity ngang.
+- **Đồng nhất**: icon activity `h-5 w-5`, header sidebar dùng `panel-head/panel-title` chuẩn (icon + tên tool + credit).
+- CSS thêm `.activity-bar/.activity-btn/.is-active::before`.
+
+**Xác minh:** vite build ✓ (821ms) · push `674dec7` · SSH pull + `optimize:clear` ✓ · asset `app-DTPJxqkW.js` = HTTP 200 trên `trillfa.shop`.
+

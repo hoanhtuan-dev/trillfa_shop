@@ -9,20 +9,20 @@ const looks = [['studio','Studio'],['warm','Ấm'],['cool','Lạnh'],['cinematic
 const hasBox = computed(() => (store.inpaintMaskBox.w || 0) >= 0.02 && (store.inpaintMaskBox.h || 0) >= 0.02);
 
 // ── Chuyên nghiệp: từng thông số = "pill" (icon + nhãn + slider + giá trị), giống Krita/PS ──
-const I = 'h-4 w-4';
+const I = 'h-3.5 w-3.5';
 const primary = 'bg-cream-100 text-ink-900 hover:bg-cream-200';
 // Nút "Hoàn thành" (chỉnh sửa vùng) — màu KHÁC hẳn (xanh lục) để phân biệt với nút "Xong" thoát (kem).
 const confirm = 'bg-emerald-600 text-white hover:bg-emerald-500';
 const btn = 'bg-ink-800 text-cream-200 hover:bg-ink-700';
 // Nút ĐANG ĐƯỢC CHỌN (toggle/mode): nền sáng + vòng brand + bóng → rõ là đang active.
 const on = '!bg-cream-100 !text-ink-900 ring-2 ring-brand-300 shadow';
-const iconBtn = 'grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700';
-const iconBtnDanger = 'grid h-7 w-7 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-red-600 hover:text-white';
-const lbl = 'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors';
+const iconBtn = 'grid h-6 w-6 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-ink-700';
+const iconBtnDanger = 'grid h-6 w-6 place-items-center rounded-full bg-ink-800 text-cream-200 transition-colors hover:bg-red-600 hover:text-white';
+const lbl = 'flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors';
 const chip = 'rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors';
 const chipOn = 'border-cream-100 bg-cream-100 font-semibold text-ink-900';
 const chipOff = 'border-ink-700 text-cream-200 hover:border-cream-300 hover:text-cream-100';
-const sep = 'mx-0.5 h-4 w-px shrink-0 bg-ink-600';
+const sep = 'mx-0.5 h-3.5 w-px shrink-0 bg-ink-600';
 const ring = 'ring-ink-600/70';
 // Widget pill cho thông số
 const pill = 'flex items-center justify-between gap-1.5 rounded-lg bg-ink-800/70 px-1.5 py-1';

@@ -237,6 +237,8 @@ export const useStudioStore = defineStore('studio', {
     // Panel Layers: dock phải khung canvas trên desktop, drawer đè canvas trên mobile.
     // Mặc định mở trên desktop, đóng trên mobile để không che canvas lúc vào trang.
     inspectorOpen: (typeof window !== 'undefined' && window.innerWidth < 1024) ? false : true,
+    leftPanelOpen: true,   // sidebar card trái (ẩn/mở bằng nút chevron)
+    outputDockOpen: true,  // dock phải Outputs (ẩn/mở)
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
     redoStack: [],   // lịch sử làm lại
     highlightLayerId: '',  // layer mới tạo cần viền nổi bật tạm thời
@@ -1751,6 +1753,7 @@ export const useStudioStore = defineStore('studio', {
     },
     // Bật/tắt panel Layers dock (Designer Workspace) — CanvasStatusBar/LayersPanel header.
     toggleInspector() { this.inspectorOpen = !this.inspectorOpen; },
+    toggleOutputDock() { this.outputDockOpen = !this.outputDockOpen; },
     // Kéo-thả sắp xếp: đặt layer 'id' NGAY TRƯỚC (placeAfter=false) hoặc NGAY SAU (true)
     // 'targetId' trong stack canvasLayers (index 0 = dưới cùng, cuối = trước nhất).
     // Layer bị khóa không cho kéo; thả quanh target khóa vẫn hợp lệ. No-op khi kéo lên chính nó.
@@ -2382,8 +2385,8 @@ export const useStudioStore = defineStore('studio', {
     // Lưu VẬT LÝ (nút Save): flush toàn bộ trạng thái + thông báo thành công.
     saveNow() { this.saveLayerLayout(); this.toast('Đã lưu trang.'); },
     // ── Cài đặt status bar (snap · nền canvas · inspector) ──
-    saveBarSettings() { try { localStorage.setItem('trillfa.bar', JSON.stringify({ snapGrid: this.snapGrid, canvasBg: this.canvasBg, inspectorOpen: this.inspectorOpen })); } catch (e) { /* bỏ qua */ } },
-    restoreBarSettings() { try { const d = JSON.parse(localStorage.getItem('trillfa.bar') || 'null'); if (!d) return; if (d.snapGrid != null) this.snapGrid = Number(d.snapGrid) || 0; if (d.canvasBg) this.canvasBg = d.canvasBg; if (d.inspectorOpen != null) this.inspectorOpen = !!d.inspectorOpen; } catch (e) { /* bỏ qua */ } },
+    saveBarSettings() { try { localStorage.setItem('trillfa.bar', JSON.stringify({ snapGrid: this.snapGrid, canvasBg: this.canvasBg, inspectorOpen: this.inspectorOpen, leftPanelOpen: this.leftPanelOpen, outputDockOpen: this.outputDockOpen })); } catch (e) { /* bỏ qua */ } },
+    restoreBarSettings() { try { const d = JSON.parse(localStorage.getItem('trillfa.bar') || 'null'); if (!d) return; if (d.snapGrid != null) this.snapGrid = Number(d.snapGrid) || 0; if (d.canvasBg) this.canvasBg = d.canvasBg; if (d.inspectorOpen != null) this.inspectorOpen = !!d.inspectorOpen; if (d.leftPanelOpen != null) this.leftPanelOpen = !!d.leftPanelOpen; if (d.outputDockOpen != null) this.outputDockOpen = !!d.outputDockOpen; } catch (e) { /* bỏ qua */ } },
     // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).
     restoreLayerLayout() {
       try {
