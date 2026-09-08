@@ -462,7 +462,7 @@ const bodyHipsLabel = computed(() => {
       <div class="h-2 w-full overflow-hidden rounded-full bg-ink-800">
         <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-400 transition-all duration-500 ease-out" :style="{ width: store.generateProgress + '%' }"></div>
       </div>
-      <p v-if="store.generateStage === 'done'" class="mt-1.5 text-[10px] text-emerald-300/70">Đã tạo {{ store.generatedCount }} ảnh ✅</p>
+      <p v-if="store.generateStage === 'done'" class="mt-1.5 flex items-center gap-1 text-[10px] text-emerald-300/70"><StudioIcon name="check" size="h-3 w-3" /> Đã tạo {{ store.generatedCount }} ảnh</p>
     </div>
 
     <!-- ===== MODAL ===== -->
@@ -546,11 +546,11 @@ const bodyHipsLabel = computed(() => {
           <!-- Sáng tạo + Biến thể -->
           <div class="grid grid-cols-2 gap-3">
             <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Độ sáng tạo của AI: 1=bám sát prompt, 10=tự do sáng tạo">
-              <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">🎨 Sáng tạo</span><span class="font-semibold text-brand-300">{{ localCreative }}/10</span></p>
+              <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Sáng tạo</span><span class="font-semibold text-brand-300">{{ localCreative }}/10</span></p>
               <input type="range" min="1" max="10" v-model.number="localCreative" class="w-full cursor-pointer accent-brand-500">
             </div>
             <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Số lượng ảnh tạo cùng lúc (tốn thêm credit)">
-              <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">🖼️ Biến thể</span><span class="font-semibold text-brand-300">{{ localVariant }}</span></p>
+              <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="grid" size="h-3.5 w-3.5" /> Biến thể</span><span class="font-semibold text-brand-300">{{ localVariant }}</span></p>
               <input type="range" min="1" max="4" step="1" v-model.number="localVariant" class="w-full cursor-pointer accent-brand-500">
             </div>
           </div>
@@ -563,7 +563,7 @@ const bodyHipsLabel = computed(() => {
 
           <!-- Texture -->
           <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Mức độ chi tiết chất liệu vải hiển thị trong ảnh">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="font-medium text-cream-200">🧵 Texture</span><span class="font-semibold text-brand-300">{{ textureLabel }}</span></p>
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="layers" size="h-3.5 w-3.5" /> Texture</span><span class="font-semibold text-brand-300">{{ textureLabel }}</span></p>
             <input type="range" min="0" max="10" step="1" v-model.number="localTexture" class="w-full cursor-pointer accent-brand-500">
           </div>
 
@@ -726,7 +726,7 @@ const bodyHipsLabel = computed(() => {
         <!-- Draft restore notice -->
         <div v-if="showDraftNotice" class="my-3 rounded-xl border border-amber-500/30 bg-amber-900/20 p-2.5">
           <div class="flex items-center justify-between">
-            <p class="text-[11px] text-amber-300/80" title="Bạn có một bản nháp chưa gửi từ lần làm việc trước">📝 Có bản nháp từ lúc {{ draftTime }}</p>
+            <p class="flex items-center gap-1.5 text-[11px] text-amber-300/80" title="Bạn có một bản nháp chưa gửi từ lần làm việc trước"><StudioIcon name="pencil" size="h-3.5 w-3.5" /> Có bản nháp từ lúc {{ draftTime }}</p>
             <div class="flex gap-1.5">
               <button @click="restoreDraft" class="rounded-lg bg-amber-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-amber-500" title="Khôi phục toàn bộ cài đặt và prompt từ bản nháp">Khôi phục</button>
               <button @click="dismissDraft" class="rounded-lg bg-ink-700 px-2 py-1 text-[10px] text-cream-200 hover:bg-red-600" title="Xóa bản nháp và bắt đầu mới">Bỏ qua</button>
