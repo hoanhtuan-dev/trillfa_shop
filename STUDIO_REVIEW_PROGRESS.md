@@ -489,3 +489,17 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** vite build ✓ (745ms) · push `0e89baa` · SSH pull + `optimize:clear` ✓ · app JS `app-DvEAFP6n.js` 200.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AO)' && git push origin main 2>&1 | tail -1
+
+## Phiên AP (2026-09-08) — Thu nhỏ card/dock + giãn nút (đúng ý người dùng)
+
+**Đính chính ý:** tối ưu không gian = **nhỏ lại** card/dock + **giãn khoảng cách nút** (không làm to nút/dock).
+
+**Đã sửa (commit `a0a5c94`):**
+- **Gỡ** các thay đổi "làm to" trước đó: bỏ `@media (pointer: coarse)` phóng to nút, `circleR` node trở về 3px.
+- **Thu nhỏ:** left sidebar `w-80→w-72` + padding `p-3→p-2.5`, `space-y-3→2.5`.
+- **Giãn nút:** activity bar `gap-1.5→gap-2`, ContextToolbar `gap-1→gap-1.5`.
+- Giữ `_grabR()` (bán kính grab node/handle 22px touch/12px chuột) — **vô hình**, chỉ tăng độ dễ bấm, không đổi kích thước hiển thị.
+
+**Xác minh:** vite build ✓ (804ms) · push `a0a5c94` · SSH pull + `optimize:clear` ✓ · app JS `app-64YDDdzL.js` 200.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AP)' && git push origin main 2>&1 | tail -1

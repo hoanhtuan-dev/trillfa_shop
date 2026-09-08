@@ -4544,6 +4544,13 @@ RULES:
             'image_credits' => (int) studio_config('image_credits', 1),
             // Card Sửa ảnh: các model chỉnh sửa được phép chọn (mặc định đứng đầu).
             'inpaint_models' => $inpaintModels,
+            // Card "Kịch bản quay" (DirectorCard): các preset video_scene từ Prompt Templates (Cài đặt).
+            'video_scenes' => Preset::category('video_scene')->get()->map(fn ($p) => [
+                'id' => $p->id,
+                'label' => $p->ui_label,
+                'prompt' => $p->prompt_injection,
+                'note' => $p->note,
+            ])->values(),
         ]);
     }
 

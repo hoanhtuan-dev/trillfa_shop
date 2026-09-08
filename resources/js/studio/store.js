@@ -120,6 +120,7 @@ export const useStudioStore = defineStore('studio', {
     palette: [],
     // director
     videoModel: '',
+    videoScenes: [],      // Kịch bản quay — preset video_scene từ Prompt Templates (Cài đặt)
     videoScene: '',
     videoDuration: '5',
     videoRes: '720',
@@ -348,6 +349,8 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.image_credits != null) this.imageCreditCost = Number(defaults.image_credits);
       // Card Sửa ảnh: danh sách model chỉnh sửa (mặc định đứng đầu).
       if (Array.isArray(defaults.inpaint_models)) this.inpaintModels = defaults.inpaint_models;
+      // Card "Kịch bản quay": preset video_scene từ Prompt Templates (Cài đặt).
+      if (Array.isArray(defaults.video_scenes)) this.videoScenes = defaults.video_scenes;
     },
     applyDefaults() {
       // Re-fetch and apply default values (used by reset button)
@@ -675,15 +678,10 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi render video.', 'error'); }
       finally { this.videoBusy = false; }
     },
-    // Ánh xạ 3 nút "Kịch bản quay" của DirectorCard (catwalk/slow/closeup) sang câu mô tả
-    // camera tiếng Anh — đồng bộ với các preset video_scene ở database/data/studio_presets.php.
+    // Đọc preset "Kịch bản quay" (video_scene) đang chọn từ danh sách nạp ở Cài đặt → Prompt Templates.
     videoSceneCamera() {
-      const map = {
-        catwalk: 'Full body shot, model walking confidently forward on a runway, camera smoothly tracking backwards at the exact same speed, maintaining subject in center frame, dynamic fabric motion',
-        slow: 'Medium-full shot, camera static, model performing a slow elegant movement, 120fps slow-motion cinematic effect, graceful fabric motion',
-        closeup: 'Extreme close-up macro shot, shallow depth of field, sharp focus on fabric texture, weave, and intricate stitching',
-      };
-      return map[this.videoScene] || '';
+      const sc = this.videoScenes.find(s => String(s.id) === String(this.videoScene));
+      return sc ? sc.prompt : '';
     },
     // Zoom theo điểm chuột (cx, cy = px so với TÂM khung) — điểm ảnh dưới con trỏ
     // không trôi khi phóng/thu (pan' = c*(1-k) + pan*k).

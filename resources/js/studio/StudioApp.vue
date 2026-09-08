@@ -33,7 +33,7 @@ const activityNav = [
   { id: 'ref', icon: 'shirt', label: 'Fitting Room', cards: [RefImageCard] },
   { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
   { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
-  { id: 'director', icon: 'film', label: 'Video', cards: [DirectorCard] },
+  { id: 'director', icon: 'film', label: 'Kịch bản quay', cards: [DirectorCard] },
 ];
 const activeActivity = ref('concept');
 const menuOpen = ref(false);
