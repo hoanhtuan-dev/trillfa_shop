@@ -472,27 +472,29 @@ const bodyHipsLabel = computed(() => {
         <p class="text-sm text-cream-300/60">Đang tải cài đặt mặc định…</p>
       </div>
       <template v-else>
-        <!-- ── Tab navigation ── -->
-        <div class="mb-4 seg">
-          <button v-for="tab in [
-            { id: 'prompt', icon: 'pencil', label: 'Prompt', tooltip: 'Nhập và chỉnh sửa prompt tạo ảnh' },
-            { id: 'body', icon: 'body', label: 'Phom dáng', tooltip: 'Điều chỉnh chiều cao, vóc dáng, eo, vai, hông của người mẫu' },
-            { id: 'hair', icon: 'hair', label: 'Kiểu tóc', tooltip: 'Chọn kiểu tóc và màu tóc thời thượng' },
-            { id: 'advanced', icon: 'gear', label: 'Nâng cao', tooltip: 'Negative prompt và các tùy chọn nâng cao' },
-          ]" :key="tab.id" @click="activeTab = tab.id" :title="tab.tooltip" class="seg-btn"
-            :class="activeTab === tab.id ? 'is-active' : ''">
-            <StudioIcon :name="tab.icon" size="h-3.5 w-3.5" />
-            <span class="hidden sm:inline">{{ tab.label }}</span>
-          </button>
+        <!-- ── Tab navigation (fixed/sticky — không cuộn theo nội dung) ── -->
+        <div class="sticky top-0 z-10 -mx-5 -mt-5 mb-4 border-b border-ink-700/80 bg-ink-900/95 px-5 py-3 backdrop-blur">
+          <div class="seg w-full">
+            <button v-for="tab in [
+              { id: 'prompt', emoji: '📝', label: 'Prompt', tooltip: 'Nhập và chỉnh sửa prompt tạo ảnh' },
+              { id: 'body', emoji: '🧍', label: 'Phom dáng', tooltip: 'Điều chỉnh chiều cao, vóc dáng, eo, vai, hông của người mẫu' },
+              { id: 'hair', emoji: '💇', label: 'Kiểu tóc', tooltip: 'Chọn kiểu tóc và màu tóc thời thượng' },
+              { id: 'advanced', emoji: '⚙️', label: 'Nâng cao', tooltip: 'Negative prompt và các tùy chọn nâng cao' },
+            ]" :key="tab.id" @click="activeTab = tab.id" :title="tab.tooltip" class="seg-btn flex-1"
+              :class="activeTab === tab.id ? 'is-active' : ''">
+              <span>{{ tab.emoji }}</span>
+              <span class="hidden sm:inline">{{ tab.label }}</span>
+            </button>
+          </div>
         </div>
 
         <!-- ===== TAB: PROMPT ===== -->
         <div v-show="activeTab === 'prompt'" class="space-y-3">
           <!-- Top bar -->
           <div class="flex items-center gap-2">
-            <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" title="Xem lại các prompt đã dùng trước đây" class="tool-btn" :class="showHistory ? 'is-active' : ''"><span class="flex items-center gap-1"><StudioIcon name="history" size="h-3.5 w-3.5" /> Lịch sử</span></button>
-            <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" title="Chọn mẫu prompt có sẵn để bắt đầu nhanh" class="tool-btn" :class="showTemplates ? 'is-active' : ''"><span class="flex items-center gap-1"><StudioIcon name="template" size="h-3.5 w-3.5" /> Templates</span></button>
-            <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" title="Prompt đã lưu từ Trợ lý thiết kế" class="tool-btn" :class="showPresets ? 'is-active' : ''"><span class="flex items-center gap-1"><StudioIcon name="sparkles" size="h-3.5 w-3.5" /> Preset</span></button>
+            <button @click="showHistory = !showHistory; if (showHistory) { loadHistory(); showTemplates = false; showPresets = false }" title="Xem lại các prompt đã dùng trước đây" class="tool-btn" :class="showHistory ? 'is-active' : ''"><span class="flex items-center gap-1">🕘 Lịch sử</span></button>
+            <button @click="showTemplates = !showTemplates; if (showTemplates) { showHistory = false; showPresets = false }" title="Chọn mẫu prompt có sẵn để bắt đầu nhanh" class="tool-btn" :class="showTemplates ? 'is-active' : ''"><span class="flex items-center gap-1">📋 Templates</span></button>
+            <button @click="showPresets = !showPresets; if (showPresets) { showHistory = false; showTemplates = false; loadPresets() }" title="Prompt đã lưu từ Trợ lý thiết kế" class="tool-btn" :class="showPresets ? 'is-active' : ''"><span class="flex items-center gap-1">✨ Preset</span></button>
             <span class="ml-auto text-xs text-cream-300/40" title="Số credit ước tính cho lần tạo này">~{{ creditEstimate }} credit</span>
           </div>
 
@@ -510,8 +512,8 @@ const bodyHipsLabel = computed(() => {
           <div class="relative">
             <textarea v-model="store.imagePromptEn" @keydown="onPromptKeydown" rows="5" class="input !text-sm !py-3 !pr-16 !rounded-2xl" placeholder="Mô tả trang phục, phong cách, bối cảnh, ánh sáng… (EN hoặc VI)"></textarea>
             <div class="absolute bottom-2 right-2 flex items-center gap-1">
-              <button @click="undo" :disabled="undoStack.length < 2" class="icon-btn !h-6 !w-6" title="Hoàn tác thay đổi gần nhất (Ctrl+Z)"><StudioIcon name="undo" size="h-3.5 w-3.5" /></button>
-              <button @click="redo" :disabled="!redoStack.length" class="icon-btn !h-6 !w-6" title="Làm lại thay đổi đã hoàn tác (Ctrl+Y)"><StudioIcon name="redo" size="h-3.5 w-3.5" /></button>
+              <button @click="undo" :disabled="undoStack.length < 2" class="icon-btn !h-6 !w-6" title="Hoàn tác thay đổi gần nhất (Ctrl+Z)">↩️</button>
+              <button @click="redo" :disabled="!redoStack.length" class="icon-btn !h-6 !w-6" title="Làm lại thay đổi đã hoàn tác (Ctrl+Y)">↪️</button>
               <span class="text-[10px] font-semibold" :class="charDanger ? 'text-red-400' : charWarning ? 'text-amber-400' : 'text-cream-300/50'" :title="'Số ký tự: ' + charCount + '/' + MAX_CHARS">{{ charCount }}/{{ MAX_CHARS }}</span>
             </div>
           </div>
@@ -520,8 +522,8 @@ const bodyHipsLabel = computed(() => {
           <div v-if="showTemplates" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showTemplates = false">
             <div class="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
               <div class="mb-3 flex items-center justify-between">
-                <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="template" /> Prompt Templates</span>
-                <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+                <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><span>📋</span> Prompt Templates</span>
+                <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng">✕</button>
               </div>
               <!-- Chế độ chèn -->
               <div class="mb-3 flex items-center gap-1.5 text-[10px]">
@@ -567,48 +569,48 @@ const bodyHipsLabel = computed(() => {
 
           <!-- Enrich Preview -->
           <button @click="openEnrichPreview" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800 px-4 py-2.5 text-xs font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10" title="Xem trước prompt sau khi được làm giàu bởi AI">
-            <StudioIcon name="wand" size="h-3.5 w-3.5" /> Preview Enrich Prompt
+            <span>✨</span> Preview Enrich Prompt
           </button>
         </div>
 
         <!-- ===== TAB: PHOM DÁNG ===== -->
         <div v-show="activeTab === 'body'" class="space-y-3">
           <div class="rounded-2xl border border-purple-500/20 bg-purple-900/10 p-3">
-            <p class="flex items-center gap-1.5 text-xs font-semibold text-purple-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Điều chỉnh phom dáng người mẫu</p>
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-purple-200"><span>🧍</span> Điều chỉnh phom dáng người mẫu</p>
             <p class="mt-0.5 text-[10px] text-purple-300/50">Để ở mức 5 (trung bình) nếu không muốn ép phom dáng cụ thể.</p>
           </div>
 
           <!-- Chiều cao -->
           <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh chiều cao người mẫu từ rất thấp đến siêu cao">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="height" size="h-3.5 w-3.5" /> Chiều cao</span><span class="font-semibold text-brand-300">{{ bodyHeightLabel }}</span></p>
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><span>📏</span> Chiều cao</span><span class="font-semibold text-brand-300">{{ bodyHeightLabel }}</span></p>
             <input type="range" min="1" max="10" step="1" v-model.number="localBodyHeight" class="w-full cursor-pointer accent-purple-400">
             <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>1.5m</span><span>1.65m</span><span>1.80m+</span></div>
           </div>
 
           <!-- Độ gầy/béo -->
           <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh vóc dáng từ siêu gầy đến đầy đặn/curvy">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="body" size="h-3.5 w-3.5" /> Vóc dáng</span><span class="font-semibold text-brand-300">{{ bodyBuildLabel }}</span></p>
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><span>🧍</span> Vóc dáng</span><span class="font-semibold text-brand-300">{{ bodyBuildLabel }}</span></p>
             <input type="range" min="1" max="10" step="1" v-model.number="localBodyBuild" class="w-full cursor-pointer accent-purple-400">
             <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Siêu gầy</span><span>Cân đối</span><span>Curvy</span></div>
           </div>
 
           <!-- Eo -->
           <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh vòng eo từ thẳng đến đồng hồ cát thon gọn">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="waist" size="h-3.5 w-3.5" /> Eo</span><span class="font-semibold text-brand-300">{{ bodyWaistLabel }}</span></p>
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><span>⏳</span> Eo</span><span class="font-semibold text-brand-300">{{ bodyWaistLabel }}</span></p>
             <input type="range" min="1" max="10" step="1" v-model.number="localBodyWaist" class="w-full cursor-pointer accent-purple-400">
             <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Thẳng</span><span>Cân đối</span><span>Đồng hồ cát</span></div>
           </div>
 
           <!-- Vai -->
           <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh độ rộng vai từ hẹp đến rộng">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="shoulder" size="h-3.5 w-3.5" /> Vai</span><span class="font-semibold text-brand-300">{{ bodyShouldersLabel }}</span></p>
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><span>↔️</span> Vai</span><span class="font-semibold text-brand-300">{{ bodyShouldersLabel }}</span></p>
             <input type="range" min="1" max="10" step="1" v-model.number="localBodyShoulders" class="w-full cursor-pointer accent-purple-400">
             <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Hẹp</span><span>Cân đối</span><span>Rộng</span></div>
           </div>
 
           <!-- Hông -->
           <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 px-4 py-3" title="Điều chỉnh độ nở hông từ hẹp đến rất nở">
-            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><StudioIcon name="hip" size="h-3.5 w-3.5" /> Hông</span><span class="font-semibold text-brand-300">{{ bodyHipsLabel }}</span></p>
+            <p class="mb-1 flex items-center justify-between text-xs"><span class="flex items-center gap-1.5 font-medium text-cream-200"><span>🍑</span> Hông</span><span class="font-semibold text-brand-300">{{ bodyHipsLabel }}</span></p>
             <input type="range" min="1" max="10" step="1" v-model.number="localBodyHips" class="w-full cursor-pointer accent-purple-400">
             <div class="mt-1 flex justify-between text-[9px] text-cream-300/40"><span>Hẹp</span><span>Cân đối</span><span>Nở</span></div>
           </div>
@@ -617,7 +619,7 @@ const bodyHipsLabel = computed(() => {
         <!-- ===== TAB: KIỂU TÓC ===== -->
         <div v-show="activeTab === 'hair'" class="space-y-3">
           <div class="rounded-2xl border border-pink-500/20 bg-pink-900/10 p-3">
-            <p class="flex items-center gap-1.5 text-xs font-semibold text-pink-200"><StudioIcon name="hair" size="h-3.5 w-3.5" /> Kiểu tóc & Màu tóc</p>
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-pink-200"><span>💇</span> Kiểu tóc & Màu tóc</p>
             <p class="mt-0.5 text-[10px] text-pink-300/50">Chọn kiểu tóc thời thượng và màu tóc. Để trống nếu không muốn ép.</p>
           </div>
 
@@ -651,14 +653,14 @@ const bodyHipsLabel = computed(() => {
         <div v-show="activeTab === 'advanced'" class="space-y-3">
           <!-- Negative prompt -->
           <div class="rounded-2xl border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
-            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="x" size="h-3.5 w-3.5" /> Negative Prompt</label>
+            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><span>🚫</span> Negative Prompt</label>
             <p class="mb-2 text-[10px] text-cream-300/50">Điều model KHÔNG nên tạo. Để trống sẽ dùng mặc định từ Cài đặt.</p>
             <textarea v-model="store.negativePromptEn" rows="3" class="input !text-sm !py-2 !rounded-xl" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..." title="Nhập các yếu tố bạn muốn AI tránh tạo ra trong ảnh"></textarea>
           </div>
 
           <!-- Enrich Preview trong tab nâng cao -->
           <button @click="openEnrichPreview" class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-ink-600 bg-ink-800 px-4 py-2.5 text-xs font-semibold text-cream-200 transition hover:border-brand-400 hover:bg-brand-600/10" title="Xem trước prompt sau khi được làm giàu bởi AI">
-            <StudioIcon name="wand" size="h-3.5 w-3.5" /> Preview Enrich Prompt
+            <span>✨</span> Preview Enrich Prompt
           </button>
         </div>
 
@@ -666,10 +668,10 @@ const bodyHipsLabel = computed(() => {
         <div v-if="showEnrich" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showEnrich = false">
           <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-emerald-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
-              <span class="flex items-center gap-2 text-sm font-semibold text-emerald-300"><StudioIcon name="wand" /> Prompt Enrich Preview</span>
+              <span class="flex items-center gap-2 text-sm font-semibold text-emerald-300"><span>✨</span> Prompt Enrich Preview</span>
               <div class="flex items-center gap-2">
                 <button @click="doEnrichPreview" :disabled="enrichLoading" class="rounded-full bg-ink-700 px-3 py-1 text-[10px] text-cream-200 hover:bg-brand-600" title="Tải lại bản xem trước prompt đã làm giàu">{{ enrichLoading ? 'Đang xử lý…' : 'Làm mới' }}</button>
-                <button @click="showEnrich = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+                <button @click="showEnrich = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng">✕</button>
               </div>
             </div>
             <div class="mb-3 rounded-xl border border-ink-600 bg-ink-800 p-3">
@@ -694,8 +696,8 @@ const bodyHipsLabel = computed(() => {
         <div v-if="showPresets" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
           <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
-              <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Preset — Prompt đã lưu</span>
-              <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
+              <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><span>✨</span> Preset — Prompt đã lưu</span>
+              <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng">✕</button>
             </div>
             <!-- Chế độ chèn cho preset -->
             <div class="mb-3 flex items-center gap-1.5 text-[10px]">
@@ -743,7 +745,7 @@ const bodyHipsLabel = computed(() => {
             Đang tạo ảnh…
           </span>
           <span v-else class="flex items-center justify-center gap-2">
-            <StudioIcon name="zap" size="h-4 w-4" /> Tạo Ảnh 2D
+            ⚡ Tạo Ảnh 2D
           </span>
         </button>
       </template>
