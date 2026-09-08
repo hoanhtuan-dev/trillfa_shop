@@ -3,8 +3,19 @@
 <head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#1f372b">
-    @include('partials.remove-service-worker')
+    <meta name="theme-color" content="#193d2b">
+    <meta name="color-scheme" content="dark light">
+    <!-- PWA Studio: manifest riêng + icon riêng + service worker scope /studio -->
+    <link rel="manifest" href="/manifest-studio.json">
+    <link rel="apple-touch-icon" href="/icons/studio-apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/icons/studio-favicon-32.png">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw-studio.js', { scope: '/studio' }).catch(function () {});
+            });
+        }
+    </script>
     <title>Studio — Trillfa</title>
     @vite(['resources/css/app.css', 'resources/js/studio/app.js'])
 </head>

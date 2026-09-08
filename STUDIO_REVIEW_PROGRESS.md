@@ -434,3 +434,19 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 **Xác minh:** `manifest-studio.json` = `application/json` ✓ · app JS `app-CV30tpGW.js` 200 ✓ · deploy SSH + `optimize:clear` ✓.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AK)' && git push origin main 2>&1 | tail -2
+
+## Phiên AL (2026-09-08) — Fix SW không kích hoạt (gốc lỗi install button không hiện)
+
+**Vấn đề:** nút cài đặt vẫn không hiện dù manifest đã `application/json`.
+
+**Gốc rễ:** `/studio` trả `Cache-Control: no-store` (middleware `NoStoreCache`). SW cũ trong `install` gọi `cache.addAll(['/studio'])` → phản hồi no-store khiến `cache.put` REJECT → `waitUntil` reject → **SW cài đặt THẤT BẠI → không bao giờ active → không kiểm soát trang → Chrome không coi là installable**.
+
+**Đã sửa (commit `5c9c068`):**
+- SW `install` chỉ `skipWaiting()` (không cache HTML no-store); navigation network-first (fallback cache), asset `/build//icons//images/` SWR (`cache.put` bọc `.catch`).
+- Thêm nút **"Cài đặt"** trên top bar (hiện khi `showInstall`) ngoài banner popup.
+
+**Xác minh:** sw-studio v2 live ✓ · app JS `app-CxkhDVSB.js` 200 ✓ · deploy SSH + `optimize:clear` ✓.
+
+**Cách kiểm tra (Chrome):** Ctrl+Shift+R → đợi SW đăng ký → **tải lại lần 2** → nút "Cài đặt" hiện trên top bar / thanh địa chỉ.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AL)' && git push origin main 2>&1 | tail -1
