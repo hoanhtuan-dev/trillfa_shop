@@ -379,3 +379,16 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (759ms) · push `a29f44d` · SSH pull + `optimize:clear` ✓ · asset `app-C0adBcfp.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AH (2026-09-08) — Tách Nguồn ảnh + Thư viện khỏi Outputs (right activity bar 3 icon)
+
+**Yêu cầu:** "tách Nguồn ảnh|xem ảnh trong thư viện đưa vào cột bên phải thay vì ở chung với outputs".
+
+**Đã sửa (commit `29634cf`):**
+- Right activity bar giờ có **3 icon**: **Nguồn ảnh** (`imagePlus`) · **Thư viện** (`library` — icon mới) · **Outputs** (`grid`, ở ĐÁY + badge đếm).
+- Bấm icon → mở panel tương ứng (giống left dock): `rightNav` + `rightView` + `selectRightView` (bấm icon đang chọn khi đang mở → đóng).
+- Panel phải giờ hiện **1 view** theo icon (SourcePanel / LibraryCard / OutputModule), header `panel-head` hiện tên view; kéo-thả OutputModule giữ nguyên.
+- Mobile drawer vẫn gộp Source+Outputs+Library (không đổi).
+
+**Xác minh:** vite build ✓ (834ms) · push `29634cf` · SSH pull + `optimize:clear` ✓ · asset `app-hNnTH51N.js` = HTTP 200 trên `trillfa.shop`.
+

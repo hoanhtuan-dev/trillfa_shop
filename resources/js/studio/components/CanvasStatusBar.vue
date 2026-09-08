@@ -110,15 +110,6 @@ const bgSwatchStyle = (b) => ({
       aria-label="Tải ảnh đang chọn"
     ><StudioIcon name="download" /></button>
 
-    <!-- 9. Toggle outputs dock (phải) -->
-    <button
-      @click="store.toggleOutputDock()"
-      class="grid h-7 w-7 place-items-center rounded-md text-cream-200 hover:bg-ink-700 disabled:opacity-30"
-      :class="store.outputDockOpen ? 'bg-brand-600/20 text-brand-300' : ''"
-      title="Bật/tắt dock Outputs"
-      aria-label="Bật/tắt dock Outputs"
-    ><StudioIcon name="grid" /></button>
-
     <!-- 9. Toggle inspector (lg+) -->
     <button
       @click="store.toggleInspector()"

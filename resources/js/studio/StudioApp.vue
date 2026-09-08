@@ -15,6 +15,7 @@ import CanvasMaskTools from './components/CanvasMaskTools.vue';
 import ContextToolbar from './components/ContextToolbar.vue';
 import DirectorCard from './components/DirectorCard.vue';
 import SourcePanel from './components/SourcePanel.vue';
+import SourcePickerPopup from './components/SourcePickerPopup.vue';
 import OutputModule from './components/OutputModule.vue';
 import LibraryCard from './components/LibraryCard.vue';
 import MultiSelectBar from './components/MultiSelectBar.vue';
@@ -141,20 +142,8 @@ function selectActivity(id) {
   if (tablet) menuOpen.value = true;
   else store.leftPanelOpen = true;
 }
-// Right activity bar: Nguồn ảnh · Thư viện · Outputs (Outputs ở ĐÁY) — mỗi icon mở 1 view riêng.
-const rightNav = [
-  { id: 'source', icon: 'imagePlus', label: 'Nguồn ảnh' },
-  { id: 'library', icon: 'library', label: 'Thư viện' },
-  { id: 'outputs', icon: 'grid', label: 'Outputs' },
-];
-const rightView = ref('outputs');
-const rightViewDef = computed(() => rightNav.find(a => a.id === rightView.value) || rightNav[2]);
-function selectRightView(id) {
-  // Bấm icon ĐANG CHỌN khi đang mở → đóng; còn lại → đổi view + mở panel.
-  if (id === rightView.value && store.outputDockOpen) { store.outputDockOpen = false; return; }
-  rightView.value = id;
-  store.outputDockOpen = true;
-}
+// Right activity bar: Nguồn ảnh (popup) · Thư viện (điều hướng) · Outputs (toggle dock).
+function goLibrary() { window.location.href = '/studio/library'; }
 // ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
 const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking);
 
@@ -579,21 +568,25 @@ function onTouchEnd(e) {
           <CanvasStatusBar />
         </div>
       </main>
-      <!-- Right dock (desktop): panel view + right activity bar (Nguồn ảnh · Thư viện · Outputs) -->
+      <!-- Right dock (desktop): chỉ hiển thị Outputs; Nguồn ảnh & Thư viện là nút HÀNH ĐỘNG ở rail -->
       <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-[115px] shrink-0 flex-col border-l border-ink-700 bg-ink-900/70 lg:flex">
         <div class="panel-head shrink-0 border-b border-ink-700">
-          <span class="panel-title"><StudioIcon :name="rightViewDef.icon" size="h-3.5 w-3.5" class="text-brand-400" /> {{ rightViewDef.label }}</span>
+          <span class="panel-title"><StudioIcon name="grid" size="h-3.5 w-3.5" class="text-brand-400" /> Outputs</span>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-2">
-          <SourcePanel v-if="rightView === 'source'" />
-          <LibraryCard v-else-if="rightView === 'library'" />
-          <OutputModule v-else />
+          <OutputModule />
         </div>
       </aside>
       <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Outputs">
-        <button v-for="a in rightNav" :key="a.id" @click="selectRightView(a.id)" class="activity-btn" :class="[rightView === a.id && store.outputDockOpen ? 'is-active' : '', a.id === 'outputs' ? 'mt-auto' : '']" :title="a.label" :aria-label="a.label">
-          <StudioIcon :name="a.icon" size="h-5 w-5" />
-          <span v-if="a.id === 'outputs' && store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
+        <button @click="store.sourcePickerOpen = true" class="activity-btn" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh">
+          <StudioIcon name="imagePlus" size="h-5 w-5" />
+        </button>
+        <button @click="goLibrary" class="activity-btn" title="Thư viện — mở trang /studio/library" aria-label="Thư viện">
+          <StudioIcon name="library" size="h-5 w-5" />
+        </button>
+        <button @click="store.toggleOutputDock()" class="activity-btn mt-auto" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
+          <StudioIcon name="grid" size="h-5 w-5" />
+          <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
         </button>
       </nav>
     </div>
@@ -636,6 +629,8 @@ function onTouchEnd(e) {
       </div>
     </div>
     <GalleryModal v-if="store.viewer" />
+    <!-- Popup chọn nguồn ảnh (mở từ activity bar phải) -->
+    <SourcePickerPopup v-model="store.sourcePickerOpen" />
     <!-- ══ Bảng quản lý dự án thiết kế (Project Workspace) ══ -->
     <ProjectWorkspace v-model="projectsOpen" />
   </div>

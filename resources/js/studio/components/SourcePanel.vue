@@ -4,23 +4,20 @@
 // - Đã có ảnh: hiển thị ảnh nguồn đang dùng (store.editSource) + nút X bỏ ảnh (góc trên phải).
 // Không tiêu đề, không chữ chú thích — mọi tên chỉ hiện khi hover (title/aria).
 // Bấm slot → mở SourcePickerPopup: popup gộp 2 nguồn (Thư viện ảnh + Sản phẩm) thành 2 tab.
-import { ref } from 'vue';
 import { useStudioStore } from '../store.js';
 import { thumbUrl, onThumbError } from '../composables/useStudioThumb.js';
-import SourcePickerPopup from './SourcePickerPopup.vue';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
-const pickerOpen = ref(false);
 </script>
 <template>
   <div class="card overflow-hidden">
     <div class="p-2">
       <!-- Slot duy nhất: icon (trống) | ảnh nguồn (đã có) — bấm mở popup 2 tab -->
       <div
-        @click="pickerOpen = true; store.exitCanvasTools()"
+        @click="store.sourcePickerOpen = true; store.exitCanvasTools()"
         role="button"
         tabindex="0"
-        @keydown.enter.prevent="pickerOpen = true"
+        @keydown.enter.prevent="store.sourcePickerOpen = true"
         class="group relative block w-full cursor-pointer overflow-hidden rounded-xl transition-colors focus:outline-none"
         :class="store.editSource ? 'border border-ink-700 bg-ink-900 hover:border-brand-500/70' : 'border border-dashed border-ink-600 bg-ink-800/50 hover:border-brand-500/70 hover:bg-ink-800'"
         :title="store.editSource ? 'Ảnh nguồn: ' + (store.editSource.name || 'Ảnh nguồn') + ' — bấm để thay / thêm (thư viện · sản phẩm)' : 'Thêm ảnh nguồn — thư viện đã tải lên · sản phẩm'"
@@ -41,7 +38,5 @@ const pickerOpen = ref(false);
       </div>
     </div>
 
-    <!-- Popup gộp 2 nguồn thành 2 tab (Thư viện ảnh / Sản phẩm) trong 1 popup -->
-    <SourcePickerPopup v-model="pickerOpen" />
   </div>
 </template>

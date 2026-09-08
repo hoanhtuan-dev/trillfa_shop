@@ -239,6 +239,7 @@ export const useStudioStore = defineStore('studio', {
     inspectorOpen: (typeof window !== 'undefined' && window.innerWidth < 1024) ? false : true,
     leftPanelOpen: true,   // sidebar card trái (ẩn/mở bằng nút chevron)
     outputDockOpen: true,  // dock phải Outputs (ẩn/mở)
+    sourcePickerOpen: false, // popup chọn nguồn ảnh (mở trực tiếp từ activity bar)
     undoStack: [],   // lịch sử hoàn tác (snapshot layers + activeLayerId)
     redoStack: [],   // lịch sử làm lại
     highlightLayerId: '',  // layer mới tạo cần viền nổi bật tạm thời
