@@ -2691,12 +2691,17 @@ export const useStudioStore = defineStore('studio', {
       if (this.inpaintSelectMode === 'new') this.inpaintSelectMode = 'add';
     },
     // ── Path (curve) select: click thêm điểm neo → đường cong mượt → đóng để tạo vùng chọn ──
+    // Bán kính grab node/handle — lớn hơn trên touch/bút (pointer: coarse) để dễ bấm bằng ngón tay.
+    _grabR() {
+      const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+      return coarse ? 22 : 12;
+    },
     // ── Bezier curve selection (Krita Pen tool): click=neo (kéo=handle), kéo NODE/HANDLE để chỉnh, right-click=xóa ──
     _pathHit(p) {
       const m = this.canvasMetrics();
       if (!m) return null;
       const d = (nx, ny) => Math.hypot((p.nx - nx) * m.vw, (p.ny - ny) * m.vh);
-      const R = 12; // bán kính grab (px màn hình, chia theo vw/vh)
+      const R = this._grabR();
       for (let i = this.inpaintPathPoints.length - 1; i >= 0; i--) {
         const nd = this.inpaintPathPoints[i];
         // Bỏ qua tay điều khiển SUY BIẾN (độ dài ~0) để kéo NODE thay vì kéo tay lệch.
@@ -2726,7 +2731,7 @@ export const useStudioStore = defineStore('studio', {
       if (!p) { this.inpaintPathCloseHover = false; this._clearPathHover(); return; }
       if (this.inpaintPathPoints.length >= 3) {
         const s = this.inpaintPathPoints[0];
-        this.inpaintPathCloseHover = this._pathScreenDist(p.nx, p.ny, s.nx, s.ny) < 20;
+        this.inpaintPathCloseHover = this._pathScreenDist(p.nx, p.ny, s.nx, s.ny) < (this._grabR() + 8);
       } else {
         this.inpaintPathCloseHover = false;
       }
@@ -2767,7 +2772,7 @@ export const useStudioStore = defineStore('studio', {
     _regionHoverHit(p) {
       const m = this.canvasMetrics(); if (!m) return { region: -1, x: 0, y: 0 };
       const sx = p.nx * m.vw, sy = p.ny * m.vh;
-      let best = { region: -1, x: p.nx, y: p.ny }, bestDist = 18;
+      let best = { region: -1, x: p.nx, y: p.ny }, bestDist = this._grabR() + 6;
       for (let r = 0; r < this.inpaintPathRegions.length; r++) {
         const arr = this.inpaintPathRegions[r]; const n = arr.length;
         for (let i = 0; i < n; i++) {
@@ -2793,7 +2798,7 @@ export const useStudioStore = defineStore('studio', {
       const m = this.canvasMetrics(); if (!m) return -1;
       for (let i = this.inpaintPathPoints.length - 1; i >= 0; i--) {
         const nd = this.inpaintPathPoints[i];
-        if (Math.hypot((p.nx - nd.nx) * m.vw, (p.ny - nd.ny) * m.vh) < 14) return i;
+        if (Math.hypot((p.nx - nd.nx) * m.vw, (p.ny - nd.ny) * m.vh) < (this._grabR() + 2)) return i;
       }
       return -1;
     },
@@ -2835,7 +2840,7 @@ export const useStudioStore = defineStore('studio', {
         const arr = this.inpaintPathRegions[r];
         for (let i = arr.length - 1; i >= 0; i--) {
           const nd = arr[i];
-          if (Math.hypot((p.nx - nd.nx) * m.vw, (p.ny - nd.ny) * m.vh) < 14) return { region: r, index: i };
+          if (Math.hypot((p.nx - nd.nx) * m.vw, (p.ny - nd.ny) * m.vh) < (this._grabR() + 2)) return { region: r, index: i };
         }
       }
       return { region: -1, index: -1 };
@@ -2895,7 +2900,7 @@ export const useStudioStore = defineStore('studio', {
         }
       }
       // Snap/đóng kín: >=3 điểm & nhấp gần điểm BẮT ĐẦU → tap = đóng, kéo = di chuyển node đầu.
-      if (pts.length >= 3 && this._pathScreenDist(p.nx, p.ny, pts[0].nx, pts[0].ny) < 22) {
+      if (pts.length >= 3 && this._pathScreenDist(p.nx, p.ny, pts[0].nx, pts[0].ny) < (this._grabR() + 10)) {
         this.inpaintPathCloseHover = false;
         this._pathDrag = { type: 'close', i: 0, sx: p.nx, sy: p.ny, moved: false };
         return;

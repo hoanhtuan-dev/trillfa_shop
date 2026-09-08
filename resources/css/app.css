@@ -216,6 +216,17 @@
     }
 }
 
+/* ── Touch / stylus (tablet) — vùng chạm lớn hơn cho ngón tay & bút ── */
+@media (pointer: coarse) {
+    .activity-bar { width: 4rem; }
+    .activity-btn { height: 3rem; width: 3rem; }
+    .activity-bar.right { width: 4rem; }
+    .icon-btn { height: 2.5rem; width: 2.5rem; }
+    .seg-btn { padding-top: 0.5rem; padding-bottom: 0.5rem; font-size: 0.75rem; }
+    .tool-btn { padding: 0.5rem 0.75rem; font-size: 0.75rem; }
+    .activity-btn.is-active::before { height: 1.5rem; }
+}
+
 /* --- Elegant scrollbars (thin, subtle, animated) --- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -464,3 +464,15 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh (curl /studio):** HTML giờ chứa `theme-color #193d2b` · `rel=manifest /manifest-studio.json` · apple-touch-icon · favicon · SW registration ✓ · deploy + `optimize:clear` ✓.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AM)' && git push origin main 2>&1 | tail -1
+
+## Phiên AN (2026-09-08) — Quản lý title cho /studio
+
+**Yêu cầu:** "thêm cách để quản lý title cho /studio".
+
+**Đã sửa (commit `db45496`):**
+- `document.title` giờ **động** theo activity + dự án đang áp dụng: `"Tạo ảnh · Trillfa Studio"`, `"Sửa ảnh · Tên dự án · Trillfa Studio"`… (watch `[activeActivity, appliedProject.name]`, `immediate`).
+- Static `<title>` trong `vue.blade.php` đổi thành `Trillfa Studio`.
+
+**Xác minh:** vite build ✓ (869ms) · push `db45496` · SSH pull + `optimize:clear` ✓ · app JS `app-CGrqMYTU.js` 200.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AN)' && git push origin main 2>&1 | tail -1
