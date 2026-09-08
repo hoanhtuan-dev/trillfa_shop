@@ -49,9 +49,8 @@ class StudioUpscaleTest extends TestCase
         $res = $this->postJson('/studio/upscale', [
             'image' => '/storage/upscale-src.png',
             'scale' => 2,
-            'photoreal' => 6,
-            'skin_detail' => 8,
-            'light_shadow' => 5,
+            'refine' => 0,   // 0 = bỏ qua AI refine (test thuần GD, không cần key)
+            'vibrance' => 4,
         ]);
         $res->assertStatus(200);
         $this->assertNotEmpty($res->json('media_url'));

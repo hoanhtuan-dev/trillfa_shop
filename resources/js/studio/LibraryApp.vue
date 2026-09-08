@@ -7,6 +7,13 @@ import StudioIcon from './components/StudioIcon.vue';
 
 const store = useStudioStore();
 
+// embedded: được nhúng trong StudioApp (SPA /studio) thay vì trang riêng /studio/library.
+// Khi embedded: wrapper compact (lấp đầy khung studio), không render GalleryModal riêng (StudioApp lo),
+// và nút "Về Studio" emit('back') để chuyển view client-side thay vì điều hướng full-page.
+const props = defineProps({ embedded: { type: Boolean, default: false } });
+const emit = defineEmits(['back']);
+function goBack() { if (props.embedded) emit('back'); else window.location.href = '/studio'; }
+
 const types = [
   { value: '', label: 'Ảnh + Video' },
   { value: 'image', label: 'Ảnh' },
@@ -122,7 +129,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="studio-dark min-h-screen bg-ink-900 p-4 text-cream-100 sm:p-6">
+  <div class="studio-dark text-cream-100" :class="props.embedded ? 'min-h-0 flex-1 overflow-y-auto bg-ink-900 p-4 sm:p-6' : 'min-h-screen bg-ink-900 p-4 sm:p-6'">
     <div class="mx-auto max-w-7xl">
       <!-- ══ Thanh điều hướng (header) ══ -->
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-700 bg-ink-900/70 px-3 py-2.5 shadow-lg shadow-black/20 sm:px-4">
@@ -135,9 +142,9 @@ onMounted(async () => {
             Thư viện
             <span class="ml-1.5 rounded-full border border-ink-700 bg-ink-800 px-2 py-0.5 text-[11px] font-semibold text-cream-300/80">{{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTotal) }}</span>
           </h1>
-          <a href="/studio" class="tool-btn !px-3 !py-1.5" title="Quay lại studio thiết kế">
+          <button type="button" @click="goBack" class="tool-btn !px-3 !py-1.5" title="Quay lại studio thiết kế">
             <span class="rotate-180"><StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></span> Về Studio
-          </a>
+          </button>
           <!-- Chip dự án hiện tại (gọn) -->
           <div v-if="store.appliedProject" class="flex items-center gap-1.5 rounded-full border border-brand-500/50 bg-brand-600/20 px-3 py-1 text-sm text-brand-100">
             <StudioIcon name="pin" size="h-3.5 w-3.5" />
@@ -301,7 +308,7 @@ onMounted(async () => {
       <div v-else-if="!store.libraryItems.length" class="rounded-2xl border border-ink-700 bg-ink-800 py-16 text-center">
         <p v-if="activeProjectId && activeProjectId !== 'none'" class="text-sm text-cream-300/50">Dự án này chưa có ảnh/video nào.</p>
         <p v-else class="text-sm text-cream-300/50">Chưa có ảnh / video nào khớp bộ lọc.</p>
-        <a href="/studio" class="mt-2 inline-block text-xs text-brand-300 hover:text-brand-200">Tạo ảnh mới trong Studio →</a>
+        <button type="button" @click="goBack" class="mt-2 inline-block text-xs text-brand-300 hover:text-brand-200">Tạo ảnh mới trong Studio →</button>
       </div>
 
       <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -435,6 +442,6 @@ onMounted(async () => {
       </template>
     </div>
 
-    <GalleryModal v-if="store.viewer" />
+    <GalleryModal v-if="store.viewer && !props.embedded" />
   </div>
 </template>

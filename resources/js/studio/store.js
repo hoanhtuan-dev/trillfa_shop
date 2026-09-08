@@ -32,12 +32,8 @@ export const useStudioStore = defineStore('studio', {
     texture: 5,
     // upscale params (fabric-weave slider removed — it affected dark skin & detail edges)
     upscaleScale: 2,
-    upscaleRefine: 0,
-    studioPhotoreal: 5,
-    lightShadow: 5,
-    sharpen: 3,   // hậu kỳ: tăng nét chi tiết (không blur)
-    clarity: 3,   // hậu kỳ: micro-contrast / độ nổi khối
-    vibrance: 3,  // hậu kỳ: độ sống động màu
+    upscaleRefine: 0,  // Tinh chỉnh AI: 0 = tắt, 1-10 = độ chi tiết (AI refine)
+    vibrance: 3,       // Màu sống động: 0-10 (độ bão hòa màu, bảo vệ tone da)
     upscaling: false,
     // film look
     lookPreset: 'studio',
@@ -211,7 +207,6 @@ export const useStudioStore = defineStore('studio', {
     flashType: 'info',
     _flashTimer: null,
     _highlightTimer: null,
-    upscalePresets: [],
     lastBatch: [],
     showBatch: false,
     // ── Thư viện (/studio/library) — quản lý + xóa ảnh cũ / ảnh rác ──
@@ -227,6 +222,7 @@ export const useStudioStore = defineStore('studio', {
     libraryManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
     // ── Files đã tải lên — quản lý file tải lên + dọn file mồ côi ──
     libraryTab: 'generations', // 'generations' | 'uploads'
+    studioView: 'studio',   // 'studio' | 'library' — view SPA hiện tại của /studio (Thư viện nhúng trong SPA)
     uploadItems: [],
     uploadStats: null,
     uploadLoading: false,
@@ -918,14 +914,11 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi áp dụng Look.', 'error'); }
       finally { this.looking = false; }
     },
-    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, photoreal: this.studioPhotoreal, light: this.lightShadow, sharpen: this.sharpen, clarity: this.clarity, vibrance: this.vibrance }; },
+    upscaleCfg() { return { scale: this.upscaleScale, refine: this.upscaleRefine, vibrance: this.vibrance }; },
     loadUpscaleMemory() {
-      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 5, studioPhotoreal: m.settings.photoreal ?? 5, lightShadow: m.settings.light ?? 5, sharpen: m.settings.sharpen ?? 3, clarity: m.settings.clarity ?? 3, vibrance: m.settings.vibrance ?? 3 }); if (Array.isArray(m.presets)) this.upscalePresets = m.presets; } catch (e) { console.error('studio operation failed', e); }
+      try { const m = JSON.parse(localStorage.getItem('trillfa.upscale') || '{}'); if (m.settings) Object.assign(this, { upscaleScale: m.settings.scale ?? 2, upscaleRefine: m.settings.refine ?? 0, vibrance: m.settings.vibrance ?? 3 }); } catch (e) { console.error('studio operation failed', e); }
     },
-    saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg(), presets: this.upscalePresets })); } catch (e) { console.error('studio operation failed', e); } },
-    savePreset(name) { const n = (name || 'Preset ' + (this.upscalePresets.length + 1)).trim(); const existing = this.upscalePresets.find(p => p.name === n); const cfg = this.upscaleCfg(); if (existing) Object.assign(existing, cfg); else this.upscalePresets.push({ name: n, ...cfg }); this.saveUpscaleMemory(); this.toast('Đã lưu preset "' + n + '".'); },
-    applyPreset(p) { Object.assign(this, { upscaleScale: p.scale ?? 2, upscaleRefine: p.refine ?? 5, studioPhotoreal: p.photoreal ?? 5, lightShadow: p.light ?? 5, sharpen: p.sharpen ?? 3, clarity: p.clarity ?? 3, vibrance: p.vibrance ?? 3 }); this.saveUpscaleMemory(); this.toast('Đã áp dụng preset "' + p.name + '".'); },
-    deletePreset(name) { this.upscalePresets = this.upscalePresets.filter(p => p.name !== name); this.saveUpscaleMemory(); },
+    saveUpscaleMemory() { try { localStorage.setItem('trillfa.upscale', JSON.stringify({ settings: this.upscaleCfg() })); } catch (e) { console.error('studio operation failed', e); } },
     zoomIn() { this.zoomAt(0, 0, 1.5); },
     zoomOut() { this.zoomAt(0, 0, 1 / 1.5); },
     // "Vừa": thu/phóng cho VỪA KHUNG nhìn — tính bbox các layer đang hiển thị (ở zoom 1, đã tính

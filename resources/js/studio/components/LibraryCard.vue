@@ -1,9 +1,11 @@
 <script setup>
 // LibraryCard — card icon "Thư viện" (tách riêng từ nút "Xem thư viện" cũ ở header Outputs).
 // Chỉ hiển thị duy nhất icon library làm slot bấm — mọi chữ chỉ hiện khi hover (title/aria).
-// Bấm → mở trang thư viện /studio/library (giữ hành vi điều hướng cũ).
+// Bấm → chuyển sang view Thư viện client-side trong SPA /studio (không điều hướng full-page).
 import StudioIcon from './StudioIcon.vue';
-function goLibrary() { window.location.href = '/studio/library'; }
+import { useStudioStore } from '../store.js';
+const store = useStudioStore();
+function goLibrary() { store.exitCanvasTools(); store.studioView = 'library'; }
 </script>
 <template>
   <div class="card overflow-hidden">

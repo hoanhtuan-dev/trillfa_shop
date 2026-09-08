@@ -46,6 +46,15 @@ class StudioController extends Controller
         return response()->view('studio.vue')->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
+    /**
+     * Legacy /studio/library → mở view Thư viện bên trong SPA /studio (?view=library).
+     * Dùng controller method (không closure) để route:cache không lỗi.
+     */
+    public function libraryRedirect()
+    {
+        return redirect()->route('studio.index', ['view' => 'library']);
+    }
+
     // storeProject() đã bị loại bỏ (finding: duplicate endpoint với validation yếu hơn
     // ProjectController::store). Route POST /studio/projects nay trỏ về ProjectController::store.
 
@@ -1879,10 +1888,10 @@ RULES:
     }
 
     /**
-     * Tinh chỉnh & Nâng cấp ảnh: AI-edit refine (optional) + GD upscale with studio photo
-     * finish, skin detail and light/shadow passes. Fabric-weave/roughness pass was REMOVED —
-     * the per-pixel skin heuristic misclassified dark skin (r <= 70) and painted weave onto
-     * faces and detail boundaries.
+     * Tinh chỉnh & Nâng cấp ảnh: AI-edit refine (optional) + GD upscale + vibrance + final
+     * skin-aware sharpen. Pipeline gọn: refine (AI) → smartUpscale (2x từng bước, cap 4096px)
+     * → vibrance → finalSharpen. Các pass cũ (studio photo finish / light-shadow / sharpen /
+     * clarity) đã gỡ để giữ kết quả ổn định, không halo/ringing trên da.
      */
     public function upscale(Request $request): \Illuminate\Http\JsonResponse
     {
@@ -1890,51 +1899,37 @@ RULES:
             'image' => ['required', 'string', 'max:2048'],
             'scale' => ['nullable', 'integer', 'min:1', 'max:4'],
             'refine' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'photoreal' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'light_shadow' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'sharpen' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'clarity' => ['nullable', 'integer', 'min:0', 'max:10'],
             'vibrance' => ['nullable', 'integer', 'min:0', 'max:10'],
         ]);
         $scale = max(1, min(4, (int) ($data['scale'] ?? 2)));
         $refine = max(0, min(10, (int) ($data['refine'] ?? 0)));
-        $photoreal = max(0, min(10, (int) ($data['photoreal'] ?? 0)));
-        $lightShadow = max(0, min(10, (int) ($data['light_shadow'] ?? 0)));
-        $sharpen = max(0, min(10, (int) ($data['sharpen'] ?? 0)));
-        $clarity = max(0, min(10, (int) ($data['clarity'] ?? 0)));
         $vibrance = max(0, min(10, (int) ($data['vibrance'] ?? 0)));
         $srcUrl = (string) $data['image'];
 
-        // Optional AI-edit refine for photoreal human detail. The prompt never asks for fabric
-        // weave (it bleeds onto faces/dark skin) and must keep the frame unchanged.
+        // Tinh chỉnh AI (optional): tái tạo chi tiết da/tóc/viền bằng AI. Prompt không yêu cầu
+        // vân vải (dễ lem lên mặt/da tối) và giữ nguyên khung hình.
         if ($refine > 0) {
             try {
-                $keep = 'Keep the exact aspect ratio and framing of the input image — do NOT crop or change the frame. Keep the exact garment, model, pose, composition unchanged. Ultra-detailed, 4K.';
-                $guard = 'IMPORTANT: Do NOT add fabric weave, texture, grain, noise, checkerboard, halftone, moiré, pixelation, blocky artifacts or any pattern to the skin, face, hair, jewellery or any flat area — keep them smooth, clean and natural. Keep all detail edges (face, hair, garment seams, outlines) crisp, sharp and completely free of aliasing, halos, ringing, moiré, banding or blur.';
-                $detail = 'Enhance this fashion photograph at high resolution (hyper-realistic, like a professional fashion editorial): hyper-realistic human skin with natural pores and soft sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, crisp sharp edges, rich natural color, '.$guard.' '.$keep;
-                $studio = 'Render a high-end professional studio photograph of this fashion garment with hyper-realistic human detail (softbox light, subtle film color grading, shallow depth of field): photorealistic skin with pores, individual hair strands, realistic eyelashes and eye catchlight, ultra-sharp micro-detail, premium catalog quality, '.$guard.' '.$keep;
-                $prompt = $photoreal > 0 ? $studio : $detail;
+                $keep = 'Keep the exact aspect ratio, framing and composition of the input image — do NOT crop or change the frame. Keep the garment, model and pose unchanged. Ultra-detailed, 4K.';
+                $guard = 'IMPORTANT: Do NOT add fabric weave, texture, grain, noise, checkerboard, halftone, moiré, pixelation, blocky artifacts or any pattern to skin, face, hair, jewellery or flat areas — keep them smooth, clean and natural. Keep all detail edges (face, hair, garment seams, outlines) crisp, sharp and completely free of aliasing, halos, ringing, moiré, banding or blur.';
+                $prompt = 'Enhance this fashion photograph at high resolution (hyper-realistic, professional fashion editorial quality): natural skin pores and soft sub-surface tone, individual hair strands with soft highlights, realistic eyelashes and eye catchlight, crisp sharp edges, rich natural color. '.$guard.' '.$keep;
                 $out = app(\App\Services\ImageAIService::class)->generate($prompt, $srcUrl);
                 if ($out) { $srcUrl = $out; }
             } catch (\Throwable $e) { logger()->warning('Upscale refine failed: '.$e->getMessage()); }
         }
-
 
         $file = $this->resolveLocalImage($srcUrl);
         if (! $file) { return response()->json(['message' => 'Không đọc được ảnh nguồn.'], 422); }
 
         $src = studio_image_decode($file);
         if (! $src) { return response()->json(['message' => 'Ảnh nguồn không hợp lệ.'], 422); }
-        $sw = imagesx($src); $sh = imagesy($src);
         $dst = $this->smartUpscale($src, $scale);
-        // One coarse skin mask, shared by every texture pass, so the face AND a dilated band
-        // around it are always protected (no weave/grain ever bleeds onto skin or its boundary).
+        // Một skin mask dùng chung cho các pass hậu kỳ (vibrance + nét cuối) — bảo vệ da
+        // và một dải quanh nó để không pass nào làm da/viền da bị nổi texture hay halo.
         $skinMask = $this->buildSkinMask($dst);
-        if ($photoreal > 0) { $this->studioPhotoFinish($dst, $photoreal, $skinMask); }
-        if ($lightShadow > 0) { $this->lightShadowPass($dst, $lightShadow); }
-        if ($sharpen > 0) { $this->sharpenPass($dst, $sharpen, $skinMask); }
-        if ($clarity > 0) { $this->clarityPass($dst, $clarity, $skinMask); }
         if ($vibrance > 0) { $this->vibrancePass($dst, $vibrance, $skinMask); }
+        // Nét cuối nhẹ (skin-aware) để bù độ mềm do phóng to — giữ viền sắc, không halo.
+        $this->finalSharpen($dst, $skinMask);
         $name = 'studio/upscale-'.Str::uuid().'.png';
         \Illuminate\Support\Facades\Storage::disk('public')->put($name, $this->pngBytes($dst));
         imagedestroy($src); imagedestroy($dst);
@@ -2023,60 +2018,36 @@ RULES:
     }
 
     /**
-     * Professional studio photo finish: contrast, subtle film color grade, film grain, vignette, and a
-     * SINGLE gentle unsharp mask. The grain and the final sharpening are skin-aware (they skip the
-     * dilated skin band) so the face and its boundary stay clean, and only ONE USM runs in the whole
-     * upscale pipeline (no double sharpening -> no halos/ringing on detail edges).
+     * Final light unsharp mask (skin-aware) — bù độ mềm sau khi phóng to, giữ viền sắc mà
+     * không khuếch đại nhiễu/halo. Bỏ qua vùng da (và dải lân cận) để lỗ chân lông tự nhiên
+     * không bị làm gắt. Chạy ĐÚNG MỘT lần trong toàn pipeline upscale.
      */
-    protected function studioPhotoFinish(\GdImage $img, int $level, ?array $skinMask = null): void
+    protected function finalSharpen(\GdImage $img, array $skinMask, float $amount = 0.35): void
     {
-        $k = $level / 10.0; // 0..1
         $w = imagesx($img); $h = imagesy($img);
-        if ($skinMask === null) { $skinMask = $this->buildSkinMask($img); }
-        $cols = (int) ceil($w / 2);
-        // smart tone: soft contrast + subtle warm/cool grade — KHÔNG blur, KHÔNG grain/noise.
-        if (function_exists('imagefilter')) {
-            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(7 * $k));
-            @imagefilter($img, IMG_FILTER_COLORIZE, (int) round(-3 * $k), (int) round(-1 * $k), (int) round(3 * $k));
-        }
-        // 3) gentle vignette (darken corners slightly, keeps depth)
-        $cx = $w / 2; $cy = $h / 2; $maxd = (float) max($w, $h);
-        for ($y = 0; $y < $h; $y += 4) {
-            for ($x = 0; $x < $w; $x += 4) {
-                $d = sqrt(($x - $cx) ** 2 + ($y - $cy) ** 2) / $maxd;
-                $v = 1 - (0.20 * $k * max(0, $d - 0.35));
-                $c = imagecolorat($img, $x, $y);
-                $r = (int) (($c >> 16) & 0xFF) * $v; $g = (int) (($c >> 8) & 0xFF) * $v; $b = (int) ($c & 0xFF) * $v;
-                imagesetpixel($img, $x, $y, imagecolorallocate($img, (int) $r, (int) $g, (int) $b));
+        if (! function_exists('imagefilter') || $w * $h > 20000000) { return; }
+        $blur = imagecreatetruecolor($w, $h);
+        imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
+        @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
+        $cols = intdiv($w + 1, 2);
+        for ($y = 0; $y < $h; $y += 2) {
+            for ($x = 0; $x < $w; $x += 2) {
+                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
+                $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
+                $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
+                $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
+                imagesetpixel($img, $x, $y, imagecolorallocate($img,
+                    max(0, min(255, (int) round($cr + $amount * ($cr - $br)))),
+                    max(0, min(255, (int) round($cg + $amount * ($cg - $bg)))),
+                    max(0, min(255, (int) round($cb + $amount * ($cb - $bb))))));
             }
         }
-        // 4) FINAL UN-SHARP MASK — ONE crisp pass; skipped on skin so pores stay natural and the
-        //    weave/grain are never amplified into halos on detail boundaries.
-        if (function_exists('imagefilter') && $w * $h <= 20000000) {
-            $blur = imagecreatetruecolor($w, $h);
-            imagecopy($blur, $img, 0, 0, 0, 0, $w, $h);
-            @imagefilter($blur, IMG_FILTER_GAUSSIAN_BLUR);
-            $amount = 0.18 + 0.22 * $k; // nhẹ — tăng nét mà không tạo halo/ringing
-            for ($y = 0; $y < $h; $y++) {
-                for ($x = 0; $x < $w; $x++) {
-                    $c = imagecolorat($img, $x, $y); $b = imagecolorat($blur, $x, $y);
-                    $cr = ($c >> 16) & 0xFF; $cg = ($c >> 8) & 0xFF; $cb = $c & 0xFF;
-                    if ($this->isSkinPixel($cr, $cg, $cb)) { continue; }
-                    $br = ($b >> 16) & 0xFF; $bg = ($b >> 8) & 0xFF; $bb = $b & 0xFF;
-                    $nr = max(0, min(255, (int) round($cr + $amount * ($cr - $br))));
-                    $ng = max(0, min(255, (int) round($cg + $amount * ($cg - $bg))));
-                    $nb = max(0, min(255, (int) round($cb + $amount * ($cb - $bb))));
-                    imagesetpixel($img, $x, $y, imagecolorallocate($img, $nr, $ng, $nb));
-                }
-            }
-            imagedestroy($blur);
-        }
+        imagedestroy($blur);
     }
 
-
     /**
-     * Skin mask: a robust warm-skin detector shared by the skin and grain passes so each operates on the right region (face/body skin vs
-     * background) and they don't cross.
+     * Skin mask: a robust warm-skin detector shared by vibrance & final sharpen passes so each
+     * operates on the right region (face/body skin vs background) and they don't cross.
      */
     protected function isSkinPixel(int $r, int $g, int $b): bool
     {
@@ -2085,8 +2056,8 @@ RULES:
 
     /**
      * Coarse skin mask (stride 2, one byte per coarse cell, one string per row).
-     * Shared by the grain / USM passes so the face AND a dilated band around it are
-     * always protected — no texture ever bleeds onto the face or its boundary.
+     * Shared by vibrance & final sharpen passes so the face AND a dilated band around it
+     * are always protected — no texture ever bleeds onto the face or its boundary.
      * @return array<int, string>
      */
     protected function buildSkinMask(\GdImage $img): array
@@ -2124,78 +2095,6 @@ RULES:
     }
 
     /**
-     * Controlled light & shadow: a soft directional light from the upper-left (brightens that
-     * side, deepens the opposite) plus a gentle contrast so shadows gain depth.
-     */
-    protected function lightShadowPass(\GdImage $img, int $level): void
-    {
-        if ($level <= 0) { return; }
-        $k = $level / 10.0; $w = imagesx($img); $h = imagesy($img);
-        for ($y = 0; $y < $h; $y += 2) {
-            for ($x = 0; $x < $w; $x += 2) {
-                $nx = ($w / 2 - $x) / max(1, $w); $ny = ($h / 2 - $y) / max(1, $h);
-                $d = ($nx + $ny) / 2.0; // -0.5..0.5; positive = upper-left side
-                $lift = (int) round($d * 28 * $k);
-                $c = imagecolorat($img, $x, $y);
-                $r = max(0, min(255, (($c >> 16) & 0xFF) + $lift));
-                $g = max(0, min(255, (($c >> 8) & 0xFF) + $lift));
-                $b = max(0, min(255, ($c & 0xFF) + $lift));
-                imagesetpixel($img, $x, $y, imagecolorallocate($img, $r, $g, $b));
-            }
-        }
-        if (function_exists('imagefilter')) {
-            @imagefilter($img, IMG_FILTER_CONTRAST, (int) round(3 * $k));
-        }
-    }
-
-    /**
-     * Hậu kỳ — Tăng nét chi tiết (unsharp mask), BỎ QUA vùng da để không lộ khuyết điểm.
-     * Làm sắc đường may, họa tiết vải, viền — không blur, không noise.
-     */
-    protected function sharpenPass(\GdImage $img, int $level, array $skinMask): void
-    {
-        if ($level <= 0) { return; }
-        $k = $level / 10.0;
-        $w = imagesx($img); $h = imagesy($img);
-        $sharp = imagecreatetruecolor($w, $h);
-        imagecopy($sharp, $img, 0, 0, 0, 0, $w, $h);
-        $a = 0.2 + 0.6 * $k; // 0.2..0.8 — nhẹ, không tạo halo/ringing
-        $kernel = [[0, -$a, 0], [-$a, 1 + 4 * $a, -$a], [0, -$a, 0]];
-        @imageconvolution($sharp, $kernel, 1, 0);
-        $cols = intdiv($w + 1, 2);
-        for ($y = 0; $y < $h; $y += 2) {
-            for ($x = 0; $x < $w; $x += 2) {
-                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
-                imagesetpixel($img, $x, $y, imagecolorat($sharp, $x, $y));
-            }
-        }
-        imagedestroy($sharp);
-    }
-
-    /**
-     * Hậu kỳ — Clarity (micro-contrast cục bộ): tăng độ "nổi khối" cho vải/chi tiết, bỏ qua da.
-     */
-    protected function clarityPass(\GdImage $img, int $level, array $skinMask): void
-    {
-        if ($level <= 0) { return; }
-        $k = $level / 10.0;
-        $w = imagesx($img); $h = imagesy($img);
-        $tmp = imagecreatetruecolor($w, $h);
-        imagecopy($tmp, $img, 0, 0, 0, 0, $w, $h);
-        $c = 0.12 + 0.38 * $k; // 0.12..0.5 — rất nhẹ, chỉ tăng khối, không sọc/halo
-        $kernel = [[0, -$c, 0], [-$c, 1 + 4 * $c, -$c], [0, -$c, 0]];
-        @imageconvolution($tmp, $kernel, 1, 0);
-        $cols = intdiv($w + 1, 2);
-        for ($y = 0; $y < $h; $y += 2) {
-            for ($x = 0; $x < $w; $x += 2) {
-                if ($this->maskNearSkin($skinMask, $cols, $x >> 1, $y >> 1, 1)) { continue; }
-                imagesetpixel($img, $x, $y, imagecolorat($tmp, $x, $y));
-            }
-        }
-        imagedestroy($tmp);
-    }
-
-    /**
      * Hậu kỳ — Vibrance (tăng độ sống động màu): đẩy màu ra xa xám, bảo vệ tone da (tăng rất nhẹ trên da).
      */
     protected function vibrancePass(\GdImage $img, int $level, array $skinMask): void
@@ -2223,18 +2122,23 @@ RULES:
     protected function smartUpscale(\GdImage $src, int $scale): \GdImage
     {
         if ($scale <= 1) { return $src; }
+        $sw = imagesx($src); $sh = imagesy($src);
+        // Stability cap: không phóng vượt MAX_UPSCALE_DIM ở cạnh dài (tránh OOM khi 4x trên ảnh lớn).
+        $maxDim = 4096;
+        $tw = $sw * $scale; $th = $sh * $scale;
+        $longest = max($tw, $th);
+        if ($longest > $maxDim) { $f = $maxDim / $longest; $tw = max(1, (int) round($tw * $f)); $th = max(1, (int) round($th * $f)); }
+        // Resample từng bước 2x (chất lượng cao hơn 1 bước nhảy lớn, giảm răng cưa).
         $img = $src; $isCopy = false;
-        $steps = $scale >= 4 ? [2, (int) round($scale / 2)] : [$scale];
-        foreach ($steps as $s) {
-            $nw = (int) max(1, round(imagesx($img) * $s));
-            $nh = (int) max(1, round(imagesy($img) * $s));
+        while (imagesx($img) < $tw || imagesy($img) < $th) {
+            $nw = min($tw, imagesx($img) * 2);
+            $nh = min($th, imagesy($img) * 2);
             $next = imagecreatetruecolor($nw, $nh);
             imagecopyresampled($next, $img, 0, 0, 0, 0, $nw, $nh, imagesx($img), imagesy($img));
             if ($isCopy) { imagedestroy($img); }
             $img = $next; $isCopy = true;
         }
-        // NOTE: no unsharp mask here. A single, skin-aware USM runs once in studioPhotoFinish,
-        // so edges are never double-sharpened (no halos / ringing on detail boundaries).
+        // Nét cuối (skin-aware) chạy riêng trong finalSharpen — không double-sharpen ở đây.
         return $img;
     }
 
@@ -3580,14 +3484,6 @@ RULES:
     /**
      * Library — browse & manage all generated assets.
      */
-    /**
-     * Vue library page (Thư viện) — grid of all generations + gallery popup.
-     */
-    public function libraryVue()
-    {
-        return view('studio.library-vue');
-    }
-
     public function library(Request $request)
     {
         $query = auth()->user()->generations()->with('project')->latest();

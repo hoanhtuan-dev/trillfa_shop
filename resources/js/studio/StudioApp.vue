@@ -18,6 +18,7 @@ import SourcePanel from './components/SourcePanel.vue';
 import SourcePickerPopup from './components/SourcePickerPopup.vue';
 import OutputModule from './components/OutputModule.vue';
 import LibraryCard from './components/LibraryCard.vue';
+import LibraryApp from './LibraryApp.vue';
 import MultiSelectBar from './components/MultiSelectBar.vue';
 import GalleryModal from './components/GalleryModal.vue';
 import ProjectWorkspace from './components/ProjectWorkspace.vue';
@@ -68,7 +69,7 @@ function openApplyPopover() {
 }
 function onCanvasResize() { nextTick(() => { eraseTick.value++; drawTick.value++; }); }
 function onBeforeUnload() { try { store.saveLayerLayout(); } catch (e) { /* bỏ qua */ } }
-onMounted(async () => { await store.load(); activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt); window.addEventListener('appinstalled', onAppInstalled); });
+onMounted(async () => { await store.load(); if (new URLSearchParams(window.location.search).get('view') === 'library') store.studioView = 'library'; activeActivity.value = store.step === 3 ? 'director' : store.step === 2 ? 'ref' : 'concept'; store.loadPaletteFromImage(store.upscaleSrc); window.addEventListener('keydown', onCanvasKey); window.addEventListener('keydown', onLayerKeys); window.addEventListener('keydown', onHistoryKeys); window.addEventListener('resize', onCanvasResize); window.addEventListener('beforeunload', onBeforeUnload); window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt); window.addEventListener('appinstalled', onAppInstalled); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onCanvasKey); window.removeEventListener('keydown', onLayerKeys); window.removeEventListener('keydown', onHistoryKeys); window.removeEventListener('resize', onCanvasResize); window.removeEventListener('beforeunload', onBeforeUnload); window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt); window.removeEventListener('appinstalled', onAppInstalled); });
 // Palette bám ẢNH HIỆN TẠI (mọi nguồn: result/preview, ảnh tải lên, product, layer đang sửa…).
 watch(() => store.upscaleSrc, (url) => { store.loadPaletteFromImage(url); });
@@ -163,7 +164,7 @@ function selectActivity(id) {
   else store.leftPanelOpen = true;
 }
 // Right activity bar: Nguồn ảnh (popup) · Thư viện (điều hướng) · Outputs (toggle dock).
-function goLibrary() { window.location.href = '/studio/library'; }
+function goLibrary() { store.exitCanvasTools(); store.studioView = 'library'; }
 // ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
 const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking);
 
@@ -433,6 +434,8 @@ function onTouchEnd(e) {
     </div>
     <!-- toast (copy/status) -->
     <div v-if="store.flashMsg" class="pointer-events-none fixed left-1/2 bottom-5 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold shadow-2xl" :class="store.flashType === 'error' ? 'bg-red-600 text-white' : 'bg-ink-800 text-cream-100 border border-brand-500/40'">{{ store.flashMsg }}</div>
+    <!-- ══ Thư viện (SPA view nhúng trong /studio — thay thế trang riêng /studio/library) ══ -->
+    <LibraryApp v-if="store.studioView === 'library'" embedded @back="store.studioView = 'studio'" />
     <!-- Prompt cài đặt PWA (hiện khi trình duyệt báo beforeinstallprompt) -->
     <div v-if="showInstall" class="fixed bottom-5 left-1/2 z-[95] flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-brand-500/40 bg-ink-900/95 px-4 py-3 shadow-2xl backdrop-blur">
       <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-5 w-5" /></span>
@@ -443,8 +446,8 @@ function onTouchEnd(e) {
       <button @click="doInstall" class="shrink-0 rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-500">Cài đặt</button>
       <button @click="showInstall = false" class="icon-btn !h-7 !w-7 shrink-0" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
     </div>
-    <!-- Mobile top bar -->
-    <div class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
+    <!-- Mobile top bar (chỉ ở view studio) -->
+    <div v-if="store.studioView !== 'library'" class="flex items-center justify-between border-b border-ink-700 bg-ink-900/80 px-3 py-2 lg:hidden">
       <button @click="menuOpen = true" class="icon-btn !h-9 !w-9 border border-ink-700 md:hidden" title="Mở menu công cụ" aria-label="Mở menu công cụ"><StudioIcon name="menu" size="h-5 w-5" /></button>
       <span class="flex items-center gap-1.5 font-display text-sm font-semibold"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span>
       <div class="flex items-center gap-1.5">
@@ -452,7 +455,7 @@ function onTouchEnd(e) {
         <button @click="outputOpen = true" class="icon-btn relative !h-9 !w-9 border border-ink-700" title="Kết quả" aria-label="Kết quả"><StudioIcon name="grid" size="h-4 w-4" /><span v-if="store.generations.length" class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-none text-white">{{ store.generations.length }}</span></button>
       </div>
     </div>
-    <div class="flex flex-1 overflow-hidden">
+    <div v-if="store.studioView !== 'library'" class="flex flex-1 overflow-hidden">
       <!-- Activity bar (VSCode-style) + Sidebar card của activity đang chọn (desktop) -->
       <nav class="activity-bar hidden md:flex" aria-label="Công cụ">
         <div class="mb-2 grid h-11 w-11 shrink-0 place-items-center text-brand-400" title="Studio"><StudioIcon name="bot" size="h-5 w-5" /></div>
@@ -612,7 +615,7 @@ function onTouchEnd(e) {
         <button @click="store.sourcePickerOpen = true" class="activity-btn" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh">
           <StudioIcon name="imagePlus" size="h-5 w-5" />
         </button>
-        <button @click="goLibrary" class="activity-btn" title="Thư viện — mở trang /studio/library" aria-label="Thư viện">
+        <button @click="goLibrary" class="activity-btn" title="Thư viện — xem ảnh đã tạo & file tải lên" aria-label="Thư viện">
           <StudioIcon name="library" size="h-5 w-5" />
         </button>
         <button @click="store.toggleOutputDock()" class="activity-btn mt-auto" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">

@@ -1025,15 +1025,13 @@ class ShopFlowTest extends TestCase
         $this->actingAs($admin)->get('/studio')->assertOk();
     }
 
-    public function test_studio_library_renders_for_admin(): void
+    public function test_studio_library_redirects_to_studio_spa(): void
     {
-        $this->get('/studio/library')->assertRedirect(route('login'));
-
-        $customer = User::where('email', 'customer@trillfa.com')->first();
-        $this->actingAs($customer)->get('/studio/library')->assertForbidden();
+        // /studio/library đã chuyển thành view bên trong SPA /studio (client-side ?view=library).
+        // URL legacy redirect (public) về /studio?view=library; dữ liệu vẫn admin-only qua /studio/library/*.
+        $this->get('/studio/library')->assertRedirect(route('studio.index', ['view' => 'library']));
 
         $admin = User::where('email', 'admin@trillfa.com')->first();
-        $this->actingAs($admin)->get('/studio/library')->assertOk()->assertSee('Thư viện');
         $this->actingAs($admin)->get('/studio')->assertOk()->assertSee('studio-root');
     }
 

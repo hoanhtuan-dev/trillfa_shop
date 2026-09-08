@@ -150,7 +150,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/pattern', [StudioController::class, 'pattern'])->name('pattern.generate');
     Route::get('/tryon', [StudioController::class, 'tryonPage'])->name('tryon');
     Route::post('/tryon', [StudioController::class, 'tryon'])->name('tryon.generate');
-    Route::get('/library', [StudioController::class, 'libraryVue'])->name('library');
+    // Trang /studio/library đã chuyển thành view bên trong SPA /studio (route public phía dưới).
     Route::get('/library/data', [StudioController::class, 'libraryData'])->name('library.data');
     Route::post('/library/scan', [StudioController::class, 'libraryScan'])->name('library.scan');
     Route::post('/library/bulk-delete', [StudioController::class, 'libraryBulkDelete'])->name('library.bulk-delete');
@@ -213,6 +213,9 @@ Route::prefix('studio')->name('studio.')->group(function () {
 // PUBLIC studio page (renders the Vue app for everyone — no auth redirect, so /studio never loops).
 // The Vue app handles the auth state client-side; the API routes above stay auth+admin protected.
 Route::get('/studio', [StudioController::class, 'index'])->name('studio.index');
+
+// Legacy URL /studio/library → mở view Thư viện bên trong SPA /studio (client-side, ?view=library).
+Route::get('/studio/library', [StudioController::class, 'libraryRedirect'])->name('studio.library');
 
 // Public garment-avatar endpoint (bypasses auth + static cache — served by Laravel with immutable cache).
 Route::get('/garment/{id}', [StudioController::class, 'garmentAvatar'])->name('garment.avatar');

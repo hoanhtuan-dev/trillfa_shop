@@ -23,23 +23,6 @@
       "_BaseBadge-ENfE4myM.js"
     ]
   },
-  "_GalleryModal-C3vnfhS-.js": {
-    "file": "assets/GalleryModal-C3vnfhS-.js",
-    "name": "GalleryModal",
-    "imports": [
-      "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_pinia-CVAjlcja.js",
-      "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_useStudioThumb-BeLv8od7.js"
-    ],
-    "css": [
-      "assets/GalleryModal-DVFIplWF.css"
-    ]
-  },
-  "_GalleryModal-DVFIplWF.css": {
-    "file": "assets/GalleryModal-DVFIplWF.css",
-    "src": "_GalleryModal-DVFIplWF.css"
-  },
   "_ProductCard-D3JAn6_r.js": {
     "file": "assets/ProductCard-D3JAn6_r.js",
     "name": "ProductCard",
@@ -171,7 +154,7 @@
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DcEeRcSh.css",
+    "file": "assets/app-Bbo12P7q.css",
     "name": "app",
     "names": [
       "app.css"
@@ -352,7 +335,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-JEifMEG5.js",
+    "file": "assets/app-CFLH266_.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -361,23 +344,10 @@
       "_pinia-CVAjlcja.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
       "_useStudioThumb-BeLv8od7.js",
-      "_GalleryModal-C3vnfhS-.js",
       "_StylistDataManager-ClLSjC0F.js"
     ],
     "css": [
-      "assets/app-nVbVs9Ec.css"
-    ]
-  },
-  "resources/js/studio/library.js": {
-    "file": "assets/library-BX1g8v1y.js",
-    "name": "library",
-    "src": "resources/js/studio/library.js",
-    "isEntry": true,
-    "imports": [
-      "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_pinia-CVAjlcja.js",
-      "_useStudioThumb-BeLv8od7.js",
-      "_GalleryModal-C3vnfhS-.js"
+      "assets/app-CV4Tc_Ch.css"
     ]
   },
   "resources/js/studio/settings.js": {
