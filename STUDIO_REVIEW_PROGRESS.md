@@ -328,3 +328,17 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** vite build ✓ (821ms) · push `674dec7` · SSH pull + `optimize:clear` ✓ · asset `app-DTPJxqkW.js` = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AD (2026-09-08) — Left card + Right dock ẩn được · Toolbar/icon giảm ~85%
+
+**Yêu cầu:** "làm cho left card có thể ẩn đc · nút nhấn ẩn icon chuẩn ngành, dễ thao tác trên tablet · viết lại phong cách right dock giống left card/vscode và có thể ẩn · giảm kích thước Toolbar và icon size = 85%".
+
+**Đã sửa (commit `4d14557`):**
+- **Left card ẩn được:** thêm state `store.leftPanelOpen`; header sidebar có nút **chevronLeft** (icon chuẩn ngành) để ẩn. Bấm lại icon activity → mở lại (`selectActivity` set `leftPanelOpen=true` trên desktop).
+- **Right dock viết lại kiểu VSCode + ẩn được:** thêm header `panel-head` ("Outputs" + nút **chevronRight**), nới rộng `w-[115px]→w-60`, state `store.outputDockOpen`. Mở lại từ **status bar** (nút grid `toggleOutputDock`).
+- **Persist:** `leftPanelOpen` + `outputDockOpen` lưu trong `trillfa.bar` (`saveBarSettings/restoreBarSettings`).
+- **Toolbar/icon ~85%:** ContextToolbar `I h-4→h-3.5`, `iconBtn/iconBtnDanger h-7→h-6`, `lbl px-3 py-1→px-2.5 py-0.5`, `sep h-4→h-3.5`; RegionTools `ICON h-5→h-4`, nút `h-9/lg:h-11 → h-8/lg:h-9`.
+- Icon mới: `panelLeft`, `chevronLeft`, `chevronRight` (Lucide).
+
+**Xác minh:** vite build ✓ (725ms) · push `4d14557` · SSH pull + `optimize:clear` ✓ · asset `app-BcfrBdYF.js` = HTTP 200 trên `trillfa.shop`.
+

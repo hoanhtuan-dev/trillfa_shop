@@ -28,7 +28,7 @@ const store = useStudioStore();
 const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 // Activity bar (VSCode-style): mỗi icon mở 1 nhóm card trong sidebar.
 const activityNav = [
-  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [StylistCard, SuggestCard, ConceptCard] },
+  { id: 'concept', icon: 'bot', label: 'Tạo ảnh', cards: [StylistCard, SuggestCard, ConceptCard] },
   { id: 'ref', icon: 'shirt', label: 'Fitting Room', cards: [RefImageCard] },
   { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
   { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
@@ -129,7 +129,18 @@ const bgClass = computed(() => ({ grid: 'cvs-checker', dark: 'bg-ink-950', white
 const activeActivityDef = computed(() => activityNav.find(a => a.id === activeActivity.value) || activityNav[0]);
 const panel = computed(() => activeActivityDef.value.cards); // ComposeCard vẫn tạm ẩn
 // Chọn activity: trên tablet/mobile (sidebar ẩn) mở drawer để hiện card; desktop chỉ đổi card sidebar.
-function selectActivity(id) { activeActivity.value = id; if (window.innerWidth < 1024) menuOpen.value = true; else store.leftPanelOpen = true; }
+// Toggle kiểu VSCode: bấm icon ĐANG CHỌN → đóng/mở card; bấm icon KHÁC → đổi card + mở.
+function selectActivity(id) {
+  const tablet = window.innerWidth < 1024;
+  if (id === activeActivity.value) {
+    if (tablet) menuOpen.value = !menuOpen.value;
+    else store.leftPanelOpen = !store.leftPanelOpen;
+    return;
+  }
+  activeActivity.value = id;
+  if (tablet) menuOpen.value = true;
+  else store.leftPanelOpen = true;
+}
 // ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
 const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking);
 
@@ -420,7 +431,7 @@ function onTouchEnd(e) {
           <span class="panel-title"><StudioIcon :name="activeActivityDef.icon" size="h-4 w-4" class="text-brand-400" /> {{ activeActivityDef.label }}</span>
           <div class="flex shrink-0 items-center gap-1.5">
             <span class="text-[10px] text-cream-300/50">Credit {{ store.creditsLeft }}</span>
-            <button @click="store.leftPanelOpen = false" class="icon-btn" title="Ẩn bảng trái" aria-label="Ẩn bảng trái"><StudioIcon name="chevronLeft" size="h-4 w-4" /></button>
+            <button @click="store.leftPanelOpen = false" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:bg-ink-700 hover:text-white" title="Ẩn bảng trái" aria-label="Ẩn bảng trái"><StudioIcon name="chevronLeft" size="h-4 w-4" /></button>
           </div>
         </div>
         <div class="scrollbar-hide space-y-3 p-3">
@@ -555,10 +566,10 @@ function onTouchEnd(e) {
         </div>
       </main>
       <!-- Right outputs dock (desktop, VSCode-style, collapsible) -->
-      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-60 shrink-0 flex-col overflow-y-auto border-l border-ink-700 bg-ink-900/70 lg:flex">
+      <aside v-if="store.outputDockOpen" class="scrollbar-hide hidden w-60 shrink-0 flex-col overflow-y-auto border-l border-ink-700 bg-ink-900/70 lg:flex" style="background-image: linear-gradient(160deg, rgba(124,200,90,.07), rgba(74,122,144,.05));">
         <div class="panel-head border-b border-ink-700">
           <span class="panel-title"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Outputs</span>
-          <button @click="store.outputDockOpen = false" class="icon-btn" title="Ẩn dock phải" aria-label="Ẩn dock phải"><StudioIcon name="chevronRight" size="h-4 w-4" /></button>
+          <button @click="store.outputDockOpen = false" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink-600 text-cream-300 transition hover:border-brand-400 hover:bg-ink-700 hover:text-white" title="Ẩn dock phải" aria-label="Ẩn dock phải"><StudioIcon name="chevronRight" size="h-4 w-4" /></button>
         </div>
         <div class="scrollbar-hide space-y-3 p-2">
           <SourcePanel />
