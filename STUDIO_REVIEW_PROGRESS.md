@@ -503,3 +503,17 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** vite build ✓ (804ms) · push `a0a5c94` · SSH pull + `optimize:clear` ✓ · app JS `app-64YDDdzL.js` 200.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AP)' && git push origin main 2>&1 | tail -1
+
+## Phiên AQ (2026-09-08) — Card "Video" → "Kịch bản quay" đọc preset từ Prompt Templates
+
+**Yêu cầu:** "làm cho card Video -> Kịch bản quay đọc cấu hình Kịch bản quay từ cài đặt prompt templates".
+
+**Đã sửa (commit `7aba074`):**
+- Backend `/studio/defaults` trả thêm `video_scenes` (preset category `video_scene`: id/label/prompt/note từ Prompt Templates).
+- Store: thêm state `videoScenes`, nạp trong `_applyDefaultValues`; `videoSceneCamera()` đọc `prompt_injection` của preset đang chọn (bỏ hardcode catwalk/slow/closeup).
+- DirectorCard: đổi tiêu đề "Ghế Đạo Diễn" → "Kịch bản quay"; render các nút `videoScenes` động (chọn theo `id`, tooltip = prompt), có empty-state nếu chưa có preset.
+- Activity bar: label "Video" → "Kịch bản quay".
+
+**Xác minh:** php -l ✓ · vite build ✓ (765ms) · push `7aba074` · SSH pull + `optimize:clear` ✓ · app JS `app-CepAIZ1E.js` 200.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AQ)' && git push origin main 2>&1 | tail -1
