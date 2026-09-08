@@ -566,3 +566,17 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** php -l ✓ · vite build ✓ (1.73s) · seed PresetSeeder ✓ (5 inpaint presets) · push `15a20c9` · SSH pull + `optimize:clear` + seed ✓ · app JS `app-JEifMEG5.js` 200.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AT)' && git push origin main 2>&1 | tail -1
+
+## Phiên AU (2026-09-08) — Chuyển Cài đặt vào /studio/presets
+
+**Yêu cầu:** "chuyển cài đặt vào studio/presets" (x2).
+
+**Đã làm (commit `8ad1721`):**
+- Redirect `/studio/settings` → **`/studio/presets`** (route `Route::redirect`).
+- `/studio/api` redirect → `/studio/presets` (thay vì settings).
+- Sidebar "Cài đặt" + "Trợ giúp" nav → `route('studio.presets')`.
+- GIỮ nguyên các endpoint `/settings/data|save|models|suggest|product-ai|faceswap|vue` (không vỡ API/Vue settings).
+
+**Xác minh:** php -l ✓ · push `8ad1721` · SSH pull + `optimize:clear` ✓ · redirect /settings → presets (auth) ✓.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AU)' && git push origin main 2>&1 | tail -1

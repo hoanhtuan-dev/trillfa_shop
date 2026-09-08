@@ -4400,7 +4400,7 @@ RULES:
     public function presets()
     {
         $presets = Preset::orderBy('sort_order')->get()->groupBy('category');
-        $categories = ['fabric', 'silhouette', 'style', 'background', 'pose', 'camera', 'lens', 'video_scene'];
+        $categories = ['fabric', 'silhouette', 'style', 'background', 'pose', 'camera', 'lens', 'video_scene', 'inpaint'];
 
         return view('studio.presets', compact('presets', 'categories'));
     }

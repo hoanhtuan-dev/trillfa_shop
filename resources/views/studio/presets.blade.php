@@ -3,8 +3,8 @@
 @section('title', 'Prompt Templates · Trillfa Studio')
 
 @php
-    $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy','lens'=>'Ống kính','video_scene'=>'Kịch bản quay'];
-    $catColors = ['fabric'=>'bg-cream-100 text-ink-700','silhouette'=>'bg-cream-100 text-ink-700','style'=>'bg-brand-50 text-brand-800','background'=>'bg-cream-100 text-ink-700','pose'=>'bg-cream-100 text-ink-700','camera'=>'bg-brand-50 text-brand-800','lens'=>'bg-cream-100 text-ink-700','video_scene'=>'bg-brand-50 text-brand-800'];
+    $catLabels = ['fabric'=>'Chất liệu','silhouette'=>'Phom dáng','style'=>'Phong cách','background'=>'Bối cảnh','pose'=>'Dáng đứng','camera'=>'Góc máy','lens'=>'Ống kính','video_scene'=>'Kịch bản quay','inpaint'=>'Sửa ảnh (Inpaint)'];
+    $catColors = ['fabric'=>'bg-cream-100 text-ink-700','silhouette'=>'bg-cream-100 text-ink-700','style'=>'bg-brand-50 text-brand-800','background'=>'bg-cream-100 text-ink-700','pose'=>'bg-cream-100 text-ink-700','camera'=>'bg-brand-50 text-brand-800','lens'=>'bg-cream-100 text-ink-700','video_scene'=>'bg-brand-50 text-brand-800','inpaint'=>'bg-brand-50 text-brand-800'];
 @endphp
 
 @section('content')
