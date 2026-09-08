@@ -421,3 +421,16 @@ Căn cứ: `grep` tên file trong `STUDIO_REVIEW.md`. **CẢNH BÁO**: đây là
 
 **Xác minh:** manifest JSON valid ✓ · sw syntax ok ✓ · deploy SSH + `optimize:clear` ✓ · tất cả asset (manifest/sw/5 icon) = HTTP 200 trên `trillfa.shop`.
 
+
+## Phiên AK (2026-09-08) — Fix install button + prompt cài đặt PWA Studio
+
+**Vấn đề:** nút cài đặt không hiện vì manifest served `text/plain` (nginx thiếu MIME cho .webmanifest) → Chrome từ chối manifest.
+
+**Đã sửa (commit `b33c89c`):**
+- Đổi manifest → **`manifest-studio.json`** (served `application/json` — Chrome chấp nhận); link `<link rel=manifest href=/manifest-studio.json>`.
+- Thêm **beforeinstallprompt handler + banner popup** "Cài đặt Trillfa Studio" (nút Cài đặt gọi `deferredPrompt.prompt()` + `appinstalled`) trong StudioApp — hiện khi trình duyệt báo installable.
+- `manifest-studio.webmanifest` cũ → 404.
+
+**Xác minh:** `manifest-studio.json` = `application/json` ✓ · app JS `app-CV30tpGW.js` 200 ✓ · deploy SSH + `optimize:clear` ✓.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AK)' && git push origin main 2>&1 | tail -2

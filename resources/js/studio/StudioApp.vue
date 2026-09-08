@@ -414,6 +414,7 @@ function onTouchEnd(e) {
           <button type="button" @click="store.unapplyProject()" class="shrink-0 text-brand-200/70 hover:text-white" aria-label="Ngắt dự án hiện tại"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
         </span>
         <span v-if="store.user" class="tool-btn hidden cursor-default md:inline-flex" title="Số credit còn lại"><StudioIcon name="coins" size="h-3.5 w-3.5" /> {{ store.creditsLeft }}</span>
+        <button v-if="showInstall" @click="doInstall" class="tool-btn is-active" title="Cài đặt Trillfa Studio — thêm vào màn hình chính"><StudioIcon name="download" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Cài đặt</span></button>
         <a v-if="store.user && store.user.is_admin" href="/admin" class="tool-btn" title="Đi tới trang quản trị (Dashboard Manager)"><StudioIcon name="gear" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Quản trị</span></a>
         <form v-if="store.user" method="POST" action="/dang-xuat" class="m-0">
           <input type="hidden" name="_token" :value="csrfToken">
