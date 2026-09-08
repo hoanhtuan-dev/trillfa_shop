@@ -548,3 +548,21 @@ EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email
 **Xác minh:** vite build ✓ (734ms) · push `7d3d5b0` · SSH pull + `optimize:clear` ✓ · app JS `app-CGbqsc17.js` 200.
 
 EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AS)' && git push origin main 2>&1 | tail -1
+
+## Phiên AT (2026-09-08) — Nâng cấp toàn diện card "Sửa ảnh" (8 mục)
+
+**Yêu cầu:** chip Đổi màu → popup chọn màu · thêm chip Xóa vật thể · Thay nền → popup nhập prompt · Giữ khuôn mặt & dáng / Giữ nền = checkbox · dùng chung preset từ Prompt Templates · xem trước mask lưới mini · Ctrl+Enter gửi · undo/redo mask.
+
+**Đã làm (commit `15a20c9` + seed):**
+- **Đổi màu** chip → popup chọn màu (12 màu nhanh + color picker) → điền prompt "đổi màu… sang màu {tên} ({hex})…".
+- **Thay nền** chip → popup nhập mô tả nền → prompt.
+- **Xóa vật thể** — preset mới (category `inpaint`, seeder → 5 preset: Xóa tạp chất/Làm sạch/Chỉnh dáng/Chất liệu/Xóa vật thể).
+- **Chip từ Prompt Templates**: `/studio/defaults` trả `inpaint_presets`; card render preset động (icon tự map).
+- **Checkbox** quay lại cho "Giữ khuôn mặt & dáng / Giữ nền".
+- **Mask lưới mini**: preview mask trên nền checkerboard (grid), kèm nút Chỉnh lại.
+- **Ctrl+Enter (hoặc ⌘+Enter)** trên textarea → gửi.
+- **Undo/Redo mask**: `_snapshotInpaintPath` (stack 30) + `inpaintPathUndo/Redo`; snapshot ở pathDown/pathClose/pathSetNodeKind/pathDeleteNode/pathUndoPoint; nút Hoàn tác/Làm lại khi đang vẽ path.
+
+**Xác minh:** php -l ✓ · vite build ✓ (1.73s) · seed PresetSeeder ✓ (5 inpaint presets) · push `15a20c9` · SSH pull + `optimize:clear` + seed ✓ · app JS `app-JEifMEG5.js` 200.
+
+EOF && git add STUDIO_REVIEW_PROGRESS.md && git -c user.name='dev' -c user.email='dev@local' commit -q -m 'docs: ledger note (Phiên AT)' && git push origin main 2>&1 | tail -1

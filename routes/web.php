@@ -178,7 +178,8 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/defaults', [StudioController::class, 'defaults'])->name('defaults');
     Route::get('/prompt-history', [StudioController::class, 'promptHistory'])->name('prompt-history');
     Route::post('/preview-enrich', [StudioController::class, 'previewEnrich'])->name('preview-enrich');
-    Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
+    // Cài đặt đã gộp vào /studio/presets (Prompt Templates) — redirect để điều hướng 'Cài đặt' về đó.
+    Route::redirect('/settings', '/studio/presets')->name('settings');
     Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');
     Route::post('/settings/save', [StudioController::class, 'settingsSave'])->name('settings.save');
     Route::get('/settings/vue', [StudioController::class, 'settingsVue'])->name('settings.vue');
@@ -187,7 +188,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/settings/suggest', [StudioController::class, 'updateSuggestSettings'])->name('settings.suggest');
     Route::post('/settings/product-ai', [StudioController::class, 'updateProductAiSettings'])->name('settings.product-ai');
     Route::post('/settings/faceswap', [StudioController::class, 'saveFaceswapPrompt'])->name('settings.faceswap');
-    Route::get('/api', fn () => redirect()->route('studio.settings'))->name('api');
+    Route::get('/api', fn () => redirect()->route('studio.presets'))->name('api');
     Route::post('/api', [StudioController::class, 'updateApi'])->name('api.update');
     Route::post('/api/test/{service}', [StudioController::class, 'testApi'])->name('api.test');
     // Quản lý data ✨ Trợ lý thiết kế (CRUD loại trang phục + câu hỏi + presets) — phải là admin.
