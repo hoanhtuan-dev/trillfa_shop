@@ -487,6 +487,14 @@ function onTouchEnd(e) {
         <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" :class="activeActivity === a.id ? 'is-active' : ''" class="activity-btn" :title="a.label" :aria-label="a.label">
           <StudioIcon :name="a.icon" size="h-5 w-5" />
         </button>
+        <!-- Prompt Tạo Ảnh — popup độc lập (ConceptCard mount ở cuối template) -->
+        <button @click="store.promptOpen = true; stylistPopupOpen = false; outputOpen = false" class="activity-btn mt-auto" :class="store.promptOpen ? 'is-active' : ''" title="Prompt Tạo Ảnh — nhập prompt & tạo ảnh" aria-label="Prompt Tạo Ảnh">
+          <StudioIcon name="sparkles" size="h-5 w-5" />
+        </button>
+        <!-- Trợ lý thiết kế — popup độc lập (StylistCard mount ở cuối template) -->
+        <button @click="stylistPopupOpen = true; store.promptOpen = false; outputOpen = false" class="activity-btn" :class="stylistPopupOpen ? 'is-active' : ''" title="Trợ lý thiết kế — khảo sát & tạo prompt thiết kế" aria-label="Trợ lý thiết kế">
+          <StudioIcon name="shirt" size="h-5 w-5" />
+        </button>
       </nav>
       <aside v-if="store.leftPanelOpen" class="scrollbar-hide hidden w-72 shrink-0 flex-col overflow-y-auto border-r border-ink-700 bg-ink-900/70 lg:flex">
         <div class="panel-head border-b border-ink-700">
@@ -634,7 +642,7 @@ function onTouchEnd(e) {
           <OutputModule />
         </div>
       </aside>
-      <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Outputs · Prompt · Trợ lý">
+      <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Outputs">
         <button @click="store.sourcePickerOpen = true" class="activity-btn" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh">
           <StudioIcon name="imagePlus" size="h-5 w-5" />
         </button>
@@ -644,14 +652,6 @@ function onTouchEnd(e) {
         <button @click="store.toggleOutputDock()" class="activity-btn mt-auto" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
           <StudioIcon name="grid" size="h-5 w-5" />
           <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
-        </button>
-        <!-- Prompt Tạo Ảnh — popup độc lập (ConceptCard mount ở cuối template) -->
-        <button @click="store.promptOpen = true; stylistPopupOpen = false; outputOpen = false" class="activity-btn" :class="store.promptOpen ? 'is-active' : ''" title="Prompt Tạo Ảnh — nhập prompt & tạo ảnh" aria-label="Prompt Tạo Ảnh">
-          <StudioIcon name="sparkles" size="h-5 w-5" />
-        </button>
-        <!-- Trợ lý thiết kế — popup độc lập (StylistCard mount ở cuối template) -->
-        <button @click="stylistPopupOpen = true; store.promptOpen = false; outputOpen = false" class="activity-btn" :class="stylistPopupOpen ? 'is-active' : ''" title="Trợ lý thiết kế — khảo sát & tạo prompt thiết kế" aria-label="Trợ lý thiết kế">
-          <StudioIcon name="shirt" size="h-5 w-5" />
         </button>
       </nav>
     </div>
