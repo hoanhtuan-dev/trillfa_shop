@@ -1807,10 +1807,14 @@ export const useStudioStore = defineStore('studio', {
     },
     // Dọn sạch canvas + toàn bộ layer (chỉ xóa trạng thái hiển thị — KHÔNG xóa output/ảnh kết quả).
     cleanCanvas() {
+      this.pushHistory();
+      this.confirmClearCanvasOpen = false;
       this.previewId = null;
       this.preview = null;
       this.editSource = null;
       this.canvasLayers = [];
+      this.layerGroups = [];
+      this.selectedLayerIds = [];
       this.activeLayerId = '';
       this.palette = [];
       this.pan = { x: 0, y: 0 };
@@ -2405,25 +2409,7 @@ export const useStudioStore = defineStore('studio', {
       this.saveLayerLayout();
       this.toast('Đã xóa ' + units.length + ' đối tượng.');
     },
-    clearCanvas() {
-      this.confirmClearCanvasOpen = true;
-      clearTimeout(this._clearCanvasTimer);
-      this._clearCanvasTimer = setTimeout(() => { this.confirmClearCanvasOpen = false; }, 5000);
-    },
-    confirmClearCanvas() {
-      const count = this.canvasLayers.length;
-      this.pushHistory();
-      this.canvasLayers = [];
-      this.layerGroups = [];
-      this.activeLayerId = '';
-      this.editSource = null;
-      this.previewId = null;
-      this.preview = null;
-      this.selectedLayerIds = [];
-      this.confirmClearCanvasOpen = false;
-      this.saveLayerLayout();
-      this.toast('Đã dọn toàn bộ canvas (' + count + ' layer).');
-    },
+    // clearCanvas + confirmClearCanvas đã gộp vào cleanCanvas() (có pushHistory + confirm popup qua LayersPanel).
     // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
     selectAll() {
       const visible = this.canvasLayers.filter(l => l.visible !== false && l.locked === false);

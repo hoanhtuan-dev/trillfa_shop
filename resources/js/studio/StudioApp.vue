@@ -519,10 +519,8 @@ function onTouchEnd(e) {
           <RegionTools />
           <!-- Inpaint mask overlay on canvas -->
           <CanvasMaskTools />
-          <!-- active image source clear -->
-          <div v-if="store.editSource" class="absolute left-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-ink-900/85 px-2.5 py-1.5 text-xs shadow-lg">
-            <button @click="store.removeEditSource()" class="grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Bỏ ảnh nguồn khỏi canvas" aria-label="Bỏ ảnh nguồn khỏi canvas"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
-          </div>
+          <!-- Nút "Bỏ ảnh nguồn khỏi canvas" đã xóa — ảnh nguồn tự động clear khi chọn layer khác hoặc dùng nút X ở SourcePanel -->
+          
           <div ref="canvasZoom" class="absolute inset-0" :class="store.selectTool ? 'cursor-crosshair active:cursor-crosshair' : 'cursor-grab active:cursor-grabbing'" style="touch-action:none" @wheel.prevent="store.wheelZoom($event)" @pointerdown="onCanvasBgDown($event)" @pointermove="onCanvasBgMove($event)" @pointerup="onCanvasBgUp($event)" @pointerleave="onCanvasBgUp($event)" @touchstart="onTouchStart($event)" @touchmove="onTouchMove($event)" @touchend="onTouchEnd($event)">
             <!-- Chế độ isolate (crop/inpaint/erase): chỉ khi có layer active — không có layer thì hiện composite (không ẩn hết) -->
             <div v-if="isolateActive && store.activeLayer" class="absolute inset-0">

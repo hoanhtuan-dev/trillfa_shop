@@ -127,7 +127,10 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
             </div>
           </div>
         </div>
-        <button @click="store.cleanCanvas()" class="grid h-7 w-7 place-items-center rounded-lg text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)" aria-label="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">
+        <button @click="store.confirmClearCanvasOpen ? store.cleanCanvas() : (store.confirmClearCanvasOpen = true, clearTimeout(store._clearCanvasTimer), store._clearCanvasTimer = setTimeout(() => { store.confirmClearCanvasOpen = false }, 5000))"
+          :class="store.confirmClearCanvasOpen ? 'grid h-7 w-7 place-items-center rounded-lg bg-red-600 text-white transition-colors' : 'grid h-7 w-7 place-items-center rounded-lg text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200'"
+          :title="store.confirmClearCanvasOpen ? '⚠️ Xác nhận dọn toàn bộ canvas (không thể hoàn tác)' : 'Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)'"
+          :aria-label="store.confirmClearCanvasOpen ? 'Xác nhận dọn toàn bộ canvas' : 'Dọn canvas — bỏ hết ảnh trên canvas'">
           <StudioIcon name="trash" size="h-4 w-4" />
         </button>
         <button @click="store.toggleInspector()" class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 transition-colors hover:bg-ink-700" title="Ẩn panel Layers" aria-label="Ẩn panel Layers">

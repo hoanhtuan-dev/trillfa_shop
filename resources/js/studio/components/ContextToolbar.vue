@@ -153,9 +153,6 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa layer đang chọn (Delete)"><StudioIcon name="trash" :size="I"/></button>
     <button @click="store.downloadSelection()" :class="[lbl, btn]" title="Tải layer đang chọn"><StudioIcon name="download" :size="I"/>Tải</button>
     <span :class="sep"></span>
-    <!-- Nút Dọn canvas: xác nhận popup trước khi xóa toàn bộ -->
-    <button @click="store.confirmClearCanvasOpen ? store.confirmClearCanvas() : store.clearCanvas()" :class="[lbl, store.confirmClearCanvasOpen ? '!bg-red-600 !text-white' : 'text-red-300 hover:bg-red-600/25 hover:text-red-200']" :title="store.confirmClearCanvasOpen ? 'Xác nhận dọn toàn bộ canvas — không thể hoàn tác sau khi xác nhận!' : 'Dọn toàn bộ canvas (cần xác nhận)'"><StudioIcon name="trashAll" :size="I"/>{{ store.confirmClearCanvasOpen ? '⚠️ Xác nhận dọn?' : 'Dọn canvas' }}</button>
-    <span :class="sep"></span>
     <button @click="store.zoomFitSelection()" :class="[lbl, btn]" title="Fit canvas — đưa các layer/group đang chọn vào giữa khung nhìn"><StudioIcon name="maximize" :size="I"/>Fit chọn</button>
     <span :class="sep"></span>
     <!-- Số layer đang chọn -->
@@ -187,8 +184,6 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
       <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa (Delete)"><StudioIcon name="trash" :size="I"/></button>
       <button @click="store.downloadSelection()" :class="[lbl, btn]" title="Tải"><StudioIcon name="download" :size="I"/>Tải</button>
     </template>
-    <span :class="sep"></span>
-    <button @click="store.confirmClearCanvasOpen ? store.confirmClearCanvas() : store.clearCanvas()" :class="[lbl, store.confirmClearCanvasOpen ? '!bg-red-600 !text-white' : 'text-red-300 hover:bg-red-600/25 hover:text-red-200']" :title="store.confirmClearCanvasOpen ? 'Xác nhận dọn toàn bộ canvas!' : 'Dọn canvas'"><StudioIcon name="trashAll" :size="I"/>{{ store.confirmClearCanvasOpen ? 'Xác nhận!' : 'Dọn canvas' }}</button>
     <span :class="sep"></span>
     <button @click="store.zoomFitSelection()" :class="[lbl, btn]" title="Fit canvas — đưa các layer/group đang chọn vào giữa khung nhìn"><StudioIcon name="maximize" :size="I"/>Fit chọn</button>
     <span :class="sep"></span>
