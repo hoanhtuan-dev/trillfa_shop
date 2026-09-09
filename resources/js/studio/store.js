@@ -348,12 +348,14 @@ export const useStudioStore = defineStore('studio', {
         const cfg = await fetch('/studio/defaults', { headers: { Accept: 'application/json' } });
         const defaults = await cfg.json();
         this._applyDefaultValues(defaults);
-        // ƯU TIÊN local: cài đặt prompt người dùng đã lưu (prefix/suffix/negative + checkbox)
-        // được khôi phục SAU defaults DB → ghi đè giá trị từ database.
-        this.restorePromptMemory();
         this.defaultsLoaded = true;
         return defaults;
       } catch (e) { /* keep current values */ return null; }
+      finally {
+        // ƯU TIÊN local (luôn chạy, kể cả khi fetch defaults lỗi): khôi phục cài đặt prompt
+        // người dùng đã lưu — ghi đè giá trị từ database.
+        this.restorePromptMemory();
+      }
     },
     _applyDefaultValues(defaults) {
       if (!defaults) return;
@@ -2581,12 +2583,24 @@ export const useStudioStore = defineStore('studio', {
     savePromptMemory() {
       try {
         localStorage.setItem('trillfa.prompt-cfg', JSON.stringify({
+          // Toàn bộ cài đặt người dùng trong Prompt Tạo Ảnh (tab Prompt + Nâng cao):
+          imagePromptEn: this.imagePromptEn || '',
+          creativeLevel: this.creativeLevel,
+          texture: this.texture,
+          variantCount: this.variantCount,
+          imageRatio: this.imageRatio,
+          imageRes: this.imageRes,
+          imageSeed: this.imageSeed || '',
+          negativePromptEn: this.negativePromptEn || '',
           promptPrefix: this.promptPrefix || '',
           promptSuffix: this.promptSuffix || '',
-          negativePromptEn: this.negativePromptEn || '',
           promptUsePrefix: !!this.promptUsePrefix,
           promptUseSuffix: !!this.promptUseSuffix,
           promptUseNegative: !!this.promptUseNegative,
+          bodyHeight: this.bodyHeight, bodyBuild: this.bodyBuild,
+          bodyWaist: this.bodyWaist, bodyShoulders: this.bodyShoulders, bodyHips: this.bodyHips,
+          hairStyle: this.hairStyle || '', hairColor: this.hairColor || '',
+          imagePoseId: this.imagePoseId || '',
         }));
       } catch (e) { /* bỏ qua */ }
     },
@@ -2594,17 +2608,33 @@ export const useStudioStore = defineStore('studio', {
       try {
         const d = JSON.parse(localStorage.getItem('trillfa.prompt-cfg') || 'null');
         if (!d) return;
+        if (typeof d.imagePromptEn === 'string') this.imagePromptEn = d.imagePromptEn;
+        if (d.creativeLevel != null) this.creativeLevel = Number(d.creativeLevel);
+        if (d.texture != null) this.texture = Number(d.texture);
+        if (d.variantCount != null) this.variantCount = Number(d.variantCount);
+        if (d.imageRatio) this.imageRatio = d.imageRatio;
+        if (d.imageRes) this.imageRes = d.imageRes;
+        if (d.imageSeed) this.imageSeed = d.imageSeed;
+        if (typeof d.negativePromptEn === 'string') this.negativePromptEn = d.negativePromptEn;
         if (typeof d.promptPrefix === 'string') this.promptPrefix = d.promptPrefix;
         if (typeof d.promptSuffix === 'string') this.promptSuffix = d.promptSuffix;
-        if (typeof d.negativePromptEn === 'string') this.negativePromptEn = d.negativePromptEn;
         if (d.promptUsePrefix != null) this.promptUsePrefix = !!d.promptUsePrefix;
         if (d.promptUseSuffix != null) this.promptUseSuffix = !!d.promptUseSuffix;
         if (d.promptUseNegative != null) this.promptUseNegative = !!d.promptUseNegative;
+        if (d.bodyHeight != null) this.bodyHeight = Number(d.bodyHeight);
+        if (d.bodyBuild != null) this.bodyBuild = Number(d.bodyBuild);
+        if (d.bodyWaist != null) this.bodyWaist = Number(d.bodyWaist);
+        if (d.bodyShoulders != null) this.bodyShoulders = Number(d.bodyShoulders);
+        if (d.bodyHips != null) this.bodyHips = Number(d.bodyHips);
+        if (typeof d.hairStyle === 'string') this.hairStyle = d.hairStyle;
+        if (typeof d.hairColor === 'string') this.hairColor = d.hairColor;
+        if (d.imagePoseId) this.imagePoseId = d.imagePoseId;
       } catch (e) { /* bỏ qua */ }
     },
     clearPromptMemory() {
       try { localStorage.removeItem('trillfa.prompt-cfg'); } catch (e) { /* bỏ qua */ }
-      this.promptPrefix = ''; this.promptSuffix = ''; this.negativePromptEn = '';
+      this.imagePromptEn = ''; this.promptPrefix = ''; this.promptSuffix = ''; this.negativePromptEn = '';
+      this.imageSeed = ''; this.hairStyle = ''; this.hairColor = ''; this.imagePoseId = '';
       this.promptUsePrefix = true; this.promptUseSuffix = true; this.promptUseNegative = true;
     },
     // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).

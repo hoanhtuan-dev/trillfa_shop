@@ -212,10 +212,17 @@ function syncSuffixToSettings(v) {
 }
 watch(() => store.promptPrefix, (v) => { if (v !== undefined) syncPrefixToSettings(v); });
 watch(() => store.promptSuffix, (v) => { if (v !== undefined) syncSuffixToSettings(v); });
-// ── Ghi nhớ local: prefix/suffix/negative + checkbox bật/tắt (ưu tiên hơn DB khi tải lại) ──
-watch(() => [store.promptPrefix, store.promptSuffix, store.negativePromptEn,
-              store.promptUsePrefix, store.promptUseSuffix, store.promptUseNegative],
-       () => store.savePromptMemory(), { deep: true });
+// ── Ghi nhớ local TOÀN BỘ cài đặt Prompt (prompt text, creative, texture, variants,
+//    ratio/res, body, hair, seed, prefix/suffix/negative + checkbox) — ưu tiên hơn DB khi tải lại ──
+watch(() => [
+    store.imagePromptEn, store.creativeLevel, store.texture, store.variantCount,
+    store.imageRatio, store.imageRes, store.imageSeed,
+    store.promptPrefix, store.promptSuffix, store.negativePromptEn,
+    store.promptUsePrefix, store.promptUseSuffix, store.promptUseNegative,
+    store.bodyHeight, store.bodyBuild, store.bodyWaist, store.bodyShoulders, store.bodyHips,
+    store.hairStyle, store.hairColor, store.imagePoseId,
+  ],
+  () => store.savePromptMemory(), { deep: true });
 
 // ── Pose mẫu (kế thừa từ chip Thử đồ — load lười khi mở tab Tư thế) ──
 async function loadImagePoses() {
@@ -511,7 +518,7 @@ const bodyHipsLabel = computed(() => {
   </div>
 
     <!-- ===== MODAL ===== (luôn mount; hiện khi store.promptOpen — dùng chung cho card & popup) -->
-    <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="Prompt Tạo Ảnh" wide height="70vh">
+    <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="Prompt Tạo Ảnh" wide height="92vh">
       <div v-if="promptLoading" class="py-16 text-center">
         <div class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></div>
         <p class="text-sm text-cream-300/60">Đang tải cài đặt mặc định…</p>
