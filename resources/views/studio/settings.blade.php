@@ -553,3 +553,187 @@
                                 <div><label class="label">Dân tộc/Phong cách</label><input name="ethnicity" value="{{ $fp->ethnicity }}" class="input !py-1" placeholder="Vietnamese female"></div>
                                 <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="{{ $fp->sort }}" min="0" class="input !py-1"></div>
                                 <div class="col-span-2"><label class="label">Mô tả khuôn mặt (tiếng Anh)</label><textarea name="description" rows="2" class="input !py-1" required>{{ $fp->description }}</textarea></div>
+                                <div class="col-span-2"><label class="label">Ảnh tham chiếu (tuỳ chọn — bỏ trống giữ ảnh cũ)</label><input type="file" name="image" accept="image/*" class="input !py-1"></div>
+                                <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($fp->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
+                            </div>
+                            <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editf=false" class="btn-ghost btn-sm">Hủy</button></div>
+                        </form>
+                    </div>
+                @empty
+                    <p class="text-xs text-ink-500">Chưa có khuôn mặt mẫu — thêm bên dưới.</p>
+                @endforelse
+            </div>
+            <form method="POST" action="{{ route('studio.face-presets.store') }}" enctype="multipart/form-data" class="mt-3 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+                @csrf
+                <h4 class="text-sm font-semibold text-ink-900">➕ Thêm khuôn mặt mẫu</h4>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div><label class="label">Tên</label><input name="name" class="input !py-2" placeholder="VD: Nhẹ nhàng tự nhiên" required></div>
+                    <div><label class="label">Dân tộc/Phong cách</label><input name="ethnicity" class="input !py-2" placeholder="Vietnamese female"></div>
+                    <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="0" min="0" class="input !py-2"></div>
+                    <div class="col-span-3"><label class="label">Mô tả khuôn mặt (tiếng Anh — model dùng mô tả này để dựng)</label><textarea name="description" rows="2" class="input !py-2" placeholder="VD: young Vietnamese woman, 22, light natural makeup, shoulder-length straight black hair, fair skin, gentle smile" required></textarea></div>
+                    <div class="col-span-3"><label class="label">Ảnh tham chiếu (tuỳ chọn)</label><input type="file" name="image" accept="image/*" class="input !py-2"></div>
+                </div>
+                <button class="btn-brand btn-sm">Thêm khuôn mặt mẫu</button>
+            </form>
+        </div>
+
+        {{-- Dáng mẫu --}}
+        <div>
+            <h3 class="text-sm font-semibold text-ink-900">🧍 Dáng mẫu <span class="text-ink-500">(pose — dùng trong 🪄 Thay Đổi Người Mẫu)</span></h3>
+            <p class="mt-1 text-xs text-ink-500">Mô tả dáng (tiếng Anh) để model dựng đúng tư thế; ảnh kèm là tuỳ chọn.</p>
+            <div class="mt-2 space-y-2">
+                @forelse($pose_presets as $pp)
+                    <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editp:false }">
+                        <div x-show="!editp" class="flex flex-wrap items-center gap-2">
+                            @if($pp->image)<img src="{{ $pp->image }}" class="h-10 w-8 rounded bg-ink-900 object-cover">@else<span class="grid h-10 w-8 place-items-center rounded bg-ink-900 text-sm">🧍</span>@endif
+                            <span class="font-semibold text-ink-900">{{ $pp->name }}</span>
+                            <span class="text-ink-500">Ưu tiên {{ $pp->sort }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-[10px] {{ $pp->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $pp->enabled ? 'Bật' : 'Tắt' }}</span>
+                            <div class="ml-auto flex items-center gap-1.5">
+                                <button type="button" @click="editp=true" class="btn-outline btn-sm">✏️ Sửa</button>
+                                <form method="POST" action="{{ route('studio.pose-presets.destroy', $pp) }}" onsubmit="return confirm('Xóa dáng «{{ $pp->name }}»?')">@csrf @method('DELETE')<button class="btn-outline btn-sm text-red-600">Xóa</button></form>
+                            </div>
+                        </div>
+                        <form x-show="editp" method="POST" action="{{ route('studio.pose-presets.update', $pp) }}" enctype="multipart/form-data" class="mt-2 space-y-2 border-t border-cream-200 pt-2">
+                            @csrf @method('PUT')
+                            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                <div><label class="label">Tên</label><input name="name" value="{{ $pp->name }}" class="input !py-1" required></div>
+                                <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="{{ $pp->sort }}" min="0" class="input !py-1"></div>
+                                <div class="col-span-2"><label class="label">Mô tả dáng (tiếng Anh)</label><textarea name="description" rows="2" class="input !py-1" required>{{ $pp->description }}</textarea></div>
+                                <div class="col-span-2"><label class="label">Ảnh tham chiếu (tuỳ chọn — bỏ trống giữ ảnh cũ)</label><input type="file" name="image" accept="image/*" class="input !py-1"></div>
+                                <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($pp->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
+                            </div>
+                            <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editp=false" class="btn-ghost btn-sm">Hủy</button></div>
+                        </form>
+                    </div>
+                @empty
+                    <p class="text-xs text-ink-500">Chưa có dáng mẫu — thêm bên dưới.</p>
+                @endforelse
+            </div>
+            <form method="POST" action="{{ route('studio.pose-presets.store') }}" enctype="multipart/form-data" class="mt-3 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+                @csrf
+                <h4 class="text-sm font-semibold text-ink-900">➕ Thêm dáng mẫu</h4>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div><label class="label">Tên</label><input name="name" class="input !py-2" placeholder="VD: Tay chống hông" required></div>
+                    <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="0" min="0" class="input !py-2"></div>
+                    <div class="col-span-3"><label class="label">Mô tả dáng (tiếng Anh — model dùng mô tả này để dựng tư thế)</label><textarea name="description" rows="2" class="input !py-2" placeholder="VD: standing, one hand on hip, one leg crossed" required></textarea></div>
+                    <div class="col-span-3"><label class="label">Ảnh tham chiếu (tuỳ chọn)</label><input type="file" name="image" accept="image/*" class="input !py-2"></div>
+                </div>
+                <button class="btn-brand btn-sm">Thêm dáng mẫu</button>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="tab==='keys'">
+    {{-- ===== API Keys Registry ===== --}}
+    <div class="card mt-6 p-6">
+        <h2 class="flex items-center justify-between font-display text-base font-semibold text-ink-900">🔑 API Keys Registry <span class="text-xs font-normal text-ink-500">đăng ký key độc lập — model chỉ cần chọn key</span></h2>
+        <p class="mt-1 text-xs text-ink-500">⚙️ <b>{{ $api_keys->pluck('provider')->unique()->count() }}</b> nhóm API · <b>{{ $api_keys->count() }}</b> key. Chỉ cần đăng ký <b>provider + key</b> (không phụ thuộc model); <b>Model Registry</b> sẽ chọn key theo <b>vai trò + ưu tiên</b>. Mỗi provider có thể có nhiều key (Qwen: Token-Plan + Pay-As-You-Go…).</p>
+        <div class="mt-3 rounded-xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
+            <p class="font-semibold">💡 Gợi ý lấy key</p>
+            <ul class="mt-1 list-inside list-disc space-y-0.5">
+                <li>Gemini: <code class="rounded bg-ink-700 px-1 text-cream-100">aistudio.google.com</code> → API Keys.</li>
+                <li>Qwen / Wan (ảnh, chỉnh sửa ảnh & video): <code class="rounded bg-ink-700 px-1 text-cream-100">home.qwencloud.com/api-keys</code> (Token-Plan) hoặc <code class="rounded bg-ink-700 px-1 text-cream-100">dashscope.aliyuncs.com</code> (Pay-As-You-Go).</li>
+                <li>Replicate: <code class="rounded bg-ink-700 px-1 text-cream-100">replicate.com/account/api-tokens</code>.</li>
+            </ul>
+            <p class="mt-2">Khi có key, service tự chuyển từ <b>stub</b> sang gọi API thật. Key trong <b>API Keys Registry</b> ưu tiên hơn env trong <code class="rounded bg-ink-700 px-1 text-cream-100">.env</code>.</p>
+        </div>
+
+        @foreach($api_keys->groupBy('provider') as $provider=>$keys)
+            <div class="mt-5">
+                <h3 class="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                    <span>{{ ($providers[$provider]['label'] ?? $provider) }}</span>
+                    <span class="badge {{ count($keys) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ count($keys) ? 'Có key × '.count($keys) : 'Chưa có' }}</span>
+                    <button type="button" class="btn-outline btn-sm ml-auto" onclick="document.getElementById('apikey-provider').value='{{ $provider }}'; document.getElementById('apikey-provider').focus(); document.querySelector('#apikey-add').scrollIntoView({behavior:'smooth'})">➕ Thêm key</button>
+                </h3>
+                <div class="mt-2 space-y-2">
+                    @foreach($keys as $k)
+                        <div class="rounded-xl border border-cream-200 p-2 text-xs" x-data="{ editk:false }">
+                            <div x-show="!editk" class="flex flex-wrap items-center gap-2">
+                                <span class="font-semibold text-ink-900">{{ $k->label }}</span>
+                                <span class="text-ink-500">{{ $k->kind ?: $provider }}</span>
+                                <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px] text-ink-700">Ưu tiên {{ $k->priority }}</span>
+                                <span class="rounded-full px-2 py-0.5 text-[10px] {{ $k->enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600' }}">{{ $k->enabled ? 'Bật' : 'Tắt' }}</span>
+                                <span class="ml-auto flex flex-wrap items-center gap-1.5">
+                                    <button type="button" @click="editk=true" class="btn-outline btn-sm">✏️ Sửa</button>
+                                    <form method="POST" action="{{ route('studio.keys.delete', $k) }}" onsubmit="return confirm('Xóa key «{{ $k->label }}»?')">@csrf @method('DELETE')<button class="btn-outline btn-sm text-red-600">Xóa</button></form>
+                                </span>
+                            </div>
+                            <form x-show="editk" method="POST" action="{{ route('studio.keys.update', $k) }}" class="mt-2 space-y-2 border-t border-cream-200 pt-2">
+                                @csrf @method('PUT')
+                                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                    <div><label class="label">Provider</label><input name="provider" value="{{ $k->provider }}" class="input !py-1"></div>
+                                    <div><label class="label">Nhãn</label><input name="label" value="{{ $k->label }}" class="input !py-1"></div>
+                                    <div><label class="label">Loại (kind)</label><input name="kind" value="{{ $k->kind }}" class="input !py-1" placeholder="plan / paygo / ..."></div>
+                                    <div class="col-span-2"><label class="label">Key (chỉ nhập nếu đổi)</label><input name="value" class="input !py-1" placeholder="để trống để giữ nguyên key hiện tại"></div>
+                                    <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="{{ $k->priority }}" min="0" max="100" class="input !py-1"></div>
+                                    <div class="col-span-2"><label class="flex items-center gap-1 text-ink-700"><input type="checkbox" name="enabled" value="1" @if($k->enabled) checked @endif class="h-4 w-4 accent-brand-600"> Bật</label></div>
+                                </div>
+                                <div class="flex gap-2"><button class="btn-brand btn-sm">💾 Lưu</button><button type="button" @click="editk=false" class="btn-ghost btn-sm">Hủy</button></div>
+                            </form>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endforeach
+
+        {{-- Add API key --}}
+        <form id="apikey-add" method="POST" action="{{ route('studio.keys.store') }}" class="mt-6 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+            @csrf
+            <h3 class="text-sm font-semibold text-ink-900">➕ Thêm API key</h3>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div><label class="label">Provider</label><select id="apikey-provider" name="provider" class="input !py-2" required>
+                    <option value="">— Chọn provider —</option>
+                    <option value="qwen">Qwen (ảnh/chỉnh sửa)</option><option value="qwen_edit">Qwen Edit (inpaint)</option>
+                    <option value="wan">Wan AI (video)</option><option value="dashscope">DashScope (Wan/Qwen)</option>
+                    <option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option>
+                    <option value="fal">Fal.ai (Flux)</option><option value="replicate">Replicate (Flux)</option><option value="veo">Google Veo</option>
+                </select></div>
+                <div><label class="label">Nhãn</label><input name="label" class="input !py-2" placeholder="VD: Qwen Token-Plan" required></div>
+                <div><label class="label">Key</label><input name="value" class="input !py-2" placeholder="sk-..." required></div>
+                <div><label class="label">Loại (kind)</label><input name="kind" class="input !py-2" placeholder="plan / paygo / ..."></div>
+                <div><label class="label">Ưu tiên</label><input type="number" name="priority" value="5" min="0" max="100" class="input !py-2"></div>
+                <div class="col-span-2 sm:col-span-3"><label class="label">Ghi chú</label><input name="note" class="input !py-2" placeholder="(tùy chọn)"></div>
+            </div>
+            <button class="btn-brand btn-sm">➕ Thêm API key</button>
+        </form>
+    </div>
+    </div>
+</div>
+@push('scripts')
+<script>
+function studioTestModel(btn, id) {
+    const row = btn.closest('div'); const el = row ? row.querySelector('.test-result') : null;
+    if (el) { el.textContent = 'Đang kiểm tra…'; el.className = 'block w-full text-[10px] text-ink-500'; }
+    fetch('/studio/models/' + id + '/test', { headers: { Accept: 'application/json' } })
+      .then(r => r.json()).then(d => {
+          if (el) {
+              const ok = d.key_exists;
+              el.className = 'block w-full text-[10px] ' + (ok ? 'text-emerald-400' : 'text-red-400');
+              el.textContent = 'Provider: ' + d.provider + ' · Model: ' + d.model_id + (ok ? ' · Key: ' + d.key_prefix : ' · CHƯA CÓ KEY') + (d.base_url ? ' · ' + d.base_url : '');
+              el.title = d.note || '';
+          }
+          if (d.note && d.note.indexOf('OK') !== 0) { alert(d.note); }
+      }).catch(e => { if (el) { el.textContent = 'Lỗi kiểm tra: ' + e.message; el.className = 'block w-full text-[10px] text-red-400'; } });
+}
+
+// Single "Model tạo ảnh" field <-> the selected provider's model (default config).
+(function () {
+    const field = document.getElementById('default-image-model');
+    if (!field) return;
+    const providerSelect = document.querySelector('[name=image_provider]');
+    const hiddenMap = {
+        flux: document.querySelector('[name=image_model]'),
+        wan: document.querySelector('[name=wan_model]'),
+        qwen: document.querySelector('[name=qwen_model]'),
+        gemini: document.querySelector('[name=gemini_image_model]'),
+    };
+    const activeHidden = function () { return hiddenMap[providerSelect ? providerSelect.value : 'flux']; };
+    function sync() { const h = activeHidden(); if (h) field.value = h.value; }
+    if (providerSelect) { providerSelect.addEventListener('change', sync); }
+    field.addEventListener('input', function () { const h = activeHidden(); if (h) h.value = field.value; });
+    sync();
+})();
+</script>
+@endpush
+@endsection
