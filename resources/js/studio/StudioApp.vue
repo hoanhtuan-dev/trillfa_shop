@@ -648,5 +648,7 @@ function onTouchEnd(e) {
     <GalleryModal v-if="store.viewer" />
     <!-- SourcePickerPopup: popup chọn nguồn ảnh (nút "Nguồn ảnh" ở activity bar) -->
     <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
+    <!-- ProjectWorkspace: popup quản lý dự án (nút "Dự án" ở mobile bar / chip dự án / popover apply) -->
+    <ProjectWorkspace v-if="projectsOpen" v-model="projectsOpen" />
   </div>
 </template>

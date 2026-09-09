@@ -116,8 +116,10 @@ PROMPT;
         if (! empty($answers['details'])) { $seg[] = 'chi tiết '.$answers['details']; }
         $model = ! empty($answers['model']) ? $answers['model'] : 'phụ nữ Việt trẻ trung, thanh mảnh, da sáng, tóc dài';
         $occ = ! empty($answers['occasion']) ? $answers['occasion'] : 'dịp sang trọng';
+        $set = ! empty($answers['setting']) ? $answers['setting'] : 'studio tối giản';
+        $style = ! empty($answers['style']) ? $answers['style'] : 'thời trang cao cấp';
         $desc = $seg ? implode(', ', $seg) : 'thiết kế hiện đại thanh lịch';
-        return 'Ảnh thời trang cao cấp của '.$g.' nữ, '.$desc.', mặc bởi '.$model.', phong cách '.$occ.', chụp full-body, ánh sáng studio dịu, nền tối giản, chi tiết sắc nét, 4k';
+        return 'Ảnh thời trang cao cấp của '.$g.' nữ, '.$desc.', mặc bởi '.$model.', phong cách '.$style.', bối cảnh '.$set.', dịp '.$occ.', chụp full-body, ánh sáng studio dịu, chi tiết sắc nét, 4k';
     }
 
     public function buildPrompt(string $type, array $answers): string
@@ -242,42 +244,6 @@ PROMPT;
         }
 
         $timeout = 15; // seconds — tight per-call so total latency stays low
-
-        // ── Qwen (parallel model×key so the fastest wins) ──
-        $qwenKeys = studio_qwen_credentials('prompt');
-        $qwenModels = studio_qwen_text_models();
-        if ($qwenKeys && $qwenModels) {
-            // Build all (model, key) pairs and fire them concurrently.
-            $requests = [];
-            foreach ($qwenModels as $qm) {
-                foreach ($qwenKeys as $key) {
-                    $base = dashscope_base_url($key).'/compatible-mode/v1';
-                    $requests[] = Http::withToken($key)->timeout($timeout)
-                        ->async()
-                        ->post($base.'/chat/completions', [
-                            'model' => $qm,
-                            'messages' => [['role' => 'user', 'content' => $instruction]],
-                            'response_format' => ['type' => 'json_object'],
-                        ]);
-                }
-            }
-            if ($requests) {
-                // Resolve the fastest successful response; ignore the rest.
-                // Http::async() returns a PendingRequest that we can ->get() on.
-                // We'll collect promises and race them manually.
-                $pool = [];
-                $idx = 0;
-                foreach ($qwenModels as $qm) {
-                    foreach ($qwenKeys as $key) {
-                        $base = dashscope_base_url($key).'/compatible-mode/v1';
-                        $pool[$idx] = ['model' => $qm, 'key' => $key, 'base' => $base];
-                        $idx++;
-                    }
-                }
-            }
-        }
-
-        // Sequential fallback (simpler, compatible with all Laravel versions):
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
         if ($qwenKey) {
             // Chỉ thử model đầu tiên (flash) + key đầu tiên — nhanh nhất.
