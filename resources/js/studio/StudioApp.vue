@@ -88,22 +88,38 @@ watch(() => store.upscaleSrc, () => {
   if (store.cropMode) store.initCropBox();
 });
 function onCanvasKey(e) {
-  const editing = store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode;
+  const editing = store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode || store.selectTool || store.panMode;
   if (!editing) return;
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
   if (e.key === 'Escape') {
-    // Thoát an toàn theo ưu tiên: vùng chọn/mask → vẽ → xóa → crop.
+    // Thoát an toàn theo ưu tiên: vùng chọn/mask → vẽ → xóa → crop → selectTool → panMode.
     if (store.inpaintMaskMode !== 'none') store.clearInpaintMask();
     else if (store.drawMode) store.cancelDraw();
     else if (store.eraseMode) store.cancelErase();
     else if (store.cropMode) store.toggleCrop();
+    else if (store.selectTool) store.selectTool = false;
+    else if (store.panMode) store.panMode = false;
   } else if (e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) {
     // Hoàn tất công cụ đang dùng (Enter = "Xong").
     if (store.cropMode) store.confirmCrop();
     else if (store.inpaintMaskMode !== 'none') store.confirmInpaintMask();
     else if (store.eraseMode) store.finishErase();
     else if (store.drawMode) store.finishDraw();
+  } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+    // Ctrl+A: chọn tất cả layer (chỉ khi selectTool đang bật hoặc không có tool nào khác)
+    if (!store.cropMode && store.inpaintMaskMode === 'none' && !store.drawMode && !store.eraseMode) {
+      e.preventDefault();
+      store.selectAll();
+    }
+  } else if (e.key === 'v' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    // 'v': toggle công cụ di chuyển canvas (panMode) — thân thiện với tablet.
+    store.exitCanvasTools();
+    store.panMode = !store.panMode;
+  } else if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    // 's': toggle công cụ lựa chọn.
+    store.exitCanvasTools();
+    store.selectTool = !store.selectTool;
   }
 }
 // Phím tắt cho layer (chế độ stack): mũi tên di chuyển, Ctrl/Cmd+D nhân đôi.
@@ -166,10 +182,10 @@ function selectActivity(id) {
 // Right activity bar: Nguồn ảnh (popup) · Thư viện (điều hướng) · Outputs (toggle dock).
 function goLibrary() { store.exitCanvasTools(); store.studioView = 'library'; }
 // ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
-const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking);
+const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking || store.selectTool || store.panMode);
 
 // ── Layer editor (composite + transform) ──
-const isolateActive = computed(() => store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode);
+const isolateActive = computed(() => (store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode) && !store.panMode);
 function layerStyle(l, i) {
   return {
     transform: store.layerTransformStyle(l),
@@ -301,6 +317,8 @@ function onCanvasBgMove(e) {
   if (!bgDownPos) return;
   const dx = e.clientX - bgDownPos.x, dy = e.clientY - bgDownPos.y;
   const panMod = e.ctrlKey || e.metaKey || e.altKey;
+  // panMode: luôn pan, không bao giờ quét chọn.
+  if (store.panMode) { store.panMove(e); return; }
   // Chỉ QUÉT CHỌN khi công cụ "Lựa chọn" đang bật; ngược lại kéo vùng trống = pan (không cạnh tranh).
   if (store.selectTool) {
     if (marquee.value === null && !panMod && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
@@ -325,7 +343,8 @@ function onCanvasBgUp(e) {
     marquee.value = null; store.panEnd(); bgDownPos = null; return;
   }
   store.panEnd();
-  if (bgDownPos && !isolateActive.value && Math.hypot(e.clientX - bgDownPos.x, e.clientY - bgDownPos.y) < 5) store.deselectAll();
+  // Click vùng trống: nếu panMode → không làm gì; selectTool → bỏ chọn hết.
+  if (bgDownPos && !isolateActive.value && !store.panMode && Math.hypot(e.clientX - bgDownPos.x, e.clientY - bgDownPos.y) < 5) store.deselectAll();
   bgDownPos = null;
 }
 // Vòng cọ (preview) khi vẽ — bám con trỏ, cỡ = drawBrushSize × zoom.

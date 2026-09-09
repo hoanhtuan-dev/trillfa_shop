@@ -128,6 +128,59 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <button @click="store.filmOpen = false" :class="iconBtnDanger" title="Đóng" aria-label="Đóng"><StudioIcon name="x" :size="I"/></button>
   </div>
 
-  <!-- ══ Placeholder ══ -->
+  <!-- ══ Select Tool: thao tác chọn layer — tối ưu cho tablet (không chuột) ══ -->
+  <div v-else-if="store.selectTool" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+    <!-- Chọn tất cả / Bỏ chọn -->
+    <button @click="store.selectAll()" :class="[lbl, btn]" title="Chọn tất cả layer (Ctrl+A)"><StudioIcon name="selectAll" :size="I"/>Tất cả</button>
+    <button @click="store.deselectAll()" :class="[lbl, btn]" title="Bỏ chọn tất cả (Esc)"><StudioIcon name="x" :size="I"/>Bỏ chọn</button>
+    <span :class="sep"></span>
+    <!-- Multi-select hành động: nút lộ khi chọn >= 2 layer, gom trong 1 hàng gọn -->
+    <template v-if="store.selectionUnitCount >= 2">
+      <!-- Căn lề nhanh -->
+      <button @click="store.alignSelection('left')" :class="iconBtn" title="Căn trái"><StudioIcon name="alignStartHorizontal" :size="I"/></button>
+      <button @click="store.alignSelection('hcenter')" :class="iconBtn" title="Căn giữa ngang"><StudioIcon name="alignCenterHorizontal" :size="I"/></button>
+      <button @click="store.alignSelection('right')" :class="iconBtn" title="Căn phải"><StudioIcon name="alignEndHorizontal" :size="I"/></button>
+      <button @click="store.alignSelection('top')" :class="iconBtn" title="Căn trên"><StudioIcon name="alignStartVertical" :size="I"/></button>
+      <button @click="store.alignSelection('vcenter')" :class="iconBtn" title="Căn giữa dọc"><StudioIcon name="alignCenterVertical" :size="I"/></button>
+      <button @click="store.alignSelection('bottom')" :class="iconBtn" title="Căn dưới"><StudioIcon name="alignEndVertical" :size="I"/></button>
+      <span :class="sep"></span>
+      <!-- Chia đều · Nhóm · Tách nhóm · Nhân đôi · Xóa · Tải -->
+      <button @click="store.distributeSelection('x')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều ngang"><StudioIcon name="distributeHorizontal" :size="I"/></button>
+      <button @click="store.distributeSelection('y')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều dọc"><StudioIcon name="distributeVertical" :size="I"/></button>
+      <button @click="store.groupSelection()" :class="[lbl, '!bg-brand-600/20 !text-brand-200 hover:!bg-brand-600 hover:!text-white']" title="Tạo nhóm từ các layer đang chọn"><StudioIcon name="group" :size="I"/>Nhóm</button>
+      <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, btn]" title="Tách nhóm"><StudioIcon name="unlink" :size="I"/>Tách</button>
+      <button @click="store.duplicateActiveUnit()" :class="iconBtn" title="Nhân đôi (Ctrl+D)"><StudioIcon name="copy" :size="I"/></button>
+      <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa (Delete)"><StudioIcon name="trash" :size="I"/></button>
+      <button @click="store.downloadSelection()" :class="[lbl, btn]" title="Tải tất cả layer đang chọn"><StudioIcon name="download" :size="I"/>Tải</button>
+    </template>
+    <!-- Khi chỉ chọn 1 layer: các nút thao tác đơn -->
+    <template v-else-if="store.activeLayer">
+      <button @click="store.duplicateActiveUnit()" :class="iconBtn" title="Nhân đôi layer (Ctrl+D)"><StudioIcon name="copy" :size="I"/></button>
+      <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa layer (Delete)"><StudioIcon name="trash" :size="I"/></button>
+      <button @click="store.downloadSelection()" :class="[lbl, btn]" title="Tải layer này"><StudioIcon name="download" :size="I"/>Tải</button>
+    </template>
+    <span :class="sep"></span>
+    <!-- Bắt điểm (snap grid) — rất quan trọng cho căn chỉnh chính xác trên tablet -->
+    <span class="flex items-center gap-1 px-1 text-[10px] font-medium text-cream-300/60"><StudioIcon name="target" size="h-3 w-3" />Bắt điểm</span>
+    <button v-for="s in ['0','4','8','16','24','32']" :key="s" @click="store.setSnapGrid(Number(s))" class="rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors" :class="String(store.snapGrid || 0) === s ? chipOn : chipOff">{{ s === '0' ? 'Tắt' : s + 'px' }}</button>
+    <span :class="sep"></span>
+    <!-- Zoom controls — hữu ích trên tablet không có bánh xe chuột -->
+    <button @click="store.zoom = Math.max(0.1, (store.zoom || 1) / 1.25)" :class="iconBtn" title="Thu nhỏ"><StudioIcon name="zoomOut" :size="I"/></button>
+    <button @click="store.zoom = Math.min(8, (store.zoom || 1) * 1.25)" :class="iconBtn" title="Phóng to"><StudioIcon name="zoomIn" :size="I"/></button>
+    <button @click="store.zoom = 1; store.pan.x = 0; store.pan.y = 0" :class="iconBtn" title="Reset zoom & pan (Zoom 100%)"><StudioIcon name="maximize" :size="I"/></button>
+    <span :class="sep"></span>
+    <!-- Số layer đang chọn -->
+    <span class="flex items-center gap-1 rounded-full bg-ink-800 px-2 py-0.5 text-[10px] text-cream-300/70"><StudioIcon name="layers" size="h-3 w-3" class="text-brand-300" />{{ store.selectionUnitCount || (store.activeLayer ? 1 : 0) }} đối tượng</span>
+  </div>
+
+  <!-- ══ Pan tool: context bar gọn với zoom + reset ══ -->
+  <div v-else-if="store.panMode" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
+    <span class="flex items-center gap-1 px-1 text-[10px] font-medium text-cream-200"><StudioIcon name="hand" :size="I"/>Di chuyển canvas</span>
+    <button @click="store.zoom = Math.max(0.1, (store.zoom || 1) / 1.25)" :class="iconBtn" title="Thu nhỏ"><StudioIcon name="zoomOut" :size="I"/></button>
+    <button @click="store.zoom = Math.min(8, (store.zoom || 1) * 1.25)" :class="iconBtn" title="Phóng to"><StudioIcon name="zoomIn" :size="I"/></button>
+    <button @click="store.zoom = 1; store.pan.x = 0; store.pan.y = 0" :class="[lbl, btn]" title="Reset zoom & pan (Zoom 100%)"><StudioIcon name="maximize" :size="I"/>Zoom 100%</button>
+  </div>
+
+  <!-- ══ No active tool: placeholder text ══ -->
   <span v-else class="text-[11px] font-medium text-cream-300/50">Chọn công cụ từ thanh công cụ cạnh canvas (Esc = hủy · Enter = xong)</span>
 </template>

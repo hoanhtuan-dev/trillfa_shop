@@ -154,7 +154,7 @@
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
-    "file": "assets/app-mj5AjhFw.css",
+    "file": "assets/app-BOa6_YaQ.css",
     "name": "app",
     "names": [
       "app.css"
@@ -335,7 +335,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-XZKP3wGj.js",
+    "file": "assets/app-3WkwaTHQ.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,

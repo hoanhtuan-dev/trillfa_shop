@@ -61,6 +61,7 @@ export const useStudioStore = defineStore('studio', {
     snapY: null,
     snapGrid: 8, // lưới bắt điểm (px) khi kéo layer — mặc định BẬT 8px (0 = tắt)
     selectTool: false, // công cụ LỰA CHỌN: bật thì kéo vùng trống = quét chọn (còn lại = pan như cũ)
+    panMode: false,   // công cụ DI CHUYỂN CANVAS (hand tool): khi bật, mọi kéo vùng trống = pan (giống Ctrl+Space). Trên desktop có thể dùng Space/Ctrl, trên tablet cần nút riêng.
     confirmDeleteOpen: false, // popup xác nhận xóa nhiều layer
     _pinch: null,
     // Xóa vùng (erase) với feather
@@ -2116,6 +2117,8 @@ export const useStudioStore = defineStore('studio', {
       this.cropMode = false;
       if (this._cropStop) this._cropStop(null);
       this.filmOpen = false;
+      this.selectTool = false;
+      this.panMode = false;
     },
     // ── Chuẩn hoá transform layer (xoay/lật) trước khi sửa pixel ──
     // Overlay vẽ/xóa/lasso tính theo khung hiển thị (chưa kể rotation/flip) nên trên layer bị XOAY
@@ -2371,6 +2374,14 @@ export const useStudioStore = defineStore('studio', {
       this.toast('Đã xóa ' + units.length + ' đối tượng.');
     },
     // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
+    selectAll() {
+      const visible = this.canvasLayers.filter(l => l.visible !== false && l.locked === false);
+      if (!visible.length) { this.toast('Không có layer nào để chọn.', 'error'); return; }
+      this._setActive(visible[visible.length - 1].id);
+      this.selectedLayerIds = visible.filter(x => x.id !== visible[visible.length - 1].id).map(x => x.id);
+      this.saveLayerLayout();
+      this.toast('Đã chọn ' + visible.length + ' layer.', 'success');
+    },
     deselectAll() {
       this.activeLayerId = '';
       this.editSource = null;

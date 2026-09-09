@@ -17,10 +17,16 @@ const ICON = 'h-4 w-4';
     <div class="scrollbar-hide pointer-events-auto flex max-w-[calc(100vw-1.5rem)] items-center gap-1 overflow-x-auto rounded-lg border border-ink-700 bg-ink-900/85 p-1.5 shadow-xl backdrop-blur lg:max-w-none lg:flex-col lg:items-center lg:overflow-visible">
 
       <!-- ══ Công cụ LỰA CHỌN (quét chọn nhiều layer) — icon chuẩn ngành ══ -->
-      <button @click="store.selectTool = !store.selectTool; store.finishDraw(); store.reframeOpen = false; store.filmOpen = false; store.exitErase(); store.clearInpaintMask()"
+      <button @click="store.selectTool = !store.selectTool; store.panMode = false; store.finishDraw(); store.reframeOpen = false; store.filmOpen = false; store.exitErase(); store.clearInpaintMask()"
         :class="store.selectTool ? mono.on : mono.off"
         class="grid h-8 w-8 shrink-0 place-items-center rounded-md border transition-colors lg:h-9 lg:w-9" title="Lựa chọn (quét chọn nhiều layer)" :aria-label="'Lựa chọn (quét chọn nhiều layer)'">
         <StudioIcon name="cursor" :size="ICON"/>
+      </button>
+      <!-- ══ Công cụ DI CHUYỂN CANVAS (pan/hand) — tablet không có Space/Ctrl để pan ══ -->
+      <button @click="store.panMode = !store.panMode; store.selectTool = false; store.finishDraw(); store.reframeOpen = false; store.filmOpen = false; store.exitErase(); store.clearInpaintMask()"
+        :class="store.panMode ? mono.on : mono.off"
+        class="grid h-8 w-8 shrink-0 place-items-center rounded-md border transition-colors lg:h-9 lg:w-9" title="Di chuyển canvas (kéo để pan)" :aria-label="'Di chuyển canvas (kéo để pan)'">
+        <StudioIcon name="hand" :size="ICON"/>
       </button>
       <div :class="sep"></div>
 
