@@ -149,8 +149,8 @@
     "file": "assets/useApi-CVQcqIlE.js",
     "name": "useApi"
   },
-  "_useStudioThumb-BeLv8od7.js": {
-    "file": "assets/useStudioThumb-BeLv8od7.js",
+  "_useStudioThumb-Cyg4xT69.js": {
+    "file": "assets/useStudioThumb-Cyg4xT69.js",
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
@@ -163,7 +163,7 @@
     "isEntry": true
   },
   "resources/js/admin/admin-product.js": {
-    "file": "assets/admin-product-C-ntxvs2.js",
+    "file": "assets/admin-product-B8G85WNL.js",
     "name": "admin-product",
     "src": "resources/js/admin/admin-product.js",
     "isEntry": true,
@@ -171,7 +171,7 @@
       "_runtime-dom.esm-bundler-Ds0T768v.js",
       "_useApi-CVQcqIlE.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_useStudioThumb-BeLv8od7.js"
+      "_useStudioThumb-Cyg4xT69.js"
     ],
     "css": [
       "assets/admin-product-BytdUvxk.css"
@@ -335,7 +335,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-Dm4YlD1t.js",
+    "file": "assets/app-C2UteHFz.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -343,7 +343,7 @@
       "_runtime-dom.esm-bundler-Ds0T768v.js",
       "_pinia-BuzXpy7O.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_useStudioThumb-BeLv8od7.js",
+      "_useStudioThumb-Cyg4xT69.js",
       "_StylistDataManager-OBmfjp_C.js"
     ],
     "css": [

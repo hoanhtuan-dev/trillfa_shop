@@ -1766,88 +1766,103 @@ RULES:
      */
     public function studioImageThumb(string $path, Request $request)
     {
-        // Containment + image/video-extension allowlist — see studioServePath().
-        $file = $this->studioServePath($path);
-        if (! $file) {
-            // File không tồn tại (có thể đã bị xóa) → trả ảnh placeholder trong suốt
-            // để tránh lỗi 500/img-broken trên UI, thay vì JSON 404.
-            $placeholder = storage_path('app/public/studio/thumb/placeholder.png');
-            if (! is_file($placeholder)) {
-                @mkdir(dirname($placeholder), 0775, true);
-                $img = imagecreatetruecolor(1, 1);
-                imagealphablending($img, false);
-                imagesavealpha($img, true);
-                $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
-                imagefill($img, 0, 0, $transparent);
-                imagepng($img, $placeholder);
-                imagedestroy($img);
+        try {
+            // Containment + image/video-extension allowlist — see studioServePath().
+            $file = $this->studioServePath($path);
+            if (! $file) {
+                // File không tồn tại (có thể đã bị xóa) → trả ảnh placeholder trong suốt
+                // để tránh lỗi 500/img-broken trên UI, thay vì JSON 404.
+                return $this->placeholderThumbResponse();
             }
-            return response()->file($placeholder, ['Cache-Control' => 'public, max-age=3600']);
-        }
 
-        // Ảnh siêu lớn (>4096px) → bỏ qua thumbnail (trả ảnh gốc) để tránh memory spike/OOM trên host.
-        $dim = @getimagesize($file);
-        if ($dim && max($dim[0], $dim[1]) > 4096) {
-            return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
-        }
+            // Ảnh siêu lớn (>4096px) → bỏ qua thumbnail (trả ảnh gốc) để tránh memory spike/OOM trên host.
+            $dim = @getimagesize($file);
+            if ($dim && max($dim[0], $dim[1]) > 4096) {
+                return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable']);
+            }
 
-        // Cỡ thumbnail: whitelist cứng để chống lạm dụng tạo ảnh lớn/tiêu tốn bộ nhớ.
-        $size = (int) $request->query('size', 160);
-        $allowed = [160, 320, 480, 640];
-        if (! in_array($size, $allowed, true)) {
-            $size = 160;
-        }
+            // Cỡ thumbnail: whitelist cứng để chống lạm dụng tạo ảnh lớn/tiêu tốn bộ nhớ.
+            $size = (int) $request->query('size', 160);
+            $allowed = [160, 320, 480, 640];
+            if (! in_array($size, $allowed, true)) {
+                $size = 160;
+            }
 
-        $thumbDir = storage_path('app/public/studio/thumb/'.$size.'/'.dirname($path));
-        $useWebp = function_exists('imagewebp');
-        $thumbExt = $useWebp ? 'webp' : 'jpg';
-        $thumbFile = $thumbDir.'/'.basename($path).'.'.$thumbExt;
+            $thumbDir = storage_path('app/public/studio/thumb/'.$size.'/'.dirname($path));
+            $useWebp = function_exists('imagewebp');
+            $thumbExt = $useWebp ? 'webp' : 'jpg';
+            $thumbFile = $thumbDir.'/'.basename($path).'.'.$thumbExt;
 
-        // Cache: chỉ tạo thumbnail lần đầu (atomic write tránh race/file corrupt).
-        if (! is_file($thumbFile)) {
-            try {
-                @mkdir($thumbDir, 0775, true);
-                $img = studio_image_decode($file);
-                if (! $img) {
-                    return response()->file($file); // ảnh không đọc được → trả ảnh gốc
-                }
-                $w = imagesx($img);
-                $h = imagesy($img);
-                $max = $size;
-                $scale = min(1.0, $max / max($w, $h));
-                $nw = max(1, (int) round($w * $scale));
-                $nh = max(1, (int) round($h * $scale));
-                $out = imagecreatetruecolor($nw, $nh);
-                imagealphablending($out, false);
-                imagesavealpha($out, true);
-                imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
-                $tmp = $thumbFile.'.tmp';
-                if ($useWebp) {
-                    imagewebp($out, $tmp, 80);
-                } else {
-                    // JPEG không có alpha → đổ nền trắng trước khi nén.
-                    $white = imagecolorallocate($out, 255, 255, 255);
-                    imagefilledrectangle($out, 0, 0, $nw - 1, $nh - 1, $white);
-                    imagealphablending($out, true);
+            // Cache: chỉ tạo thumbnail lần đầu (atomic write tránh race/file corrupt).
+            if (! is_file($thumbFile)) {
+                try {
+                    @mkdir($thumbDir, 0775, true);
+                    $img = studio_image_decode($file);
+                    if (! $img) {
+                        return response()->file($file); // ảnh không đọc được → trả ảnh gốc
+                    }
+                    $w = imagesx($img);
+                    $h = imagesy($img);
+                    $max = $size;
+                    $scale = min(1.0, $max / max($w, $h));
+                    $nw = max(1, (int) round($w * $scale));
+                    $nh = max(1, (int) round($h * $scale));
+                    $out = imagecreatetruecolor($nw, $nh);
+                    imagealphablending($out, false);
+                    imagesavealpha($out, true);
                     imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
-                    imagejpeg($out, $tmp, 80);
+                    $tmp = $thumbFile.'.tmp';
+                    if ($useWebp) {
+                        imagewebp($out, $tmp, 80);
+                    } else {
+                        // JPEG không có alpha → đổ nền trắng trước khi nén.
+                        $white = imagecolorallocate($out, 255, 255, 255);
+                        imagefilledrectangle($out, 0, 0, $nw - 1, $nh - 1, $white);
+                        imagealphablending($out, true);
+                        imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                        imagejpeg($out, $tmp, 80);
+                    }
+                    imagedestroy($out);
+                    imagedestroy($img);
+                    if (is_file($tmp)) {
+                        @rename($tmp, $thumbFile);
+                    }
+                } catch (\Throwable $e) {
+                    // Mọi lỗi GD → log + fallback ảnh gốc (không bao giờ 500).
+                    logger()->warning('studioImageThumb failed: '.$e->getMessage(), ['path' => $path]);
                 }
-                imagedestroy($out);
-                imagedestroy($img);
-                if (is_file($tmp)) {
-                    @rename($tmp, $thumbFile);
-                }
-            } catch (\Throwable $e) {
-                // Mọi lỗi GD → log + fallback ảnh gốc (không bao giờ 500).
-                logger()->warning('studioImageThumb failed: '.$e->getMessage(), ['path' => $path]);
             }
-        }
 
-        if (! is_file($thumbFile)) {
-            return response()->file($file);
-        }
+            if (! is_file($thumbFile)) {
+                return response()->file($file);
+            }
 
-        return response()->file($thumbFile, ['Cache-Control' => 'public, max-age=31536000, immutable']);
+            return response()->file($thumbFile, ['Cache-Control' => 'public, max-age=31536000, immutable']);
+        } catch (\Throwable $e) {
+            // Ultimate safety net: mọi lỗi không lường trước → placeholder thay vì 500.
+            logger()->error('studioImageThumb unexpected error: '.$e->getMessage(), ['path' => $path, 'exception' => $e]);
+            return $this->placeholderThumbResponse();
+        }
+    }
+
+    /**
+     * Trả về ảnh placeholder 1×1 trong suốt cho thumbnail.
+     * Dùng chung giữa trường hợp file không tồn tại và lỗi bất ngờ.
+     */
+    protected function placeholderThumbResponse()
+    {
+        $placeholder = storage_path('app/public/studio/thumb/placeholder.png');
+        if (! is_file($placeholder)) {
+            @mkdir(dirname($placeholder), 0775, true);
+            $img = imagecreatetruecolor(1, 1);
+            imagealphablending($img, false);
+            imagesavealpha($img, true);
+            $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
+            imagefill($img, 0, 0, $transparent);
+            imagepng($img, $placeholder);
+            imagedestroy($img);
+        }
+        return response()->file($placeholder, ['Cache-Control' => 'public, max-age=3600']);
     }
 
     public function garmentAvatar(string $id)

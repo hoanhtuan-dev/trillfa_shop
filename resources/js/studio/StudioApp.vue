@@ -646,5 +646,7 @@ function onTouchEnd(e) {
     </div>
     <!-- GalleryModal: xem ảnh lớn (bấm vào output trong dock phải) -->
     <GalleryModal v-if="store.viewer" />
+    <!-- SourcePickerPopup: popup chọn nguồn ảnh (nút "Nguồn ảnh" ở activity bar) -->
+    <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
   </div>
 </template>

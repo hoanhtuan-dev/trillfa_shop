@@ -17,6 +17,7 @@ const SAFE = /^[a-zA-Z0-9/_.-]+$/;
  * (http(s)://<host>/storage/... — do asset() sinh ra ở AdminProductsApp picker).
  * - /storage/...      → /studio/image-thumb/{path}
  * - /studio/image/... → /studio/image-thumb/{path}
+ * - /studio/image-thumb/... → giữ nguyên (tránh double-wrap)
  * - URL ngoài / data:URL / path đặc biệt / khác origin → trả nguyên url gốc (fallback an toàn).
  * - url rỗng/null → trả nguyên (component tự xử lý v-if để tránh img rỗng).
  *
@@ -39,6 +40,10 @@ export function thumbUrl(url, size = 0) {
     }
   }
   const qs = size && size !== 160 ? '?size=' + size : '';
+  // Đã là thumbnail URL → giữ nguyên (tránh double-wrap /studio/image-thumb/studio/image-thumb/...).
+  if (clean.startsWith('/studio/image-thumb/')) {
+    return size ? clean + qs : url;
+  }
   if (clean.startsWith('/storage/')) {
     const p = clean.slice(9);
     return SAFE.test(p) ? '/studio/image-thumb/' + p + qs : url;
@@ -61,7 +66,8 @@ export function onThumbError(e, originalUrl) {
   // Lần lỗi đầu: thử ảnh gốc full-size (thumbnail có thể chưa tạo/xóa).
   if (el.dataset.fallback !== '1') {
     el.dataset.fallback = '1';
-    if (originalUrl && el.src !== originalUrl) {
+    // Chỉ fallback nếu originalUrl KHÁC với src hiện tại (tránh loop vô hạn).
+    if (originalUrl && el.src !== originalUrl && !el.src.includes(originalUrl)) {
       el.src = originalUrl;
       return;
     }
