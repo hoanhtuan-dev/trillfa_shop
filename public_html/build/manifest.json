@@ -154,7 +154,7 @@
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DEn1X8zI.css",
+    "file": "assets/app-CKKtIZbC.css",
     "name": "app",
     "names": [
       "app.css"
@@ -335,7 +335,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-DmnznbCE.js",
+    "file": "assets/app-DpF7yTWW.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -347,7 +347,7 @@
       "_StylistDataManager-BJgbByKT.js"
     ],
     "css": [
-      "assets/app-DyCKfOz0.css"
+      "assets/app-CpiuhU80.css"
     ]
   },
   "resources/js/studio/settings.js": {

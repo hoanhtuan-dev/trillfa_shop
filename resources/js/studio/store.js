@@ -1805,6 +1805,12 @@ export const useStudioStore = defineStore('studio', {
       const l = pool.find((x) => x.id === this.activeLayerId) || pool[0];
       this.deleteLayer(l); // xoá layer + chuyển active đúng cách (tôn trọng lock)
     },
+    // Mở popup xác nhận dọn canvas (LayersPanel) — tự reset sau 5s nếu không confirm.
+    openClearCanvasConfirm() {
+      this.confirmClearCanvasOpen = true;
+      clearTimeout(this._clearCanvasTimer);
+      this._clearCanvasTimer = setTimeout(() => { this.confirmClearCanvasOpen = false; }, 5000);
+    },
     // Dọn sạch canvas + toàn bộ layer (chỉ xóa trạng thái hiển thị — KHÔNG xóa output/ảnh kết quả).
     cleanCanvas() {
       this.pushHistory();
