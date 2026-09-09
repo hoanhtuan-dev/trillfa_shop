@@ -96,6 +96,8 @@ export const useStudioStore = defineStore('studio', {
     // concept
     imagePromptEn: '',
     negativePromptEn: '',
+    promptPrefix: '',      // Prompt prefix từ Settings (tự động thêm vào đầu) — đồng bộ 2 chiều
+    promptSuffix: '',      // Prompt suffix từ Settings (tự động thêm vào cuối) — đồng bộ 2 chiều
     creativeLevel: 6,
     variantCount: 1,
     imageRatio: '1:1',
@@ -339,6 +341,8 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.video_duration) this.videoDuration = defaults.video_duration;
       if (defaults.video_resolution) this.videoRes = defaults.video_resolution;
       if (defaults.negative_prompt !== undefined) this.negativePromptEn = defaults.negative_prompt;
+      if (defaults.prompt_prefix !== undefined) this.promptPrefix = defaults.prompt_prefix;
+      if (defaults.prompt_suffix !== undefined) this.promptSuffix = defaults.prompt_suffix;
       // 💡 Gợi ý từ ảnh — trạng thái + ngôn ngữ + độ bám/chi tiết mặc định.
       if (defaults.suggest_enabled !== undefined) this.suggestEnabled = !!defaults.suggest_enabled;
       if (defaults.suggest_default_lang) this.suggestLang = defaults.suggest_default_lang === 'vi' ? 'vi' : 'en';
@@ -430,6 +434,8 @@ export const useStudioStore = defineStore('studio', {
           creative_level: this.creativeLevel,
           texture: this.texture,
           negative_prompt: this.negativePromptEn || '',
+          prompt_prefix: this.promptPrefix || '',
+          prompt_suffix: this.promptSuffix || '',
           resolution: this.imageRes,
           ratio: this.imageRatio,
           variants,

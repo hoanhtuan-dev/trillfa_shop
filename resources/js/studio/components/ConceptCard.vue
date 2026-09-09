@@ -190,6 +190,24 @@ watch(localBodyWaist, (v) => { debouncedSet('bodyWaist', v); });
 watch(localBodyShoulders, (v) => { debouncedSet('bodyShoulders', v); });
 watch(localBodyHips, (v) => { debouncedSet('bodyHips', v); });
 
+// ── Two-way sync prompt_prefix/prompt_suffix với Settings ──
+let _syncPrefixTimer = null;
+let _syncSuffixTimer = null;
+function syncPrefixToSettings(v) {
+  clearTimeout(_syncPrefixTimer);
+  _syncPrefixTimer = setTimeout(() => {
+    fetch('/studio/settings/sync-prompt', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ prompt_prefix: v }) }).catch(() => {});
+  }, 800);
+}
+function syncSuffixToSettings(v) {
+  clearTimeout(_syncSuffixTimer);
+  _syncSuffixTimer = setTimeout(() => {
+    fetch('/studio/settings/sync-prompt', { method: 'POST', headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ prompt_suffix: v }) }).catch(() => {});
+  }, 800);
+}
+watch(() => store.promptPrefix, (v) => { if (v !== undefined) syncPrefixToSettings(v); });
+watch(() => store.promptSuffix, (v) => { if (v !== undefined) syncSuffixToSettings(v); });
+
 // ── Draft state ──
 const showDraftNotice = ref(false);
 const draftTime = ref('');
@@ -664,6 +682,18 @@ const bodyHipsLabel = computed(() => {
 
         <!-- ===== TAB: NÂNG CAO ===== -->
         <div v-show="activeTab === 'advanced'" class="space-y-3">
+          <!-- Prompt Prefix (đồng bộ từ Settings) -->
+          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
+            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="arrowRight" size="h-3.5 w-3.5" /> Prompt Prefix (tự động thêm vào đầu)</label>
+            <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a href="/studio/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a>. Để trống = dùng mặc định.</p>
+            <textarea v-model="store.promptPrefix" rows="2" class="input !text-sm !py-2 !rounded-md" placeholder="High-fashion editorial photograph, professional fashion photography" title="Tự động ghép vào ĐẦU prompt khi tạo ảnh"></textarea>
+          </div>
+          <!-- Prompt Suffix (đồng bộ từ Settings) -->
+          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
+            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Prompt Suffix (tự động thêm vào cuối)</label>
+            <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a href="/studio/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a>. Để trống = dùng mặc định.</p>
+            <textarea v-model="store.promptSuffix" rows="2" class="input !text-sm !py-2 !rounded-md" placeholder="soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus" title="Tự động ghép vào CUỐI prompt khi tạo ảnh"></textarea>
+          </div>
           <!-- Negative prompt -->
           <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
             <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="x" size="h-3.5 w-3.5" /> Negative Prompt</label>

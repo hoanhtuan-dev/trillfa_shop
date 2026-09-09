@@ -79,6 +79,8 @@ class StudioController extends Controller
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
             'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            'prompt_prefix' => ['nullable', 'string', 'max:500'],
+            'prompt_suffix' => ['nullable', 'string', 'max:500'],
             // Phom dáng + tóc (không bắt buộc)
             'body_height' => ['nullable', 'integer', 'min:1', 'max:10'],
             'body_build' => ['nullable', 'integer', 'min:1', 'max:10'],
@@ -94,6 +96,8 @@ class StudioController extends Controller
         $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
         $texture = (int) ($data['texture'] ?? studio_config('texture', 5));
         $customNegative = $data['negative_prompt'] ?? null;
+        $customPrefix = $data['prompt_prefix'] ?? null;
+        $customSuffix = $data['prompt_suffix'] ?? null;
         $shouldEnrich = (bool) studio_config('enrich_prompt', true);
 
         // ── Inject phom dáng + tóc vào user prompt (trước khi enrich) ──
@@ -106,7 +110,7 @@ class StudioController extends Controller
         // Enrich the prompt with CreativeDirectionService
         $direction = app(\App\Services\CreativeDirectionService::class);
         if ($shouldEnrich) {
-            $enriched = $direction->enrichGeneratePrompt($userPrompt, $creativeLevel, $texture, $customNegative);
+            $enriched = $direction->enrichGeneratePrompt($userPrompt, $creativeLevel, $texture, $customNegative, $customPrefix, $customSuffix);
             $finalPrompt = $enriched['prompt'];
             $negativePrompt = $enriched['negative_prompt'];
         } else {
@@ -4265,6 +4269,25 @@ RULES:
         return back()->with('success', 'Đã lưu cài đặt Studio.');
     }
 
+    /**
+     * Sync prompt_prefix / prompt_suffix từ tab Nâng cao về Settings DB.
+     * Endpoint nhẹ — chỉ validate 2 field này, không yêu cầu toàn bộ form Settings.
+     */
+    public function syncPromptSettings(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'prompt_prefix' => ['nullable', 'string', 'max:500'],
+            'prompt_suffix' => ['nullable', 'string', 'max:500'],
+        ]);
+        if (array_key_exists('prompt_prefix', $data)) {
+            set_setting('studio_prompt_prefix', $data['prompt_prefix'] ?? '');
+        }
+        if (array_key_exists('prompt_suffix', $data)) {
+            set_setting('studio_prompt_suffix', $data['prompt_suffix'] ?? '');
+        }
+        return response()->json(['ok' => true]);
+    }
+
     public function api()
     {
         $providers = [
@@ -4464,6 +4487,8 @@ RULES:
             'video_resolution' => (string) studio_config('video_resolution', '720'),
             'enrich_prompt' => (bool) studio_config('enrich_prompt', true),
             'negative_prompt' => (string) studio_config('negative_prompt', ''),
+            'prompt_prefix' => (string) studio_config('prompt_prefix', ''),
+            'prompt_suffix' => (string) studio_config('prompt_suffix', ''),
             // Gợi ý từ ảnh — trạng thái + ngôn ngữ mặc định cho SuggestCard.
             'suggest_enabled' => studio_suggest_enabled(),
             'suggest_default_lang' => (string) studio_suggest_config('default_lang', 'en'),
@@ -4580,6 +4605,8 @@ RULES:
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
             'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            'prompt_prefix' => ['nullable', 'string', 'max:500'],
+            'prompt_suffix' => ['nullable', 'string', 'max:500'],
             // Phom dáng + tóc (không bắt buộc)
             'body_height' => ['nullable', 'integer', 'min:1', 'max:10'],
             'body_build' => ['nullable', 'integer', 'min:1', 'max:10'],

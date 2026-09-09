@@ -181,6 +181,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');
     Route::post('/settings/save', [StudioController::class, 'settingsSave'])->name('settings.save');
+    Route::post('/settings/sync-prompt', [StudioController::class, 'syncPromptSettings'])->name('settings.sync-prompt');
     Route::get('/settings/vue', [StudioController::class, 'settingsVue'])->name('settings.vue');
     Route::post('/settings', [StudioController::class, 'updateSettings'])->name('settings.update');
     Route::post('/settings/models', [StudioController::class, 'updateModelSettings'])->name('settings.models');
