@@ -30,7 +30,7 @@ const store = useStudioStore();
 const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 // Activity bar (VSCode-style): mỗi icon mở 1 nhóm card trong sidebar.
 const activityNav = [
-  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [StylistCard, SuggestCard, ConceptCard] },
+  { id: 'concept', icon: 'sparkles', label: 'Tạo ảnh', cards: [SuggestCard] },
   { id: 'ref', icon: 'shirt', label: 'Fitting Room', cards: [RefImageCard] },
   { id: 'inpaint', icon: 'pencil', label: 'Sửa ảnh', cards: [InpaintCard] },
   { id: 'upscale', icon: 'maximize', label: 'Upscale', cards: [UpscaleCard] },
@@ -40,6 +40,8 @@ const activeActivity = ref('concept');
 const menuOpen = ref(false);
 const outputOpen = ref(false);
 const projectsOpen = ref(false);
+const promptPopupOpen = ref(false);  // popup độc lập cho Prompt Tạo Ảnh (ConceptCard)
+const stylistPopupOpen = ref(false); // popup độc lập cho Trợ lý Thiết kế (StylistCard)
 // PWA install prompt (beforeinstallprompt) — hiện nút cài đặt khi trình duyệt cho phép.
 const installPrompt = ref(null);
 const showInstall = ref(false);
@@ -52,9 +54,9 @@ async function doInstall() {
   if (choice && choice.outcome === 'accepted') showInstall.value = false;
   installPrompt.value = null;
 }
-// Popup "Prompt Tạo Ảnh" (ConceptCard) mở từ bất kỳ nơi nào (vd GalleryModal > nút "Sử dụng"):
-// trên mobile ConceptCard chỉ mount trong drawer menu → mở drawer + đóng drawer Outputs cho gọn.
-watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; menuOpen.value = true; } });
+// Popup "Prompt Tạo Ảnh" (ConceptCard) mount GLOBAL ở cuối template (mọi viewport):
+// chỉ cần đồng bộ activity hiện tại + đóng drawer Outputs mobile cho gọn.
+watch(() => store.promptOpen, (v) => { if (v) { activeActivity.value = 'concept'; outputOpen.value = false; } });
 // Lưu cài đặt status bar khi thay đổi (snap · nền canvas · inspector).
 watch([() => store.snapGrid, () => store.canvasBg, () => store.inspectorOpen], () => store.saveBarSettings());
 // ── Thoát công cụ thông minh khi chuyển tác vụ / thoát ảnh tiêu điểm ──
@@ -632,7 +634,7 @@ function onTouchEnd(e) {
           <OutputModule />
         </div>
       </aside>
-      <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Outputs">
+      <nav class="activity-bar right hidden lg:flex" aria-label="Nguồn · Thư viện · Outputs · Prompt · Trợ lý">
         <button @click="store.sourcePickerOpen = true" class="activity-btn" title="Nguồn ảnh — chọn ảnh từ thư viện/sản phẩm" aria-label="Nguồn ảnh">
           <StudioIcon name="imagePlus" size="h-5 w-5" />
         </button>
@@ -642,6 +644,14 @@ function onTouchEnd(e) {
         <button @click="store.toggleOutputDock()" class="activity-btn mt-auto" :class="store.outputDockOpen ? 'is-active' : ''" title="Outputs — bật/tắt danh sách" aria-label="Outputs">
           <StudioIcon name="grid" size="h-5 w-5" />
           <span v-if="store.generations.length" class="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand-600 px-1 text-[8px] font-bold leading-none text-white">{{ store.generations.length }}</span>
+        </button>
+        <!-- Prompt Tạo Ảnh — popup độc lập (ConceptCard mount ở cuối template) -->
+        <button @click="store.promptOpen = true; stylistPopupOpen = false; outputOpen = false" class="activity-btn" :class="store.promptOpen ? 'is-active' : ''" title="Prompt Tạo Ảnh — nhập prompt & tạo ảnh" aria-label="Prompt Tạo Ảnh">
+          <StudioIcon name="sparkles" size="h-5 w-5" />
+        </button>
+        <!-- Trợ lý thiết kế — popup độc lập (StylistCard mount ở cuối template) -->
+        <button @click="stylistPopupOpen = true; store.promptOpen = false; outputOpen = false" class="activity-btn" :class="stylistPopupOpen ? 'is-active' : ''" title="Trợ lý thiết kế — khảo sát & tạo prompt thiết kế" aria-label="Trợ lý thiết kế">
+          <StudioIcon name="shirt" size="h-5 w-5" />
         </button>
       </nav>
     </div>
@@ -654,6 +664,13 @@ function onTouchEnd(e) {
         <div class="mb-3 flex gap-1.5 overflow-x-auto">
           <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'">
             <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
+          </button>
+          <!-- Truy cập popup Prompt + Trợ lý thiết kế trên mobile/tablet (đi qua drawer) -->
+          <button @click="store.promptOpen = true; menuOpen = false" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="store.promptOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Prompt Tạo Ảnh">
+            <StudioIcon name="sparkles" size="h-4 w-4" /> Prompt
+          </button>
+          <button @click="stylistPopupOpen = true; menuOpen = false" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="stylistPopupOpen ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'" title="Trợ lý thiết kế">
+            <StudioIcon name="shirt" size="h-4 w-4" /> Trợ lý
           </button>
         </div>
         <div class="space-y-3"><component :is="c" v-for="(c,i) in panel" :key="i" /></div>
@@ -671,5 +688,9 @@ function onTouchEnd(e) {
     <SourcePickerPopup v-if="store.sourcePickerOpen" v-model="store.sourcePickerOpen" />
     <!-- ProjectWorkspace: popup quản lý dự án (nút "Dự án" ở mobile bar / chip dự án / popover apply) -->
     <ProjectWorkspace v-if="projectsOpen" v-model="projectsOpen" />
+    <!-- Prompt Tạo Ảnh (ConceptCard): popup độc lập — nút sparkles ở right toolbar (dưới cùng) -->
+    <ConceptCard popup />
+    <!-- Trợ lý thiết kế (StylistCard): popup độc lập — nút shirt ở right toolbar (dưới cùng) -->
+    <StylistCard popup v-model="stylistPopupOpen" />
   </div>
 </template>

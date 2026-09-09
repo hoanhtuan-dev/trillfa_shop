@@ -4,6 +4,8 @@ import { useStudioStore } from '../store.js';
 import BaseModal from './BaseModal.vue';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
+// popup=true: chỉ mount BaseModal (không render card) — dùng cho nút right-toolbar.
+defineProps({ popup: { type: Boolean, default: false } });
 
 // ── Tab navigation trong modal ──
 const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'pose' | 'advanced'
@@ -474,9 +476,9 @@ const bodyHipsLabel = computed(() => {
 </script>
 
 <template>
-  <div class="card p-5" style="background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
+  <div v-if="!popup" class="card p-5" style="background: linear-gradient(160deg, rgba(124,58,237,.12), rgba(74,122,144,.06));">
     <!-- Header card: click mở modal -->
-    <button @click="openPrompt" class="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 p-4 text-left transition hover:border-brand-400 hover:bg-white/[0.07] group">
+    <button v-if="!popup" @click="openPrompt" class="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 p-4 text-left transition hover:border-brand-400 hover:bg-white/[0.07] group">
       <span class="min-w-0 flex-1 overflow-hidden">
         <span class="flex items-center gap-2 text-sm font-semibold text-brand-300">
           <span class="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500/20 text-brand-300"><StudioIcon name="sliders" size="h-4 w-4" /></span>
@@ -501,8 +503,9 @@ const bodyHipsLabel = computed(() => {
       </div>
       <p v-if="store.generateStage === 'done'" class="mt-1.5 flex items-center gap-1 text-[10px] text-emerald-300/70"><StudioIcon name="check" size="h-3 w-3" /> Đã tạo {{ store.generatedCount }} ảnh</p>
     </div>
+  </div>
 
-    <!-- ===== MODAL ===== -->
+    <!-- ===== MODAL ===== (luôn mount; hiện khi store.promptOpen — dùng chung cho card & popup) -->
     <BaseModal :model-value="store.promptOpen" @update:model-value="store.promptOpen = $event" title="Prompt Tạo Ảnh" wide height="70vh">
       <div v-if="promptLoading" class="py-16 text-center">
         <div class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-brand-400 border-t-transparent"></div>
@@ -834,5 +837,4 @@ const bodyHipsLabel = computed(() => {
         </div>
       </template>
     </BaseModal>
-  </div>
 </template>

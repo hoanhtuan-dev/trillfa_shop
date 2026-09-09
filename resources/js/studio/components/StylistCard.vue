@@ -6,7 +6,10 @@ import StylistDataManager from './StylistDataManager.vue';
 import StudioIcon from './StudioIcon.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 const store = useStudioStore();
-const open = ref(false);
+// popup=true: chỉ mount BaseModal (không render card) — dùng cho nút right-toolbar.
+// open là v-model để parent (StudioApp) điều khiển mở/đóng popup.
+defineProps({ popup: { type: Boolean, default: false } });
+const open = defineModel({ type: Boolean, default: false });
 const settingsOpen = ref(false);
 const types = ref([]);
 const step = ref('type'); // type | survey | result
@@ -79,7 +82,7 @@ function applyToGenerate() {
 function openSettings() { settingsOpen.value = true; }
 </script>
 <template>
-  <div class="card p-5" style="background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
+  <div v-if="!popup" class="card p-5" style="background: linear-gradient(160deg, rgba(74,122,144,.14), rgba(124,58,237,.06));">
     <div class="flex items-center gap-2">
       <button @click="open=true; step='type'" class="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3 text-left transition hover:border-brand-400">
         <span class="min-w-0 flex-1"><span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Trợ lý thiết kế</span></span>
@@ -87,6 +90,7 @@ function openSettings() { settingsOpen.value = true; }
       </button>
       <button @click="openSettings" title="Quản lý data Trợ lý thiết kế" class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-brand-300 transition hover:border-brand-400 hover:text-brand-200"><StudioIcon name="gear" /></button>
     </div>
+  </div>
 
     <BaseModal v-model="open" title="Trợ lý thiết kế" wide>
       <div class="p-5">
@@ -143,5 +147,4 @@ function openSettings() { settingsOpen.value = true; }
     <BaseModal v-model="settingsOpen" title="Quản lý data Trợ lý thiết kế" wide>
       <div class="p-5"><StylistDataManager /></div>
     </BaseModal>
-  </div>
 </template>
