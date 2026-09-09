@@ -644,5 +644,7 @@ function onTouchEnd(e) {
       <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
       </div>
     </div>
+    <!-- GalleryModal: xem ảnh lớn (bấm vào output trong dock phải) -->
+    <GalleryModal v-if="store.viewer" />
   </div>
 </template>

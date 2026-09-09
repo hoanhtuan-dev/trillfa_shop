@@ -4565,12 +4565,27 @@ RULES:
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'texture' => ['nullable', 'integer', 'min:0', 'max:10'],
             'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            // Phom dáng + tóc (không bắt buộc)
+            'body_height' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_build' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_waist' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_shoulders' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'body_hips' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'hair_style' => ['nullable', 'string', 'max:100'],
+            'hair_color' => ['nullable', 'string', 'max:100'],
         ]);
 
         $userPrompt = (string) $data['prompt'];
         $creativeLevel = (int) ($data['creative_level'] ?? studio_config('creative_level', 6));
         $texture = (int) ($data['texture'] ?? studio_config('texture', 5));
         $customNegative = $data['negative_prompt'] ?? null;
+
+        // ── Inject phom dáng + tóc vào user prompt (trước khi enrich) ──
+        $bodyDirectives = $this->buildBodyDirective($data);
+        $hairDirective = $this->buildHairDirective($data);
+        if ($bodyDirectives !== '' || $hairDirective !== '') {
+            $userPrompt = trim($userPrompt.' '.trim($bodyDirectives.' '.$hairDirective));
+        }
 
         $direction = app(\App\Services\CreativeDirectionService::class);
         $enriched = $direction->enrichGeneratePrompt($userPrompt, $creativeLevel, $texture, $customNegative);

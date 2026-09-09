@@ -315,7 +315,7 @@ async function doEnrichPreview() {
     const res = await fetch('/studio/preview-enrich', {
       method: 'POST', signal: controller.signal,
       headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '', 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ prompt: p, creative_level: store.creativeLevel, texture: store.texture, negative_prompt: store.negativePromptEn || null })
+      body: JSON.stringify({ prompt: p, creative_level: store.creativeLevel, texture: store.texture, negative_prompt: store.negativePromptEn || null, body_height: store.bodyHeight, body_build: store.bodyBuild, body_waist: store.bodyWaist, body_shoulders: store.bodyShoulders, body_hips: store.bodyHips, hair_style: store.hairStyle || '', hair_color: store.hairColor || '' })
     });
     if (!res.ok) throw new Error('Lỗi preview');
     const d = await res.json();
