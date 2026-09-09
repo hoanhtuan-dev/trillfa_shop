@@ -127,10 +127,10 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
             </div>
           </div>
         </div>
-        <button @click="store.confirmClearCanvasOpen ? store.cleanCanvas() : store.openClearCanvasConfirm()"
-          :class="store.confirmClearCanvasOpen ? 'grid h-7 w-7 place-items-center rounded-lg bg-red-600 text-white transition-colors' : 'grid h-7 w-7 place-items-center rounded-lg text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200'"
-          :title="store.confirmClearCanvasOpen ? '⚠️ Xác nhận dọn toàn bộ canvas (không thể hoàn tác)' : 'Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)'"
-          :aria-label="store.confirmClearCanvasOpen ? 'Xác nhận dọn toàn bộ canvas' : 'Dọn canvas — bỏ hết ảnh trên canvas'">
+        <button @click="store.openClearCanvasConfirm()"
+          class="grid h-7 w-7 place-items-center rounded-lg text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200"
+          title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)"
+          aria-label="Dọn canvas — bỏ hết ảnh trên canvas">
           <StudioIcon name="trash" size="h-4 w-4" />
         </button>
         <button @click="store.toggleInspector()" class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 transition-colors hover:bg-ink-700" title="Ẩn panel Layers" aria-label="Ẩn panel Layers">
@@ -289,6 +289,18 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
         <div class="mt-3 flex gap-2">
           <button @click="doRemoveBg()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500">Xóa nền</button>
           <button @click="removeBgConfirmOpen = false" class="flex-1 rounded-lg bg-ink-800 px-3 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Popup xác nhận dọn canvas -->
+    <div v-if="store.confirmClearCanvasOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="store.confirmClearCanvasOpen = false">
+      <div class="w-full max-w-xs rounded-lg border border-red-500/40 bg-ink-900 p-4 shadow-2xl">
+        <p class="text-sm font-semibold text-cream-100">⚠️ Dọn toàn bộ canvas?</p>
+        <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Tất cả <b>{{ store.canvasLayers.length }} layer</b> và <b>{{ store.layerGroups.length }} nhóm</b> sẽ bị xóa khỏi canvas. Ảnh kết quả vẫn còn trong <b>Output/Thư viện</b>. Có thể hoàn tác (Ctrl+Z).</p>
+        <div class="mt-3 flex gap-2">
+          <button @click="store.cleanCanvas()" class="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500">Dọn canvas</button>
+          <button @click="store.confirmClearCanvasOpen = false" class="flex-1 rounded-lg bg-ink-800 px-3 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
         </div>
       </div>
     </div>
