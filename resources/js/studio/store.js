@@ -977,6 +977,37 @@ export const useStudioStore = defineStore('studio', {
       this.zoom = z;
       this.pan = { x: -cx * z, y: -cy * z };
     },
+    // Fit view KHUNG các layer/group ĐANG CHỌN (chỉ chúng, không toàn bộ canvas).
+    zoomFitSelection() {
+      const cont = this.canvasZoom;
+      const ids = this.selectedIds;
+      if (!cont || !ids.length) return;
+      const layers = this.canvasLayers.filter(l => ids.includes(l.id) && l.visible !== false && l.image);
+      if (!layers.length) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      layers.forEach((l) => {
+        const bw = Number(l.baseW) || 512, bh = Number(l.baseH) || 512;
+        const s = Number(l.scale) || 1;
+        const rot = ((Number(l.rotation) || 0) * Math.PI) / 180;
+        const cos = Math.cos(rot), sin = Math.sin(rot);
+        const hw = (bw * s) / 2, hh = (bh * s) / 2;
+        const x = Number(l.x) || 0, y = Number(l.y) || 0;
+        [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([cx, cy]) => {
+          const px = cx * cos - cy * sin + x;
+          const py = cx * sin + cy * cos + y;
+          if (px < minX) minX = px; if (px > maxX) maxX = px;
+          if (py < minY) minY = py; if (py > maxY) maxY = py;
+        });
+      });
+      const r = cont.getBoundingClientRect();
+      const cw = Math.max(1, r.width - 64), ch = Math.max(1, r.height - 64);
+      const bw2 = Math.max(1, maxX - minX), bh2 = Math.max(1, maxY - minY);
+      // Giới hạn max zoom = 4x cho fit selection (có thể nhỏ hơn ảnh thật để dễ thao tác).
+      const z = Math.max(0.05, Math.min(4, Math.min(cw / bw2, ch / bh2)));
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+      this.zoom = z;
+      this.pan = { x: -cx * z, y: -cy * z };
+    },
     // Pinch-zoom (2 ngón) trên cảm ứng.
     beginPinch(t1, t2) { this._pinch = { dist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1, zoom: this.zoom }; this._drag = null; },
     pinchMove(t1, t2) { if (!this._pinch) return; const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1; this.zoom = Math.max(0.1, Math.min(8, this._pinch.zoom * (dist / this._pinch.dist))); },

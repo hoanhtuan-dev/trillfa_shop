@@ -19,7 +19,7 @@ import SourcePickerPopup from './components/SourcePickerPopup.vue';
 import OutputModule from './components/OutputModule.vue';
 import LibraryCard from './components/LibraryCard.vue';
 import LibraryApp from './LibraryApp.vue';
-import MultiSelectBar from './components/MultiSelectBar.vue';
+// MultiSelectBar đã gộp vào ContextToolbar (layer selection bar).
 import GalleryModal from './components/GalleryModal.vue';
 import ProjectWorkspace from './components/ProjectWorkspace.vue';
 import StudioIcon from './components/StudioIcon.vue';
@@ -182,7 +182,7 @@ function selectActivity(id) {
 // Right activity bar: Nguồn ảnh (popup) · Thư viện (điều hướng) · Outputs (toggle dock).
 function goLibrary() { store.exitCanvasTools(); store.studioView = 'library'; }
 // ContextToolbar chỉ hiện (floating) trên mobile khi có công cụ đang hoạt động — tối giản mobile.
-const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking || store.selectTool || store.panMode);
+const toolActive = computed(() => store.inpaintMaskMode !== 'none' || store.inpaintMaskDone || store.eraseMode || store.drawMode || store.reframeOpen || store.cropMode || store.filmOpen || store.looking || store.selectTool || store.panMode || !!store.activeLayer);
 
 // ── Layer editor (composite + transform) ──
 const isolateActive = computed(() => (store.cropMode || store.inpaintMaskMode !== 'none' || store.eraseMode || store.drawMode) && !store.panMode);
@@ -242,7 +242,11 @@ const drawOverlayStyle = computed(() => {
   };
 });
 function onLayerPointerDown(l, e) {
+  // panMode: không bao giờ kéo/thao tác layer — chỉ pan canvas.
+  if (store.panMode) { store.panStart(e); bgDownPos = { x: e.clientX, y: e.clientY }; marquee.value = null; return; }
   if (e.shiftKey) { store.shiftSelectLayer(l.id); return; } // shift+click: thêm/bỏ vào nhóm chọn nhiều
+  // selectTool bật: click layer = toggle chọn (giống shift+click) — quét vùng trống để chọn nhiều.
+  if (store.selectTool) { store.shiftSelectLayer(l.id); return; }
   if (l.locked) { store.selectLayer(l); return; }
   // Alt+click layer trong nhóm → chỉnh sửa RIÊNG layer đó (edit in group), không chọn cả nhóm.
   if (e.altKey && l.groupId) store.setActiveLayer(l.id);
@@ -510,7 +514,7 @@ function onTouchEnd(e) {
             <!-- Khung chọn nhóm (mỗi nhóm được chọn trọn = 1 đối tượng) -->
             <template v-for="o in selectedGroupOutlines" :key="o.gid"><div class="pointer-events-none absolute z-40 rounded-lg border-2 border-dashed border-violet-400 bg-violet-400/10" :style="o.style"></div></template>
             <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
-            <MultiSelectBar v-if="store.selectionUnitCount > 1" class="absolute left-1/2 top-3 z-50 -translate-x-1/2" />
+            <!-- MultiSelectBar đã gộp vào ContextToolbar (hiện ở bottom toolbar) -->
           <!-- Floating tools (Crop/Select/Draw/Erase/Look) — mọi viewport; tự định vị theo màn hình -->
           <RegionTools />
           <!-- Inpaint mask overlay on canvas -->
