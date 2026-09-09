@@ -49,6 +49,23 @@ function applyPrompt() {
       </div>
     </div>
 
+    <!-- Checkbox bỏ qua phân tích (mặc định bật = AI bỏ qua) -->
+    <div class="mt-2 space-y-1.5 rounded-lg border border-white/10 bg-white/5 p-2.5 text-[11px]">
+      <p class="mb-1 text-[10px] font-semibold text-cream-300/50">Bỏ qua phân tích</p>
+      <label class="flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
+        <input type="checkbox" v-model="store.suggestSkipLogo" class="h-3.5 w-3.5 accent-brand-500 rounded" />
+        <span>Không phân tích logo, chữ, watermark</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
+        <input type="checkbox" v-model="store.suggestSkipHair" class="h-3.5 w-3.5 accent-brand-500 rounded" />
+        <span>Không phân tích kiểu tóc</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer text-cream-200 hover:text-cream-100">
+        <input type="checkbox" v-model="store.suggestSkipBackground" class="h-3.5 w-3.5 accent-brand-500 rounded" />
+        <span>Không phân tích bối cảnh</span>
+      </label>
+    </div>
+
     <button @click="store.suggestStyle(store.upscaleSrc)" :disabled="store.suggesting || !store.upscaleSrc" title="Phân tích ảnh và gợi ý phong cách, prompt" class="btn-brand mt-3 w-full">{{ store.suggesting ? 'Đang phân tích…' : 'Gợi ý phong cách & prompt' }}</button>
 
     <div v-if="store.suggestResult && (store.suggestResult.styles?.length || store.suggestResult.background || store.suggestResult.image_prompt_en)" class="relative mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs">

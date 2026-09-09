@@ -1610,6 +1610,9 @@ RULES:
             'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'adherence' => ['nullable', 'integer', 'min:0', 'max:10'],
             'detail_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'skip_hair' => ['nullable', 'integer', 'min:0', 'max:1'],
+            'skip_logo' => ['nullable', 'integer', 'min:0', 'max:1'],
+            'skip_background' => ['nullable', 'integer', 'min:0', 'max:1'],
         ]);
 
         $imagePath = null;
@@ -1631,6 +1634,9 @@ RULES:
             'adherence' => $data['adherence'] ?? null,
             'detail_level' => $data['detail_level'] ?? null,
             'creative_level' => $creativeLevel,
+            'skip_hair' => (bool) ($data['skip_hair'] ?? false),
+            'skip_logo' => (bool) ($data['skip_logo'] ?? false),
+            'skip_background' => (bool) ($data['skip_background'] ?? false),
         ]);
 
         if (($result['disabled'] ?? false) === true) {

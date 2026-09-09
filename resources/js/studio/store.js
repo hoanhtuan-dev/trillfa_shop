@@ -203,7 +203,10 @@ export const useStudioStore = defineStore('studio', {
     suggestEnabled: true,   // bật/tắt tính năng "💡 Gợi ý từ ảnh" (cấu hình Studio)
     suggestLang: 'en',      // ngôn ngữ hiển thị mặc định (en | vi)
     suggestAdherence: 0,     // 0 = tự theo creative; 1..10 ép bám ảnh gốc (cao = tái tạo chính xác trang phục gốc)
-    suggestDetailLevel: 8,   // 1..10 mức chi tiết phân tích ảnh gốc (màu/đường may/hoạ tiết/độ dài/cổ/tay...)
+    suggestDetailLevel: 8,
+    suggestSkipHair: true,        // Bỏ qua phân tích kiểu tóc (mặc định bật)
+    suggestSkipLogo: true,         // Bỏ qua logo, chữ, watermark (mặc định bật)
+    suggestSkipBackground: true,   // Bỏ qua phân tích bối cảnh (mặc định bật)   // 1..10 mức chi tiết phân tích ảnh gốc (màu/đường may/hoạ tiết/độ dài/cổ/tay...)
     promptOpen: false,
     viewer: null,
     flashMsg: '',
@@ -2463,6 +2466,10 @@ export const useStudioStore = defineStore('studio', {
         // Gửi độ bám/chi tiết để backend ép bám ảnh gốc (0 = tự theo creative).
         if (this.suggestAdherence) payload.adherence = this.suggestAdherence;
         if (this.suggestDetailLevel) payload.detail_level = this.suggestDetailLevel;
+        // Cờ bỏ qua phân tích (mặc định false → AI phân tích bình thường).
+        payload.skip_hair = this.suggestSkipHair ? 1 : 0;
+        payload.skip_logo = this.suggestSkipLogo ? 1 : 0;
+        payload.skip_background = this.suggestSkipBackground ? 1 : 0;
         const d = await this.api('/studio/suggest', payload);
         this.suggestResult = d;
         const styles = (d.styles || []).join(', ');

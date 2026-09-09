@@ -24,6 +24,11 @@ class StyleSuggestService
         $adherence = $this->resolveAdherence($opts);
         $detailLevel = $this->resolveDetailLevel($opts);
 
+        // Cờ bỏ qua phân tích (checkbox trong card Gợi ý từ ảnh).
+        $skipHair = (bool) ($opts['skip_hair'] ?? false);
+        $skipLogo = (bool) ($opts['skip_logo'] ?? false);
+        $skipBackground = (bool) ($opts['skip_background'] ?? false);
+
         // Provider + model RIÊNG cho "Gợi ý từ ảnh" — không dùng chung cấu hình Vision.
         $provider = studio_suggest_provider();
         $geminiKey = studio_api_key('gemini');
@@ -43,10 +48,10 @@ class StyleSuggestService
         foreach ($attempts as $attempt) {
             try {
                 if ($attempt === 'qwen') {
-                    return $this->suggestViaQwenVision($imagePath, $creativeLevel, $adherence, $detailLevel);
+                    return $this->suggestViaQwenVision($imagePath, $creativeLevel, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
                 }
 
-                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey, $adherence, $detailLevel);
+                return $this->suggestViaVision($imagePath, $creativeLevel, $geminiKey, $adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
             } catch (\Throwable $e) {
                 logger()->error($attempt.' vision suggest failed: '.$e->getMessage());
             }
@@ -100,22 +105,38 @@ class StyleSuggestService
      * Prompt phân tích chi tiết — yêu cầu vision mô tả chính xác trang phục gốc (màu, họa tiết,
      * đường may, độ dài, kiểu cổ/tay, chất liệu, phụ kiện) và sinh prompt EN/VI bám sát.
      */
-    protected function analysisPrompt(int $adherence, int $detailLevel): string
+    protected function analysisPrompt(int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false): string
     {
         $direction = app(CreativeDirectionService::class);
         $adherenceClause = $direction->adherenceDirective($adherence);
         $detailClause = $direction->detailDirective($detailLevel);
+
+        $exclude = [];
+        if ($skipHair) {
+            $exclude[] = 'hairstyle & hair colour, makeup palette';
+        }
+        if ($skipLogo) {
+            $exclude[] = 'logos, text, watermarks, branding';
+        }
+        if ($skipBackground) {
+            $exclude[] = 'the background/setting/lighting';
+        }
+        $excludeClause = $exclude ? ' Do NOT describe or include in the prompt: '.implode('; ', $exclude).'.' : '';
 
         return "You are a senior fashion stylist & prompt engineer. Analyze this fashion model photo and the EXACT garment worn. "
             .$detailClause.' '
             .$adherenceClause.' '
             ."Study the reference image precisely and capture: garment type (dress / top+bottom / suit / outerwear ...), "
             ."exact dominant and accent colours, fabric/material & texture, neckline, collar, sleeve length & shape, "
-            ."hem length, fit/silhouette, drape, patterns/prints/embellishments, buttons/zips/trims, accessories, footwear, "
-            ."hairstyle & hair colour, makeup palette, pose, body angle, and the background/setting/lighting. "
+            ."hem length, fit/silhouette, drape, patterns/prints/embellishments, buttons/zips/trims, accessories, footwear"
+            .($skipHair ? '' : ', hairstyle & hair colour, makeup palette')
+            .', pose, body angle'
+            .($skipBackground ? '' : ', and the background/setting/lighting')
+            .'. '
             ."Do NOT invent new colours, fabrics, silhouettes or accessories that are not in the image. "
-            ."If a detail is not visible, omit it rather than guessing. "
-            ."Return ONLY valid JSON (no markdown) with these keys: "
+            ."If a detail is not visible, omit it rather than guessing."
+            .$excludeClause
+            ." Return ONLY valid JSON (no markdown) with these keys: "
             .'"styles" (1-3 style labels), "background" (one label), "pose" (one label), '
             .'"fabric" (one label), "silhouette" (one label), "camera" (one label), '
             .'"garment_type" (one short label, e.g. "midi dress", "blazer + trousers"), '
@@ -130,10 +151,10 @@ class StyleSuggestService
             .'"keywords" (array of 5-12 tags).';
     }
 
-    protected function suggestViaQwenVision(string $imagePath, int $creativeLevel, int $adherence, int $detailLevel): array
+    protected function suggestViaQwenVision(string $imagePath, int $creativeLevel, int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false): array
     {
         [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
-        $prompt = $this->analysisPrompt($adherence, $detailLevel);
+        $prompt = $this->analysisPrompt($adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
 
         // Try several Qwen VISION models × keys. qwen3.8-flash/max (multimodal) thường thử trước; các tài khoản cũ chỉ expose qwen-vl-* nên giữ fallback ở cuối danh sách.
         $last = null;
@@ -180,7 +201,7 @@ class StyleSuggestService
         throw new \RuntimeException('Qwen vision: '.($last ?: 'không xác định'));
     }
 
-    protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key, int $adherence, int $detailLevel): array
+    protected function suggestViaVision(string $imagePath, int $creativeLevel, string $key, int $adherence, int $detailLevel, bool $skipHair = false, bool $skipLogo = false, bool $skipBackground = false): array
     {
         $model = studio_suggest_gemini_model();
         [$b64, $mime] = $this->downscaleBase64($imagePath, (int) studio_suggest_config('downscale_max', 1024));
@@ -189,7 +210,7 @@ class StyleSuggestService
             $b64 = base64_encode((string) file_get_contents($imagePath));
         }
 
-        $prompt = $this->analysisPrompt($adherence, $detailLevel);
+        $prompt = $this->analysisPrompt($adherence, $detailLevel, $skipHair, $skipLogo, $skipBackground);
 
         $resp = Http::withHeaders(['x-goog-api-key' => $key])->timeout(90)
             ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent', [
