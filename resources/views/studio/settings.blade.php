@@ -6,7 +6,7 @@
     <p class="mt-1 text-sm text-ink-500">Cấu hình nhà cung cấp AI, model &amp; API key dùng cho công cụ nội bộ.</p>
 
     {{-- Tabs --}}
-    <div class="mt-4 flex flex-wrap gap-1.5 rounded-2xl border border-ink-700 bg-ink-800 p-1 text-xs font-semibold">
+    <div class="mt-4 flex flex-wrap gap-1.5 rounded-lg border border-ink-700 bg-ink-800 p-1 text-xs font-semibold">
         <button @click="tab='general'" class="rounded-2xl px-3 py-2 transition-colors" :class="tab==='general' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">⚙️ Cấu hình</button>
         <button @click="tab='models'" class="rounded-2xl px-3 py-2 transition-colors" :class="tab==='models' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">🤖 Model</button>
         <button @click="tab='faces'" class="rounded-2xl px-3 py-2 transition-colors" :class="tab==='faces' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">💃 Dáng & Khuôn mặt</button>
@@ -233,7 +233,7 @@
         <h2 class="font-display text-base font-semibold text-ink-900">💡 Gợi ý từ ảnh (Image → Style / Prompt)</h2>
         <p class="text-xs text-ink-500">Cấu hình <b>provider + model + hành vi riêng</b> cho tính năng "Gợi ý từ ảnh". Không phụ thuộc cấu hình Vision chung, Model Registry hay API Keys của các tính năng khác.</p>
 
-        <div class="rounded-2xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
+        <div class="rounded-lg border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
             <label class="flex items-center gap-2 font-semibold text-brand-100">
                 <input type="checkbox" name="suggest_enabled" value="1" @if(old('suggest_enabled', $suggest_enabled)) checked @endif class="h-4 w-4 accent-brand-600">
                 Bật tính năng
@@ -329,7 +329,7 @@
         <h2 class="font-display text-base font-semibold text-ink-900">🧠 AI Sản phẩm (Content + SEO)</h2>
         <p class="text-xs text-ink-500">Cấu hình <b>provider + model + kỹ thuật riêng</b> cho trợ lý viết mô tả/SEO ở trang tạo-sửa sản phẩm. <b>Ưu tiên Qwen trước</b> (qwen3.8-flash …) rồi mới Gemini; mọi model/key đều đọc từ đây nên nâng cấp model sau này không cần sửa code.</p>
 
-        <div class="rounded-2xl border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
+        <div class="rounded-lg border border-brand-100 bg-brand-900/40 p-4 text-xs text-brand-200">
             <label class="flex items-center gap-2 font-semibold text-brand-100">
                 <input type="checkbox" name="pai_enabled" value="1" @if(old('pai_enabled', product_ai_enabled() ? '1' : null)) checked @endif class="h-4 w-4 accent-brand-600">
                 Bật tính năng
@@ -493,7 +493,7 @@
 
 
         {{-- Add / edit model --}}
-        <form method="POST" action="{{ route('studio.models.store') }}" class="mt-6 space-y-3 rounded-xl border border-dashed border-cream-300 p-4">
+        <form method="POST" action="{{ route('studio.models.store') }}" class="mt-6 space-y-3 rounded-md border border-dashed border-cream-300 p-4">
             @csrf
             <h3 class="text-sm font-semibold text-ink-900">➕ Thêm model</h3>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -526,7 +526,7 @@
         <div>
             <h3 class="text-sm font-semibold text-ink-900">👩 Khuôn mặt mẫu <span class="text-ink-500">(dùng trong 🪄 Thay Đổi Người Mẫu)</span></h3>
             <p class="mt-1 text-xs text-ink-500">Preset là <b>mô tả khuôn mặt</b> (không cần tải ảnh) — nhập mô tả tiếng Anh rõ ràng để model dựng đúng. Nếu có ảnh kèm, hệ thống dùng ảnh làm tham chiếu (độ giống cao hơn).</p>
-            <form method="POST" action="{{ route('studio.settings.faceswap') }}" class="mt-3 rounded-2xl border border-brand-200 bg-brand-50 p-3">
+            <form method="POST" action="{{ route('studio.settings.faceswap') }}" class="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
                 @csrf
                 <label class="label">🎨 Prompt thay khuôn mặt (Compose → 👤 Thay khuôn mặt)</label>
                 <textarea name="faceswap_prompt" rows="3" class="input !py-2" placeholder="Face swap...">{{ old('faceswap_prompt', $faceswap_prompt) }}</textarea>
@@ -553,4 +553,3 @@
                                 <div><label class="label">Dân tộc/Phong cách</label><input name="ethnicity" value="{{ $fp->ethnicity }}" class="input !py-1" placeholder="Vietnamese female"></div>
                                 <div><label class="label">Ưu tiên</label><input type="number" name="sort" value="{{ $fp->sort }}" min="0" class="input !py-1"></div>
                                 <div class="col-span-2"><label class="label">Mô tả khuôn mặt (tiếng Anh)</label><textarea name="description" rows="2" class="input !py-1" required>{{ $fp->description }}</textarea></div>
-                                <div class="col-span-2"><label class="label">Ảnh tham chiếu (tuỳ chọn — bỏ trống giữ ảnh cũ)</label><input type="file" name="image" accept="image/*" class="input !py-1"></div>

@@ -394,7 +394,7 @@ function onTouchEnd(e) {
         <!-- Dự án + quick-apply gộp 1 tool-btn -->
         <div class="relative">
           <button @click="openApplyPopover" class="tool-btn" title="Dự án — áp dụng nhanh hoặc mở workspace quản lý"><StudioIcon name="kanban" size="h-3.5 w-3.5" /> <span class="hidden sm:inline">Dự án</span> <StudioIcon name="chevronDown" size="h-3 w-3" /></button>
-          <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-ink-700 bg-ink-900 shadow-xl">
+          <div v-if="applyOpen" class="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-ink-700 bg-ink-900 shadow-xl">
             <div class="p-2.5">
               <p class="mb-2 text-[11px] font-semibold text-cream-200">Áp dụng dự án cho phiên tạo ảnh</p>
               <div v-if="store.projectScope !== 'own'" class="mb-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">Đang xem dự án chờ duyệt. Mở workspace để xem dự án của bạn.</div>
@@ -437,8 +437,8 @@ function onTouchEnd(e) {
     <!-- ══ Thư viện (SPA view nhúng trong /studio — thay thế trang riêng /studio/library) ══ -->
     <LibraryApp v-if="store.studioView === 'library'" embedded @back="store.studioView = 'studio'" />
     <!-- Prompt cài đặt PWA (hiện khi trình duyệt báo beforeinstallprompt) -->
-    <div v-if="showInstall" class="fixed bottom-5 left-1/2 z-[95] flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-brand-500/40 bg-ink-900/95 px-4 py-3 shadow-2xl backdrop-blur">
-      <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-5 w-5" /></span>
+    <div v-if="showInstall" class="fixed bottom-5 left-1/2 z-[95] flex -translate-x-1/2 items-center gap-3 rounded-lg border border-brand-500/40 bg-ink-900/95 px-4 py-3 shadow-2xl backdrop-blur">
+      <span class="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-brand-600/20 text-brand-300"><StudioIcon name="sparkles" size="h-5 w-5" /></span>
       <div class="min-w-0 text-xs">
         <p class="font-semibold text-cream-100">Cài đặt Trillfa Studio</p>
         <p class="text-cream-300/60">Thêm vào màn hình chính để mở nhanh hơn</p>
@@ -477,7 +477,7 @@ function onTouchEnd(e) {
       </aside>
       <!-- Center canvas -->
       <main class="relative flex-1 min-w-0 p-3">
-        <div class="relative flex h-full flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-900">
+        <div class="relative flex h-full flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
           <!-- ══ Toolbar dock (phía trên, full width) — desktop only ══ -->
           <div class="relative z-40 hidden min-h-12 shrink-0 items-center justify-center gap-2 overflow-x-auto overflow-y-hidden border-b border-ink-700/40 px-3 py-1.5 lg:flex">
             <ContextToolbar />
@@ -487,7 +487,7 @@ function onTouchEnd(e) {
           <!-- ══ Vùng canvas (trái, flex-1) ══ -->
           <div class="relative flex-1 overflow-hidden" :class="bgClass" @dragover.prevent="dropOver = true" @dragleave="dropOver = false" @drop.prevent="onCanvasDrop($event)">
             <!-- Khung báo kéo-thả khi đang kéo ảnh vào canvas -->
-            <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-2xl border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
+            <div v-if="dropOver" class="pointer-events-none absolute inset-2 z-50 rounded-lg border-2 border-dashed border-brand-400 bg-brand-400/5"></div>
             <!-- Khung chọn nhóm (mỗi nhóm được chọn trọn = 1 đối tượng) -->
             <template v-for="o in selectedGroupOutlines" :key="o.gid"><div class="pointer-events-none absolute z-40 rounded-lg border-2 border-dashed border-violet-400 bg-violet-400/10" :style="o.style"></div></template>
             <!-- Thanh ngữ cảnh khi chọn nhiều layer: căn lề · chia đều · bắt điểm · xóa -->
@@ -569,7 +569,7 @@ function onTouchEnd(e) {
             <button @click="store.deleteLayer(store.activeLayer)" :disabled="!store.activeLayer" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-ink-900/85 text-red-300 shadow hover:bg-red-600 hover:text-white disabled:opacity-30" title="Xóa layer khỏi canvas" aria-label="Xóa layer khỏi canvas"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
           </div>
           <!-- variant slider (bottom, only when multiple variants) -->
-          <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-2xl bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
+          <div v-if="store.showBatch && store.activeBatch.length > 1" class="batch-slider absolute bottom-14 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-ink-900/90 px-2.5 py-1.5 shadow-xl">
             <div class="flex items-center gap-1.5">
               <span class="text-[10px] text-cream-300/60">{{ store.activeBatch.length }} biến thể</span>
               <button v-for="v in store.activeBatch" :key="v.id" @click="store.select(v)" class="relative h-12 w-12 overflow-hidden rounded-lg border-2 transition-all duration-300" :class="store.previewId === v.id ? 'border-brand-500 scale-105' : 'border-ink-700 hover:border-brand-400'">
@@ -631,7 +631,7 @@ function onTouchEnd(e) {
       <div class="absolute left-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
         <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="sparkles" size="h-4 w-4" class="text-brand-400" /> Studio</span><button @click="menuOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng menu" aria-label="Đóng menu"><StudioIcon name="x" size="h-4 w-4" /></button></div>
         <div class="mb-3 flex gap-1.5 overflow-x-auto">
-          <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" class="flex shrink-0 flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'">
+          <button v-for="a in activityNav" :key="a.id" @click="selectActivity(a.id)" class="flex shrink-0 flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold transition-colors" :class="activeActivity === a.id ? 'bg-brand-600 text-white' : 'bg-ink-800 text-cream-300/70'">
             <StudioIcon :name="a.icon" size="h-4 w-4" /> {{ a.label }}
           </button>
         </div>
@@ -642,67 +642,3 @@ function onTouchEnd(e) {
     <div v-if="outputOpen" class="fixed inset-0 z-50 lg:hidden">
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
-        <div class="panel-head -mx-3 mb-2 border-b border-ink-700 px-3"><span class="panel-title"><StudioIcon name="grid" size="h-4 w-4" class="text-brand-400" /> Outputs <span class="text-cream-300/50">({{ store.generations.length }})</span></span><button @click="outputOpen=false" class="icon-btn !h-8 !w-8 bg-ink-800" title="Đóng" aria-label="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button></div>
-        <SourcePanel />
-        <OutputModule />
-        <LibraryCard />
-      </div>
-    </div>
-    <!-- Popup xác nhận xóa layer đang chọn (phím Delete / nút Xóa) -->
-    <div v-if="store.confirmDeleteOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="store.confirmDeleteOpen = false">
-      <div class="w-full max-w-sm rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl">
-        <div class="mb-2 flex items-center gap-2">
-          <div class="grid h-8 w-8 place-items-center rounded-xl bg-red-600/15 text-red-300"><StudioIcon name="trash" size="h-4 w-4"/></div>
-          <p class="text-sm font-semibold text-cream-100">Xóa {{ store.selectionUnitCount }} đối tượng?</p>
-        </div>
-        <p class="text-xs leading-relaxed text-cream-300/60">Hành động này sẽ xóa {{ store.selectionUnitCount }} đối tượng khỏi canvas (mỗi group tính là 1 đối tượng). (Ctrl+Z để hoàn tác).</p>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="store.confirmDeleteOpen = false" class="rounded-xl border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
-          <button @click="store.confirmDeleteSelection()" class="flex items-center gap-1 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500"><StudioIcon name="trash" size="h-3.5 w-3.5"/>Xóa layer</button>
-        </div>
-      </div>
-    </div>
-    <GalleryModal v-if="store.viewer" />
-    <!-- Popup chọn nguồn ảnh (mở từ activity bar phải) -->
-    <SourcePickerPopup v-model="store.sourcePickerOpen" />
-    <!-- ══ Bảng quản lý dự án thiết kế (Project Workspace) ══ -->
-    <ProjectWorkspace v-model="projectsOpen" />
-  </div>
-</template>
-<style scoped>
-.cvs-checker { background: repeating-conic-gradient(#3a3a44 0 25%, #2a2a31 0 50%) 0 / 18px 18px; }
-
-/* ── Batch slider (biến thể cùng lượt) ── */
-.batch-slider { animation: batchSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
-@keyframes batchSlideIn {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-.batch-thumb { animation: batchThumbIn 0.4s ease; }
-@keyframes batchThumbIn {
-  from { opacity: 0; transform: scale(0.85); }
-  to { opacity: 1; transform: scale(1); }
-}
-/* Skeleton shimmer cho thumbnail đang chờ/xử lý */
-.skeleton-shimmer {
-  background: linear-gradient(100deg, #1c2333 20%, #2a3347 40%, #3a4560 60%, #2a3347 80%, #1c2333 100%);
-  background-size: 200% 100%;
-  animation: shimmerSweep 1.8s linear infinite;
-}
-@keyframes shimmerSweep {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-/* Dot nhấp nháy cho thumbnail pending */
-.batch-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: #f5c06a;
-  animation: dotBlink 1.2s ease-in-out infinite;
-}
-@keyframes dotBlink {
-  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
-}
-</style>

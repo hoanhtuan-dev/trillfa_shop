@@ -17,7 +17,7 @@ const pos = ref(50);
         <button @click="emit('update:modelValue', false)" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white">✕</button>
       </div>
 
-      <div class="relative mx-auto aspect-square max-h-[70vh] w-full select-none overflow-hidden rounded-2xl border border-white/10 bg-ink-900">
+      <div class="relative mx-auto aspect-square max-h-[70vh] w-full select-none overflow-hidden rounded-lg border border-white/10 bg-ink-900">
         <!-- Ảnh Trước (nền) -->
         <img :src="before" class="absolute inset-0 h-full w-full object-contain" draggable="false">
         <!-- Ảnh Sau (phủ, cắt theo vị trí slider) -->

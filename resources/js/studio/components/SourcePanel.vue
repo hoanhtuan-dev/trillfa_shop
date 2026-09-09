@@ -18,7 +18,7 @@ const store = useStudioStore();
         role="button"
         tabindex="0"
         @keydown.enter.prevent="store.sourcePickerOpen = true"
-        class="group relative block w-full cursor-pointer overflow-hidden rounded-xl transition-colors focus:outline-none"
+        class="group relative block w-full cursor-pointer overflow-hidden rounded-md transition-colors focus:outline-none"
         :class="store.editSource ? 'border border-ink-700 bg-ink-900 hover:border-brand-500/70' : 'border border-dashed border-ink-600 bg-ink-800/50 hover:border-brand-500/70 hover:bg-ink-800'"
         :title="store.editSource ? 'Ảnh nguồn: ' + (store.editSource.name || 'Ảnh nguồn') + ' — bấm để thay / thêm (thư viện · sản phẩm)' : 'Thêm ảnh nguồn — thư viện đã tải lên · sản phẩm'"
         :aria-label="'Thêm ảnh nguồn'"

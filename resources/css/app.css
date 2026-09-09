@@ -174,7 +174,7 @@
     .prose-content blockquote { @apply my-5 border-l-4 border-brand-500 bg-cream-100 py-3 pl-5 italic text-ink-700; }
     .prose-content a { @apply text-brand-700 underline underline-offset-2; }
     .prose-content img { @apply my-6 w-full rounded-2xl; }
-    .studio-nav { @apply flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-white;
+    .studio-nav { @apply flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-white;
     }
     .studio-nav.is-active {
         @apply bg-brand-600 font-semibold text-white hover:bg-brand-600;
@@ -186,13 +186,13 @@
 
 /* Studio dark theme overrides — UNLAYERED so they beat Tailwind utilities (bg-cream, text-ink, etc.) */
     .studio-dark { @apply bg-ink-900 text-cream-100; }
-    .studio-dark .card { @apply border-ink-700 bg-ink-800 shadow-black/30; }
+    .studio-dark .card { @apply border-ink-700 bg-ink-800 shadow-black/30 rounded-lg; } }
     .studio-dark .card-hover { @apply hover:shadow-black/50; }
-    .studio-dark .input { @apply border-ink-700 bg-ink-900 text-cream-50 placeholder:text-cream-200/40 focus:border-brand-400 focus:ring-brand-400/20; }
+    .studio-dark .input { @apply border-ink-700 bg-ink-900 text-cream-50 rounded-md placeholder:text-cream-200/40 focus:border-brand-400 focus:ring-brand-400/20; }
     .studio-dark .label { @apply text-cream-300; }
     .studio-dark .btn-outline { @apply border-ink-700 text-cream-100 hover:border-cream-300 hover:bg-cream-300 hover:text-ink-900; }
     .studio-dark .btn-ghost { @apply text-cream-200 hover:bg-ink-700; }
-    .studio-dark .chip { @apply border-ink-700 bg-ink-900 text-cream-200 hover:border-brand-400 hover:text-brand-200; }
+    .studio-dark .chip { @apply border-ink-700 bg-ink-900 text-cream-200 rounded-md hover:border-brand-400 hover:text-brand-200; }
     .studio-dark .link { @apply text-brand-300 hover:text-brand-200; }
     .studio-dark .text-ink-900 { @apply text-cream-50; }
     .studio-dark .text-ink-700 { @apply text-cream-200; }
@@ -218,14 +218,14 @@
    Chỉ đặt tên mới (seg-, tool-btn, icon-btn, panel-) — không đụng storefront. */
 @layer components {
     /* Segmented control (tabs / chế độ / ngôn ngữ) — thay mọi chip lồng nhau */
-    .seg { @apply flex gap-1 rounded-2xl bg-ink-800 p-1; }
-    .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-cream-300/70 transition hover:text-cream-100; }
+    .seg { @apply flex gap-1 rounded-lg bg-ink-800 p-1; } }
+    .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] font-semibold text-cream-300/70 transition hover:text-cream-100; }
     .seg-btn.is-active { @apply bg-brand-600 text-white hover:text-white; }
     /* Nút toolbar nhỏ trong card/panel (toggle lịch sử, templates, hành động phụ) */
-    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-xl border border-ink-700 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-ink-600 hover:bg-ink-700 disabled:opacity-40; }
+    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-ink-600 hover:bg-ink-700 disabled:opacity-40; }
     .tool-btn.is-active { @apply border-brand-500/70 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
     /* Nút icon vuông chuẩn (mọi chrome studio) */
-    .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded-lg text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }
+    .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }
     /* Header chuẩn của panel/card trong workspace */
     .panel-head { @apply flex shrink-0 items-center justify-between gap-2 px-2.5 py-2; }
     .panel-title { @apply flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-cream-100; }
@@ -233,7 +233,7 @@
     .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-2 border-r border-ink-700 bg-ink-900 py-2.5; }
     .activity-bar.right { @apply border-l border-r-0; }
     .activity-bar.right .activity-btn.is-active::before { left: auto; right: 0; }
-    .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-cream-300/60 transition-colors hover:bg-ink-800 hover:text-cream-100; }
+    .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-lg text-cream-300/60 transition-colors hover:bg-ink-800 hover:text-cream-100; }
     .activity-btn.is-active { @apply bg-ink-800 text-brand-200; }
     .activity-btn.is-active::before {
         content: '';

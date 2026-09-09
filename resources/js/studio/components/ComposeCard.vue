@@ -225,36 +225,36 @@ function saveSettings() {
     <h2 class="flex items-center gap-2 font-display text-base font-semibold text-brand-300"><StudioIcon name="puzzle" /> Ghép ảnh</h2>
 
     <!-- Chọn chế độ: segmented tabs 1 hàng (lean) -->
-    <div class="mt-3 grid grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-ink-900/60 p-1">
+    <div class="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-white/10 bg-ink-900/60 p-1">
       <button @click="setMode('compose')" title="Ghép tự do: hòa trộn nhiều ảnh"
               :class="mode === 'compose' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
-              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
+              class="flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
         <StudioIcon name="layers" size="h-4 w-4" /> Ghép tự do
       </button>
       <button @click="setMode('faceswap')" title="Thay khuôn mặt người mẫu"
               :class="mode === 'faceswap' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
-              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
+              class="flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
         <StudioIcon name="user" size="h-4 w-4" /> Thay mặt
       </button>
       <button @click="setMode('outfit')" title="Ghép Trang Phục: lai tạo biến thể từ 2 trang phục"
               :class="mode === 'outfit' ? 'bg-brand-600 text-white shadow' : 'text-cream-200 hover:bg-ink-800'"
-              class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
+              class="flex flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-[9px] font-semibold leading-tight transition-colors">
         <StudioIcon name="shirt" size="h-4 w-4" /> Ghép trang phục
       </button>
     </div>
 
     <!-- Hướng dẫn slot theo chế độ -->
-    <p v-if="mode === 'faceswap'" class="mt-2 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+    <p v-if="mode === 'faceswap'" class="mt-2 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 = người mẫu · @image2 = khuôn mặt · @image3 = ảnh ghép (tùy chọn)
     </p>
-    <p v-if="mode === 'outfit'" class="mt-2 rounded-xl border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
+    <p v-if="mode === 'outfit'" class="mt-2 rounded-md border border-brand-500/30 bg-brand-900/20 px-2.5 py-1.5 text-[10px] leading-relaxed text-brand-100">
       @image1 + @image2 = trang phục nguồn · @image3 = bối cảnh (tùy chọn) — lai tạo biến thể mới
     </p>
 
     <!-- 3 slot ảnh: bấm để tải/chọn -->
     <div class="mt-3 grid grid-cols-3 gap-2">
       <button v-for="i in 3" :key="i" @click="openSlot(i - 1)" title="Bấm để tải/chọn ảnh"
-              class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-xl border transition"
+              class="relative flex h-24 flex-col items-center justify-center overflow-hidden rounded-md border transition"
               :class="selected[i-1] ? slotRingClass + ' bg-ink-900' : slotRingEmptyClass + ' bg-ink-900/40'">
         <template v-if="selected[i-1]">
           <img :src="selected[i-1].url" class="h-full w-full object-cover" @error="onSlotImgError(i-1)">
@@ -285,13 +285,13 @@ function saveSettings() {
       <input v-model="style" type="text" maxlength="200" class="input !text-xs" placeholder="VD: tối giản hiện đại, công sở thanh lịch, streetwear, boho, cổ điển…">
       <p class="mt-1 text-[10px] text-cream-300/50">Phong cách là hướng sáng tạo CHỦ ĐẠO — kết quả sẽ bám theo phong cách này.</p>
     </div>
-    <div v-if="mode === 'outfit'" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+    <div v-if="mode === 'outfit'" class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
       <span class="shrink-0 font-medium text-cream-200">Trang trí</span>
       <input type="range" min="0" max="10" v-model.number="ornamentLevel" class="h-2 w-full cursor-pointer accent-brand-500">
       <span class="shrink-0 font-semibold text-cream-50">{{ ornamentLevel }}</span><span class="shrink-0 text-cream-300/60">/10</span>
     </div>
     <p v-if="mode === 'outfit'" class="mt-1 text-[10px] leading-relaxed text-cream-300/50">0 = tối giản, không họa tiết/đính đá · 10 = cầu kỳ, đính đá & họa tiết đậm.</p>
-    <div v-if="mode === 'outfit'" class="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+    <div v-if="mode === 'outfit'" class="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
       <span class="shrink-0 font-medium text-cream-200">Sáng tạo</span>
       <input type="range" min="1" max="10" v-model.number="creativeLevel" class="h-2 w-full cursor-pointer accent-brand-500">
       <span class="shrink-0 font-semibold text-cream-50">{{ creativeLevel }}</span><span class="shrink-0 text-cream-300/60">/10</span>
@@ -336,7 +336,7 @@ function saveSettings() {
     <button @click="togglePreview" type="button" class="btn-outline mt-3 w-full whitespace-nowrap">
       {{ previewOpen ? 'Ẩn xem trước prompt' : '👁 Xem trước prompt' }}
     </button>
-    <div v-if="previewOpen" class="mt-2 rounded-2xl border border-brand-500/30 bg-brand-900/20 p-3">
+    <div v-if="previewOpen" class="mt-2 rounded-lg border border-brand-500/30 bg-brand-900/20 p-3">
       <div class="mb-1.5 flex items-center justify-between gap-2">
         <span class="text-[11px] font-semibold text-brand-200">Prompt sẽ gửi cho AI (chỉnh được)</span>
         <button @click="loadPreview" :disabled="previewLoading" class="btn-ghost btn-sm shrink-0">{{ previewLoading ? 'Đang tải…' : 'Làm mới' }}</button>
@@ -357,7 +357,7 @@ function saveSettings() {
     </button>
 
     <!-- Tiến độ (LoadingSpinner dùng chung) -->
-    <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
+    <div v-if="running" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-900/30 p-3">
       <LoadingSpinner
         :text="store.composeStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang ghép ảnh…'"
         :subtext="fmt(elapsedSec) + ' · ' + doneCount + '/' + store.composeGenIds.length + ' biến thể'"
@@ -368,13 +368,13 @@ function saveSettings() {
     </div>
 
     <!-- Thành công -->
-    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
+    <div v-if="store.composeStage === 'done'" class="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
       Đã ghép xong — kết quả đã được chọn trong Outputs.
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
     <!-- Lỗi -->
-    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-2xl border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
+    <div v-if="store.composeStage === 'error' && store.composeError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
       <p class="font-semibold">Ghép ảnh thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.composeError }}</p>
       <div class="mt-2 flex gap-2">
@@ -384,7 +384,7 @@ function saveSettings() {
     </div>
 
     <!-- Đã hủy -->
-    <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
+    <div v-if="store.composeStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
       Đã hủy yêu cầu ghép ảnh.
       <button @click="store.clearComposeStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>

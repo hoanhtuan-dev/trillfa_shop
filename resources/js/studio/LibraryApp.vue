@@ -132,10 +132,10 @@ onMounted(async () => {
   <div class="studio-dark text-cream-100" :class="props.embedded ? 'min-h-0 flex-1 overflow-y-auto bg-ink-900 p-4 sm:p-6' : 'min-h-screen bg-ink-900 p-4 sm:p-6'">
     <div class="mx-auto max-w-7xl">
       <!-- ══ Thanh điều hướng (header) ══ -->
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-700 bg-ink-900/70 px-3 py-2.5 shadow-lg shadow-black/20 sm:px-4">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ink-700 bg-ink-900/70 px-3 py-2.5 shadow-lg shadow-black/20 sm:px-4">
         <!-- Trái: thương hiệu + tiêu đề + điều hướng + dự án hiện tại -->
         <div class="flex min-w-0 flex-wrap items-center gap-2.5">
-          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-600/20 text-brand-300 ring-1 ring-brand-500/30">
+          <div class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-brand-600/20 text-brand-300 ring-1 ring-brand-500/30">
             <StudioIcon name="image" size="h-4 w-4" />
           </div>
           <h1 class="font-display text-lg font-semibold leading-tight sm:text-xl">
@@ -157,7 +157,7 @@ onMounted(async () => {
         <!-- Phải: hành động -->
         <div class="flex items-center gap-1.5">
           <button @click="refresh" :disabled="store.libraryLoading || store.uploadLoading"
-                  class="icon-btn !h-9 !w-9 rounded-xl border border-ink-700 bg-ink-800 disabled:opacity-40"
+                  class="icon-btn !h-9 !w-9 rounded-md border border-ink-700 bg-ink-800 disabled:opacity-40"
                   title="Làm mới thư viện" aria-label="Làm mới thư viện">
             <StudioIcon name="refresh" size="h-4 w-4" />
           </button>
@@ -185,34 +185,34 @@ onMounted(async () => {
       <template v-if="store.libraryTab === 'generations'">
       <!-- ══ Thống kê ══ -->
       <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+        <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Tổng mục</p>
           <p class="text-lg font-semibold text-cream-100">{{ fmtNum(stats.total ?? store.libraryTotal) }}</p>
         </div>
-        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+        <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Hoàn tất</p>
           <p class="text-lg font-semibold text-emerald-300">{{ fmtNum(stats.completed ?? 0) }}</p>
         </div>
-        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+        <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Đã gắn dự án</p>
           <p class="text-lg font-semibold text-brand-300">{{ fmtNum(stats.project_linked_count ?? 0) }}</p>
         </div>
-        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+        <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Ảnh rác</p>
           <p class="text-lg font-semibold text-amber-300">{{ fmtNum(stats.junk_count ?? 0) }}</p>
           <p v-if="stats.junk_bytes" class="text-[10px] text-cream-300/50">{{ fmtBytes(stats.junk_bytes) }}</p>
         </div>
-        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+        <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Ảnh cũ</p>
           <p class="text-lg font-semibold text-sky-300">{{ fmtNum(stats.old_count ?? 0) }}</p>
           <p v-if="stats.old_bytes" class="text-[10px] text-cream-300/50">{{ fmtBytes(stats.old_bytes) }}</p>
         </div>
-        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+        <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">File mồ côi</p>
           <p class="text-lg font-semibold text-red-300">{{ fmtNum(stats.orphan_count ?? 0) }}</p>
           <p v-if="stats.orphan_bytes" class="text-[10px] text-cream-300/50">{{ fmtBytes(stats.orphan_bytes) }}</p>
         </div>
-        <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+        <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
           <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Ngưỡng ảnh cũ</p>
           <div class="mt-1 flex items-center gap-1">
             <input v-model.number="store.libraryFilters.old_days" type="number" min="1" max="365" @change="onChangeOldDays"
@@ -223,7 +223,7 @@ onMounted(async () => {
       </div>
 
       <!-- ══ Bộ lọc ══ -->
-      <div class="mb-4 flex flex-wrap items-end gap-2 rounded-2xl border border-ink-700 bg-ink-800 p-3">
+      <div class="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-ink-700 bg-ink-800 p-3">
         <div class="w-36">
           <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-cream-300">Loại</label>
           <select @change="onChangeType" class="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
@@ -268,7 +268,7 @@ onMounted(async () => {
       </div>
 
       <!-- ══ Thanh quản lý ══ -->
-      <div v-if="store.libraryManage" class="mb-4 space-y-2 rounded-2xl border border-brand-600/40 bg-brand-900/30 p-3">
+      <div v-if="store.libraryManage" class="mb-4 space-y-2 rounded-lg border border-brand-600/40 bg-brand-900/30 p-3">
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ selectedCount }}</span> mục</span>
           <button @click="toggleAll" class="rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-cream-200 hover:bg-ink-700">{{ allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}</button>
@@ -302,10 +302,10 @@ onMounted(async () => {
 
       <!-- ══ Lưới ảnh ══ -->
       <div v-if="store.libraryLoading && !store.libraryItems.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        <div v-for="i in 10" :key="i" class="aspect-[3/4] animate-pulse rounded-2xl border-2 border-ink-700 bg-ink-800"></div>
+        <div v-for="i in 10" :key="i" class="aspect-[3/4] animate-pulse rounded-lg border-2 border-ink-700 bg-ink-800"></div>
       </div>
 
-      <div v-else-if="!store.libraryItems.length" class="rounded-2xl border border-ink-700 bg-ink-800 py-16 text-center">
+      <div v-else-if="!store.libraryItems.length" class="rounded-lg border border-ink-700 bg-ink-800 py-16 text-center">
         <p v-if="activeProjectId && activeProjectId !== 'none'" class="text-sm text-cream-300/50">Dự án này chưa có ảnh/video nào.</p>
         <p v-else class="text-sm text-cream-300/50">Chưa có ảnh / video nào khớp bộ lọc.</p>
         <button type="button" @click="goBack" class="mt-2 inline-block text-xs text-brand-300 hover:text-brand-200">Tạo ảnh mới trong Studio →</button>
@@ -313,7 +313,7 @@ onMounted(async () => {
 
       <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         <div v-for="g in store.libraryItems" :key="g.id"
-             class="group relative overflow-hidden rounded-2xl border-2 transition"
+             class="group relative overflow-hidden rounded-lg border-2 transition"
              :class="isSelected(g.id) ? 'border-brand-400' : 'border-ink-700'">
           <div class="relative cursor-pointer" @click="openViewer(g)">
             <img v-if="g.media_url" :src="thumbUrl(g.media_url, 480)" class="aspect-[3/4] w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
@@ -358,7 +358,7 @@ onMounted(async () => {
       <!-- ══ Xem thêm ══ -->
       <div v-if="store.libraryHasMore" class="mt-6 flex justify-center">
         <button @click="store.loadMoreLibrary()" :disabled="store.libraryLoading"
-                class="rounded-xl border border-ink-700 bg-ink-800 px-5 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
+                class="rounded-md border border-ink-700 bg-ink-800 px-5 py-2 text-sm font-semibold text-cream-200 hover:bg-ink-700 disabled:opacity-50">
           {{ store.libraryLoading ? 'Đang tải…' : 'Xem thêm' }}
         </button>
       </div>
@@ -367,27 +367,27 @@ onMounted(async () => {
       <!-- ══ Tab: FILE TẢI LÊN ══ -->
       <template v-else>
         <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+          <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
             <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Tổng file</p>
             <p class="text-lg font-semibold text-cream-100">{{ fmtNum(uploadStats.total ?? store.uploadItems.length) }}</p>
           </div>
-          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+          <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
             <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Dung lượng</p>
             <p class="text-lg font-semibold text-cream-100">{{ fmtBytes(uploadStats.total_bytes ?? 0) }}</p>
           </div>
-          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+          <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
             <p class="text-[10px] uppercase tracking-wide text-cream-300/50">File mồ côi (chưa dùng)</p>
             <p class="text-lg font-semibold text-red-300">{{ fmtNum(uploadUnusedCount) }}</p>
             <p v-if="uploadStats.unused_bytes" class="text-[10px] text-cream-300/50">{{ fmtBytes(uploadStats.unused_bytes) }}</p>
           </div>
-          <div class="rounded-2xl border border-ink-700 bg-ink-800 p-3">
+          <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
             <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Đang dùng</p>
             <p class="text-lg font-semibold text-emerald-300">{{ fmtNum((uploadStats.total ?? 0) - (uploadStats.unused_count ?? 0)) }}</p>
           </div>
         </div>
 
         <!-- Thanh quản lý uploads -->
-        <div v-if="store.libraryManage" class="mb-4 space-y-2 rounded-2xl border border-brand-600/40 bg-brand-900/30 p-3">
+        <div v-if="store.libraryManage" class="mb-4 space-y-2 rounded-lg border border-brand-600/40 bg-brand-900/30 p-3">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-semibold text-cream-100">Đã chọn <span class="text-brand-300">{{ uploadSelectedCount }}</span> file</span>
             <button @click="store.uploadSelectUnused" class="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs text-red-200 hover:bg-red-500/20">Chọn file mồ côi</button>
@@ -414,14 +414,14 @@ onMounted(async () => {
 
         <!-- Lưới file tải lên -->
         <div v-if="store.uploadLoading && !store.uploadItems.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          <div v-for="i in 10" :key="i" class="aspect-square animate-pulse rounded-2xl border-2 border-ink-700 bg-ink-800"></div>
+          <div v-for="i in 10" :key="i" class="aspect-square animate-pulse rounded-lg border-2 border-ink-700 bg-ink-800"></div>
         </div>
-        <div v-else-if="!store.uploadItems.length" class="rounded-2xl border border-ink-700 bg-ink-800 py-16 text-center">
+        <div v-else-if="!store.uploadItems.length" class="rounded-lg border border-ink-700 bg-ink-800 py-16 text-center">
           <p class="text-sm text-cream-300/50">Chưa có file nào được tải lên.</p>
         </div>
         <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           <div v-for="f in store.uploadItems" :key="f.rel"
-               class="group relative overflow-hidden rounded-2xl border-2 transition"
+               class="group relative overflow-hidden rounded-lg border-2 transition"
                :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
             <div class="relative cursor-pointer">
               <img :src="thumbUrl(f.url, 480)" class="aspect-square w-full bg-ink-900 object-cover" loading="lazy" @error="onThumbError($event, f.url)">

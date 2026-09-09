@@ -91,7 +91,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
     </div>
 
     <!-- 👩 Đổi khuôn mặt (mặc định BẬT) -->
-    <div class="mt-3 flex items-center justify-between gap-3 rounded-2xl border px-3 py-2" :class="changeFace ? 'border-brand-500/50 bg-brand-600/10' : 'border-ink-700 bg-ink-800/40'">
+    <div class="mt-3 flex items-center justify-between gap-3 rounded-lg border px-3 py-2" :class="changeFace ? 'border-brand-500/50 bg-brand-600/10' : 'border-ink-700 bg-ink-800/40'">
       <div class="min-w-0">
         <p class="text-xs font-semibold text-cream-200">👩 Đổi khuôn mặt</p>
         <p class="truncate text-[10px] text-cream-300/60">{{ changeFace ? 'Theo khuôn mặt người mẫu đã chọn' : 'Giữ nguyên khuôn mặt gốc' }}</p>
@@ -114,7 +114,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
     <p v-if="!canApply && !running" class="mt-1 text-[10px] text-cream-300/50">{{ changeFace ? 'Chọn 1 khuôn mặt + ít nhất 1 dáng.' : 'Chọn ít nhất 1 dáng.' }}</p>
 
     <!-- Trạng thái hoạt động (LoadingSpinner dùng chung) -->
-    <div v-if="running" class="mt-3 rounded-2xl border border-brand-500/30 bg-brand-900/30 p-3">
+    <div v-if="running" class="mt-3 rounded-lg border border-brand-500/30 bg-brand-900/30 p-3">
       <LoadingSpinner
         :text="store.swapStage === 'send' ? 'Đang gửi yêu cầu tới AI…' : 'AI đang đổi người mẫu…'"
         :subtext="'⏱ ' + fmt(elapsedSec) + ' · ' + doneCount + '/' + (store.swapGenIds.length || store.swapTotal) + ' dáng' + (activeModel ? ' · Model: ' + activeModel : '')" />
@@ -124,12 +124,12 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full animate-pulse rounded-full bg-brand-400" style="width:60%"></div></div>
     </div>
 
-    <div v-if="store.swapStage === 'done'" class="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
+    <div v-if="store.swapStage === 'done'" class="mt-3 flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs text-emerald-200">
       ✅ Đã đổi xong — kết quả đã được in vào layer canvas.
       <button @click="store.clearSwapStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
 
-    <div v-if="store.swapStage === 'error' && store.swapError" class="mt-3 rounded-2xl border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
+    <div v-if="store.swapStage === 'error' && store.swapError" class="mt-3 rounded-lg border border-red-500/40 bg-red-900/25 p-3 text-xs text-red-200">
       <p class="font-semibold">⚠️ Thay đổi người mẫu thất bại</p>
       <p class="mt-1 whitespace-pre-line leading-relaxed">{{ store.swapError }}</p>
       <div class="mt-2 flex gap-2">
@@ -138,7 +138,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
       </div>
     </div>
 
-    <div v-if="store.swapStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
+    <div v-if="store.swapStage === 'cancelled'" class="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 p-3 text-xs text-cream-200">
       🛑 Đã hủy yêu cầu đổi người mẫu.
       <button @click="store.clearSwapStatus()" class="ml-auto rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20">Đóng</button>
     </div>
@@ -148,14 +148,14 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
         <template v-if="changeFace">
         <p class="mb-2 text-xs font-semibold text-cream-200">👩 Khuôn mặt</p>
         <div class="flex flex-wrap gap-2">
-          <button v-for="f in faceList" :key="f.id" @click="selectOne(store.swapModelIds, f.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-xl border-2" :class="store.swapModelIds.includes(f.id) ? 'border-brand-500' : 'border-ink-700'"><img v-if="f.image" :src="f.image" class="h-full w-full bg-ink-900 object-cover"><span v-else class="grid h-full w-full place-items-center bg-ink-800 text-xl">👩</span><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ f.name }}</span><button v-if="f.custom" @click.stop="delAsset({id:f.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
+          <button v-for="f in faceList" :key="f.id" @click="selectOne(store.swapModelIds, f.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-lg border-2" :class="store.swapModelIds.includes(f.id) ? 'border-brand-500' : 'border-ink-700'"><img v-if="f.image" :src="f.image" class="h-full w-full bg-ink-900 object-cover"><span v-else class="grid h-full w-full place-items-center bg-ink-800 text-xl">👩</span><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ f.name }}</span><button v-if="f.custom" @click.stop="delAsset({id:f.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
         </div>
         </template>
-        <div v-else class="mb-px rounded-2xl border border-dashed border-ink-600 bg-ink-800/60 p-3 text-xs leading-relaxed text-cream-300/70">👩 Đang <b class="text-cream-100">giữ nguyên khuôn mặt gốc</b> — chỉ đổi dáng, hậu cảnh và tông màu. Bật nút phía trên để chọn khuôn mặt người mẫu khác.</div>
+        <div v-else class="mb-px rounded-lg border border-dashed border-ink-600 bg-ink-800/60 p-3 text-xs leading-relaxed text-cream-300/70">👩 Đang <b class="text-cream-100">giữ nguyên khuôn mặt gốc</b> — chỉ đổi dáng, hậu cảnh và tông màu. Bật nút phía trên để chọn khuôn mặt người mẫu khác.</div>
         <!-- Dáng -->
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🧍 Dáng</p>
         <div class="flex flex-wrap gap-2">
-          <button v-for="p in poseList" :key="p.id" @click="toggle(store.swapPoseIds, p.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-xl border-2" :class="store.swapPoseIds.includes(p.id) ? 'border-brand-500' : 'border-ink-700'"><img v-if="p.image" :src="p.image" class="h-full w-full bg-ink-900 object-cover"><span v-else class="grid h-full w-full place-items-center bg-ink-800 text-xl">🧍</span><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span><button v-if="p.custom" @click.stop="delAsset({id:p.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
+          <button v-for="p in poseList" :key="p.id" @click="toggle(store.swapPoseIds, p.id, $event)" class="relative h-20 w-16 overflow-hidden rounded-lg border-2" :class="store.swapPoseIds.includes(p.id) ? 'border-brand-500' : 'border-ink-700'"><img v-if="p.image" :src="p.image" class="h-full w-full bg-ink-900 object-cover"><span v-else class="grid h-full w-full place-items-center bg-ink-800 text-xl">🧍</span><span class="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-[9px] text-cream-200">{{ p.name }}</span><button v-if="p.custom" @click.stop="delAsset({id:p.id})" class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600/90 text-[9px] text-white">🗑</button></button>
         </div>
         <!-- Bối cảnh -->
         <p class="mb-2 mt-4 text-xs font-semibold text-cream-200">🖼 Bối cảnh</p>
@@ -170,7 +170,7 @@ async function delAsset(a) { const r = await fetch('/studio/assets/' + a.id, { m
           </div>
         </div>
         <!-- Thêm / xóa -->
-        <div class="mt-5 rounded-2xl border border-dashed border-cream-300/40 p-3">
+        <div class="mt-5 rounded-lg border border-dashed border-cream-300/40 p-3">
           <p class="mb-2 text-xs font-semibold text-cream-200">➕ Thêm {{ addType === 'model' ? 'khuôn mặt' : 'dáng' }} (bộ sưu tập riêng)</p>
           <div class="flex flex-wrap items-center gap-2">
             <select v-model="addType" class="input !py-1.5 !w-32"><option value="model">Khuôn mặt</option><option value="pose">Dáng</option></select>

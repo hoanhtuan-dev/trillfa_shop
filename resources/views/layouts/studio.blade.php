@@ -80,7 +80,7 @@
                     <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 hover:text-white" :title="'Ẩn thanh bên'">«</button>
                 </div>
                 @if($u)
-                <div class="mb-2 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800/60 p-2">
+                <div class="mb-2 flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800/60 p-2">
                     <img src="{{ $u->avatar ?: asset('images/placeholder.svg') }}" class="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-brand-500/40" alt="Ảnh đại diện">
                     <div class="min-w-0 leading-tight">
                         <p class="truncate text-sm font-semibold text-cream-50">{{ $u->name }}</p>

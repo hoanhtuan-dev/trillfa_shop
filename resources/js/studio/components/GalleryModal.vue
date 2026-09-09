@@ -290,10 +290,10 @@ onBeforeUnmount(() => {
 
     <div class="flex h-full w-full max-w-7xl flex-col gap-2 lg:flex-row">
       <!-- ══ Khu vực ảnh ══ -->
-      <div class="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-ink-700/60 bg-ink-900/40">
+      <div class="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-ink-700/60 bg-ink-900/40">
         <!-- Video: phát trực tiếp, không zoom/pan (fit trọn khung, centered) -->
         <video v-if="isVideo && current?.media_url" :src="current.media_url" controls autoplay loop muted playsinline
-               class="absolute inset-0 m-auto max-h-full max-w-full rounded-xl object-contain"></video>
+               class="absolute inset-0 m-auto max-h-full max-w-full rounded-md object-contain"></video>
         <!-- Ảnh: zoom / pan. absolute inset-0 m-auto + max-w/max-h 100% => LUÔN fit trọn
              khung & canh giữa khi mở (không phụ thuộc flex/grid). Scale quanh tâm ảnh. -->
         <div ref="zoomArea" v-else-if="current?.media_url && !imgError" class="absolute inset-0 cursor-grab overflow-hidden active:cursor-grabbing" style="touch-action:none"
@@ -331,7 +331,7 @@ onBeforeUnmount(() => {
         </div>
         <!-- Dải thumbnail: cuộn ngang bằng wheel (vertical scroll → horizontal) + kéo chuột/touch -->
         <div v-if="items.length > 1" ref="stripEl"
-             class="absolute bottom-14 left-1/2 z-10 flex max-w-[92%] -translate-x-1/2 items-center gap-1.5 overflow-x-auto rounded-2xl border border-ink-700 bg-ink-900/95 p-1.5 shadow-lg"
+             class="absolute bottom-14 left-1/2 z-10 flex max-w-[92%] -translate-x-1/2 items-center gap-1.5 overflow-x-auto rounded-lg border border-ink-700 bg-ink-900/95 p-1.5 shadow-lg"
              style="scrollbar-width:none; scroll-snap-type:x proximity; cursor:grab; touch-action:pan-x; user-select:none; -webkit-user-select:none;"
              @wheel.prevent="stripWheel"
              @pointerdown="stripDown" @pointermove="stripMove" @pointerup="stripUp" @pointercancel="stripUp" @pointerleave="stripUp">
@@ -346,7 +346,7 @@ onBeforeUnmount(() => {
 
       <!-- ══ Panel thông tin + hành động ══ -->
       <Transition name="aside">
-      <aside v-if="infoOpen" class="flex max-h-[42vh] w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-ink-700 bg-ink-900/95 p-4 lg:max-h-none lg:w-80">
+      <aside v-if="infoOpen" class="flex max-h-[42vh] w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border border-ink-700 bg-ink-900/95 p-4 lg:max-h-none lg:w-80">
         <!-- Tiêu đề -->
         <div class="flex items-center justify-between">
           <p class="text-sm font-semibold text-cream-100">Ảnh #<span class="text-brand-300">{{ current?.id }}</span></p>
@@ -367,7 +367,7 @@ onBeforeUnmount(() => {
         </div>
         <Transition name="cf">
           <div v-if="fieldsOpen" key="fields" class="grid grid-cols-2 gap-1.5">
-            <div v-for="f in fields" :key="f.k" class="rounded-xl bg-ink-800/70 px-2.5 py-1.5">
+            <div v-for="f in fields" :key="f.k" class="rounded-md bg-ink-800/70 px-2.5 py-1.5">
               <p class="text-[9px] uppercase tracking-wide text-cream-300/50">{{ f.l }}</p>
               <p class="truncate text-xs font-medium text-cream-100">{{ f.k === 'project' ? projectLabel : (current?.[f.k] ?? '—') }}</p>
             </div>
@@ -375,7 +375,7 @@ onBeforeUnmount(() => {
         </Transition>
 
         <!-- ══ Khối Dự án: gắn / gỡ ══ -->
-        <div class="rounded-xl border border-ink-700/60 bg-ink-800/70 p-2.5">
+        <div class="rounded-md border border-ink-700/60 bg-ink-800/70 p-2.5">
           <!-- KHI đã có project_id: chip dự án + nút chuyển + nút gỡ -->
           <template v-if="current?.project_id">
             <div class="flex items-center justify-between gap-2">
@@ -422,7 +422,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Prompt + copy -->
-        <div class="rounded-xl border border-ink-700/60 bg-ink-800/70 p-2.5">
+        <div class="rounded-md border border-ink-700/60 bg-ink-800/70 p-2.5">
           <div class="mb-1 flex items-center justify-between">
             <p class="text-[10px] font-semibold uppercase tracking-wide text-cream-300/50">Prompt</p>
             <button @click="copyPrompt" class="inline-flex items-center gap-1 rounded-full bg-ink-700 px-2 py-0.5 text-[10px] font-semibold text-cream-200 transition hover:bg-brand-600 hover:text-white" title="Sao chép prompt">
@@ -461,7 +461,7 @@ onBeforeUnmount(() => {
         <!-- ══ Vùng nguy hiểm (tách biệt, xác nhận 2 bước) ══ -->
         <div class="mt-1 border-t border-ink-700/70 pt-3">
           <template v-if="!confirming">
-            <button @click="startConfirm" class="inline-flex items-center justify-center gap-1 w-full rounded-xl border border-red-500/40 bg-transparent py-2 text-xs font-semibold text-red-300 transition hover:bg-red-600/10">
+            <button @click="startConfirm" class="inline-flex items-center justify-center gap-1 w-full rounded-md border border-red-500/40 bg-transparent py-2 text-xs font-semibold text-red-300 transition hover:bg-red-600/10">
               <StudioIcon name="trash" size="h-3.5 w-3.5" />
               Xóa ảnh
             </button>
@@ -469,8 +469,8 @@ onBeforeUnmount(() => {
           <template v-else>
             <p class="mb-1.5 flex items-center justify-center gap-1 text-center text-[11px] font-medium text-red-200"><StudioIcon name="alertTriangle" size="h-3.5 w-3.5" /> Xóa vĩnh viễn? Hành động này không thể hoàn tác.</p>
             <div class="flex gap-1.5">
-              <button @click="resetConfirm" class="flex-1 rounded-xl border border-ink-600 bg-ink-800 py-2 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
-              <button @click="doDelete" class="inline-flex items-center justify-center gap-1 flex-1 rounded-xl bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500">
+              <button @click="resetConfirm" class="flex-1 rounded-md border border-ink-600 bg-ink-800 py-2 text-xs font-semibold text-cream-200 transition hover:bg-ink-700">Hủy</button>
+              <button @click="doDelete" class="inline-flex items-center justify-center gap-1 flex-1 rounded-md bg-red-600 py-2 text-xs font-semibold text-white transition hover:bg-red-500">
                 <StudioIcon name="trash" size="h-3.5 w-3.5" />
                 Xóa vĩnh viễn
               </button>

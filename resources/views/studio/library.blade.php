@@ -104,9 +104,9 @@
                                  @pointerdown="lbStartPan($event)" @pointermove="lbMovePan($event)" @pointerup="lbEndPan" @pointerleave="lbEndPan"
                                  onerror="this.src='/images/placeholder.svg'">
                             <div class="absolute bottom-3 right-3 z-10 flex items-center gap-1">
-                                <button @click="lbZout()" class="grid h-8 w-8 place-items-center rounded-lg border border-cream-200 bg-white/90 text-ink-700 hover:bg-white" title="Thu nhỏ">−</button>
-                                <button @click="lbReset()" class="rounded-lg border border-cream-200 bg-white/90 px-2 py-1 text-xs text-ink-700 hover:bg-white" title="Vừa khung">Vừa</button>
-                                <button @click="lbZin()" class="grid h-8 w-8 place-items-center rounded-lg border border-cream-200 bg-white/90 text-ink-700 hover:bg-white" title="Phóng to">+</button>
+                                <button @click="lbZout()" class="grid h-8 w-8 place-items-center rounded border border-cream-200 bg-white/90 text-ink-700 hover:bg-white" title="Thu nhỏ">−</button>
+                                <button @click="lbReset()" class="rounded border border-cream-200 bg-white/90 px-2 py-1 text-xs text-ink-700 hover:bg-white" title="Vừa khung">Vừa</button>
+                                <button @click="lbZin()" class="grid h-8 w-8 place-items-center rounded border border-cream-200 bg-white/90 text-ink-700 hover:bg-white" title="Phóng to">+</button>
                             </div>
                         </div>
                     </template>

@@ -101,7 +101,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
           </button>
           <!-- Backdrop phủ toàn màn hình: bấm ra ngoài menu → tự thoát popup (thoát tiêu điểm) -->
           <div v-if="blankMenuOpen" class="fixed inset-0 z-40" @pointerdown="blankMenuOpen = false"></div>
-          <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-56 flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900/95 p-3 shadow-2xl">
+          <div v-if="blankMenuOpen" class="absolute right-0 top-9 z-50 flex w-56 flex-col gap-2 rounded-md border border-ink-700 bg-ink-900/95 p-3 shadow-2xl">
             <p class="px-1 text-[10px] font-semibold text-cream-300/70">Nền layer mới</p>
             <button @click="store.addBlankLayer(null, blankRatio); blankMenuOpen = false" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-cream-100 hover:bg-ink-800"><span class="h-5 w-5 rounded border border-white/30" style="background: repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 / 8px 8px"></span>Trong suốt</button>
 
@@ -280,7 +280,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
 
     <!-- Popup xác nhận xóa nền AI (markup y hệt StudioApp :542-551) -->
     <div v-if="removeBgConfirmOpen" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" @click.self="removeBgConfirmOpen = false">
-      <div class="w-full max-w-xs rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-2xl">
+      <div class="w-full max-w-xs rounded-lg border border-ink-700 bg-ink-900 p-4 shadow-2xl">
         <p class="text-sm font-semibold text-cream-100">Xóa nền AI?</p>
         <p class="mt-1 text-xs leading-relaxed text-cream-300/70">Nền sẽ được xóa thành <b>trong suốt</b> (PNG alpha). AI tự nhận diện chủ thể — <b>vẽ lasso quanh chủ thể</b> nếu muốn chính xác hơn. Tốn <b>1 credit</b>.</p>
         <div class="mt-3 flex gap-2">

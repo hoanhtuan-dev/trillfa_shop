@@ -19,15 +19,15 @@ async function save() {
     <div class="mb-4 flex items-center justify-between">
       <h1 class="font-display text-lg font-semibold text-cream-50">⚙️ Studio Settings (Vue)</h1>
       <div class="flex gap-1.5">
-        <button @click="tab='keys'" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-xl px-3 py-1.5 text-xs font-semibold">🔑 API Keys</button>
-        <button @click="tab='models'" :class="tab==='models' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-xl px-3 py-1.5 text-xs font-semibold">🤖 Model</button>
-        <button @click="tab='providers'" :class="tab==='providers' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-xl px-3 py-1.5 text-xs font-semibold">Providers</button>
+        <button @click="tab='keys'" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-lg px-3 py-1.5 text-xs font-semibold">🔑 API Keys</button>
+        <button @click="tab='models'" :class="tab==='models' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-lg px-3 py-1.5 text-xs font-semibold">🤖 Model</button>
+        <button @click="tab='providers'" :class="tab==='providers' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200'" class="rounded-lg px-3 py-1.5 text-xs font-semibold">Providers</button>
       </div>
     </div>
     <!-- Keys -->
     <div v-if="tab==='keys'" class="card p-5">
       <p class="mb-2 text-xs text-ink-500">⚙️ {{ data?.providers ? Object.keys(data.providers).length : 0 }} nhóm · {{ data?.api_keys?.length || 0 }} key. Chỉ cần provider + key.</p>
-      <div v-for="k in data?.api_keys" :key="k.id" class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
+      <div v-for="k in data?.api_keys" :key="k.id" class="flex flex-wrap items-center gap-2 rounded-md border border-cream-200 p-2 text-xs">
         <span class="font-semibold text-ink-900">{{ k.label }}</span>
         <span class="text-ink-500">{{ k.provider }} · {{ k.kind || '' }}</span>
         <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px]">Ưu tiên {{ k.priority }}</span>
@@ -45,7 +45,7 @@ async function save() {
     <!-- Models -->
     <div v-if="tab==='models'" class="card p-5">
       <p class="mb-2 text-xs text-ink-500">Chọn API key → tự nhận provider → gán vai trò + ưu tiên.</p>
-      <div v-for="m in data?.models" :key="m.id" class="flex flex-wrap items-center gap-2 rounded-xl border border-cream-200 p-2 text-xs">
+      <div v-for="m in data?.models" :key="m.id" class="flex flex-wrap items-center gap-2 rounded-md border border-cream-200 p-2 text-xs">
         <span class="font-semibold text-ink-900">{{ m.name }}</span>
         <span class="text-ink-500">{{ m.provider }} · {{ m.model_id }} <span v-if="m.api_key_ref" class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">🔑 {{ m.api_key_ref }}</span></span>
         <span class="rounded-full bg-cream-200 px-2 py-0.5 text-[10px]">Ưu tiên {{ m.priority }}</span>
@@ -63,7 +63,7 @@ async function save() {
     <!-- Providers -->
     <div v-if="tab==='providers'" class="card p-5">
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div v-for="(p,pid) in data?.providers" :key="pid" class="rounded-xl border border-cream-200 p-3 text-xs">
+        <div v-for="(p,pid) in data?.providers" :key="pid" class="rounded-md border border-cream-200 p-3 text-xs">
           <p class="font-semibold text-ink-900">{{ p.label }}</p>
           <p class="mt-1" :class="p.configured ? 'text-emerald-600' : 'text-amber-600'">{{ p.configured ? '✓ Đã cấu hình' : '⚠ Chưa có key' }}</p>
         </div>

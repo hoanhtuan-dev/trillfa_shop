@@ -220,12 +220,12 @@ watch(() => open.value, (v) => {
 <template>
   <Teleport to="body">
     <div v-if="open" role="dialog" aria-modal="true" aria-label="Dự án thiết kế" class="fixed inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-3 sm:p-6">
-      <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-950 text-cream-100 shadow-2xl">
+      <div class="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-ink-700 bg-ink-950 text-cream-100 shadow-2xl">
         <!-- ══ Header ══ -->
         <div class="flex shrink-0 items-center justify-between gap-3 border-b border-ink-700 bg-ink-900 px-4 py-3">
           <div class="flex items-center gap-3">
             <span class="font-display text-base font-semibold"><StudioIcon name="kanban" size="h-4 w-4" class="mr-1.5 inline align-[-2px]" />Dự án thiết kế</span>
-            <div class="flex items-center gap-1 rounded-xl bg-ink-800 p-1">
+            <div class="flex items-center gap-1 rounded-md bg-ink-800 p-1">
               <button @click="store.projectView = 'board'" class="rounded-lg px-2.5 py-1 text-xs font-semibold" :class="store.projectView === 'board' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">Bảng</button>
               <button @click="store.projectView = 'list'" class="rounded-lg px-2.5 py-1 text-xs font-semibold" :class="store.projectView === 'list' ? 'bg-brand-600 text-white' : 'text-cream-200 hover:bg-ink-700'">Danh sách</button>
             </div>
@@ -251,7 +251,7 @@ watch(() => open.value, (v) => {
             <!-- Empty state cho hàng đợi duyệt / scope lưu trữ -->
             <div v-if="boardEmptyMessage" class="flex flex-1 items-center justify-center p-10 text-center text-xs text-cream-300/40">{{ boardEmptyMessage }}</div>
             <div v-else class="scrollbar-hide flex flex-1 gap-3 overflow-x-auto p-4">
-              <div v-for="s in statusOrder" :key="s" class="flex w-60 shrink-0 flex-col rounded-xl border border-ink-700/60 bg-ink-900/50">
+              <div v-for="s in statusOrder" :key="s" class="flex w-60 shrink-0 flex-col rounded-md border border-ink-700/60 bg-ink-900/50">
                 <div class="flex items-center justify-between border-b border-ink-700/60 px-3 py-2">
                   <span class="flex items-center gap-2 text-xs font-bold">
                     <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ background: statusColor(s) }"></span>
@@ -288,7 +288,7 @@ watch(() => open.value, (v) => {
 
           <!-- List view -->
           <div v-else-if="store.projectView === 'list' && !store.activeProject" class="flex-1 overflow-y-auto p-4">
-            <div class="overflow-hidden rounded-xl border border-ink-700">
+            <div class="overflow-hidden rounded-md border border-ink-700">
               <table class="w-full text-left text-xs">
                 <thead class="bg-ink-900 text-cream-300/70">
                   <tr>
@@ -377,15 +377,15 @@ watch(() => open.value, (v) => {
             <!-- Brief + meta -->
             <div class="grid gap-4 p-4 lg:grid-cols-3">
               <div class="lg:col-span-2 space-y-4">
-                <div v-if="store.activeProject.brief" class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3">
+                <div v-if="store.activeProject.brief" class="rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
                   <p class="mb-1 text-[11px] font-bold uppercase tracking-wide text-cream-300/50">Brief thiết kế</p>
                   <p class="whitespace-pre-wrap text-xs leading-relaxed text-cream-100">{{ store.activeProject.brief }}</p>
                 </div>
-                <div v-if="store.activeProject.base_concept" class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3">
+                <div v-if="store.activeProject.base_concept" class="rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
                   <p class="mb-1 text-[11px] font-bold uppercase tracking-wide text-cream-300/50">Ý tưởng gốc</p>
                   <p class="text-xs text-cream-200">{{ store.activeProject.base_concept }}</p>
                 </div>
-                <div class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3">
+                <div class="rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
                   <p class="mb-2 text-[11px] font-bold uppercase tracking-wide text-cream-300/50">Outputs ({{ store.activeProjectGenerations.length }})</p>
                   <div v-if="store.activeProjectGenerations.length" class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                     <div v-for="g in store.activeProjectGenerations" :key="g.id" class="group relative aspect-square overflow-hidden rounded-lg bg-ink-800" :class="g.media_url ? 'cursor-pointer' : ''" @click="g.media_url ? store.openViewer(g, store.activeProjectGenerations) : null">
@@ -401,17 +401,17 @@ watch(() => open.value, (v) => {
                 </div>
               </div>
               <div class="space-y-3">
-                <div class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3">
+                <div class="rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
                   <p class="mb-1 text-[11px] font-bold uppercase tracking-wide text-cream-300/50">Deadline</p>
                   <p class="text-xs" :class="isOverdue(store.activeProject) ? 'text-red-400' : 'text-cream-100'" :title="deadlineFull(store.activeProject.deadline)">{{ deadlineLabel(store.activeProject.deadline) || 'Không đặt' }}<span v-if="deadlineCountdown(store.activeProject)" class="ml-1 text-[10px] opacity-80">({{ deadlineCountdown(store.activeProject) }})</span></p>
                 </div>
-                <div v-if="store.activeProject.tags && store.activeProject.tags.length" class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3">
+                <div v-if="store.activeProject.tags && store.activeProject.tags.length" class="rounded-md border border-ink-700/60 bg-ink-900/40 p-3">
                   <p class="mb-2 text-[11px] font-bold uppercase tracking-wide text-cream-300/50">Thẻ</p>
                   <div class="flex flex-wrap gap-1.5">
                     <span v-for="t in store.activeProject.tags" :key="t" class="rounded-full bg-ink-700 px-2 py-0.5 text-[10px] text-cream-200">{{ t }}</span>
                   </div>
                 </div>
-                <div class="rounded-xl border border-ink-700/60 bg-ink-900/40 p-3 text-[11px] text-cream-300/60">
+                <div class="rounded-md border border-ink-700/60 bg-ink-900/40 p-3 text-[11px] text-cream-300/60">
                   <p class="mb-1 font-bold uppercase tracking-wide text-cream-300/50">Tạo lúc</p>
                   <p>{{ store.activeProject.created_at ? new Date(store.activeProject.created_at).toLocaleString('vi-VN') : '—' }}</p>
                 </div>
@@ -426,7 +426,7 @@ watch(() => open.value, (v) => {
   <!-- ══ Modal tạo/sửa ══ -->
   <Teleport to="body">
     <div v-if="creating || editing" role="dialog" aria-modal="true" :aria-label="creating ? 'Tạo dự án mới' : 'Sửa dự án'" class="fixed inset-0 z-[96] flex items-center justify-center bg-black/70 p-4" @click.self="closeForm">
-      <div class="w-full max-w-lg rounded-2xl border border-ink-700 bg-ink-950 p-5 text-cream-100 shadow-2xl">
+      <div class="w-full max-w-lg rounded-lg border border-ink-700 bg-ink-950 p-5 text-cream-100 shadow-2xl">
         <div class="mb-4 flex items-center justify-between">
           <p class="font-display text-sm font-semibold">{{ creating ? 'Dự án mới' : 'Sửa dự án' }}</p>
           <button @click="closeForm" aria-label="Đóng biểu mẫu" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-ink-600"><StudioIcon name="x" size="h-4 w-4" /></button>
