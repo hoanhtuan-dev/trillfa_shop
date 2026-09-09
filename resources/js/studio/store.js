@@ -208,6 +208,16 @@ export const useStudioStore = defineStore('studio', {
     suggestSkipHair: true,        // Bỏ qua phân tích kiểu tóc (mặc định bật)
     suggestSkipLogo: true,         // Bỏ qua logo, chữ, watermark (mặc định bật)
     suggestSkipBackground: true,   // Bỏ qua phân tích bối cảnh (mặc định bật)   // 1..10 mức chi tiết phân tích ảnh gốc (màu/đường may/hoạ tiết/độ dài/cổ/tay...)
+    suggestSaving: false,       // đang lưu kết quả vào thư viện prompt
+    // ── Thư viện Prompt phân tích (💡 Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
+    suggestLibItems: [],
+    suggestLibTotal: 0,
+    suggestLibStats: null,
+    suggestLibFilters: { q: '', garment_type: '', project_id: '', page: 1, per_page: 48 },
+    suggestLibHasMore: false,
+    suggestLibLoading: false,
+    suggestLibSelection: [],   // danh sách id đang được chọn (checkbox)
+    suggestLibManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
     promptOpen: false,
     viewer: null,
     flashMsg: '',
@@ -228,7 +238,7 @@ export const useStudioStore = defineStore('studio', {
     libraryCleaning: false,
     libraryManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
     // ── Files đã tải lên — quản lý file tải lên + dọn file mồ côi ──
-    libraryTab: 'generations', // 'generations' | 'uploads'
+    libraryTab: 'generations', // 'generations' | 'uploads' | 'suggest' — tab Thư viện Prompt
     studioView: 'studio',   // 'studio' | 'library' — view SPA hiện tại của /studio (Thư viện nhúng trong SPA)
     uploadItems: [],
     uploadStats: null,
@@ -1176,6 +1186,113 @@ export const useStudioStore = defineStore('studio', {
         return true;
       } catch (e) { this.toast(e.message || 'Lỗi dọn dẹp.', 'error'); return false; }
       finally { this.uploadCleaning = false; }
+    },
+    // ── Thư viện Prompt phân tích (💡 Gợi ý từ ảnh) — kế thừa pattern từ libraryItems ──
+    async loadSuggestLib(reset = true) {
+      if (this.suggestLibLoading) return;
+      this.suggestLibLoading = true;
+      if (reset) { this.suggestLibFilters.page = 1; }
+      try {
+        const q = new URLSearchParams();
+        if (this.suggestLibFilters.q) q.set('q', this.suggestLibFilters.q);
+        if (this.suggestLibFilters.garment_type) q.set('garment_type', this.suggestLibFilters.garment_type);
+        if (this.suggestLibFilters.project_id) q.set('project_id', this.suggestLibFilters.project_id);
+        q.set('page', String(this.suggestLibFilters.page));
+        q.set('per_page', String(this.suggestLibFilters.per_page));
+        const d = await fetch('/studio/suggest-library/data?' + q.toString(), { headers: { Accept: 'application/json' } });
+        if (!d.ok) throw new Error('Không tải được thư viện prompt.');
+        const data = await d.json();
+        this.suggestLibItems = data.items || [];
+        this.suggestLibTotal = data.total || 0;
+        this.suggestLibStats = data.stats || null;
+        this.suggestLibHasMore = data.has_more || false;
+        this.suggestLibFilters.page = data.current_page || 1;
+      } catch (e) { this.toast(e.message || 'Lỗi tải thư viện prompt.', 'error'); }
+      finally { this.suggestLibLoading = false; }
+    },
+    setSuggestLibFilter(key, value) {
+      this.suggestLibFilters[key] = value;
+      this.suggestLibSelection = [];
+      this.loadSuggestLib(true);
+    },
+    suggestLibNextPage() {
+      if (!this.suggestLibHasMore || this.suggestLibLoading) return;
+      this.suggestLibFilters.page++;
+      this.loadSuggestLib(false);
+    },
+    toggleSuggestLibSelect(id) {
+      const i = this.suggestLibSelection.indexOf(id);
+      if (i >= 0) this.suggestLibSelection.splice(i, 1);
+      else this.suggestLibSelection.push(id);
+    },
+    suggestLibSelectAll() {
+      this.suggestLibSelection = this.suggestLibItems.map(x => x.id);
+    },
+    suggestLibSelectNone() { this.suggestLibSelection = []; },
+    async suggestLibBulkDelete() {
+      const ids = this.suggestLibSelection.filter(Boolean);
+      if (!ids.length) { this.toast('Chưa chọn prompt nào để xóa.', 'error'); return false; }
+      try {
+        const res = await fetch('/studio/suggest-library/bulk-delete', {
+          method: 'POST',
+          headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ ids }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.message || 'Lỗi xóa.');
+        this.suggestLibSelection = [];
+        this.toast('Đã xóa ' + (d.deleted || 0) + ' prompt.');
+        await this.loadSuggestLib(true);
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi xóa prompt.', 'error'); return false; }
+    },
+    async saveSuggestResult() {
+      if (!this.suggestResult || !this.suggestResult.image_prompt_en) {
+        this.toast('Chưa có kết quả phân tích để lưu.', 'error');
+        return;
+      }
+      if (this.suggestSaving) return;
+      this.suggestSaving = true;
+      try {
+        const body = {
+          reference_url: this.upscaleSrc || '',
+          project_id: this.appliedProjectId() || null,
+          ...this.suggestResult,
+        };
+        const res = await fetch('/studio/suggest-library/save', {
+          method: 'POST',
+          headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.message || 'Lỗi lưu.');
+        this.toast('💾 Đã lưu prompt vào Thư viện Prompt.');
+      } catch (e) { this.toast(e.message || 'Lỗi lưu prompt.', 'error'); }
+      finally { this.suggestSaving = false; }
+    },
+    async applySuggestPrompt(item) {
+      if (!item || !item.image_prompt_en) {
+        this.toast('Prompt trống, không thể áp dụng.', 'error');
+        return;
+      }
+      // Đưa prompt vào ô Tạo ảnh
+      this.imagePromptEn = item.image_prompt_en;
+      if (item.creative_level != null) this.creativeLevel = Number(item.creative_level);
+      if (item.texture != null) this.texture = Number(item.texture);
+      if (item.negative_prompt) this.negativePromptEn = item.negative_prompt;
+      this.promptOpen = true;
+      // Đánh dấu đã áp dụng
+      try {
+        await fetch('/studio/suggest-library/apply/' + item.id, {
+          method: 'POST',
+          headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: '{}',
+        });
+        // Cập nhật local item
+        const local = this.suggestLibItems.find(x => x.id === item.id);
+        if (local) { local.apply_count = (local.apply_count || 0) + 1; local.applied_at = new Date().toLocaleString('vi-VN'); }
+      } catch (e) { /* bỏ qua lỗi — prompt vẫn được áp dụng */ }
+      this.toast('Đã áp dụng prompt vào ô Tạo ảnh.');
     },
     // ═══════════════════════════════════════════════════════════════════
     // Dự án thiết kế (Project Workspace) — CRUD + workflow cho Designer.

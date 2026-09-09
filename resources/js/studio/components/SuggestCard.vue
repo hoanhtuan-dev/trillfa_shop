@@ -109,6 +109,7 @@ function applyPrompt() {
         </div>
         <p class="max-h-36 overflow-y-auto rounded-md border border-white/10 bg-white/5 p-2 leading-relaxed text-cream-100">{{ lang === 'vi' ? (store.suggestResult.prompt_vi || 'Đang dịch…') : store.suggestResult.image_prompt_en }}</p>
         <button @click="applyPrompt" title="Đưa prompt vào ô Prompt Tạo Ảnh" class="btn-brand btn-sm mt-2 w-full">Áp dụng → Tạo Ảnh</button>
+        <button @click="store.saveSuggestResult()" :disabled="store.suggestSaving" title="Lưu kết quả vào Thư viện Prompt để dùng lại sau" class="btn-ghost btn-sm mt-1.5 w-full border border-emerald-500/30 text-emerald-200 hover:bg-emerald-900/30">{{ store.suggestSaving ? 'Đang lưu…' : '💾 Lưu vào Thư viện Prompt' }}</button>
       </div>
     </div>
   </div>

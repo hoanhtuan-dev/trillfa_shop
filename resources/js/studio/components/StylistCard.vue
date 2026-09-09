@@ -37,7 +37,32 @@ async function submitPrompt() {
 }
 async function refine() {
   loading.value = true;
-  try { const d = await store.api('/studio/stylist/refine', { type: type.value, prompt_en: promptEn.value, answers: buildAnswers() }); if (d.refined_en) promptEn.value = d.refined_en; if (d.refined_vi) promptVi.value = d.refined_vi; store.toast('Đã tinh chỉnh prompt.'); }
+  try {
+    const d = await store.api('/studio/stylist/refine', { type: type.value, prompt_en: promptEn.value, answers: buildAnswers() });
+    if (d.error) {
+      // AI không khả dụng — hiển thị lỗi rõ ràng thay vì âm thầm giữ prompt cũ
+      store.toast(d.error_message || 'Không thể tinh chỉnh: AI không phản hồi.', 'error');
+      // Vẫn hiển thị advice nếu có (advice tĩnh dự phòng)
+      if (d.advice) {
+        store.toast('💡 Gợi ý: ' + d.advice.replace(/[•\-]/g, '').trim().substring(0, 200), 'info');
+      }
+      loading.value = false;
+      return;
+    }
+    if (d.refined_en && d.refined_en !== promptEn.value) {
+      promptEn.value = d.refined_en;
+    }
+    if (d.refined_vi) {
+      promptVi.value = d.refined_vi;
+    }
+    store.toast('Đã tinh chỉnh prompt.');
+    if (d.advice) {
+      // Hiển thị lời khuyên chuyên gia trong toast thứ 2
+      setTimeout(() => {
+        store.toast('💡 ' + d.advice.replace(/[•\-]/g, '').trim().substring(0, 200), 'info');
+      }, 500);
+    }
+  }
   catch(e){ store.toast(e.message || 'Lỗi tinh chỉnh.', 'error'); }
   finally { loading.value = false; }
 }

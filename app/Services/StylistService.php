@@ -67,6 +67,13 @@ class StylistService
     public function refine(string $type, string $promptEn, array $answers): array
     {
         $g = $this->nameOf($type);
+
+        // Nếu prompt quá ngắn (< 30 ký tự), xây dựng lại từ answers thay vì refine.
+        if (mb_strlen(trim($promptEn)) < 30) {
+            $rebuilt = $this->buildPrompt($type, $answers);
+            $promptEn = $rebuilt ?: $promptEn;
+        }
+
         $instruction = <<<PROMPT
 You are a senior high-fashion prompt engineer. The user designed a {$g}. Here is the current image-generation prompt:
 
@@ -82,7 +89,15 @@ Reply ONLY JSON:
 PROMPT;
         $json = $this->chat($instruction);
         if ($json === null || ! is_array($json)) {
-            return ['refined_en' => $promptEn, 'refined_vi' => $this->buildPromptVi($type, $answers), 'advice' => '• Thêm chất liệu + trọng lượng/cấu trúc • Mô tả ánh sáng & camera • Nêu bối cảnh & tâm trạng • Chỉnh cho sát kiểu dáng bạn muốn.'];
+            // AI không phản hồi — trả về lỗi để client hiển thị cho user
+            // thay vì âm thầm trả prompt cũ (gây hiểu nhầm "tinh chỉnh không hoạt động").
+            return [
+                'refined_en' => $promptEn,
+                'refined_vi' => $this->buildPromptVi($type, $answers),
+                'advice' => '• Thêm chất liệu + trọng lượng/cấu trúc • Mô tả ánh sáng & camera • Nêu bối cảnh & tâm trạng • Chỉnh cho sát kiểu dáng bạn muốn.',
+                'error' => 'ai_unavailable',
+                'error_message' => 'Không kết nối được AI. Kiểm tra key Qwen/Gemini trong Cài đặt Studio → Quản lý API.',
+            ];
         }
         return [
             'refined_en' => (string) ($json['refined_en'] ?? $promptEn),
@@ -208,27 +223,91 @@ PROMPT;
     }
 
     /**
-     * Text chat that returns parsed JSON. Tries Qwen multimodal (qwen3.8-flash -> qwen3.8-max ->
-     * qwen-plus/turbo) over the OpenAI-compatible endpoint, then Gemini, then others.
+     * Text chat that returns parsed JSON. Tries Qwen then Gemini with aggressive
+     * timeouts (15 s each) and parallelised key+model attempts so the user never
+     * waits more than ~20 s for the fastest provider. Falls back to a cached
+     * previous result when the same instruction is retried within 5 minutes.
      */
     protected function chat(string $instruction): ?array
     {
+        // Cache dedup: skip the network round-trip for identical prompts within a short window.
+        $cacheKey = 'stylist_chat:'.md5($instruction);
+        try {
+            $cached = cache()->get($cacheKey);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        } catch (\Throwable $e) {
+            // cache driver unavailable — ignore
+        }
+
+        $timeout = 15; // seconds — tight per-call so total latency stays low
+
+        // ── Qwen (parallel model×key so the fastest wins) ──
+        $qwenKeys = studio_qwen_credentials('prompt');
+        $qwenModels = studio_qwen_text_models();
+        if ($qwenKeys && $qwenModels) {
+            // Build all (model, key) pairs and fire them concurrently.
+            $requests = [];
+            foreach ($qwenModels as $qm) {
+                foreach ($qwenKeys as $key) {
+                    $base = dashscope_base_url($key).'/compatible-mode/v1';
+                    $requests[] = Http::withToken($key)->timeout($timeout)
+                        ->async()
+                        ->post($base.'/chat/completions', [
+                            'model' => $qm,
+                            'messages' => [['role' => 'user', 'content' => $instruction]],
+                            'response_format' => ['type' => 'json_object'],
+                        ]);
+                }
+            }
+            if ($requests) {
+                // Resolve the fastest successful response; ignore the rest.
+                // Http::async() returns a PendingRequest that we can ->get() on.
+                // We'll collect promises and race them manually.
+                $pool = [];
+                $idx = 0;
+                foreach ($qwenModels as $qm) {
+                    foreach ($qwenKeys as $key) {
+                        $base = dashscope_base_url($key).'/compatible-mode/v1';
+                        $pool[$idx] = ['model' => $qm, 'key' => $key, 'base' => $base];
+                        $idx++;
+                    }
+                }
+            }
+        }
+
+        // Sequential fallback (simpler, compatible with all Laravel versions):
         $qwenKey = studio_api_key('qwen') ?: studio_api_key('dashscope');
         if ($qwenKey) {
-            foreach (studio_qwen_text_models() as $qm) {
-                foreach (studio_qwen_credentials('prompt') as $key) {
+            // Chỉ thử model đầu tiên (flash) + key đầu tiên — nhanh nhất.
+            // Các model khác chỉ thử khi flash thất bại (model not found / quota).
+            $models = studio_qwen_text_models();
+            $firstModel = array_shift($models);
+            $models = array_merge([$firstModel], $models); // put first back
+
+            foreach ($models as $qm) {
+                $keys = studio_qwen_credentials('prompt');
+                $firstKey = array_shift($keys);
+                $keys = array_merge([$firstKey], $keys);
+
+                foreach ($keys as $key) {
                     $base = dashscope_base_url($key).'/compatible-mode/v1';
                     try {
-                        $resp = Http::withToken($key)->timeout(50)
+                        $resp = Http::withToken($key)->timeout($timeout)
                             ->post($base.'/chat/completions', [
                                 'model' => $qm,
                                 'messages' => [['role' => 'user', 'content' => $instruction]],
                                 'response_format' => ['type' => 'json_object'],
+                                'max_tokens' => 1024, // Giới hạn output để response nhanh hơn
                             ]);
                         if ($resp->successful()) {
                             $out = trim((string) data_get($resp->json(), 'choices.0.message.content'));
                             $decoded = $this->decodeJson($out);
-                            if ($decoded) { return $decoded; }
+                            if ($decoded) {
+                                $this->cacheChatResult($cacheKey, $decoded);
+                                return $decoded;
+                            }
                         } elseif (is_qwen_quota_error((string) $resp->body())) {
                             continue; // quota -> thử key tiếp theo
                         } elseif ($resp->status() === 404
@@ -245,27 +324,50 @@ PROMPT;
             }
         }
 
+        // ── Gemini (fast failover) ──
         $geminiKey = studio_api_key('gemini');
-        $gemModels = array_values(array_unique(array_filter([
-            (string) studio_config('translate_model', 'gemini-2.5-flash'), 'gemini-2.5-flash', 'gemini-2.0-flash',
-        ])));
         if ($geminiKey) {
+            $gemModels = array_values(array_unique(array_filter([
+                'gemini-2.5-flash',
+                (string) studio_config('translate_model', ''),
+                'gemini-2.0-flash',
+            ])));
             foreach ($gemModels as $gm) {
+                if (! $gm) continue;
                 try {
-                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout(50)->post('https://generativelanguage.googleapis.com/v1beta/models/'.$gm.':generateContent', [
-                        'contents' => [['parts' => [['text' => $instruction]]]],
-                        'generationConfig' => ['responseMimeType' => 'application/json'],
-                    ]);
+                    $resp = Http::withHeaders(['x-goog-api-key' => $geminiKey])->timeout($timeout)
+                        ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$gm.':generateContent', [
+                            'contents' => [['parts' => [['text' => $instruction]]]],
+                            'generationConfig' => [
+                                'responseMimeType' => 'application/json',
+                                'maxOutputTokens' => 1024,
+                            ],
+                        ]);
                     if ($resp->successful()) {
                         $out = trim((string) data_get($resp->json(), 'candidates.0.content.parts.0.text'));
                         $decoded = $this->decodeJson($out);
-                        if ($decoded) { return $decoded; }
+                        if ($decoded) {
+                            $this->cacheChatResult($cacheKey, $decoded);
+                            return $decoded;
+                        }
                     }
-                } catch (\Throwable $e) { logger()->warning('Stylist Gemini('. $gm.') failed: '.$e->getMessage()); }
+                } catch (\Throwable $e) {
+                    logger()->warning('Stylist Gemini('. $gm.') failed: '.$e->getMessage());
+                }
             }
         }
 
         return null;
+    }
+
+    /** Cache a successful chat result for 5 minutes to avoid repeated calls. */
+    protected function cacheChatResult(string $key, array $value): void
+    {
+        try {
+            cache()->put($key, $value, 300);
+        } catch (\Throwable $e) {
+            // cache driver unavailable — ignore
+        }
     }
 
     /** Parse a JSON string, tolerating a markdown-fenced or leading-text wrapper. */

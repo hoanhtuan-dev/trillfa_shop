@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useStudioStore } from './store.js';
 import { thumbUrl, onThumbError } from './composables/useStudioThumb.js';
 import GalleryModal from './components/GalleryModal.vue';
+import SuggestLibraryCard from './components/SuggestLibraryCard.vue';
 import StudioIcon from './components/StudioIcon.vue';
 
 const store = useStudioStore();
@@ -31,6 +32,7 @@ const statuses = [
 
 const selectedCount = computed(() => store.librarySelection.length);
 const stats = computed(() => store.libraryStats || {});
+const suggestLibStats = computed(() => store.suggestLibStats || {});
 const allSelected = computed(() => store.libraryItems.length > 0 && store.librarySelection.length === store.libraryItems.length);
 const selectedBytes = computed(() => {
   const ids = new Set(store.librarySelection);
@@ -92,9 +94,11 @@ function openViewer(g) { store.openViewer(g); }
 function switchTab(tab) {
   store.libraryTab = tab;
   if (tab === 'uploads' && !store.uploadItems.length) store.loadUploads();
+  else if (tab === 'suggest' && !store.suggestLibItems.length) store.loadSuggestLib();
 }
 function refresh() {
   if (store.libraryTab === 'uploads') store.loadUploads();
+  else if (store.libraryTab === 'suggest') store.loadSuggestLib();
   else { store.loadLibrary(true); store.refreshLibraryScan(); }
 }
 
@@ -140,7 +144,7 @@ onMounted(async () => {
           </div>
           <h1 class="font-display text-lg font-semibold leading-tight sm:text-xl">
             Thư viện
-            <span class="ml-1.5 rounded-full border border-ink-700 bg-ink-800 px-2 py-0.5 text-[11px] font-semibold text-cream-300/80">{{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTotal) }}</span>
+            <span class="ml-1.5 rounded-full border border-ink-700 bg-ink-800 px-2 py-0.5 text-[11px] font-semibold text-cream-300/80">{{ fmtNum(store.libraryTab === 'uploads' ? (uploadStats.total ?? store.uploadItems.length) : store.libraryTab === 'suggest' ? (suggestLibStats.total ?? 0) : store.libraryTotal) }}</span>
           </h1>
           <button type="button" @click="goBack" class="tool-btn !px-3 !py-1.5" title="Quay lại studio thiết kế">
             <span class="rotate-180"><StudioIcon name="arrowRight" size="h-3.5 w-3.5" /></span> Về Studio
@@ -171,7 +175,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- ══ Tab điều hướng: Ảnh đã tạo / File tải lên ══ -->
+      <!-- ══ Tab điều hướng: Ảnh đã tạo / File tải lên / Prompt ══ -->
       <div class="seg mb-4 !p-1">
         <button @click="switchTab('generations')" class="seg-btn !py-2" :class="store.libraryTab === 'generations' ? 'is-active' : ''" title="Ảnh AI đã tạo">
           <StudioIcon name="image" size="h-4 w-4"/> Ảnh đã tạo
@@ -179,6 +183,10 @@ onMounted(async () => {
         <button @click="switchTab('uploads')" class="seg-btn !py-2" :class="store.libraryTab === 'uploads' ? 'is-active' : ''" title="File đã tải lên">
           <StudioIcon name="folderOpen" size="h-4 w-4"/> File tải lên
           <span v-if="uploadStats.unused_count" class="ml-1 rounded-full bg-red-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-red-100">{{ uploadStats.unused_count }}</span>
+        </button>
+        <button @click="switchTab('suggest')" class="seg-btn !py-2" :class="store.libraryTab === 'suggest' ? 'is-active' : ''" title="Prompt phân tích từ Gợi ý từ ảnh">
+          <StudioIcon name="lightbulb" size="h-4 w-4"/> 💡 Prompt
+          <span v-if="suggestLibStats.total" class="ml-1 rounded-full bg-brand-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-brand-100">{{ fmtNum(suggestLibStats.total) }}</span>
         </button>
       </div>
 
@@ -365,7 +373,7 @@ onMounted(async () => {
       </template>
 
       <!-- ══ Tab: FILE TẢI LÊN ══ -->
-      <template v-else>
+      <template v-else-if="store.libraryTab === 'uploads'">
         <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div class="rounded-lg border border-ink-700 bg-ink-800 p-3">
             <p class="text-[10px] uppercase tracking-wide text-cream-300/50">Tổng file</p>
@@ -439,6 +447,10 @@ onMounted(async () => {
             </button>
           </div>
         </div>
+      </template>
+      <!-- ══ Tab: 💡 PROMPT PHÂN TÍCH ══ -->
+      <template v-else>
+        <SuggestLibraryCard />
       </template>
     </div>
 

@@ -1665,6 +1665,78 @@ RULES:
     }
 
     /**
+     * Lưu kết quả phân tích từ "Gợi ý từ ảnh" vào Thư viện Prompt.
+     */
+    public function suggestLibrarySave(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'reference_url' => ['required', 'string', 'max:2048'],
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'styles' => ['nullable', 'array'],
+            'background' => ['nullable', 'string', 'max:200'],
+            'pose' => ['nullable', 'string', 'max:200'],
+            'fabric' => ['nullable', 'string', 'max:200'],
+            'silhouette' => ['nullable', 'string', 'max:200'],
+            'camera' => ['nullable', 'string', 'max:200'],
+            'garment_type' => ['nullable', 'string', 'max:200'],
+            'embellishment' => ['nullable', 'string', 'max:200'],
+            'detail_notes' => ['nullable', 'string', 'max:2000'],
+            'color_palette' => ['nullable', 'array'],
+            'image_prompt_en' => ['nullable', 'string', 'max:4000'],
+            'prompt_vi' => ['nullable', 'string', 'max:4000'],
+            'video_prompt_en' => ['nullable', 'string', 'max:4000'],
+            'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            'keywords' => ['nullable', 'array'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'adherence' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'detail_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'category' => ['nullable', 'array'],
+        ]);
+
+        $result = app(\App\Services\SuggestLibraryService::class)->save(
+            auth()->user(),
+            $data,
+            (string) $data['reference_url']
+        );
+
+        return response()->json(['id' => $result->id, 'ok' => true]);
+    }
+
+    /**
+     * Lấy danh sách Thư viện Prompt phân tích.
+     */
+    public function suggestLibraryData(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $filters = $request->only(['q', 'garment_type', 'project_id', 'page', 'per_page']);
+
+        return response()->json(
+            app(\App\Services\SuggestLibraryService::class)->list(auth()->user(), $filters)
+        );
+    }
+
+    /**
+     * Đánh dấu prompt đã được áp dụng vào Tạo ảnh.
+     */
+    public function suggestLibraryApply(int $id): \Illuminate\Http\JsonResponse
+    {
+        $result = \App\Models\SuggestResult::where('user_id', auth()->id())->findOrFail($id);
+        app(\App\Services\SuggestLibraryService::class)->apply($result);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Xóa hàng loạt prompt đã lưu.
+     */
+    public function suggestLibraryBulkDelete(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $ids = $request->input('ids', []);
+        $result = app(\App\Services\SuggestLibraryService::class)->bulkDelete(auth()->user(), $ids);
+
+        return response()->json($result);
+    }
+
+    /**
      * Upload a reference image (from a local blob) and return a public storage URL so it can be
      * used as a base_image for the pixel-preserving edit flow.
      */

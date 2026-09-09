@@ -98,6 +98,11 @@ class User extends Authenticatable
         return $this->hasMany(PromptsHistory::class);
     }
 
+    public function suggestResults(): HasMany
+    {
+        return $this->hasMany(SuggestResult::class);
+    }
+
     public function generations(): HasMany
     {
         return $this->hasMany(Generation::class);

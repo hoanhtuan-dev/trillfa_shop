@@ -155,6 +155,11 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/library/scan', [StudioController::class, 'libraryScan'])->name('library.scan');
     Route::post('/library/bulk-delete', [StudioController::class, 'libraryBulkDelete'])->name('library.bulk-delete');
     Route::post('/library/cleanup', [StudioController::class, 'libraryCleanup'])->name('library.cleanup');
+    // Thư viện Prompt phân tích ("💡 Gợi ý từ ảnh")
+    Route::get('/suggest-library/data', [StudioController::class, 'suggestLibraryData'])->name('suggest-library.data');
+    Route::post('/suggest-library/save', [StudioController::class, 'suggestLibrarySave'])->name('suggest-library.save');
+    Route::post('/suggest-library/apply/{id}', [StudioController::class, 'suggestLibraryApply'])->name('suggest-library.apply');
+    Route::post('/suggest-library/bulk-delete', [StudioController::class, 'suggestLibraryBulkDelete'])->name('suggest-library.bulk-delete');
     Route::get('/uploads', [StudioController::class, 'uploadedFiles'])->name('uploads');
     Route::post('/uploads/delete', [StudioController::class, 'uploadedFilesDelete'])->name('uploads.delete');
     Route::post('/uploads/cleanup', [StudioController::class, 'uploadedFilesCleanup'])->name('uploads.cleanup');
