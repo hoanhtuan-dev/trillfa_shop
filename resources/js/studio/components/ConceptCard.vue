@@ -6,11 +6,14 @@ import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
 
 // ── Tab navigation trong modal ──
-const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'advanced'
+const activeTab = ref('prompt'); // 'prompt' | 'body' | 'hair' | 'pose' | 'advanced'
 
 // ── Sub-panels ──
 const showAdvanced = ref(false);
 const promptLoading = ref(false);
+// Pose mẫu (kế thừa từ chip Thử đồ — tab Tư thế)
+const imagePoses = ref([]);
+const imagePosesLoaded = ref(false);
 const showHistory = ref(false);
 const showTemplates = ref(false);
 const showPresets = ref(false);
@@ -207,6 +210,20 @@ function syncSuffixToSettings(v) {
 }
 watch(() => store.promptPrefix, (v) => { if (v !== undefined) syncPrefixToSettings(v); });
 watch(() => store.promptSuffix, (v) => { if (v !== undefined) syncSuffixToSettings(v); });
+
+// ── Pose mẫu (kế thừa từ chip Thử đồ — load lười khi mở tab Tư thế) ──
+async function loadImagePoses() {
+  if (imagePosesLoaded.value) return;
+  imagePosesLoaded.value = true;
+  try {
+    const r = await fetch('/studio/swap-poses', { headers: { Accept: 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if (Array.isArray(d.items)) imagePoses.value = d.items;
+  } catch (e) { /* giữ mặc định */ }
+}
+// Watch tab switch để load poses khi vào tab Tư thế
+watch(activeTab, (tab) => { if (tab === 'pose') loadImagePoses(); });
 
 // ── Draft state ──
 const showDraftNotice = ref(false);
@@ -499,6 +516,7 @@ const bodyHipsLabel = computed(() => {
               { id: 'prompt', icon: 'pencil', label: 'Prompt', tooltip: 'Nhập và chỉnh sửa prompt tạo ảnh' },
               { id: 'body', icon: 'body', label: 'Phom dáng', tooltip: 'Điều chỉnh chiều cao, vóc dáng, eo, vai, hông của người mẫu' },
               { id: 'hair', icon: 'hair', label: 'Kiểu tóc', tooltip: 'Chọn kiểu tóc và màu tóc thời thượng' },
+              { id: 'pose', icon: 'pose', label: 'Tư thế', tooltip: 'Chọn tư thế người mẫu (kế thừa từ chip Thử đồ)' },
               { id: 'advanced', icon: 'gear', label: 'Nâng cao', tooltip: 'Negative prompt và các tùy chọn nâng cao' },
             ]" :key="tab.id" @click="activeTab = tab.id" :title="tab.tooltip" class="seg-btn"
               :class="activeTab === tab.id ? 'is-active' : ''">
@@ -677,6 +695,25 @@ const bodyHipsLabel = computed(() => {
                 {{ c.name }}
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- ===== TAB: TƯ THẾ (kế thừa từ chip Thử đồ) ===== -->
+        <div v-show="activeTab === 'pose'" class="space-y-3">
+          <div class="rounded-lg border border-emerald-500/20 bg-emerald-900/10 p-3">
+            <p class="flex items-center gap-1.5 text-xs font-semibold text-emerald-200"><StudioIcon name="pose" size="h-3.5 w-3.5" /> Tư thế người mẫu</p>
+            <p class="mt-0.5 text-[10px] text-emerald-300/50">Kế thừa từ chip Thử đồ. AI sẽ đọc ảnh pose để tạo mô tả tư thế. Để trống = AI tự chọn.</p>
+          </div>
+          <div v-if="!imagePosesLoaded" class="py-4 text-center"><div class="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent"></div></div>
+          <div v-else class="grid grid-cols-2 gap-1.5">
+            <button v-for="p in imagePoses" :key="p.id" @click="store.imagePoseId = (String(store.imagePoseId) === String(p.id)) ? '' : String(p.id)"
+                    :class="String(store.imagePoseId) === String(p.id) ? 'border-emerald-400 bg-emerald-600/25 ring-1 ring-emerald-400/40' : 'border-ink-700 bg-ink-800 hover:border-emerald-400/50'"
+                    class="flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] font-semibold text-cream-200 transition">
+              <img v-if="p.thumb || p.image" :src="p.thumb || p.image" loading="lazy" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-white/20">
+              <span v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-700 text-sm">🧍</span>
+              <span class="truncate">{{ p.name }}</span>
+            </button>
+            <span v-if="!imagePoses.length" class="col-span-2 text-[10px] text-cream-300/50">Chưa có pose mẫu — để trống để AI tự chọn.</span>
           </div>
         </div>
 

@@ -96,6 +96,7 @@ export const useStudioStore = defineStore('studio', {
     // concept
     imagePromptEn: '',
     negativePromptEn: '',
+    imagePoseId: '',          // Pose mẫu được chọn trong tab Tư thế (kế thừa từ chip Thử đồ)
     promptPrefix: '',      // Prompt prefix từ Settings (tự động thêm vào đầu) — đồng bộ 2 chiều
     promptSuffix: '',      // Prompt suffix từ Settings (tự động thêm vào cuối) — đồng bộ 2 chiều
     creativeLevel: 6,
@@ -450,6 +451,7 @@ export const useStudioStore = defineStore('studio', {
           body_hips: this.bodyHips,
           hair_style: this.hairStyle || '',
           hair_color: this.hairColor || '',
+          pose_id: this.imagePoseId || '',
           // "Dự án hiện tại": ảnh tạo ra sẽ tự gắn vào dự án đang áp dụng
           // (null khi đang ở chế độ duyệt → không gắn vào dự án người khác).
           project_id: this.appliedProjectId(),

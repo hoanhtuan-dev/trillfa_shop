@@ -89,6 +89,7 @@ class StudioController extends Controller
             'body_hips' => ['nullable', 'integer', 'min:1', 'max:10'],
             'hair_style' => ['nullable', 'string', 'max:100'],
             'hair_color' => ['nullable', 'string', 'max:100'],
+            'pose_id' => ['nullable', 'string', 'max:255'],
             'seed' => ['nullable', 'integer', 'min:1', 'max:2147483647'],
         ]);
 
@@ -103,8 +104,25 @@ class StudioController extends Controller
         // ── Inject phom dáng + tóc vào user prompt (trước khi enrich) ──
         $bodyDirectives = $this->buildBodyDirective($data);
         $hairDirective = $this->buildHairDirective($data);
-        if ($bodyDirectives !== '' || $hairDirective !== '') {
-            $userPrompt = trim($userPrompt.' '.trim($bodyDirectives.' '.$hairDirective));
+
+        // ── Inject pose mẫu vào user prompt (kế thừa từ chip Thử đồ) ──
+        $poseDirective = '';
+        if (! empty($data['pose_id'])) {
+            $pose = app(\App\Services\VirtualTryOnService::class)->pickPose((string) $data['pose_id']);
+            if ($pose) {
+                $poseImage = ! empty($pose['image']) ? (string) $pose['image'] : null;
+                if ($poseImage) {
+                    $poseDirective = $this->poseDescription($poseImage);
+                }
+                if (! $poseDirective) {
+                    $poseDirective = trim((string) ($pose['skeleton'] ?? $pose['name'] ?? ''));
+                }
+            }
+        }
+
+        $extraDirectives = trim(trim($bodyDirectives.' '.$hairDirective).' '.$poseDirective);
+        if ($extraDirectives !== '') {
+            $userPrompt = trim($userPrompt.' '.$extraDirectives);
         }
 
         // Enrich the prompt with CreativeDirectionService
