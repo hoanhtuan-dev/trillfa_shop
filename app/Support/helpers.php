@@ -314,9 +314,10 @@ if (! function_exists('studio_config')) {
     function studio_config(string $key, $default = null)
     {
         // Prefer a DB setting override (set via the Studio admin), fall back to config.
+        // Empty string from DB (= user cleared the field) → fall back to config default.
         $stored = setting('studio_'.$key);
 
-        return $stored !== null ? (string) $stored : config('studio.'.$key, $default);
+        return ($stored !== null && $stored !== '') ? (string) $stored : config('studio.'.$key, $default);
     }
 }
 
