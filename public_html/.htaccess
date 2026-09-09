@@ -1,3 +1,12 @@
+# Ep MIME type chuan cho .js — Hostinger mac dinh tra "application/x-javascript" (khong thuoc
+# JavaScript MIME type list theo WHATWG spec) khien Chromium bao "cross-world service worker
+# resource mismatch" + "preloaded but not used" cho modulepreload cua cac chunk dung chung.
+# text/javascript la MIME chuan duoc moi trinh duyet cong nhan cho ES modules.
+<IfModule mod_mime.c>
+    AddType text/javascript .js
+    AddType text/javascript .mjs
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
