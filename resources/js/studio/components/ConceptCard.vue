@@ -212,6 +212,10 @@ function syncSuffixToSettings(v) {
 }
 watch(() => store.promptPrefix, (v) => { if (v !== undefined) syncPrefixToSettings(v); });
 watch(() => store.promptSuffix, (v) => { if (v !== undefined) syncSuffixToSettings(v); });
+// ── Ghi nhớ local: prefix/suffix/negative + checkbox bật/tắt (ưu tiên hơn DB khi tải lại) ──
+watch(() => [store.promptPrefix, store.promptSuffix, store.negativePromptEn,
+              store.promptUsePrefix, store.promptUseSuffix, store.promptUseNegative],
+       () => store.savePromptMemory(), { deep: true });
 
 // ── Pose mẫu (kế thừa từ chip Thử đồ — load lười khi mở tab Tư thế) ──
 async function loadImagePoses() {
@@ -262,6 +266,7 @@ async function openPrompt() {
 function restoreDraft() { loadDraft(); showDraftNotice.value = false; undoStack.value = [store.imagePromptEn || '']; redoStack.value = []; store.toast('Đã khôi phục bản nháp.'); }
 function dismissDraft() { showDraftNotice.value = false; clearDraft(); }
 function resetToDefaults() {
+  store.clearPromptMemory(); // xóa cài đặt prompt local (prefix/suffix/negative + checkbox) trước khi reset
   store.applyDefaults();
   localCreative.value = store.creativeLevel; localTexture.value = store.texture;
   localVariant.value = store.variantCount; localBodyHeight.value = store.bodyHeight;
@@ -723,22 +728,31 @@ const bodyHipsLabel = computed(() => {
         <!-- ===== TAB: NÂNG CAO ===== -->
         <div v-show="activeTab === 'advanced'" class="space-y-3">
           <!-- Prompt Prefix (đồng bộ từ Settings) -->
-          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
-            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="arrowRight" size="h-3.5 w-3.5" /> Prompt Prefix (tự động thêm vào đầu)</label>
+          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4" :class="!store.promptUsePrefix ? 'opacity-60' : ''">
+            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200">
+              <button type="button" @click="store.promptUsePrefix = !store.promptUsePrefix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUsePrefix ? 'border-brand-400 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUsePrefix ? 'Đang dùng Prompt Prefix — bấm để tắt' : 'Không dùng Prompt Prefix — bấm để bật'" :aria-label="store.promptUsePrefix ? 'Tắt dùng Prompt Prefix' : 'Bật dùng Prompt Prefix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUsePrefix ? '' : 'opacity-0'" /></button>
+              <StudioIcon name="arrowRight" size="h-3.5 w-3.5" /> Prompt Prefix (tự động thêm vào đầu)
+            </label>
             <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a href="/studio/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a>. Để trống = dùng mặc định.</p>
-            <textarea v-model="store.promptPrefix" rows="2" class="input !text-sm !py-2 !rounded-md" placeholder="High-fashion editorial photograph, professional fashion photography" title="Tự động ghép vào ĐẦU prompt khi tạo ảnh"></textarea>
+            <textarea v-model="store.promptPrefix" rows="2" :disabled="!store.promptUsePrefix" class="input !text-sm !py-2 !rounded-md disabled:opacity-50" placeholder="High-fashion editorial photograph, professional fashion photography" title="Tự động ghép vào ĐẦU prompt khi tạo ảnh"></textarea>
           </div>
           <!-- Prompt Suffix (đồng bộ từ Settings) -->
-          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
-            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Prompt Suffix (tự động thêm vào cuối)</label>
+          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4" :class="!store.promptUseSuffix ? 'opacity-60' : ''">
+            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200">
+              <button type="button" @click="store.promptUseSuffix = !store.promptUseSuffix" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUseSuffix ? 'border-brand-400 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUseSuffix ? 'Đang dùng Prompt Suffix — bấm để tắt' : 'Không dùng Prompt Suffix — bấm để bật'" :aria-label="store.promptUseSuffix ? 'Tắt dùng Prompt Suffix' : 'Bật dùng Prompt Suffix'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUseSuffix ? '' : 'opacity-0'" /></button>
+              <StudioIcon name="arrowLeft" size="h-3.5 w-3.5" /> Prompt Suffix (tự động thêm vào cuối)
+            </label>
             <p class="mb-2 text-[10px] text-cream-300/50">Đồng bộ 2 chiều với <a href="/studio/settings" target="_blank" class="text-brand-400 underline">Cài đặt Studio</a>. Để trống = dùng mặc định.</p>
-            <textarea v-model="store.promptSuffix" rows="2" class="input !text-sm !py-2 !rounded-md" placeholder="soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus" title="Tự động ghép vào CUỐI prompt khi tạo ảnh"></textarea>
+            <textarea v-model="store.promptSuffix" rows="2" :disabled="!store.promptUseSuffix" class="input !text-sm !py-2 !rounded-md disabled:opacity-50" placeholder="soft diffused studio lighting, clean minimal background, ultra detailed, 4k, sharp focus" title="Tự động ghép vào CUỐI prompt khi tạo ảnh"></textarea>
           </div>
           <!-- Negative prompt -->
-          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4">
-            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200"><StudioIcon name="x" size="h-3.5 w-3.5" /> Negative Prompt</label>
+          <div class="rounded-lg border border-ink-700 bg-gradient-to-br from-ink-800 to-ink-800/70 p-4" :class="!store.promptUseNegative ? 'opacity-60' : ''">
+            <label class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-cream-200">
+              <button type="button" @click="store.promptUseNegative = !store.promptUseNegative" class="grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors" :class="store.promptUseNegative ? 'border-brand-400 bg-brand-500/40 text-white' : 'border-ink-600 text-transparent'" :title="store.promptUseNegative ? 'Đang dùng Negative Prompt — bấm để tắt' : 'Không dùng Negative Prompt — bấm để bật'" :aria-label="store.promptUseNegative ? 'Tắt dùng Negative Prompt' : 'Bật dùng Negative Prompt'"><StudioIcon name="check" size="h-3 w-3" :class="store.promptUseNegative ? '' : 'opacity-0'" /></button>
+              <StudioIcon name="x" size="h-3.5 w-3.5" /> Negative Prompt
+            </label>
             <p class="mb-2 text-[10px] text-cream-300/50">Điều model KHÔNG nên tạo. Để trống sẽ dùng mặc định từ Cài đặt.</p>
-            <textarea v-model="store.negativePromptEn" rows="3" class="input !text-sm !py-2 !rounded-md" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..." title="Nhập các yếu tố bạn muốn AI tránh tạo ra trong ảnh"></textarea>
+            <textarea v-model="store.negativePromptEn" rows="3" :disabled="!store.promptUseNegative" class="input !text-sm !py-2 !rounded-md disabled:opacity-50" placeholder="blurry, low quality, distorted proportions, extra limbs, deformed hands, watermark, text, logo..." title="Nhập các yếu tố bạn muốn AI tránh tạo ra trong ảnh"></textarea>
           </div>
 
 

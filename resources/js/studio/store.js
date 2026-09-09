@@ -101,6 +101,10 @@ export const useStudioStore = defineStore('studio', {
     imagePoseId: '',          // Pose mẫu được chọn trong tab Tư thế (kế thừa từ chip Thử đồ)
     promptPrefix: '',      // Prompt prefix từ Settings (tự động thêm vào đầu) — đồng bộ 2 chiều
     promptSuffix: '',      // Prompt suffix từ Settings (tự động thêm vào cuối) — đồng bộ 2 chiều
+    // ── Bật/tắt dùng Prompt Prefix · Prompt Suffix · Negative Prompt (ghi nhớ local, mặc định BẬT) ──
+    promptUsePrefix: true,
+    promptUseSuffix: true,
+    promptUseNegative: true,
     creativeLevel: 6,
     variantCount: 1,
     imageRatio: '1:1',
@@ -344,6 +348,9 @@ export const useStudioStore = defineStore('studio', {
         const cfg = await fetch('/studio/defaults', { headers: { Accept: 'application/json' } });
         const defaults = await cfg.json();
         this._applyDefaultValues(defaults);
+        // ƯU TIÊN local: cài đặt prompt người dùng đã lưu (prefix/suffix/negative + checkbox)
+        // được khôi phục SAU defaults DB → ghi đè giá trị từ database.
+        this.restorePromptMemory();
         this.defaultsLoaded = true;
         return defaults;
       } catch (e) { /* keep current values */ return null; }
@@ -449,9 +456,10 @@ export const useStudioStore = defineStore('studio', {
           prompt: this.imagePromptEn,
           creative_level: this.creativeLevel,
           texture: this.texture,
-          negative_prompt: this.negativePromptEn || '',
-          prompt_prefix: this.promptPrefix || '',
-          prompt_suffix: this.promptSuffix || '',
+          // Tôn trọng checkbox: tắt → gửi rỗng → backend bỏ qua prefix/suffix/negative.
+          negative_prompt: this.promptUseNegative ? (this.negativePromptEn || '') : '',
+          prompt_prefix: this.promptUsePrefix ? (this.promptPrefix || '') : '',
+          prompt_suffix: this.promptUseSuffix ? (this.promptSuffix || '') : '',
           resolution: this.imageRes,
           ratio: this.imageRatio,
           variants,
@@ -2567,6 +2575,38 @@ export const useStudioStore = defineStore('studio', {
     // ── Cài đặt status bar (snap · nền canvas · inspector) ──
     saveBarSettings() { try { localStorage.setItem('trillfa.bar', JSON.stringify({ snapGrid: this.snapGrid, canvasBg: this.canvasBg, inspectorOpen: this.inspectorOpen, leftPanelOpen: this.leftPanelOpen, outputDockOpen: this.outputDockOpen })); } catch (e) { /* bỏ qua */ } },
     restoreBarSettings() { try { const d = JSON.parse(localStorage.getItem('trillfa.bar') || 'null'); if (!d) return; if (d.snapGrid != null) this.snapGrid = Number(d.snapGrid) || 0; if (d.canvasBg) this.canvasBg = d.canvasBg; if (d.inspectorOpen != null) this.inspectorOpen = !!d.inspectorOpen; if (d.leftPanelOpen != null) this.leftPanelOpen = !!d.leftPanelOpen; if (d.outputDockOpen != null) this.outputDockOpen = !!d.outputDockOpen; } catch (e) { /* bỏ qua */ } },
+    // ── Ghi nhớ cài đặt prompt của người dùng (localStorage) — ƯU TIÊN hơn dữ liệu DB ──
+    // Lưu negative prompt + prefix/suffix + 3 checkbox bật/tắt. Khi load lại trang,
+    // giá trị local ghi đè lên defaults từ database (nếu đã từng chỉnh sửa ở đây).
+    savePromptMemory() {
+      try {
+        localStorage.setItem('trillfa.prompt-cfg', JSON.stringify({
+          promptPrefix: this.promptPrefix || '',
+          promptSuffix: this.promptSuffix || '',
+          negativePromptEn: this.negativePromptEn || '',
+          promptUsePrefix: !!this.promptUsePrefix,
+          promptUseSuffix: !!this.promptUseSuffix,
+          promptUseNegative: !!this.promptUseNegative,
+        }));
+      } catch (e) { /* bỏ qua */ }
+    },
+    restorePromptMemory() {
+      try {
+        const d = JSON.parse(localStorage.getItem('trillfa.prompt-cfg') || 'null');
+        if (!d) return;
+        if (typeof d.promptPrefix === 'string') this.promptPrefix = d.promptPrefix;
+        if (typeof d.promptSuffix === 'string') this.promptSuffix = d.promptSuffix;
+        if (typeof d.negativePromptEn === 'string') this.negativePromptEn = d.negativePromptEn;
+        if (d.promptUsePrefix != null) this.promptUsePrefix = !!d.promptUsePrefix;
+        if (d.promptUseSuffix != null) this.promptUseSuffix = !!d.promptUseSuffix;
+        if (d.promptUseNegative != null) this.promptUseNegative = !!d.promptUseNegative;
+      } catch (e) { /* bỏ qua */ }
+    },
+    clearPromptMemory() {
+      try { localStorage.removeItem('trillfa.prompt-cfg'); } catch (e) { /* bỏ qua */ }
+      this.promptPrefix = ''; this.promptSuffix = ''; this.negativePromptEn = '';
+      this.promptUsePrefix = true; this.promptUseSuffix = true; this.promptUseNegative = true;
+    },
     // Khôi phục bố cục layer; bỏ layer 'gen' đã bị xóa khỏi output, giữ layer 'source' (URL vẫn hợp lệ).
     restoreLayerLayout() {
       try {
