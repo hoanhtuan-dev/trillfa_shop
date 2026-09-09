@@ -186,7 +186,7 @@
 
 /* Studio dark theme overrides — UNLAYERED so they beat Tailwind utilities (bg-cream, text-ink, etc.) */
     .studio-dark { @apply bg-ink-900 text-cream-100; }
-    .studio-dark .card { @apply border-ink-700 bg-ink-800 shadow-black/30 rounded-lg; } }
+    .studio-dark .card { @apply border-ink-700 bg-ink-800 shadow-black/30 rounded-lg; }
     .studio-dark .card-hover { @apply hover:shadow-black/50; }
     .studio-dark .input { @apply border-ink-700 bg-ink-900 text-cream-50 rounded-md placeholder:text-cream-200/40 focus:border-brand-400 focus:ring-brand-400/20; }
     .studio-dark .label { @apply text-cream-300; }
@@ -218,7 +218,7 @@
    Chỉ đặt tên mới (seg-, tool-btn, icon-btn, panel-) — không đụng storefront. */
 @layer components {
     /* Segmented control (tabs / chế độ / ngôn ngữ) — thay mọi chip lồng nhau */
-    .seg { @apply flex gap-1 rounded-lg bg-ink-800 p-1; } }
+    .seg { @apply flex gap-1 rounded-lg bg-ink-800 p-1; }
     .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] font-semibold text-cream-300/70 transition hover:text-cream-100; }
     .seg-btn.is-active { @apply bg-brand-600 text-white hover:text-white; }
     /* Nút toolbar nhỏ trong card/panel (toggle lịch sử, templates, hành động phụ) */

@@ -642,3 +642,7 @@ function onTouchEnd(e) {
     <div v-if="outputOpen" class="fixed inset-0 z-50 lg:hidden">
       <div class="absolute inset-0 bg-black/60"></div>
       <div class="absolute right-0 top-0 h-full w-80 scrollbar-hide overflow-y-auto bg-ink-900 p-3" @click.stop>
+      </div>
+    </div>
+  </div>
+</template>
