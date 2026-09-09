@@ -124,6 +124,12 @@ const ICONS = {
   hand: '<path d="M18 11V6a1 1 0 0 0-2 0v5"/><path d="M16 11V4a1 1 0 0 0-2 0v7"/><path d="M14 11V4.5a1 1 0 0 0-2 0V11"/><path d="M12 11V6a1 1 0 0 0-2 0v8"/><path d="M10 14.5V12a1 1 0 0 0-2 0v3a6 6 0 0 0 6 6 6 6 0 0 0 6-6V9a1 1 0 0 0-2 0v3"/>',
   // Chọn tất cả layer trên canvas.
   selectAll: '<path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M7 3h2"/><path d="M15 3h2"/><path d="M7 21h2"/><path d="M15 21h2"/><path d="M3 7v2"/><path d="M3 15v2"/><path d="M21 7v2"/><path d="M21 15v2"/><rect width="6" height="6" x="9" y="9" rx="1"/>',
+  // Checkbox có tick (checked) — nút chọn nhiều.
+  checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>',
+  // Checkbox trống (unchecked).
+  square: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
+  // Dọn toàn bộ canvas (clear all).
+  trashAll: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6h14l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Z"/><line x1="10" x2="14" y1="3" y2="3"/>',
   chevronLeft: '<path d="m15 18-6-6 6-6"/>',
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
   imagePlus: '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><line x1="16" x2="22" y1="5" y2="5"/><line x1="19" x2="19" y1="2" y2="8"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',

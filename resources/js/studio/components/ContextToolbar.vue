@@ -128,11 +128,11 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <button @click="store.filmOpen = false" :class="iconBtnDanger" title="Đóng" aria-label="Đóng"><StudioIcon name="x" :size="I"/></button>
   </div>
 
-  <!-- ══ Layer Selection: hiện khi có layer ĐANG CHỌN (không cần bật selectTool) — thay thế MultiSelectBar ══ -->
+  <!-- ══ Layer Selection: hiện khi có layer ĐANG CHỌN (không cần bật selectTool) ══ -->
   <div v-else-if="store.activeLayer && !store.selectTool" class="flex flex-wrap items-center justify-center gap-1.5 rounded-lg bg-ink-900/95 px-2.5 py-2 text-xs font-semibold shadow-xl ring-1" :class="ring">
-    <!-- Nút chọn nhiều: toggle = bắt đầu/tắt chế độ shift+click (giống MultiSelectBar cũ) -->
-    <button @click="store.selectTool = !store.selectTool" :class="[lbl, store.selectTool ? on : btn]" title="Bật/tắt chọn nhiều — khi bật, bấm vào layer khác để thêm vào nhóm chọn (Shift+click)"><StudioIcon name="cursor" :size="I"/>Chọn nhiều</button>
-    <!-- Căn lề (hiện khi chọn >= 2 layer) -->
+    <!-- Nút checkbox chọn nhiều: toggle selectTool → cho phép thêm/bớt layer vào selection -->
+    <button @click="store.selectTool = !store.selectTool" :class="[lbl, store.selectTool ? on : btn]" title="Bật/tắt chọn nhiều layer — bấm layer để thêm/bớt vào nhóm chọn (giống Shift+click)"><StudioIcon name="checkSquare" :size="I"/>Chọn nhiều</button>
+    <!-- Căn lề (hiện khi >= 2 layer) -->
     <template v-if="store.selectionUnitCount >= 2">
       <span :class="sep"></span>
       <button @click="store.alignSelection('left')" :class="iconBtn" title="Căn trái"><StudioIcon name="alignStartHorizontal" :size="I"/></button>
@@ -145,12 +145,16 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
       <button @click="store.distributeSelection('x')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều ngang"><StudioIcon name="distributeHorizontal" :size="I"/></button>
       <button @click="store.distributeSelection('y')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều dọc"><StudioIcon name="distributeVertical" :size="I"/></button>
       <button @click="store.groupSelection()" :class="[lbl, '!bg-brand-600/20 !text-brand-200 hover:!bg-brand-600 hover:!text-white']" title="Tạo nhóm từ các layer đang chọn"><StudioIcon name="group" :size="I"/>Nhóm</button>
-      <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, btn]" title="Tách nhóm"><StudioIcon name="unlink" :size="I"/>Tách</button>
     </template>
+    <!-- Nút Tách nhóm: luôn hiện nếu ít nhất 1 layer thuộc group (kể cả chọn 1 layer trong group) -->
+    <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, 'text-amber-300 hover:bg-amber-600/25 hover:text-amber-200']" title="Tách nhóm — trả các layer về độc lập"><StudioIcon name="unlink" :size="I"/>Tách</button>
     <span :class="sep"></span>
     <button @click="store.duplicateActiveUnit()" :class="iconBtn" title="Nhân đôi (Ctrl+D)"><StudioIcon name="copy" :size="I"/></button>
-    <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa (Delete)"><StudioIcon name="trash" :size="I"/></button>
+    <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa layer đang chọn (Delete)"><StudioIcon name="trash" :size="I"/></button>
     <button @click="store.downloadSelection()" :class="[lbl, btn]" title="Tải layer đang chọn"><StudioIcon name="download" :size="I"/>Tải</button>
+    <span :class="sep"></span>
+    <!-- Nút Dọn canvas: xác nhận popup trước khi xóa toàn bộ -->
+    <button @click="store.confirmClearCanvasOpen ? store.confirmClearCanvas() : store.clearCanvas()" :class="[lbl, store.confirmClearCanvasOpen ? '!bg-red-600 !text-white' : 'text-red-300 hover:bg-red-600/25 hover:text-red-200']" :title="store.confirmClearCanvasOpen ? 'Xác nhận dọn toàn bộ canvas — không thể hoàn tác sau khi xác nhận!' : 'Dọn toàn bộ canvas (cần xác nhận)'"><StudioIcon name="trashAll" :size="I"/>{{ store.confirmClearCanvasOpen ? '⚠️ Xác nhận dọn?' : 'Dọn canvas' }}</button>
     <span :class="sep"></span>
     <button @click="store.zoomFitSelection()" :class="[lbl, btn]" title="Fit canvas — đưa các layer/group đang chọn vào giữa khung nhìn"><StudioIcon name="maximize" :size="I"/>Fit chọn</button>
     <span :class="sep"></span>
@@ -164,7 +168,7 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
     <button @click="store.selectAll()" :class="[lbl, btn]" title="Chọn tất cả layer (Ctrl+A)"><StudioIcon name="selectAll" :size="I"/>Tất cả</button>
     <button @click="store.deselectAll()" :class="[lbl, btn]" title="Bỏ chọn tất cả (Esc)"><StudioIcon name="x" :size="I"/>Bỏ chọn</button>
     <span :class="sep"></span>
-    <!-- Các hành động khi có layer đang chọn trong chế độ quét -->
+    <!-- Hành động hiện khi có layer đang chọn -->
     <template v-if="store.selectionUnitCount >= 2">
       <button @click="store.alignSelection('left')" :class="iconBtn" title="Căn trái"><StudioIcon name="alignStartHorizontal" :size="I"/></button>
       <button @click="store.alignSelection('hcenter')" :class="iconBtn" title="Căn giữa ngang"><StudioIcon name="alignCenterHorizontal" :size="I"/></button>
@@ -176,12 +180,16 @@ function P(icon, lbl, v) { return { icon, lbl, v }; }
       <button @click="store.distributeSelection('x')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều ngang"><StudioIcon name="distributeHorizontal" :size="I"/></button>
       <button @click="store.distributeSelection('y')" :class="iconBtn" :disabled="store.selectionUnitCount < 3" title="Chia đều theo chiều dọc"><StudioIcon name="distributeVertical" :size="I"/></button>
       <button @click="store.groupSelection()" :class="[lbl, '!bg-brand-600/20 !text-brand-200 hover:!bg-brand-600 hover:!text-white']" title="Tạo nhóm"><StudioIcon name="group" :size="I"/>Nhóm</button>
-      <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, btn]" title="Tách nhóm"><StudioIcon name="unlink" :size="I"/>Tách</button>
+    </template>
+    <button v-if="store.selection.some(l => l.groupId)" @click="store.ungroupSelection()" :class="[lbl, 'text-amber-300 hover:bg-amber-600/25 hover:text-amber-200']" title="Tách nhóm"><StudioIcon name="unlink" :size="I"/>Tách</button>
+    <template v-if="store.selectionUnitCount">
       <button @click="store.duplicateActiveUnit()" :class="iconBtn" title="Nhân đôi (Ctrl+D)"><StudioIcon name="copy" :size="I"/></button>
       <button @click="store.deleteSelection()" :class="iconBtnDanger" title="Xóa (Delete)"><StudioIcon name="trash" :size="I"/></button>
       <button @click="store.downloadSelection()" :class="[lbl, btn]" title="Tải"><StudioIcon name="download" :size="I"/>Tải</button>
-      <span :class="sep"></span>
     </template>
+    <span :class="sep"></span>
+    <button @click="store.confirmClearCanvasOpen ? store.confirmClearCanvas() : store.clearCanvas()" :class="[lbl, store.confirmClearCanvasOpen ? '!bg-red-600 !text-white' : 'text-red-300 hover:bg-red-600/25 hover:text-red-200']" :title="store.confirmClearCanvasOpen ? 'Xác nhận dọn toàn bộ canvas!' : 'Dọn canvas'"><StudioIcon name="trashAll" :size="I"/>{{ store.confirmClearCanvasOpen ? 'Xác nhận!' : 'Dọn canvas' }}</button>
+    <span :class="sep"></span>
     <button @click="store.zoomFitSelection()" :class="[lbl, btn]" title="Fit canvas — đưa các layer/group đang chọn vào giữa khung nhìn"><StudioIcon name="maximize" :size="I"/>Fit chọn</button>
     <span :class="sep"></span>
     <span class="flex items-center gap-1 rounded-full bg-ink-800 px-2 py-0.5 text-[10px] text-cream-300/70"><StudioIcon name="layers" size="h-3 w-3" class="text-brand-300" />{{ store.selectionUnitCount || (store.activeLayer ? 1 : 0) }}</span>

@@ -63,6 +63,7 @@ export const useStudioStore = defineStore('studio', {
     selectTool: false, // công cụ LỰA CHỌN: bật thì kéo vùng trống = quét chọn (còn lại = pan như cũ)
     panMode: false,   // công cụ DI CHUYỂN CANVAS (hand tool): khi bật, mọi kéo vùng trống = pan (giống Ctrl+Space). Trên desktop có thể dùng Space/Ctrl, trên tablet cần nút riêng.
     confirmDeleteOpen: false, // popup xác nhận xóa nhiều layer
+    confirmClearCanvasOpen: false, // popup xác nhận dọn toàn bộ canvas
     _pinch: null,
     // Xóa vùng (erase) với feather
     eraseMode: false,
@@ -2403,6 +2404,25 @@ export const useStudioStore = defineStore('studio', {
       this.confirmDeleteOpen = false;
       this.saveLayerLayout();
       this.toast('Đã xóa ' + units.length + ' đối tượng.');
+    },
+    clearCanvas() {
+      this.confirmClearCanvasOpen = true;
+      clearTimeout(this._clearCanvasTimer);
+      this._clearCanvasTimer = setTimeout(() => { this.confirmClearCanvasOpen = false; }, 5000);
+    },
+    confirmClearCanvas() {
+      const count = this.canvasLayers.length;
+      this.pushHistory();
+      this.canvasLayers = [];
+      this.layerGroups = [];
+      this.activeLayerId = '';
+      this.editSource = null;
+      this.previewId = null;
+      this.preview = null;
+      this.selectedLayerIds = [];
+      this.confirmClearCanvasOpen = false;
+      this.saveLayerLayout();
+      this.toast('Đã dọn toàn bộ canvas (' + count + ' layer).');
     },
     // Bỏ chọn layer active (nhấp khoảng trống trên canvas).
     selectAll() {
