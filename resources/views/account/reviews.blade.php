@@ -20,7 +20,7 @@
                 <div class="card p-6">
                     <div class="flex items-center justify-between">
                         <a href="{{ route('product.show', $review->product->slug) }}" class="flex items-center gap-3">
-                            <img src="{{ $review->product->image_url ?: asset('images/placeholder.svg') }}" class="h-12 w-12 rounded-xl object-cover" alt="">
+                            <img src="{{ $review->product->image_url ?: asset('images/placeholder.svg') }}" class="h-12 w-12 rounded-2xl object-cover" alt="">
                             <div>
                                 <p class="text-sm font-medium text-ink-900 hover:text-brand-700">{{ $review->product->name }}</p>
                                 <div class="mt-0.5"><x-rating :value="$review->rating" /></div>

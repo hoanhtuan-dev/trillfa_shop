@@ -93,7 +93,7 @@
                     <ul class="space-y-1">
                         @foreach($items as $item)
                             <li>
-                                <a href="{{ $item[1] }}" class="flex items-center gap-3 rounded-xl px-3 py-2.5 transition {{ (request()->path() === ltrim(parse_url($item[1], PHP_URL_PATH), '/') || (substr_count(ltrim(parse_url($item[1], PHP_URL_PATH), '/'), '/') >= 1 && str_starts_with(request()->path(), ltrim(parse_url($item[1], PHP_URL_PATH), '/').'/'))) ? 'bg-brand-600 text-white' : 'text-cream-100/80 hover:bg-white/10' }}">
+                                <a href="{{ $item[1] }}" class="flex items-center gap-3 rounded-2xl px-3 py-2.5 transition {{ (request()->path() === ltrim(parse_url($item[1], PHP_URL_PATH), '/') || (substr_count(ltrim(parse_url($item[1], PHP_URL_PATH), '/'), '/') >= 1 && str_starts_with(request()->path(), ltrim(parse_url($item[1], PHP_URL_PATH), '/').'/'))) ? 'bg-brand-600 text-white' : 'text-cream-100/80 hover:bg-white/10' }}">
                                     <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $item[2] }}"/></svg>
                                     <span>{{ $item[0] }}</span>
                                 </a>
@@ -115,7 +115,7 @@
             </div>
             <form method="POST" action="{{ route('logout') }}" class="mt-3">
                 @csrf
-                <button type="submit" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-cream-100/80 transition hover:bg-white/10 hover:text-white">
+                <button type="submit" class="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium text-cream-100/80 transition hover:bg-white/10 hover:text-white">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
                     Đăng xuất
                 </button>

@@ -127,9 +127,9 @@ onMounted(() => store.fetchCart());
                         <div>
                             <h3 class="text-sm font-semibold text-ink-900">Danh mục</h3>
                             <div class="mt-3 space-y-1">
-                                <a href="/shop" class="block rounded-xl px-3 py-1.5 text-sm transition" :class="!boot.active?.category ? 'bg-brand-600/10 font-semibold text-brand-700' : 'text-ink-700 hover:bg-cream-100'">Tất cả</a>
+                                <a href="/shop" class="block rounded-2xl px-3 py-1.5 text-sm transition" :class="!boot.active?.category ? 'bg-brand-600/10 font-semibold text-brand-700' : 'text-ink-700 hover:bg-cream-100'">Tất cả</a>
                                 <template v-for="cat in categories" :key="cat.id">
-                                    <a :href="cat.url" class="block rounded-xl px-3 py-1.5 text-sm transition" :class="boot.active?.category === cat.slug ? 'bg-brand-600/10 font-semibold text-brand-700' : 'text-ink-700 hover:bg-cream-100'">{{ cat.name }}</a>
+                                    <a :href="cat.url" class="block rounded-2xl px-3 py-1.5 text-sm transition" :class="boot.active?.category === cat.slug ? 'bg-brand-600/10 font-semibold text-brand-700' : 'text-ink-700 hover:bg-cream-100'">{{ cat.name }}</a>
                                     <div class="ml-3 space-y-0.5 border-l border-cream-200 pl-2">
                                         <a
                                             v-for="child in cat.children"
@@ -151,7 +151,7 @@ onMounted(() => store.fetchCart());
                                     v-for="b in brands"
                                     :key="b"
                                     @click="filters.brand = filters.brand === b ? '' : b; apply(1)"
-                                    class="block w-full rounded-xl px-3 py-1.5 text-left text-sm transition"
+                                    class="block w-full rounded-2xl px-3 py-1.5 text-left text-sm transition"
                                     :class="filters.brand === b ? 'bg-brand-600/10 font-semibold text-brand-700' : 'text-ink-700 hover:bg-cream-100'"
                                 >{{ b }}</button>
                             </div>
@@ -200,7 +200,7 @@ onMounted(() => store.fetchCart());
                                 v-for="p in lastPage"
                                 :key="p"
                                 @click="goPage(p)"
-                                class="grid h-9 w-9 place-items-center rounded-full text-sm font-medium transition"
+                                class="grid h-9 w-9 place-items-center rounded-2xl text-sm font-medium transition"
                                 :class="p === filters.page ? 'bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-md shadow-brand-600/30' : 'text-ink-700 hover:bg-cream-100'"
                             >{{ p }}</button>
                             <button :disabled="filters.page >= lastPage" @click="goPage(filters.page + 1)" class="sf-btn sf-btn-soft !p-2" aria-label="Sau"><Icon name="chevron-right" :size="18" /></button>

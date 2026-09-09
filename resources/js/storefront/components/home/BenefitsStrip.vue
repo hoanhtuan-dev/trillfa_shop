@@ -12,7 +12,7 @@ const props = defineProps({
             <div
                 v-for="b in benefits"
                 :key="b.title"
-                class="card-surface card-surface-hover flex items-start gap-3 rounded-3xl p-4"
+                class="card-surface card-surface-hover flex items-start gap-3 rounded-2xl p-4"
             >
                 <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600/15 to-brand-500/5 text-brand-600 ring-1 ring-brand-600/10">
                     <Icon :name="b.icon" :size="20" />

@@ -14,7 +14,7 @@
         </div>
 
         @if($errors->any())
-            <div class="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
+            <div class="mt-5 rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
         @endif
 
         <form method="POST" action="{{ route('account.complete.store', $order) }}" class="mt-6 space-y-4">

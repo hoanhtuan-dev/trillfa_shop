@@ -12,7 +12,7 @@
 @endphp
 
 <div x-data="productCard" class="group relative flex flex-col">
-    <a href="{{ route('product.show', $product->slug) }}" class="relative block overflow-hidden rounded-3xl bg-cream-100">
+    <a href="{{ route('product.show', $product->slug) }}" class="relative block overflow-hidden rounded-2xl bg-cream-100">
         <div class="aspect-[4/5] w-full overflow-hidden">
             <img src="{{ $img }}" alt="{{ $product->name }}" loading="lazy" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105">
         </div>

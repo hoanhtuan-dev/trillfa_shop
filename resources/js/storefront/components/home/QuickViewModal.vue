@@ -107,7 +107,7 @@ function toggleWishlist() { store.toggleWishlist(product.value.id); }
                                 <span class="pointer-events-none absolute bottom-3 right-3 rounded-full bg-ink-900/60 px-2.5 py-1 text-[10px] font-medium text-cream-50 backdrop-blur">+ Hover để phóng to</span>
                             </div>
                             <div v-if="images.length > 1" class="flex gap-2 p-3">
-                                <button v-for="(img, i) in images" :key="i" @click="activeImg = i" class="h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition" :class="i === activeImg ? 'border-brand-500' : 'border-transparent opacity-70 hover:opacity-100'">
+                                <button v-for="(img, i) in images" :key="i" @click="activeImg = i" class="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border-2 transition" :class="i === activeImg ? 'border-brand-500' : 'border-transparent opacity-70 hover:opacity-100'">
                                     <img :src="img" :alt="product.name" class="h-full w-full object-cover" />
                                 </button>
                             </div>
@@ -152,19 +152,19 @@ function toggleWishlist() { store.toggleWishlist(product.value.id); }
                                 <div v-if="Object.keys(attrs).length" class="mt-4">
                                     <p class="text-xs font-semibold uppercase tracking-wide text-ink-700">Thông số</p>
                                     <div class="mt-2 grid grid-cols-2 gap-2">
-                                        <div v-for="(val, key) in attrs" :key="key" class="rounded-xl border border-cream-200 bg-white/60 px-3 py-2"><p class="text-[11px] uppercase tracking-wide text-ink-500">{{ key }}</p><p class="mt-0.5 text-sm font-medium text-ink-900">{{ val }}</p></div>
+                                        <div v-for="(val, key) in attrs" :key="key" class="rounded-2xl border border-cream-200 bg-white/60 px-3 py-2"><p class="text-[11px] uppercase tracking-wide text-ink-500">{{ key }}</p><p class="mt-0.5 text-sm font-medium text-ink-900">{{ val }}</p></div>
                                     </div>
                                 </div>
 
                                 <!-- Actions -->
                                 <div class="mt-5 flex items-center gap-3">
-                                    <div class="inline-flex items-center rounded-full border border-cream-200 bg-white">
-                                        <button @click="qty = Math.max(1, qty - 1)" class="grid h-10 w-10 place-items-center rounded-full text-ink-700 hover:bg-cream-100" aria-label="Giảm"><Icon name="minus" :size="15" /></button>
+                                    <div class="inline-flex items-center rounded-2xl border border-cream-200 bg-white">
+                                        <button @click="qty = Math.max(1, qty - 1)" class="grid h-10 w-10 place-items-center rounded-lg text-ink-700 hover:bg-cream-100" aria-label="Giảm"><Icon name="minus" :size="15" /></button>
                                         <span class="min-w-8 text-center font-semibold">{{ qty }}</span>
-                                        <button @click="qty = Math.min(99, qty + 1)" class="grid h-10 w-10 place-items-center rounded-full text-ink-700 hover:bg-cream-100" aria-label="Tăng"><Icon name="plus" :size="15" /></button>
+                                        <button @click="qty = Math.min(99, qty + 1)" class="grid h-10 w-10 place-items-center rounded-lg text-ink-700 hover:bg-cream-100" aria-label="Tăng"><Icon name="plus" :size="15" /></button>
                                     </div>
                                     <button :disabled="!product.in_stock" @click="addToCart" class="sf-btn sf-btn-primary flex-1 !py-3" :class="{ '!opacity-50 pointer-events-none': !product.in_stock }"><Icon name="cart" :size="17" /> {{ product.in_stock ? 'Thêm vào giỏ' : 'Hết hàng' }}</button>
-                                    <button @click="toggleWishlist" class="grid h-11 w-11 shrink-0 place-items-center rounded-full glass-strong text-ink-900" :class="store.wishlistHas(product.id) ? 'text-clay-500' : ''" aria-label="Yêu thích"><Icon name="heart" :size="18" :fill="true" :stroke-width="0" /></button>
+                                    <button @click="toggleWishlist" class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl glass-strong text-ink-900" :class="store.wishlistHas(product.id) ? 'text-clay-500' : ''" aria-label="Yêu thích"><Icon name="heart" :size="18" :fill="true" :stroke-width="0" /></button>
                                 </div>
 
                                 <a :href="product.url" class="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">Xem chi tiết sản phẩm <Icon name="arrow-right" :size="15" /></a>

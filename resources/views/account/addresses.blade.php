@@ -11,7 +11,7 @@
     </div>
 
     @if(session('success'))
-        <div class="mb-4 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
+        <div class="mb-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
     @endif
 
     <div class="grid gap-4 sm:grid-cols-2" x-data="{ form: false, edit: null }">
@@ -63,7 +63,7 @@
             </form>
         </div>
         @if($errors->any())
-            <div class="col-span-full rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
+            <div class="col-span-full rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
         @endif
     </div>
 @endsection

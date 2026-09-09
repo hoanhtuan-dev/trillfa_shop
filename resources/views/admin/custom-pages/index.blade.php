@@ -5,7 +5,7 @@
 
 @section('content')
     <div class="mb-5 flex items-center justify-between">
-        <div class="rounded-xl bg-brand-50 p-4 text-sm text-brand-800">
+        <div class="rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">
             Tạo các trang đích linh hoạt: bộ sưu tập mới, sự kiện ra mắt, chiến dịch… Mỗi trang có hero riêng, nội dung phong phú và bộ sưu tập sản phẩm.
         </div>
         <a href="{{ route('admin.pages.create') }}" class="btn-brand btn-sm shrink-0">+ Tạo trang đích</a>
@@ -58,6 +58,6 @@
     </div>
 
     @if(session('success'))
-        <div class="mt-4 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
+        <div class="mt-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
     @endif
 @endsection

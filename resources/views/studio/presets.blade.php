@@ -49,7 +49,7 @@
             <label class="label">Chú giải (tiếng Việt — hiển thị khi hover / xem thông tin template)</label>
             <textarea name="note" rows="1" class="input !text-xs" placeholder="VD: Chụp Lookbook thương mại, hiển thị tỷ lệ trang phục trung thực."></textarea>
         </div>
-        @if($errors->any())<div class="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
+        @if($errors->any())<div class="mt-3 rounded-2xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </form>
 
     <!-- Lists grouped by category -->

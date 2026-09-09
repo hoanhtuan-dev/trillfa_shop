@@ -141,7 +141,7 @@ onMounted(() => store.fetchCart());
 
               <div class="mt-5 space-y-3">
                 <div v-for="(it, i) in order.items" :key="i" class="flex items-center gap-3">
-                  <div class="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-cream-100"><img v-if="it.image" :src="it.image" :alt="it.name" class="h-full w-full object-cover" /><Icon v-else name="bag" :size="20" class="p-3 text-brand-600" /></div>
+                  <div class="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-cream-100"><img v-if="it.image" :src="it.image" :alt="it.name" class="h-full w-full object-cover" /><Icon v-else name="bag" :size="20" class="p-3 text-brand-600" /></div>
                   <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium text-ink-900">{{ it.name }}</p><p class="text-xs text-ink-500">{{ it.sku }} · x{{ it.quantity }}</p></div>
                   <span class="text-sm font-medium text-ink-900">{{ formatMoney(it.subtotal) }}</span>
                 </div>

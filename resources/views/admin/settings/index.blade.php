@@ -5,7 +5,7 @@
 
 @section('content')
     @if(session('success'))
-        <div class="mb-4 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
+        <div class="mb-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
     @endif
 
     <form method="POST" action="{{ route('admin.settings.update') }}" class="grid gap-6 lg:grid-cols-2">

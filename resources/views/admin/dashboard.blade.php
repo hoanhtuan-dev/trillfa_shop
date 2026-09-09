@@ -71,7 +71,7 @@
                     </div>
                 @endforeach
             </div>
-            <div class="mt-5 rounded-xl bg-amber-50 p-4 text-sm">
+            <div class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm">
                 <p class="font-medium text-amber-700">Cảnh báo</p>
                 <p class="mt-1 text-amber-600">{{ number_format($pendingOrders) }} đơn chờ xử lý · {{ number_format($lowStock) }} sản phẩm sắp hết hàng</p>
             </div>
@@ -85,7 +85,7 @@
             <div class="space-y-3">
                 @foreach($topProducts as $p)
                     <div class="flex items-center gap-3">
-                        <img src="{{ $p->image_url ?: asset('images/placeholder.svg') }}" class="h-12 w-12 rounded-xl object-cover" alt="">
+                        <img src="{{ $p->image_url ?: asset('images/placeholder.svg') }}" class="h-12 w-12 rounded-2xl object-cover" alt="">
                         <div class="flex-1 min-w-0">
                             <p class="truncate text-sm font-medium text-ink-900">{{ $p->name }}</p>
                             <p class="text-xs text-ink-500">{{ $p->category?->name ?? 'Chung' }}</p>

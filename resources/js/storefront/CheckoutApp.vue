@@ -144,7 +144,7 @@ onMounted(() => {
                     <h2 class="font-display text-lg font-semibold text-ink-900">Đơn hàng</h2>
                     <div class="mt-4 max-h-64 space-y-3 overflow-y-auto">
                         <div v-for="item in items" :key="item.id" class="flex items-center gap-3">
-                            <div class="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-cream-100">
+                            <div class="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-cream-100">
                                 <img :src="item.image" :alt="item.name" class="h-full w-full object-cover" />
                                 <span class="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-ink-900 px-1 text-[10px] font-bold text-cream-50">{{ item.quantity }}</span>
                             </div>

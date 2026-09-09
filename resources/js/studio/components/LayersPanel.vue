@@ -96,7 +96,7 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
       </p>
       <div class="flex shrink-0 items-center gap-1">
         <div class="relative">
-          <button @click="blankMenuOpen = !blankMenuOpen" class="grid h-7 w-7 place-items-center rounded-md bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer mới" aria-label="Thêm layer mới">
+          <button @click="blankMenuOpen = !blankMenuOpen" class="grid h-7 w-7 place-items-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-500" title="Thêm layer mới" aria-label="Thêm layer mới">
             <StudioIcon name="plus" size="h-4 w-4" />
           </button>
           <!-- Backdrop phủ toàn màn hình: bấm ra ngoài menu → tự thoát popup (thoát tiêu điểm) -->
@@ -127,10 +127,10 @@ function doRemoveBg() { removeBgConfirmOpen.value = false; store.removeBackgroun
             </div>
           </div>
         </div>
-        <button @click="store.cleanCanvas()" class="grid h-7 w-7 place-items-center rounded-md text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)" aria-label="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">
+        <button @click="store.cleanCanvas()" class="grid h-7 w-7 place-items-center rounded-lg text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200" title="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)" aria-label="Dọn canvas — bỏ hết ảnh trên canvas (không xóa kết quả)">
           <StudioIcon name="trash" size="h-4 w-4" />
         </button>
-        <button @click="store.toggleInspector()" class="grid h-7 w-7 place-items-center rounded-md text-cream-200 transition-colors hover:bg-ink-700" title="Ẩn panel Layers" aria-label="Ẩn panel Layers">
+        <button @click="store.toggleInspector()" class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 transition-colors hover:bg-ink-700" title="Ẩn panel Layers" aria-label="Ẩn panel Layers">
           <StudioIcon name="panelRight" size="h-4 w-4" />
         </button>
       </div>

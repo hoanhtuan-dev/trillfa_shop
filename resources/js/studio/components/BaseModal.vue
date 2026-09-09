@@ -12,7 +12,7 @@ const emit = defineEmits(['update:modelValue']);
     <!-- Mode 1: có height cố định -> flex-col + header cố định + body cuộn (inline style chống override) -->
     <div
       v-if="height"
-      class="w-full overflow-hidden rounded-3xl border border-brand-500/40 bg-ink-900 shadow-2xl"
+      class="w-full overflow-hidden rounded-2xl border border-brand-500/40 bg-ink-900 shadow-2xl"
       :class="wide ? 'max-w-3xl' : 'max-w-lg'"
       :style="{ display: 'flex', flexDirection: 'column', height: height, maxHeight: 'calc(100vh - 2rem)' }"
       @click.stop
@@ -28,7 +28,7 @@ const emit = defineEmits(['update:modelValue']);
     <!-- Mode 2: không height -> auto tối đa 85vh, toàn bộ cuộn + header sticky -->
     <div
       v-else
-      class="w-full overflow-y-auto overscroll-contain rounded-3xl border border-brand-500/40 bg-ink-900 shadow-2xl"
+      class="w-full overflow-y-auto overscroll-contain rounded-2xl border border-brand-500/40 bg-ink-900 shadow-2xl"
       :class="wide ? 'max-w-3xl' : 'max-w-lg'"
       style="max-height: 85vh"
       @click.stop

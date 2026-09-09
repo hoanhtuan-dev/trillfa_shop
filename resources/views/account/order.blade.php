@@ -12,10 +12,10 @@
     </div>
 
     @if(session('success'))
-        <div class="mb-4 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
+        <div class="mb-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
     @endif
     @if(session('error'))
-        <div class="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ session('error') }}</div>
+        <div class="mb-4 rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ session('error') }}</div>
     @endif
 
     <!-- Status -->

@@ -27,7 +27,7 @@
     <div class="mt-8 grid gap-10 lg:grid-cols-2" x-data="productDetail({ productId: {{ $product->id }}, hasVariants: {{ $hasVariants ? 'true' : 'false' }}, variants: {{ Js::from($variants) }}, minQty: 1, maxQty: {{ max((int) $product->total_stock, 1) }} })">
         <!-- Gallery -->
         <div class="lg:sticky lg:top-24 lg:self-start" x-data="productGallery({ images: {{ Js::from($baseImages) }} })" @variant-image.window="images.unshift($event.detail); active = 0">
-            <div class="relative overflow-hidden rounded-3xl bg-cream-100">
+            <div class="relative overflow-hidden rounded-2xl bg-cream-100">
                 <img :src="images[active]" :alt="'{{ $product->name }}'" class="aspect-[4/5] w-full object-cover" />
                 @if($product->discount_percent > 0)
                     <span class="badge absolute left-4 top-4 bg-clay-500 text-white">-{{ $product->discount_percent }}%</span>
@@ -202,10 +202,10 @@
                                 <button type="submit" class="btn-brand">Gửi đánh giá</button>
                             </form>
                             @if($errors->any())
-                                <div class="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
+                                <div class="mb-4 rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
                             @endif
                         @else
-                            <p class="mb-6 rounded-xl bg-cream-100 p-4 text-sm text-ink-700">Đăng nhập để viết đánh giá. <a href="{{ route('login') }}" class="link">Đăng nhập</a></p>
+                            <p class="mb-6 rounded-2xl bg-cream-100 p-4 text-sm text-ink-700">Đăng nhập để viết đánh giá. <a href="{{ route('login') }}" class="link">Đăng nhập</a></p>
                         @endauth
 
                         @forelse($product->reviews as $review)

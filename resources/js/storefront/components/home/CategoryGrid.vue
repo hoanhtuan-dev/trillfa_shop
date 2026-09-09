@@ -114,7 +114,7 @@ onBeforeUnmount(() => { if (io) io.disconnect(); });
     display: block;
     aspect-ratio: 4 / 5;
     overflow: hidden;
-    border-radius: 1.5rem;
+    border-radius: 1.75rem;
     border: 1px solid rgba(233, 229, 219, 0.9);
     background: linear-gradient(145deg, #ffffff 0%, #f4f2ec 100%);
     box-shadow:
@@ -211,7 +211,7 @@ onBeforeUnmount(() => { if (io) io.disconnect(); });
     place-items: center;
     width: 2.25rem;
     height: 2.25rem;
-    border-radius: 0.85rem;
+    border-radius: 0.75rem;
     background: rgba(255, 255, 255, 0.82);
     border: 1px solid rgba(255, 255, 255, 0.7);
     box-shadow: 0 6px 16px -8px rgba(11, 18, 16, 0.5);

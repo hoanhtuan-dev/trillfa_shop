@@ -36,7 +36,7 @@ const store = useStudioStore();
       <button v-for="sc in store.videoScenes" :key="sc.id" @click="store.videoScene = String(store.videoScene) === String(sc.id) ? '' : sc.id" :title="sc.prompt"
               class="flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[10px] font-semibold transition-all"
               :class="String(store.videoScene) === String(sc.id) ? 'border-brand-400 bg-brand-600/25 text-cream-50 shadow-brand-500/20' : 'border-ink-700 bg-ink-800 text-cream-200 hover:border-brand-400/50 hover:bg-ink-700'">
-        <span class="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-ink-700/70 text-brand-300"><StudioIcon name="film" size="h-3 w-3" /></span>
+        <span class="grid h-5 w-5 shrink-0 place-items-center rounded-lg bg-ink-700/70 text-brand-300"><StudioIcon name="film" size="h-3 w-3" /></span>
         <span class="truncate">{{ sc.label }}</span>
       </button>
     </div>

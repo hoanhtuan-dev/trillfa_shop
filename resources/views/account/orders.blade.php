@@ -31,10 +31,10 @@
                     <div class="flex flex-wrap items-center justify-between gap-3 pt-4">
                         <div class="flex -space-x-3">
                             @foreach($order->items->take(4) as $item)
-                                <img src="{{ $item->image_url ?: asset('images/placeholder.svg') }}" class="h-12 w-12 rounded-xl border-2 border-white object-cover" alt="">
+                                <img src="{{ $item->image_url ?: asset('images/placeholder.svg') }}" class="h-12 w-12 rounded-2xl border-2 border-white object-cover" alt="">
                             @endforeach
                             @if($order->items->count() > 4)
-                                <span class="grid h-12 w-12 place-items-center rounded-xl border-2 border-white bg-cream-100 text-xs font-semibold text-ink-500">+{{ $order->items->count() - 4 }}</span>
+                                <span class="grid h-12 w-12 place-items-center rounded-2xl border-2 border-white bg-cream-100 text-xs font-semibold text-ink-500">+{{ $order->items->count() - 4 }}</span>
                             @endif
                         </div>
                         <div class="flex items-center gap-3">

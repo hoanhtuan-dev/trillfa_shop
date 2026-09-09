@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="container-x flex min-h-[75vh] items-center justify-center py-16">
-    <div class="grid w-full max-w-4xl overflow-hidden rounded-3xl border border-cream-200 bg-white lg:grid-cols-2">
+    <div class="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-cream-200 bg-white lg:grid-cols-2">
         <div class="relative hidden lg:block">
             <img src="{{ asset('samples/2aOboQrGJ4Pj8CanWSj6MFVJ1xiwOYY5srLPEBjk.jpg') }}" alt="" class="h-full w-full object-cover">
             <div class="absolute inset-0 bg-gradient-to-tr from-ink-900/70 via-ink-900/20 to-transparent"></div>
@@ -18,7 +18,7 @@
             <p class="mt-2 text-sm text-ink-500">Chào mừng bạn quay lại Trillfa Fa.</p>
 
             @if($errors->any())
-                <div class="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
+                <div class="mt-4 rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
             @endif
 
             <form method="POST" action="{{ route('login.store') }}" class="mt-6 space-y-4">

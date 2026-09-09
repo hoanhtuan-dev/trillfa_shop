@@ -129,7 +129,7 @@
                         </div>
                         <span class="badge bg-cream-200 text-ink-700"><span x-text="sel.credits_cost || 0"></span> token</span>
                     </div>
-                    <div x-show="sel.prompt"><p class="text-xs font-semibold text-ink-700">Prompt:</p><p class="mt-1 rounded-xl bg-cream-100 p-3 text-xs text-ink-500" x-text="sel.prompt"></p></div>
+                    <div x-show="sel.prompt"><p class="text-xs font-semibold text-ink-700">Prompt:</p><p class="mt-1 rounded-2xl bg-cream-100 p-3 text-xs text-ink-500" x-text="sel.prompt"></p></div>
                     <div class="flex flex-wrap gap-2">
                         <a :href="'/studio/generations/' + sel.id + '/download'" class="btn-brand btn-sm" x-show="sel.media_url">Tải xuống</a>
                         <a :href="'/studio?gen=' + sel.id" class="btn-outline btn-sm">Mở trong Studio</a>

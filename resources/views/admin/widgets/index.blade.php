@@ -4,7 +4,7 @@
 @section('page_title', 'Widget & khối nội dung')
 
 @section('content')
-    <div class="mb-5 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">
+    <div class="mb-5 rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">
         Bật/tắt, đặt giới hạn hiển thị và biên tập nội dung từng khối trên trang chủ, footer và thanh thông báo. Cài đặt được lưu và áp dụng ngay.
     </div>
 
@@ -55,6 +55,6 @@
     </form>
 
     @if(session('success'))
-        <div class="mt-4 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
+        <div class="mt-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
     @endif
 @endsection

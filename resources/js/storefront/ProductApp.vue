@@ -171,10 +171,10 @@ onMounted(() => {
 
                     <!-- Quantity + Add -->
                     <div class="mt-6 flex flex-wrap items-center gap-3">
-                        <div class="inline-flex items-center rounded-full border border-cream-200 bg-white">
-                            <button @click="decQty" class="grid h-11 w-11 place-items-center rounded-full text-ink-700 transition hover:bg-cream-100" aria-label="Giảm"><Icon name="minus" :size="18" /></button>
+                        <div class="inline-flex items-center rounded-2xl border border-cream-200 bg-white">
+                            <button @click="decQty" class="grid h-11 w-11 place-items-center rounded-lg text-ink-700 transition hover:bg-cream-100" aria-label="Giảm"><Icon name="minus" :size="18" /></button>
                             <span class="min-w-10 text-center text-base font-semibold">{{ qty }}</span>
-                            <button @click="incQty" class="grid h-11 w-11 place-items-center rounded-full text-ink-700 transition hover:bg-cream-100" aria-label="Tăng"><Icon name="plus" :size="18" /></button>
+                            <button @click="incQty" class="grid h-11 w-11 place-items-center rounded-lg text-ink-700 transition hover:bg-cream-100" aria-label="Tăng"><Icon name="plus" :size="18" /></button>
                         </div>
                         <BaseButton v-if="product.in_stock" @click="addToCart" variant="primary" size="lg" class="flex-1">
                             <Icon name="cart" :size="18" /> Thêm vào giỏ

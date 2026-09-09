@@ -23,7 +23,7 @@ onMounted(() => store.fetchCart());
         <h1 class="mt-2 font-display text-4xl font-semibold text-ink-900 sm:text-5xl">{{ page.title }}</h1>
         <!-- Mở đầu (giới thiệu ngắn) do admin soạn bằng rich editor — hiển thị như HTML -->
         <div v-if="page.intro" class="prose-content mx-auto mt-4 max-w-2xl text-lg text-ink-500" v-html="page.intro"></div>
-        <img v-if="page.image" :src="page.image" :alt="page.title" class="mx-auto mt-8 w-full max-w-2xl rounded-3xl object-cover" />
+        <img v-if="page.image" :src="page.image" :alt="page.title" class="mx-auto mt-8 w-full max-w-2xl rounded-2xl object-cover" />
       </div>
 
       <!-- Contact form -->

@@ -25,7 +25,7 @@ const toolHint = computed(() => {
 });
 
 // Nút icon chuẩn (spec §4.2): h-7 hit-target, hover nền ink-700, disabled mờ 30%.
-const BTN = 'grid h-7 w-7 place-items-center rounded-md text-cream-200 hover:bg-ink-700 disabled:opacity-30';
+const BTN = 'grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30';
 
 // Nền swatch — inline style y hệt pill cũ StudioApp (grid checker / dark / white / cream).
 const bgSwatchStyle = (b) => ({
@@ -50,7 +50,7 @@ const bgSwatchStyle = (b) => ({
 
     <!-- 3. Zoom -->
     <button @click="store.zoomOut()" :class="BTN" title="Thu nhỏ" aria-label="Thu nhỏ"><StudioIcon name="zoomOut" /></button>
-    <button @click="store.zoomFit()" class="min-w-12 rounded-md px-1 py-1 text-center text-[11px] tabular-nums text-cream-200 hover:bg-ink-700">{{ Math.round(store.zoom * 100) }}%</button>
+    <button @click="store.zoomFit()" class="min-w-12 rounded-lg px-1 py-1 text-center text-[11px] tabular-nums text-cream-200 hover:bg-ink-700">{{ Math.round(store.zoom * 100) }}%</button>
     <button @click="store.zoomIn()" :class="BTN" title="Phóng to" aria-label="Phóng to"><StudioIcon name="zoomIn" /></button>
     <button @click="store.zoomFit()" :class="BTN" title="Vừa khung hình" aria-label="Vừa khung hình"><StudioIcon name="maximize" /></button>
 
@@ -96,7 +96,7 @@ const bgSwatchStyle = (b) => ({
     <!-- 8. Lưu vật lý -->
     <button
       @click="store.saveNow()"
-      class="grid h-7 w-7 place-items-center rounded-md text-cream-200 hover:bg-ink-700"
+      class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700"
       title="Lưu trang (Save)"
       aria-label="Lưu trang"
     ><StudioIcon name="save" /></button>
@@ -105,7 +105,7 @@ const bgSwatchStyle = (b) => ({
     <button
       @click="store.downloadActive()"
       :disabled="!store.upscaleSrc"
-      class="grid h-7 w-7 place-items-center rounded-md bg-brand-600 text-white transition-colors hover:bg-brand-500 disabled:opacity-30"
+      class="grid h-7 w-7 place-items-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-500 disabled:opacity-30"
       title="Tải ảnh đang chọn"
       aria-label="Tải ảnh đang chọn"
     ><StudioIcon name="download" /></button>
@@ -113,7 +113,7 @@ const bgSwatchStyle = (b) => ({
     <!-- 9. Toggle inspector (lg+) -->
     <button
       @click="store.toggleInspector()"
-      class="grid h-7 w-7 place-items-center rounded-md text-cream-200 hover:bg-ink-700 disabled:opacity-30"
+      class="grid h-7 w-7 place-items-center rounded-lg text-cream-200 hover:bg-ink-700 disabled:opacity-30"
       :class="store.inspectorOpen ? 'bg-brand-600/20 text-brand-300' : ''"
       title="Bật/tắt panel Layers"
       aria-label="Bật/tắt panel Layers"

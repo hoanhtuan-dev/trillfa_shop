@@ -142,7 +142,7 @@
                         <button type="button" @click="resetForm()" class="btn-ghost" x-show="editing">Hủy</button>
                     </div>
                 </form>
-                @if($errors->any())<div class="mt-3 rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>@endif
+                @if($errors->any())<div class="mt-3 rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>@endif
             </div>
         </div>
     @endforeach

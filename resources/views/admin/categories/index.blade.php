@@ -82,12 +82,12 @@
             </div>
             <div>
                 <label class="label">Ảnh</label>
-                <button type="button" @click="$refs.image.click()" class="flex w-full items-center justify-center rounded-xl border-2 border-dashed border-cream-300 p-5 text-center transition hover:border-brand-500">
+                <button type="button" @click="$refs.image.click()" class="flex w-full items-center justify-center rounded-2xl border-2 border-dashed border-cream-300 p-5 text-center transition hover:border-brand-500">
                     <span class="text-sm text-ink-500">Chọn ảnh</span>
                 </button>
                 <input x-ref="image" type="file" name="image" @change="onImg" class="hidden" accept="image/*">
                 <template x-if="imagePreview">
-                    <div class="relative mt-3 overflow-hidden rounded-xl">
+                    <div class="relative mt-3 overflow-hidden rounded-2xl">
                         <img :src="imagePreview" class="h-28 w-full bg-cream-100 object-cover" alt="">
                         <button type="button" @click="removeImg" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-ink-900/70 text-white hover:bg-red-600">×</button>
                     </div>
@@ -108,7 +108,7 @@
                     <p class="label">Hoặc dùng icon tùy chỉnh (tải ảnh lên)</p>
                     <input type="hidden" name="icon_image_remove" :value="iconRemove ? '1' : '0'">
                     <div class="flex items-center gap-2">
-                        <button type="button" @click="$refs.iconImg.click()" class="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-cream-300 px-3 py-2 text-sm text-ink-500 transition hover:border-brand-500">Chọn ảnh icon</button>
+                        <button type="button" @click="$refs.iconImg.click()" class="flex flex-1 items-center justify-center rounded-2xl border-2 border-dashed border-cream-300 px-3 py-2 text-sm text-ink-500 transition hover:border-brand-500">Chọn ảnh icon</button>
                         <input x-ref="iconImg" type="file" name="icon_image" @change="onIconImg" class="hidden" accept="image/*">
                         <button type="button" @click="removeIconImg" class="btn-ghost btn-sm !text-red-500" x-show="iconPreview">Xóa</button>
                     </div>
@@ -125,7 +125,7 @@
                 <button type="button" @click="reset()" class="btn-ghost" x-show="editing">Hủy sửa</button>
             </div>
         </form>
-        @if($errors->any())<div class="mt-3 rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>@endif
+        @if($errors->any())<div class="mt-3 rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </div>
 </div>
 

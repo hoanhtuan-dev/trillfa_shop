@@ -19,7 +19,7 @@
                     <div><label class="label">Mô tả ngắn</label><input type="text" name="excerpt" value="{{ old('excerpt', $page->excerpt) }}" class="input"></div>
                     <div>
                         <label class="label">Nội dung *</label>
-                        <div x-data="richEditor" class="overflow-hidden rounded-xl border border-cream-300 bg-white focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10">
+                        <div x-data="richEditor" class="overflow-hidden rounded-2xl border border-cream-300 bg-white focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10">
                             <div class="flex flex-wrap items-center gap-1 border-b border-cream-200 bg-cream-100 px-2 py-1.5 text-ink-700">
                                 <button type="button" @click="exec('bold')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Đậm"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 01-4 4H6zM6 12h9a4 4 0 01-4 4H6z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                                 <button type="button" @click="exec('italic')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Nghiêng"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5h6M13 19h6M14 5l-4 14" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -52,13 +52,13 @@
                         <div>
                             <div x-data="imageUploader({ existing: @js($page->hero_image_url) })">
                                 <label class="label">Ảnh nền hero</label>
-                                <button type="button" @click="$refs.input.click()" class="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-cream-300 p-6 text-center transition hover:border-brand-500">
+                                <button type="button" @click="$refs.input.click()" class="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-cream-300 p-6 text-center transition hover:border-brand-500">
                                     <svg class="h-6 w-6 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z"/></svg>
                                     <span class="text-sm text-ink-500">Chọn ảnh nền</span>
                                 </button>
                                 <input x-ref="input" type="file" name="hero_image" @change="onChange" class="hidden" accept="image/*">
                                 <template x-if="hasImage">
-                                    <div class="relative mt-3 overflow-hidden rounded-xl">
+                                    <div class="relative mt-3 overflow-hidden rounded-2xl">
                                         <img :src="displaySrc" class="h-40 w-full bg-cream-100 object-cover" alt="">
                                         <button type="button" @click="remove()" class="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-ink-900/70 text-white hover:bg-red-600" title="Xóa ảnh">×</button>
                                     </div>
@@ -118,7 +118,7 @@
                     <p class="mt-2 text-xs text-ink-500" x-text="'Đang chọn: ' + selected.length + ' sản phẩm (hiển thị ' + shown().length + ' sản phẩm)'"></p>
                     <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <template x-for="p in shown()" :key="p.id">
-                            <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-cream-200 px-3 py-2 text-sm transition hover:border-brand-400" :class="selected.includes(p.id) ? 'border-brand-600 bg-brand-50' : ''">
+                            <label class="flex cursor-pointer items-center gap-2 rounded-2xl border border-cream-200 px-3 py-2 text-sm transition hover:border-brand-400" :class="selected.includes(p.id) ? 'border-brand-600 bg-brand-50' : ''">
                                 <input type="checkbox" name="product_ids[]" :value="p.id" :checked="selected.includes(p.id)" @change="toggle(p.id)" class="h-4 w-4 shrink-0 accent-brand-600">
                                 <span x-text="p.name" class="truncate"></span>
                             </label>
@@ -134,7 +134,7 @@
             </div>
 
             @if($errors->any())
-                <div class="rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
+                <div class="rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
             @endif
         </div>
     </form>

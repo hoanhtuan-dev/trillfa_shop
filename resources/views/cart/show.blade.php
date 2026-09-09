@@ -77,7 +77,7 @@
                     </div>
                 </div>
                 <template x-if="$store.cart.coupon">
-                    <div class="mt-5 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-2.5 text-sm">
+                    <div class="mt-5 flex items-center justify-between rounded-2xl bg-brand-50 px-4 py-2.5 text-sm">
                         <span class="font-medium text-brand-800">Mã <span x-text="$store.cart.coupon.code"></span> (-<span x-text="$money($store.cart.discount)"></span>)</span>
                         <button @click="$store.cart.removeCoupon()" class="text-brand-700 underline">Xóa</button>
                     </div>
@@ -88,7 +88,7 @@
                     <p class="label">Vận chuyển</p>
                     <div class="space-y-2">
                         <template x-for="m in $store.cart.shippingMethods" :key="m.code">
-                            <label class="flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition" :class="$store.cart.shippingMethod && $store.cart.shippingMethod.code === m.code ? 'border-brand-600 bg-brand-50' : 'border-cream-200'">
+                            <label class="flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition" :class="$store.cart.shippingMethod && $store.cart.shippingMethod.code === m.code ? 'border-brand-600 bg-brand-50' : 'border-cream-200'">
                                 <input type="radio" name="shipping" :value="m.code" :checked="$store.cart.shippingMethod && $store.cart.shippingMethod.code === m.code" @change="$store.cart.setShipping(m.code)" class="accent-brand-600">
                                 <span class="flex-1 text-sm font-medium text-ink-900" x-text="m.name"></span>
                                 <span class="text-sm text-ink-700" x-text="m.fee > 0 ? $money(m.fee) : 'Miễn phí'"></span>
@@ -106,7 +106,7 @@
 
                 @auth
                     @if(! auth()->user()->addresses()->where('is_default', true)->exists())
-                        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                             <p class="flex items-center gap-2 font-medium text-amber-800"><svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Bạn chưa có địa chỉ giao hàng.</p>
                             <a href="{{ route('account.addresses') }}" class="mt-2 inline-flex items-center gap-1 font-semibold text-brand-700 underline underline-offset-2">Tạo địa chỉ giao hàng ngay →</a>
                         </div>

@@ -29,10 +29,10 @@
             <button type="submit" class="btn-brand">Lưu cấu hình API</button>
             <a href="{{ route('studio.index') }}" class="btn-ghost">Quay lại</a>
         </div>
-        @if($errors->any())<div class="rounded-xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
+        @if($errors->any())<div class="rounded-2xl bg-red-50 p-3 text-sm text-red-600">{{ $errors->first() }}</div>@endif
     </form>
 
-    <div class="mt-6 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
+    <div class="mt-6 rounded-2xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
         <p class="font-semibold">Gợi ý lấy key:</p>
         <ul class="mt-1 list-inside list-disc space-y-0.5">
             <li>Gemini: <code class="rounded bg-white px-1">aistudio.google.com</code> → API key.</li>
@@ -41,7 +41,7 @@
             <li>Replicate: <code class="rounded bg-white px-1">replicate.com/account/api-tokens</code>.</li>
         </ul>
     </div>
-    <div class="mt-3 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
+    <div class="mt-3 rounded-2xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-800">
         Khi nhập khoá, các service tự chuyển từ <strong>stub</strong> sang gọi API thật (Gemini tạo prompt; Fal/Replicate sinh ảnh; Wan/Veo render video).
     </div>
 </div>

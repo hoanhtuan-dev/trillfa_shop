@@ -6,44 +6,44 @@
       "_runtime-dom.esm-bundler-JCahQlAg.js"
     ]
   },
-  "_BaseButton-DS2U9hR0.js": {
-    "file": "assets/BaseButton-DS2U9hR0.js",
+  "_BaseButton-DaBRfU4J.js": {
+    "file": "assets/BaseButton-DaBRfU4J.js",
     "name": "BaseButton",
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js"
+      "_StorefrontLayout-Ct-bo2qC.js"
     ]
   },
-  "_BlogCard-B55jwFRA.js": {
-    "file": "assets/BlogCard-B55jwFRA.js",
+  "_BlogCard-DK4uvUph.js": {
+    "file": "assets/BlogCard-DK4uvUph.js",
     "name": "BlogCard",
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_BaseBadge-ENfE4myM.js"
     ]
   },
-  "_ProductCard-D3JAn6_r.js": {
-    "file": "assets/ProductCard-D3JAn6_r.js",
+  "_ProductCard-CWUkYD_A.js": {
+    "file": "assets/ProductCard-CWUkYD_A.js",
     "name": "ProductCard",
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js"
+      "_StorefrontLayout-Ct-bo2qC.js"
     ]
   },
-  "_SkeletonCard-C3chPQij.js": {
-    "file": "assets/SkeletonCard-C3chPQij.js",
+  "_SkeletonCard-pxF3bqEv.js": {
+    "file": "assets/SkeletonCard-pxF3bqEv.js",
     "name": "SkeletonCard",
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js"
     ]
   },
-  "_StorefrontLayout-Z76EHoAa.css": {
-    "file": "assets/StorefrontLayout-Z76EHoAa.css",
-    "src": "_StorefrontLayout-Z76EHoAa.css"
+  "_StorefrontLayout-BlbFX2Hs.css": {
+    "file": "assets/StorefrontLayout-BlbFX2Hs.css",
+    "src": "_StorefrontLayout-BlbFX2Hs.css"
   },
-  "_StorefrontLayout-yyJcXGIF.js": {
-    "file": "assets/StorefrontLayout-yyJcXGIF.js",
+  "_StorefrontLayout-Ct-bo2qC.js": {
+    "file": "assets/StorefrontLayout-Ct-bo2qC.js",
     "name": "StorefrontLayout",
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
@@ -52,7 +52,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/StorefrontLayout-Z76EHoAa.css"
+      "assets/StorefrontLayout-BlbFX2Hs.css"
     ]
   },
   "_StylistDataManager-ClLSjC0F.js": {
@@ -154,7 +154,7 @@
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
-    "file": "assets/app-Cs-KCPxd.css",
+    "file": "assets/app-DvXx4NhR.css",
     "name": "app",
     "names": [
       "app.css"
@@ -184,110 +184,110 @@
     "isEntry": true
   },
   "resources/js/storefront/account.js": {
-    "file": "assets/account-DumBcXSx.js",
+    "file": "assets/account-CYD-xWye.js",
     "name": "account",
     "src": "resources/js/storefront/account.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_useApi-CVQcqIlE.js",
       "_BaseBadge-ENfE4myM.js"
     ]
   },
   "resources/js/storefront/app.js": {
-    "file": "assets/app-CefdNLFi.js",
+    "file": "assets/app-BIuQlFRT.js",
     "name": "app",
     "src": "resources/js/storefront/app.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
-      "_BaseButton-DS2U9hR0.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
+      "_BaseButton-DaBRfU4J.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_SkeletonCard-C3chPQij.js",
-      "_ProductCard-D3JAn6_r.js",
-      "_BlogCard-B55jwFRA.js"
+      "_SkeletonCard-pxF3bqEv.js",
+      "_ProductCard-CWUkYD_A.js",
+      "_BlogCard-DK4uvUph.js"
     ],
     "css": [
-      "assets/app-BBt9Ucv-.css"
+      "assets/app-xNUgleg9.css"
     ]
   },
   "resources/js/storefront/auth.js": {
-    "file": "assets/auth-4qN88K7V.js",
+    "file": "assets/auth-CC-MlUgX.js",
     "name": "auth",
     "src": "resources/js/storefront/auth.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_useApi-CVQcqIlE.js"
     ]
   },
   "resources/js/storefront/blog-post.js": {
-    "file": "assets/blog-post-XJ2Qy4uX.js",
+    "file": "assets/blog-post-DF-xGFdY.js",
     "name": "blog-post",
     "src": "resources/js/storefront/blog-post.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js"
+      "_StorefrontLayout-Ct-bo2qC.js"
     ]
   },
   "resources/js/storefront/blog.js": {
-    "file": "assets/blog-Dcybr99R.js",
+    "file": "assets/blog-Dy9x1lGm.js",
     "name": "blog",
     "src": "resources/js/storefront/blog.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
-      "_BlogCard-B55jwFRA.js"
+      "_StorefrontLayout-Ct-bo2qC.js",
+      "_BlogCard-DK4uvUph.js"
     ]
   },
   "resources/js/storefront/cart.js": {
-    "file": "assets/cart-CMclkaQ4.js",
+    "file": "assets/cart-BjC66g3_.js",
     "name": "cart",
     "src": "resources/js/storefront/cart.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js"
+      "_StorefrontLayout-Ct-bo2qC.js"
     ]
   },
   "resources/js/storefront/checkout-result.js": {
-    "file": "assets/checkout-result-D6KyOtF1.js",
+    "file": "assets/checkout-result-w-cHnpFe.js",
     "name": "checkout-result",
     "src": "resources/js/storefront/checkout-result.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_useApi-CVQcqIlE.js"
     ]
   },
   "resources/js/storefront/checkout.js": {
-    "file": "assets/checkout-BIyAiGj6.js",
+    "file": "assets/checkout-CXuYmHTW.js",
     "name": "checkout",
     "src": "resources/js/storefront/checkout.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_useApi-CVQcqIlE.js"
     ]
   },
   "resources/js/storefront/product.js": {
-    "file": "assets/product-Ds7RUq8C.js",
+    "file": "assets/product-ClSZwrSO.js",
     "name": "product",
     "src": "resources/js/storefront/product.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
-      "_BaseButton-DS2U9hR0.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
+      "_BaseButton-DaBRfU4J.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_ProductCard-D3JAn6_r.js",
+      "_ProductCard-CWUkYD_A.js",
       "_BaseBadge-ENfE4myM.js"
     ],
     "css": [
@@ -295,47 +295,47 @@
     ]
   },
   "resources/js/storefront/shop.js": {
-    "file": "assets/shop-CYhlByoe.js",
+    "file": "assets/shop-KlFxNblG.js",
     "name": "shop",
     "src": "resources/js/storefront/shop.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_useApi-CVQcqIlE.js",
       "__plugin-vue_export-helper-BDNMzG2s.js",
-      "_SkeletonCard-C3chPQij.js",
-      "_ProductCard-D3JAn6_r.js"
+      "_SkeletonCard-pxF3bqEv.js",
+      "_ProductCard-CWUkYD_A.js"
     ],
     "css": [
-      "assets/shop-BTnFaxj8.css"
+      "assets/shop-BfTMuCbC.css"
     ]
   },
   "resources/js/storefront/static.js": {
-    "file": "assets/static-BihfU-ks.js",
+    "file": "assets/static-BY6StIR8.js",
     "name": "static",
     "src": "resources/js/storefront/static.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_useApi-CVQcqIlE.js"
     ]
   },
   "resources/js/storefront/wishlist.js": {
-    "file": "assets/wishlist-DV8z7b9c.js",
+    "file": "assets/wishlist-DNzQdjGa.js",
     "name": "wishlist",
     "src": "resources/js/storefront/wishlist.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-JCahQlAg.js",
-      "_StorefrontLayout-yyJcXGIF.js",
+      "_StorefrontLayout-Ct-bo2qC.js",
       "_useApi-CVQcqIlE.js",
-      "_ProductCard-D3JAn6_r.js"
+      "_ProductCard-CWUkYD_A.js"
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-dBNmIHmr.js",
+    "file": "assets/app-CuDF2IdB.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -347,7 +347,7 @@
       "_StylistDataManager-ClLSjC0F.js"
     ],
     "css": [
-      "assets/app-CV4Tc_Ch.css"
+      "assets/app-DNpGaah5.css"
     ]
   },
   "resources/js/studio/settings.js": {

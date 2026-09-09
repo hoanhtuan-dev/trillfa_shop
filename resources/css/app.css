@@ -72,6 +72,43 @@
     }
 }
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VSCode-inspired Design Tokens — đồng bộ toàn diện
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer base {
+    :root {
+        /* VSCode-inspired spacing & radius scale */
+        --radius-xs: 0.25rem;   /* 4px  — icon nhỏ, resize handles */
+        --radius-sm: 0.375rem;  /* 6px  — badge nhỏ, tag */
+        --radius-md: 0.5rem;    /* 8px  — button icon, input nhỏ */
+        --radius-lg: 0.75rem;   /* 12px — button, chip, nav item */
+        --radius-xl: 1rem;      /* 16px — card, panel, modal */
+        --radius-2xl: 1.25rem;  /* 20px — hero card, large modal */
+        --radius-3xl: 1.75rem;  /* 28px — product card, featured */
+    }
+
+    /* VSCode-inspired typography scale */
+    h1, h2, h3, h4, h5, h6 {
+        letter-spacing: -0.02em;
+    }
+
+    /* VSCode-style focus ring */
+    *:focus-visible {
+        outline: 2px solid var(--color-brand-500);
+        outline-offset: 2px;
+        border-radius: 2px;
+    }
+}
+
+/* VSCode-style subtle transitions on interactive elements */
+@layer base {
+    a, button, input, select, textarea {
+        transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+}
+
 @layer components {
     .container-x {
         @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
@@ -97,28 +134,24 @@
         @apply px-4 py-2 text-xs;
     }
 
-    .input {
-        @apply w-full rounded-xl border border-cream-300 bg-white px-4 py-3 text-sm text-ink-900 placeholder:text-ink-500/70 transition-all focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10;
+    .input { @apply w-full rounded-2xl border border-cream-300 bg-white px-4 py-3 text-sm text-ink-900 placeholder:text-ink-500/70 transition-all focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10;
     }
 
     .label {
         @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-700;
     }
 
-    .card {
-        @apply rounded-3xl border border-cream-200 bg-cream-100 shadow-sm shadow-ink-900/5;
+    .card { @apply rounded-2xl border border-cream-200 bg-cream-100 shadow-sm shadow-ink-900/5;
     }
 
     .card-hover {
         @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-ink-900/10;
     }
 
-    .badge {
-        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
+    .badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
     }
 
-    .chip {
-        @apply inline-flex items-center gap-2 rounded-full border border-cream-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-brand-500 hover:text-brand-700;
+    .chip { @apply inline-flex items-center gap-2 rounded-2xl border border-cream-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-brand-500 hover:text-brand-700;
     }
 
     .section-title {
@@ -141,8 +174,7 @@
     .prose-content blockquote { @apply my-5 border-l-4 border-brand-500 bg-cream-100 py-3 pl-5 italic text-ink-700; }
     .prose-content a { @apply text-brand-700 underline underline-offset-2; }
     .prose-content img { @apply my-6 w-full rounded-2xl; }
-    .studio-nav {
-        @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-white;
+    .studio-nav { @apply flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-cream-100 transition-colors hover:bg-ink-700 hover:text-white;
     }
     .studio-nav.is-active {
         @apply bg-brand-600 font-semibold text-white hover:bg-brand-600;
@@ -186,14 +218,14 @@
    Chỉ đặt tên mới (seg-, tool-btn, icon-btn, panel-) — không đụng storefront. */
 @layer components {
     /* Segmented control (tabs / chế độ / ngôn ngữ) — thay mọi chip lồng nhau */
-    .seg { @apply flex gap-1 rounded-xl bg-ink-800 p-1; }
+    .seg { @apply flex gap-1 rounded-2xl bg-ink-800 p-1; }
     .seg-btn { @apply flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[11px] font-semibold text-cream-300/70 transition hover:text-cream-100; }
     .seg-btn.is-active { @apply bg-brand-600 text-white hover:text-white; }
     /* Nút toolbar nhỏ trong card/panel (toggle lịch sử, templates, hành động phụ) */
-    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-ink-600 hover:bg-ink-700 disabled:opacity-40; }
+    .tool-btn { @apply inline-flex items-center gap-1.5 rounded-xl border border-ink-700 bg-ink-800 px-2.5 py-1.5 text-[11px] font-semibold text-cream-200 transition hover:border-ink-600 hover:bg-ink-700 disabled:opacity-40; }
     .tool-btn.is-active { @apply border-brand-500/70 bg-brand-600/20 text-brand-200 hover:bg-brand-600/30; }
     /* Nút icon vuông chuẩn (mọi chrome studio) */
-    .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded-md text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }
+    .icon-btn { @apply grid h-7 w-7 shrink-0 place-items-center rounded-lg text-cream-200 transition-colors hover:bg-ink-700 disabled:opacity-30; }
     /* Header chuẩn của panel/card trong workspace */
     .panel-head { @apply flex shrink-0 items-center justify-between gap-2 px-2.5 py-2; }
     .panel-title { @apply flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-cream-100; }
@@ -201,7 +233,7 @@
     .activity-bar { @apply flex w-14 shrink-0 flex-col items-center gap-2 border-r border-ink-700 bg-ink-900 py-2.5; }
     .activity-bar.right { @apply border-l border-r-0; }
     .activity-bar.right .activity-btn.is-active::before { left: auto; right: 0; }
-    .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-xl text-cream-300/60 transition-colors hover:bg-ink-800 hover:text-cream-100; }
+    .activity-btn { @apply relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-cream-300/60 transition-colors hover:bg-ink-800 hover:text-cream-100; }
     .activity-btn.is-active { @apply bg-ink-800 text-brand-200; }
     .activity-btn.is-active::before {
         content: '';
@@ -233,8 +265,7 @@ aside::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); }
 aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 * { scrollbar-width: thin; scrollbar-color: rgba(107, 99, 88, 0.35) transparent; }
 
-@utility btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 @layer utilities {
@@ -325,8 +356,7 @@ aside::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.30); }
 .section-title {
     @apply font-display text-2xl font-semibold text-ink-900 sm:text-3xl;
 }
-.sf-badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
+.sf-badge { @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
 }
 
 .sf-input {

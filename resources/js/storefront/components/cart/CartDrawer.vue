@@ -76,12 +76,12 @@ async function changeQty(item, qty) {
                                     </div>
                                     <p class="mt-0.5 text-xs text-ink-500">{{ formatMoney(item.price) }}</p>
                                     <div class="mt-2 flex items-center justify-between">
-                                        <div class="inline-flex items-center rounded-full border border-cream-200 bg-white">
-                                            <button @click="changeQty(item, Number(item.quantity) - 1)" class="grid h-7 w-7 place-items-center rounded-full text-ink-700 hover:bg-cream-100" aria-label="Giảm">
+                                        <div class="inline-flex items-center rounded-2xl border border-cream-200 bg-white">
+                                            <button @click="changeQty(item, Number(item.quantity) - 1)" class="grid h-7 w-7 place-items-center rounded-lg text-ink-700 hover:bg-cream-100" aria-label="Giảm">
                                                 <Icon name="minus" :size="14" />
                                             </button>
                                             <span class="min-w-7 text-center text-sm font-medium">{{ item.quantity }}</span>
-                                            <button @click="changeQty(item, Number(item.quantity) + 1)" class="grid h-7 w-7 place-items-center rounded-full text-ink-700 hover:bg-cream-100" aria-label="Tăng">
+                                            <button @click="changeQty(item, Number(item.quantity) + 1)" class="grid h-7 w-7 place-items-center rounded-lg text-ink-700 hover:bg-cream-100" aria-label="Tăng">
                                                 <Icon name="plus" :size="14" />
                                             </button>
                                         </div>

@@ -23,7 +23,7 @@
                 <div class="divide-y divide-cream-200">
                     @foreach($order->items as $item)
                         <div class="flex items-center gap-4 py-3">
-                            <img src="{{ $item->image_url ?: asset('images/placeholder.svg') }}" class="h-14 w-14 rounded-xl object-cover" alt="">
+                            <img src="{{ $item->image_url ?: asset('images/placeholder.svg') }}" class="h-14 w-14 rounded-2xl object-cover" alt="">
                             <div class="flex-1">
                                 <p class="text-sm font-medium text-ink-900">{{ $item->product_name }}</p>
                                 @if($item->options)<p class="text-xs text-ink-500">{{ is_array($item->options) ? implode(' / ', $item->options) : $item->options }}</p>@endif

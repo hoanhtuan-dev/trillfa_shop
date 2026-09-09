@@ -47,7 +47,7 @@
         <aside class="hidden shrink-0 flex-col border-r border-ink-700 bg-ink-800 transition-[width] duration-300" :class="sidebarCollapsed ? 'lg:flex lg:w-16' : 'lg:flex lg:w-60'">
             <div class="flex items-center gap-2 border-b border-ink-700 px-3 py-3">
                 <a href="{{ route('studio.index') }}" class="flex min-w-0 items-center gap-2">
-                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-600 text-white">
+                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-brand-600 text-white">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
                     </span>
                     <span class="truncate font-display text-lg font-bold tracking-tight text-cream-50" x-show="!sidebarCollapsed">Trillfa<span class="text-brand-400"> Studio</span></span>
@@ -80,7 +80,7 @@
                     <button @click="sidebarCollapsed = !sidebarCollapsed" class="rounded-full border border-ink-700 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700 hover:text-white" :title="'Ẩn thanh bên'">«</button>
                 </div>
                 @if($u)
-                <div class="mb-2 flex items-center gap-2 rounded-xl border border-ink-700 bg-ink-800/60 p-2">
+                <div class="mb-2 flex items-center gap-2 rounded-2xl border border-ink-700 bg-ink-800/60 p-2">
                     <img src="{{ $u->avatar ?: asset('images/placeholder.svg') }}" class="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-brand-500/40" alt="Ảnh đại diện">
                     <div class="min-w-0 leading-tight">
                         <p class="truncate text-sm font-semibold text-cream-50">{{ $u->name }}</p>

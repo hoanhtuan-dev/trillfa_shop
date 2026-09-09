@@ -19,7 +19,7 @@
                     <div><label class="label">Mô tả ngắn</label><input type="text" name="excerpt" value="{{ old('excerpt', $post->excerpt) }}" class="input"></div>
                     <div>
                         <label class="label">Nội dung *</label>
-                        <div x-data="richEditor" class="overflow-hidden rounded-xl border border-cream-300 bg-white focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10">
+                        <div x-data="richEditor" class="overflow-hidden rounded-2xl border border-cream-300 bg-white focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10">
                             <div class="flex flex-wrap items-center gap-1 border-b border-cream-200 bg-cream-100 px-2 py-1.5 text-ink-700">
                                 <button type="button" @click="exec('bold')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Đậm"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 01-4 4H6zM6 12h9a4 4 0 01-4 4H6z" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                                 <button type="button" @click="exec('italic')" class="grid h-8 w-8 place-items-center rounded-lg hover:bg-white" title="Nghiêng"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5h6M13 19h6M14 5l-4 14" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -84,14 +84,14 @@
 
             <div class="card p-6" x-data="imageUploader({ existing: @js($post->image_url) })">
                 <h2 class="mb-4 font-display text-lg font-semibold text-ink-900">Ảnh đại diện</h2>
-                <button type="button" @click="$refs.input.click()" class="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-cream-300 p-6 text-center transition hover:border-brand-500">
+                <button type="button" @click="$refs.input.click()" class="flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-cream-300 p-6 text-center transition hover:border-brand-500">
                     <svg class="mb-2 h-8 w-8 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z"/></svg>
                     <span class="text-sm text-ink-500">Chọn ảnh đại diện</span>
                     <span x-show="fileName" class="mt-1 text-xs text-brand-700" x-text="fileName"></span>
                 </button>
                 <input x-ref="input" type="file" name="image" @change="onChange" class="hidden" accept="image/*">
                 <template x-if="hasImage">
-                    <div class="relative mt-3 overflow-hidden rounded-xl">
+                    <div class="relative mt-3 overflow-hidden rounded-2xl">
                         <img :src="displaySrc" class="h-40 w-full bg-cream-100 object-cover" alt="">
                         <button type="button" @click="remove()" class="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-ink-900/70 text-white hover:bg-red-600" title="Xóa ảnh">×</button>
                     </div>
@@ -99,7 +99,7 @@
             </div>
 
             @if($errors->any())
-                <div class="rounded-xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
+                <div class="rounded-2xl bg-red-50 p-4 text-sm text-red-600">{{ $errors->first() }}</div>
             @endif
         </div>
     </form>

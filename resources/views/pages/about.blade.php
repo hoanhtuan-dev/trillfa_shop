@@ -9,7 +9,7 @@
         <h1 class="font-display text-4xl font-semibold text-ink-900 sm:text-5xl">{{ setting('about_heading', 'Thời trang cho người Việt hiện đại') }}</h1>
         <p class="mt-5 text-lg leading-relaxed text-ink-500">{{ setting('about_intro', 'Trillfa Fa ra đời với khát vọng mang đến trải nghiệm mua sắm trực tuyến tối giản, tinh tế nhưng đầy cảm hứng — nơi mỗi sản phẩm đều là một lựa chọn phong cách cho cuộc sống của bạn.') }}</p>
         @if(setting('about_image'))
-            <img src="{{ asset_image(setting('about_image')) }}" alt="" class="mx-auto mt-8 w-full max-w-2xl rounded-3xl object-cover">
+            <img src="{{ asset_image(setting('about_image')) }}" alt="" class="mx-auto mt-8 w-full max-w-2xl rounded-2xl object-cover">
         @endif
     </div>
 

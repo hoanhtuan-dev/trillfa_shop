@@ -23,7 +23,7 @@
         <div class="card p-8">
             <h2 class="font-display text-lg font-semibold text-ink-900">Gửi tin nhắn</h2>
             @if(session('success'))
-                <div class="mt-4 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
+                <div class="mt-4 rounded-2xl bg-brand-50 p-4 text-sm text-brand-800">{{ session('success') }}</div>
             @endif
             <form method="POST" action="{{ route('page.contact.send') }}" class="mt-4 space-y-4">
                 @csrf

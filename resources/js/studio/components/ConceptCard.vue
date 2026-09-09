@@ -524,7 +524,7 @@ const bodyHipsLabel = computed(() => {
 
           <!-- Templates popup -->
           <div v-if="showTemplates" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showTemplates = false">
-            <div class="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+            <div class="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
               <div class="mb-3 flex items-center justify-between">
                 <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="template" /> Prompt Templates</span>
                 <button @click="showTemplates = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>
@@ -680,7 +680,7 @@ const bodyHipsLabel = computed(() => {
 
         <!-- Enrich Preview popup -->
         <div v-if="showEnrich" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showEnrich = false">
-          <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-emerald-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+          <div class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-emerald-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
               <span class="flex items-center gap-2 text-sm font-semibold text-emerald-300"><StudioIcon name="wand" /> Prompt Enrich Preview</span>
               <div class="flex items-center gap-2">
@@ -708,7 +708,7 @@ const bodyHipsLabel = computed(() => {
 
         <!-- Preset popup -->
         <div v-if="showPresets" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" @click.self="showPresets = false">
-          <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
+          <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-brand-500/40 bg-ink-900 p-5 shadow-2xl" @click.stop>
             <div class="mb-3 flex items-center justify-between">
               <span class="flex items-center gap-2 text-sm font-semibold text-brand-300"><StudioIcon name="sparkles" /> Preset — Prompt đã lưu</span>
               <button @click="showPresets = false" class="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-cream-200 hover:text-white" title="Đóng"><StudioIcon name="x" size="h-4 w-4" /></button>

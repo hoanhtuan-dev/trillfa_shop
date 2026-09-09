@@ -18,7 +18,7 @@
         </div>
 
         {{-- Mock gateway note --}}
-        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-700">
+        <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-700">
             Đây là cổng thanh toán <strong>mô phỏng</strong> cho bản demo. Nhấn nút bên dưới để xác nhận thanh toán.
         </div>
 

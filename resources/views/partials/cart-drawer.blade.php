@@ -70,7 +70,7 @@
                 <p x-show="applied" x-text="applied" class="mt-2 text-xs text-brand-600"></p>
             </div>
             <template x-if="$store.cart.coupon">
-                <div class="mb-4 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-2.5 text-sm">
+                <div class="mb-4 flex items-center justify-between rounded-2xl bg-brand-50 px-4 py-2.5 text-sm">
                     <span class="font-medium text-brand-800">Mã <span x-text="$store.cart.coupon.code"></span></span>
                     <button @click="$store.cart.removeCoupon()" class="text-brand-700 underline">Xóa</button>
                 </div>

@@ -25,7 +25,7 @@
         <h1 class="mt-4 font-display text-3xl font-semibold leading-tight text-ink-900 sm:text-5xl">{{ $post->title }}</h1>
         <p class="mt-4 text-lg leading-relaxed text-ink-500">{{ $post->excerpt }}</p>
 
-        <div class="mt-8 overflow-hidden rounded-3xl">
+        <div class="mt-8 overflow-hidden rounded-2xl">
             <img src="{{ $post->image_url ?: asset('images/placeholder.svg') }}" class="w-full object-cover" alt="">
         </div>
 

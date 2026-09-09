@@ -8,6 +8,9 @@
 #
 # Cách dùng (chạy trên máy local, sau khi đã commit + push):
 #   bash scripts/deploy.sh
+#
+# LƯU Ý: Build frontend CHẠY TRÊN LOCAL trước khi commit (npm run build).
+#        File deploy này chỉ pull code + composer + migrate + clear cache.
 # =============================================================================
 set -euo pipefail
 
@@ -26,8 +29,7 @@ git fetch origin main
 git pull --ff-only origin main
 
 echo "-- cài vendor (bỏ scripts — shared hosting tắt proc_open) --"
-composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts \
-  || echo "  (composer bỏ qua — vendor đã build sẵn, chỉ deploy frontend)"
+composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts   || echo "  (composer bỏ qua — vendor đã build sẵn, chỉ deploy frontend)"
 
 echo "-- migrate (an toàn, không đổi schema nếu không có migration mới) --"
 php artisan migrate --force

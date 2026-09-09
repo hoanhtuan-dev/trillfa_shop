@@ -9,7 +9,7 @@
 
     @auth
         @if(! ($address ?? null))
-            <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
                 <span class="flex items-center gap-2 font-medium text-amber-800"><svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Bạn chưa có địa chỉ giao hàng lưu sẵn.</span>
                 <a href="{{ route('account.addresses') }}" class="font-semibold text-brand-700 underline underline-offset-2">Tạo địa chỉ ngay →</a>
             </div>
@@ -106,7 +106,7 @@
                 <h2 class="mb-4 font-display text-lg font-semibold text-ink-900">3. Phương thức vận chuyển</h2>
                 <div class="space-y-2">
                     @foreach($shippingMethods as $m)
-                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition" :class="$store.cart.shippingMethod && $store.cart.shippingMethod.code === '{{ $m->code }}' ? 'border-brand-600 bg-brand-50' : 'border-cream-200'">
+                        <label class="flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition" :class="$store.cart.shippingMethod && $store.cart.shippingMethod.code === '{{ $m->code }}' ? 'border-brand-600 bg-brand-50' : 'border-cream-200'">
                             <input type="radio" name="shipping_method" value="{{ $m->code }}" :checked="$store.cart.shippingMethod && $store.cart.shippingMethod.code === '{{ $m->code }}'" @change="$store.cart.setShipping('{{ $m->code }}')" class="accent-brand-600">
                             <div class="flex-1">
                                 <p class="text-sm font-semibold text-ink-900">{{ $m->name }}</p>
@@ -123,7 +123,7 @@
                 <h2 class="mb-4 font-display text-lg font-semibold text-ink-900">4. Phương thức thanh toán</h2>
                 <div class="space-y-2">
                     @foreach($paymentMethods as $m)
-                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition" :class="pay === '{{ $m->code }}' ? 'border-brand-600 bg-brand-50' : 'border-cream-200'">
+                        <label class="flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition" :class="pay === '{{ $m->code }}' ? 'border-brand-600 bg-brand-50' : 'border-cream-200'">
                             <input type="radio" name="payment_method" value="{{ $m->code }}" x-model="pay" class="accent-brand-600">
                             <div class="flex-1">
                                 <p class="text-sm font-semibold text-ink-900">{{ $m->name }}</p>
