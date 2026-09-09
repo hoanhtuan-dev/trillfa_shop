@@ -166,6 +166,7 @@ chmod -R 775 storage bootstrap/cache
 | 500 / white page | `APP_DEBUG=false` che lỗi. Bật `APP_DEBUG=true` tạm, xem log `storage/logs/laravel.log`. Thường do: sai `.env`, chưa `key:generate`, storage không ghi được. |
 | `No application encryption key` | Chạy `php artisan key:generate`. |
 | `Access denied for user` | Sai DB_HOST/DB_USERNAME/DB_PASSWORD; kiểm tra hPanel. |
+| `SQLSTATE[HY000] [2002] Operation not permitted` (qua web, CLI vẫn OK) | Hostinger chặn PHP-FPM/Apache worker mở **TCP socket** ra 127.0.0.1:3306 (chỉ CLI được). Cách sửa: set `DB_SOCKET=/tmp/mysql.sock` (hoặc `/var/lib/mysql/mysql.sock`) trong `.env` → Laravel dùng Unix socket thay vì TCP. CLI test socket: `php -r "var_dump(new PDO('mysql:unix_socket=/tmp/mysql.sock;dbname=DB', 'user','pass'));"`. |
 | Không có CSS/JS | Thiếu `public/build/` (npm run build) hoặc upload thiếu. |
 | `Table not found` | Chưa chạy `php artisan migrate --force`. |
 | 419 Page Expired | Vấn đề session/CSRF. Đảm bảo `SESSION_DRIVER=database` + đã migrate; với HTTPS bật `SESSION_SECURE_COOKIE=true`? (chỉ khi HTTPS). |
@@ -232,6 +233,8 @@ php artisan route:cache
 php artisan view:cache
 ```
 
+> **Bắt buộc trên Hostinger:** thêm `DB_SOCKET=/tmp/mysql.sock` vào `.env` (hoặc `/var/lib/mysql/mysql.sock`). Không có nó, mọi request qua web bị 500 `SQLSTATE[HY000] [2002] Operation not permitted` vì PHP worker không mở được TCP socket đến MySQL — chỉ `php artisan` (CLI) mới mở được TCP. Unix socket là file I/O nên không bị chặn.
+
 > **Lưu ý:** không dùng `php artisan serve` trên shared hosting (cần `proc_open`). Host dùng Apache/nginx, truy cập qua `https://domain` là đủ.
 ## Checklist an toàn sản xuất (production)
 
@@ -240,6 +243,7 @@ php artisan view:cache
 - [ ] Khi có HTTPS: `SESSION_SECURE_COOKIE=true` (tùy chọn `SESSION_ENCRYPT=true`, `SESSION_HTTP_ONLY=true`).
 - [ ] `APP_KEY` được set (đã sinh, không bao giờ đưa lên repo).
 - [ ] Dùng MySQL cho production: `DB_CONNECTION=mysql` + host/user/pass thật.
+- [ ] **Hostinger/shared hosting bắt buộc:** `DB_SOCKET=/tmp/mysql.sock` trong `.env` (worker PHP không mở được TCP 127.0.0.1:3306 → 500 toàn app nếu thiếu).
 - [ ] Chạy `php artisan migrate --force` để cập nhật schema (thêm bảng newsletter_subscribers, custom_pages; cột mới menu_items/custom_pages).
 - [ ] Bind storage: `ln -s ../storage/app/public public_html/storage` (đã có nếu copy nguyên project).
 - [ ] Cache cấu hình & route sau khi deploy: `php artisan config:cache` + `php artisan route:cache` (đảm bảo các route/cấu hình không dùng closure gây lỗi khi cache).
