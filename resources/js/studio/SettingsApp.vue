@@ -206,9 +206,11 @@ function taskDefaultLabel(g) {
 }
 function taskGroupModelOptions(g) {
   // Danh sách chọn cho một nhóm: các model ĐÃ thuộc nhóm + "auto" (legacy/priority).
-  const models = taskGroups.value[g]?.models || [];
-  const seen = new Set(models.map(m => m.provider + ':' + m.model));
-  const opts = [...models.map(m => ({ value: m.provider + ':' + m.model, label: m.label + (m.default ? ' ★' : ''), registry: !!m.registry_id }))];
+  // Local đặt tên groupModels để không shadow computed models (Model Registry) —
+  // bug trước đó: models.value trên mảng thường → "not iterable".
+  const groupModels = taskGroups.value[g]?.models || [];
+  const seen = new Set(groupModels.map(m => m.provider + ':' + m.model));
+  const opts = [...groupModels.map(m => ({ value: m.provider + ':' + m.model, label: m.label + (m.default ? ' ★' : ''), registry: !!m.registry_id }))];
   // Thêm các model khác trong Registry (chưa thuộc nhóm) để gán nhanh.
   for (const m of models.value) {
     const v = m.provider + ':' + m.model_id;
