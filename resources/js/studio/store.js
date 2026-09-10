@@ -223,6 +223,7 @@ export const useStudioStore = defineStore('studio', {
     suggestLibTotal: 0,
     suggestLibStats: null,
     suggestLibFilters: { q: '', garment_type: '', project_id: '', page: 1, per_page: 48 },
+    suggestLibSort: 'newest', // 'newest' | 'oldest' | 'name_asc' | 'name_desc' | 'used_desc'
     suggestLibHasMore: false,
     suggestLibLoading: false,
     suggestLibSelection: [],   // danh sách id đang được chọn (checkbox)
@@ -240,6 +241,7 @@ export const useStudioStore = defineStore('studio', {
     libraryTotal: 0,
     libraryStats: null,
     libraryFilters: { type: '', status: '', project_id: '', q: '', page: 1, per_page: 48, old_days: 30 },
+    librarySort: 'newest', // 'newest' | 'oldest' | 'name_asc' | 'name_desc' | 'cost_desc' | 'cost_asc'
     libraryHasMore: false,
     libraryLoading: false,
     librarySelection: [],   // danh sách id đang được chọn (checkbox)
@@ -248,6 +250,9 @@ export const useStudioStore = defineStore('studio', {
     libraryManage: false,   // bật chế độ quản lý (chọn/xóa hàng loạt)
     // ── Files đã tải lên — quản lý file tải lên + dọn file mồ côi ──
     libraryTab: 'generations', // 'generations' | 'uploads' | 'suggest' — tab Thư viện Prompt
+    uploadSort: 'newest', // 'newest' | 'oldest' | 'name_asc' | 'name_desc' | 'size_desc' | 'size_asc' (client-side)
+    libraryView: 'grid',   // 'grid' | 'list' — chế độ hiển thị chung cho cả 3 tab
+    libraryGrid: 'm',      // 's' | 'm' | 'l' — cỡ lưới ảnh chung cho cả 3 tab
     studioView: 'studio',   // 'studio' | 'library' — view SPA hiện tại của /studio (Thư viện nhúng trong SPA)
     uploadItems: [],
     uploadStats: null,
@@ -1120,6 +1125,7 @@ export const useStudioStore = defineStore('studio', {
         qs.set('page', String(this.libraryFilters.page || 1));
         qs.set('per_page', String(this.libraryFilters.per_page || 48));
         qs.set('old_days', String(this.libraryFilters.old_days || 30));
+        if (this.librarySort) qs.set('sort', this.librarySort);
         const d = await this._libraryFetch('/studio/library/data?' + qs.toString());
         const items = Array.isArray(d.items) ? d.items : [];
         this.libraryItems = reset ? items : this.libraryItems.concat(items.filter(x => !this.libraryItems.some(y => y.id === x.id)));
@@ -1266,6 +1272,7 @@ export const useStudioStore = defineStore('studio', {
         if (this.suggestLibFilters.project_id) q.set('project_id', this.suggestLibFilters.project_id);
         q.set('page', String(this.suggestLibFilters.page));
         q.set('per_page', String(this.suggestLibFilters.per_page));
+        if (this.suggestLibSort) q.set('sort', this.suggestLibSort);
         const d = await fetch('/studio/suggest-library/data?' + q.toString(), { headers: { Accept: 'application/json' } });
         if (!d.ok) throw new Error('Không tải được thư viện prompt.');
         const data = await d.json();
@@ -1281,6 +1288,19 @@ export const useStudioStore = defineStore('studio', {
       this.suggestLibFilters[key] = value;
       this.suggestLibSelection = [];
       this.loadSuggestLib(true);
+    },
+    setSuggestLibSort(v) {
+      this.suggestLibSort = v;
+      this.suggestLibSelection = [];
+      this.loadSuggestLib(true);
+    },
+    setLibrarySort(v) {
+      this.librarySort = v;
+      this.librarySelection = [];
+      this.loadLibrary(true);
+    },
+    setUploadSort(v) {
+      this.uploadSort = v; // client-side — không cần gọi lại API
     },
     suggestLibNextPage() {
       if (!this.suggestLibHasMore || this.suggestLibLoading) return;
@@ -1309,6 +1329,43 @@ export const useStudioStore = defineStore('studio', {
         if (!res.ok) throw new Error(d.message || 'Lỗi xóa.');
         this.suggestLibSelection = [];
         this.toast('Đã xóa ' + (d.deleted || 0) + ' prompt.');
+        await this.loadSuggestLib(true);
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi xóa prompt.', 'error'); return false; }
+    },
+    // ── CRUD prompt trong Thư viện Prompt (thêm / sửa / xóa đơn lẻ) ──
+    async savePrompt(payload) {
+      try {
+        const d = await this._libraryFetch('/studio/suggest-library', payload);
+        this.toast('Đã thêm prompt vào Thư viện Prompt.');
+        await this.loadSuggestLib(true);
+        return d;
+      } catch (e) { this.toast(e.message || 'Lỗi thêm prompt.', 'error'); return null; }
+    },
+    async updatePrompt(id, payload) {
+      try {
+        const res = await fetch('/studio/suggest-library/' + id, {
+          method: 'PUT',
+          headers: { 'X-CSRF-TOKEN': CSRF(), 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.message || 'Lỗi cập nhật.');
+        this.toast('Đã cập nhật prompt.');
+        await this.loadSuggestLib(true);
+        return d;
+      } catch (e) { this.toast(e.message || 'Lỗi cập nhật prompt.', 'error'); return null; }
+    },
+    async deletePrompt(id) {
+      try {
+        const res = await fetch('/studio/suggest-library/' + id, {
+          method: 'DELETE',
+          headers: { 'X-CSRF-TOKEN': CSRF(), Accept: 'application/json' },
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.message || 'Lỗi xóa.');
+        this.suggestLibSelection = this.suggestLibSelection.filter(x => x !== id);
+        this.toast('Đã xóa prompt.');
         await this.loadSuggestLib(true);
         return true;
       } catch (e) { this.toast(e.message || 'Lỗi xóa prompt.', 'error'); return false; }

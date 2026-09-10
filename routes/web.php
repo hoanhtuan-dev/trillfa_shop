@@ -161,6 +161,10 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::post('/suggest-library/save', [StudioController::class, 'suggestLibrarySave'])->name('suggest-library.save');
     Route::post('/suggest-library/apply/{id}', [StudioController::class, 'suggestLibraryApply'])->name('suggest-library.apply');
     Route::post('/suggest-library/bulk-delete', [StudioController::class, 'suggestLibraryBulkDelete'])->name('suggest-library.bulk-delete');
+    // CRUD prompt trong Thư viện Prompt (thêm / sửa / xóa đơn lẻ).
+    Route::post('/suggest-library', [StudioController::class, 'suggestLibraryStore'])->name('suggest-library.store');
+    Route::put('/suggest-library/{id}', [StudioController::class, 'suggestLibraryUpdate'])->name('suggest-library.update');
+    Route::delete('/suggest-library/{id}', [StudioController::class, 'suggestLibraryDestroy'])->name('suggest-library.destroy');
     Route::get('/uploads', [StudioController::class, 'uploadedFiles'])->name('uploads');
     Route::post('/uploads/delete', [StudioController::class, 'uploadedFilesDelete'])->name('uploads.delete');
     Route::post('/uploads/cleanup', [StudioController::class, 'uploadedFilesCleanup'])->name('uploads.cleanup');

@@ -1720,7 +1720,7 @@ RULES:
      */
     public function suggestLibraryData(Request $request): \Illuminate\Http\JsonResponse
     {
-        $filters = $request->only(['q', 'garment_type', 'project_id', 'page', 'per_page']);
+        $filters = $request->only(['q', 'garment_type', 'project_id', 'page', 'per_page', 'sort']);
 
         return response()->json(
             app(\App\Services\SuggestLibraryService::class)->list(auth()->user(), $filters)
@@ -1747,6 +1747,71 @@ RULES:
         $result = app(\App\Services\SuggestLibraryService::class)->bulkDelete(auth()->user(), $ids);
 
         return response()->json($result);
+    }
+
+    /**
+     * CRUD: tạo mới một prompt trong Thư viện Prompt.
+     */
+    public function suggestLibraryStore(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $this->validateSuggestLibrary($request);
+        $result = app(\App\Services\SuggestLibraryService::class)->create(auth()->user(), $data);
+
+        return response()->json(['id' => $result->id, 'ok' => true]);
+    }
+
+    /**
+     * CRUD: cập nhật một prompt trong Thư viện Prompt.
+     */
+    public function suggestLibraryUpdate(Request $request, int $id): \Illuminate\Http\JsonResponse
+    {
+        $data = $this->validateSuggestLibrary($request);
+        $result = \App\Models\SuggestResult::where('user_id', auth()->id())->findOrFail($id);
+        app(\App\Services\SuggestLibraryService::class)->update($result, $data);
+
+        return response()->json(['ok' => true, 'id' => $result->id]);
+    }
+
+    /**
+     * CRUD: xóa một prompt trong Thư viện Prompt.
+     */
+    public function suggestLibraryDestroy(int $id): \Illuminate\Http\JsonResponse
+    {
+        $result = \App\Models\SuggestResult::where('user_id', auth()->id())->findOrFail($id);
+        app(\App\Services\SuggestLibraryService::class)->delete($result);
+
+        return response()->json(['ok' => true, 'deleted' => 1]);
+    }
+
+    /**
+     * Validation rules dùng chung cho CRUD prompt (store + update).
+     * reference_url optional — người dùng có thể tạo prompt thuần văn bản không cần ảnh nguồn.
+     */
+    private function validateSuggestLibrary(Request $request): array
+    {
+        return $request->validate([
+            'reference_url' => ['nullable', 'string', 'max:2048'],
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'styles' => ['nullable', 'array'],
+            'background' => ['nullable', 'string', 'max:200'],
+            'pose' => ['nullable', 'string', 'max:200'],
+            'fabric' => ['nullable', 'string', 'max:200'],
+            'silhouette' => ['nullable', 'string', 'max:200'],
+            'camera' => ['nullable', 'string', 'max:200'],
+            'garment_type' => ['nullable', 'string', 'max:200'],
+            'embellishment' => ['nullable', 'string', 'max:200'],
+            'detail_notes' => ['nullable', 'string', 'max:2000'],
+            'color_palette' => ['nullable', 'array'],
+            'image_prompt_en' => ['nullable', 'string', 'max:4000'],
+            'prompt_vi' => ['nullable', 'string', 'max:4000'],
+            'video_prompt_en' => ['nullable', 'string', 'max:4000'],
+            'negative_prompt' => ['nullable', 'string', 'max:2000'],
+            'keywords' => ['nullable', 'array'],
+            'creative_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'adherence' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'detail_level' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'category' => ['nullable', 'array'],
+        ]);
     }
 
     /**
@@ -3652,7 +3717,7 @@ RULES:
      */
     public function libraryData(Request $request): \Illuminate\Http\JsonResponse
     {
-        $filters = $request->only(['type', 'status', 'project_id', 'q', 'page', 'per_page']);
+        $filters = $request->only(['type', 'status', 'project_id', 'q', 'page', 'per_page', 'sort']);
         $filters['old_days'] = max(1, min(365, (int) ($request->input('old_days', 30))));
 
         return response()->json(app(\App\Services\StudioLibraryService::class)->list(auth()->user(), $filters));

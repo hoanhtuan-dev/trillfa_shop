@@ -206,6 +206,14 @@ const fields = [
   { k: 'duration', l: 'Thời lượng' }, { k: 'created_at', l: 'Ngày' },
 ];
 
+// Seed (gieo quẻ) — đọc từ seed top-level hoặc meta.seed (ảnh đã tạo lưu thêm seed khi có).
+const seedValue = computed(() => {
+  const c = current.value;
+  if (!c) return '';
+  const s = c.seed ?? c.meta?.seed;
+  return (s === null || s === undefined || s === '') ? '' : String(s);
+});
+
 // ── Gắn / gỡ dự án ──
 const attachOpen = ref(false);
 const attachBusy = ref(false);
@@ -373,6 +381,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </Transition>
+
+        <!-- Seed (gieo quẻ) — hiện khi ảnh đã tạo có lưu seed -->
+        <div v-if="seedValue" class="flex items-center justify-between rounded-md border border-brand-500/30 bg-brand-600/10 px-2.5 py-1.5">
+          <span class="text-[9px] font-semibold uppercase tracking-wide text-brand-300/80">🎲 Seed</span>
+          <span class="text-xs font-semibold text-brand-100">{{ seedValue }}</span>
+        </div>
 
         <!-- ══ Khối Dự án: gắn / gỡ ══ -->
         <div class="rounded-md border border-ink-700/60 bg-ink-800/70 p-2.5">

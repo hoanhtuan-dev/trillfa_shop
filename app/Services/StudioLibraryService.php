@@ -57,9 +57,30 @@ class StudioLibraryService
             });
         }
 
+        $sort = (string) ($filters['sort'] ?? 'newest');
+        switch ($sort) {
+            case 'oldest':
+                $query->oldest();
+                break;
+            case 'name_asc':
+                $query->orderBy('prompt', 'asc')->orderBy('created_at', 'desc');
+                break;
+            case 'name_desc':
+                $query->orderBy('prompt', 'desc')->orderBy('created_at', 'desc');
+                break;
+            case 'cost_desc':
+                $query->orderBy('credits_cost', 'desc')->orderBy('created_at', 'desc');
+                break;
+            case 'cost_asc':
+                $query->orderBy('credits_cost', 'asc')->orderBy('created_at', 'desc');
+                break;
+            default:
+                $query->latest();
+        }
+
         $perPage = max(12, min(100, (int) ($filters['per_page'] ?? 48)));
         /** @var LengthAwarePaginator $paginator */
-        $paginator = $query->latest()->paginate($perPage);
+        $paginator = $query->paginate($perPage);
 
         $items = $paginator->getCollection()->map(fn (Generation $g) => $this->serialize($g))->values();
 
@@ -520,6 +541,7 @@ class StudioLibraryService
             'ratio' => $g->ratio,
             'duration' => $g->duration,
             'elapsed_ms' => $g->elapsed_ms,
+            'seed' => is_array($g->meta) ? ($g->meta['seed'] ?? null) : null,
             'meta' => $g->meta,
         ];
     }

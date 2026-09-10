@@ -44,9 +44,27 @@ class SuggestLibraryService
             });
         }
 
+        $sort = (string) ($filters['sort'] ?? 'newest');
+        switch ($sort) {
+            case 'oldest':
+                $query->oldest();
+                break;
+            case 'name_asc':
+                $query->orderBy('garment_type', 'asc')->orderBy('created_at', 'desc');
+                break;
+            case 'name_desc':
+                $query->orderBy('garment_type', 'desc')->orderBy('created_at', 'desc');
+                break;
+            case 'used_desc':
+                $query->orderBy('apply_count', 'desc')->orderBy('created_at', 'desc');
+                break;
+            default:
+                $query->latest();
+        }
+
         $perPage = max(12, min(100, (int) ($filters['per_page'] ?? 48)));
         /** @var LengthAwarePaginator $paginator */
-        $paginator = $query->latest()->paginate($perPage);
+        $paginator = $query->paginate($perPage);
 
         $items = $paginator->getCollection()->map(fn (SuggestResult $r) => $this->serialize($r))->values();
 
@@ -114,6 +132,14 @@ class SuggestLibraryService
     }
 
     /**
+     * Tạo mới một prompt trong Thư viện Prompt (CRUD — thủ công từ giao diện).
+     */
+    public function create(User $user, array $data): SuggestResult
+    {
+        return $this->save($user, $data, (string) ($data['reference_url'] ?? ''));
+    }
+
+    /**
      * Đánh dấu prompt đã được áp dụng vào Tạo ảnh.
      */
     public function apply(SuggestResult $result): void
@@ -137,6 +163,55 @@ class SuggestLibraryService
         $count = $user->suggestResults()->whereIn('id', $ids)->delete();
 
         return ['deleted' => $count];
+    }
+
+    /**
+     * Cập nhật prompt (CRUD). Chỉ cập nhật các trường được gửi lên; giữ nguyên trường cũ khi thiếu.
+     */
+    public function update(SuggestResult $result, array $data): SuggestResult
+    {
+        $fields = [
+            'project_id' => array_key_exists('project_id', $data) ? $data['project_id'] : $result->project_id,
+            'styles' => array_key_exists('styles', $data) ? ($data['styles'] ?? []) : $result->styles,
+            'background' => array_key_exists('background', $data) ? $data['background'] : $result->background,
+            'pose' => array_key_exists('pose', $data) ? $data['pose'] : $result->pose,
+            'fabric' => array_key_exists('fabric', $data) ? $data['fabric'] : $result->fabric,
+            'silhouette' => array_key_exists('silhouette', $data) ? $data['silhouette'] : $result->silhouette,
+            'camera' => array_key_exists('camera', $data) ? $data['camera'] : $result->camera,
+            'garment_type' => array_key_exists('garment_type', $data) ? $data['garment_type'] : $result->garment_type,
+            'embellishment' => array_key_exists('embellishment', $data) ? $data['embellishment'] : $result->embellishment,
+            'detail_notes' => array_key_exists('detail_notes', $data) ? $data['detail_notes'] : $result->detail_notes,
+            'color_palette' => array_key_exists('color_palette', $data) ? ($data['color_palette'] ?? []) : $result->color_palette,
+            'image_prompt_en' => array_key_exists('image_prompt_en', $data) ? $data['image_prompt_en'] : $result->image_prompt_en,
+            'prompt_vi' => array_key_exists('prompt_vi', $data) ? $data['prompt_vi'] : $result->prompt_vi,
+            'video_prompt_en' => array_key_exists('video_prompt_en', $data) ? $data['video_prompt_en'] : $result->video_prompt_en,
+            'negative_prompt' => array_key_exists('negative_prompt', $data) ? $data['negative_prompt'] : $result->negative_prompt,
+            'keywords' => array_key_exists('keywords', $data) ? ($data['keywords'] ?? []) : $result->keywords,
+            'creative_level' => array_key_exists('creative_level', $data) ? (int) $data['creative_level'] : $result->creative_level,
+            'adherence' => array_key_exists('adherence', $data) ? (int) $data['adherence'] : $result->adherence,
+            'detail_level' => array_key_exists('detail_level', $data) ? (int) $data['detail_level'] : $result->detail_level,
+            'category' => array_key_exists('category', $data) ? $data['category'] : $result->category,
+        ];
+
+        if (array_key_exists('reference_url', $data)) {
+            $ref = (string) ($data['reference_url'] ?? '');
+            $fields['reference_url'] = $ref;
+            if ($ref !== $result->reference_url) {
+                $fields['reference_thumb'] = $this->makeThumb($ref);
+            }
+        }
+
+        $result->update($fields);
+
+        return $result->fresh();
+    }
+
+    /**
+     * Xóa một prompt (CRUD).
+     */
+    public function delete(SuggestResult $result): void
+    {
+        $result->delete();
     }
 
     /**

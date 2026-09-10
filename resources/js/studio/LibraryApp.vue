@@ -3,8 +3,9 @@ import { ref, computed, onMounted } from 'vue';
 import { useStudioStore } from './store.js';
 import { thumbUrl, onThumbError } from './composables/useStudioThumb.js';
 import GalleryModal from './components/GalleryModal.vue';
-import SuggestLibraryCard from './components/SuggestLibraryCard.vue';
+import PromptLibraryTab from './components/PromptLibraryTab.vue';
 import StudioIcon from './components/StudioIcon.vue';
+import { gridClass } from './libraryLayout.js';
 
 const store = useStudioStore();
 
@@ -102,6 +103,69 @@ function refresh() {
   else { store.loadLibrary(true); store.refreshLibraryScan(); }
 }
 
+// ── Sắp xếp / hiển thị / cỡ lưới (dùng chung 3 tab) ──
+const sortOptions = computed(() => {
+  if (store.libraryTab === 'uploads') return [
+    { value: 'newest', label: 'Mới nhất' },
+    { value: 'oldest', label: 'Cũ nhất' },
+    { value: 'name_asc', label: 'Tên A→Z' },
+    { value: 'name_desc', label: 'Tên Z→A' },
+    { value: 'size_desc', label: 'Dung lượng ↓' },
+    { value: 'size_asc', label: 'Dung lượng ↑' },
+  ];
+  if (store.libraryTab === 'suggest') return [
+    { value: 'newest', label: 'Mới nhất' },
+    { value: 'oldest', label: 'Cũ nhất' },
+    { value: 'name_asc', label: 'Loại A→Z' },
+    { value: 'name_desc', label: 'Loại Z→A' },
+    { value: 'used_desc', label: 'Dùng nhiều nhất' },
+  ];
+  return [
+    { value: 'newest', label: 'Mới nhất' },
+    { value: 'oldest', label: 'Cũ nhất' },
+    { value: 'name_asc', label: 'Tên A→Z' },
+    { value: 'name_desc', label: 'Tên Z→A' },
+    { value: 'cost_desc', label: 'Credit ↓' },
+    { value: 'cost_asc', label: 'Credit ↑' },
+  ];
+});
+
+const activeSort = computed({
+  get() {
+    if (store.libraryTab === 'uploads') return store.uploadSort;
+    if (store.libraryTab === 'suggest') return store.suggestLibSort;
+    return store.librarySort;
+  },
+  set(v) {
+    if (store.libraryTab === 'uploads') store.setUploadSort(v);
+    else if (store.libraryTab === 'suggest') store.setSuggestLibSort(v);
+    else store.setLibrarySort(v);
+  },
+});
+
+const gridCls = computed(() => gridClass(store.libraryGrid));
+
+// File tải lên: sort client-side (không phân trang → sắp xếp ngay trên danh sách đã tải).
+const sortedUploads = computed(() => {
+  const arr = [...(store.uploadItems || [])];
+  const s = store.uploadSort;
+  const cmp = {
+    newest: (a, b) => (b.mtime || 0) - (a.mtime || 0),
+    oldest: (a, b) => (a.mtime || 0) - (b.mtime || 0),
+    name_asc: (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'),
+    name_desc: (a, b) => String(b.name || '').localeCompare(String(a.name || ''), 'vi'),
+    size_desc: (a, b) => (b.size || 0) - (a.size || 0),
+    size_asc: (a, b) => (a.size || 0) - (b.size || 0),
+  }[s] || ((a, b) => (b.mtime || 0) - (a.mtime || 0));
+  return arr.sort(cmp);
+});
+
+function seedLabel(g) {
+  if (g == null) return '';
+  const s = g.seed ?? g.meta?.seed;
+  return (s === null || s === undefined || s === '') ? '' : String(s);
+}
+
 // ── Dự án helpers ──
 const activeProjectId = computed(() => store.libraryFilters.project_id);
 const filteredProject = computed(() => {
@@ -188,6 +252,31 @@ onMounted(async () => {
           <StudioIcon name="lightbulb" size="h-4 w-4"/> 💡 Prompt
           <span v-if="suggestLibStats.total" class="ml-1 rounded-full bg-brand-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-brand-100">{{ fmtNum(suggestLibStats.total) }}</span>
         </button>
+      </div>
+
+      <!-- ══ Thanh sắp xếp / hiển thị / cỡ lưới (dùng chung cho cả 3 tab) ══ -->
+      <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-ink-700 bg-ink-800 p-3">
+        <div class="flex items-center gap-1.5">
+          <label class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Sắp xếp theo</label>
+          <select v-model="activeSort" class="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-cream-100 focus:border-brand-400 focus:outline-none">
+            <option v-for="o in sortOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <label class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Hiển thị theo</label>
+          <div class="seg !p-0.5">
+            <button @click="store.libraryView = 'grid'" class="seg-btn !py-1" :class="store.libraryView === 'grid' ? 'is-active' : ''" title="Hiển thị dạng lưới"><StudioIcon name="grid" size="h-3.5 w-3.5" /> Lưới</button>
+            <button @click="store.libraryView = 'list'" class="seg-btn !py-1" :class="store.libraryView === 'list' ? 'is-active' : ''" title="Hiển thị dạng danh sách"><StudioIcon name="list" size="h-3.5 w-3.5" /> Danh sách</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <label class="text-[10px] font-semibold uppercase tracking-wide text-cream-300">Cỡ lưới ảnh</label>
+          <div class="seg !p-0.5">
+            <button @click="store.libraryGrid = 's'" class="seg-btn !px-2.5 !py-1" :class="store.libraryGrid === 's' ? 'is-active' : ''" title="Lưới nhỏ (nhiều cột)">S</button>
+            <button @click="store.libraryGrid = 'm'" class="seg-btn !px-2.5 !py-1" :class="store.libraryGrid === 'm' ? 'is-active' : ''" title="Lưới vừa">M</button>
+            <button @click="store.libraryGrid = 'l'" class="seg-btn !px-2.5 !py-1" :class="store.libraryGrid === 'l' ? 'is-active' : ''" title="Lưới lớn (ít cột)">L</button>
+          </div>
+        </div>
       </div>
 
       <template v-if="store.libraryTab === 'generations'">
@@ -309,7 +398,7 @@ onMounted(async () => {
       </div>
 
       <!-- ══ Lưới ảnh ══ -->
-      <div v-if="store.libraryLoading && !store.libraryItems.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div v-if="store.libraryLoading && !store.libraryItems.length" class="grid gap-3" :class="gridCls">
         <div v-for="i in 10" :key="i" class="aspect-[3/4] animate-pulse rounded-lg border-2 border-ink-700 bg-ink-800"></div>
       </div>
 
@@ -319,7 +408,7 @@ onMounted(async () => {
         <button type="button" @click="goBack" class="mt-2 inline-block text-xs text-brand-300 hover:text-brand-200">Tạo ảnh mới trong Studio →</button>
       </div>
 
-      <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div v-else-if="store.libraryView === 'grid'" class="grid gap-3" :class="gridCls">
         <div v-for="g in store.libraryItems" :key="g.id"
              class="group relative overflow-hidden rounded-lg border-2 transition"
              :class="isSelected(g.id) ? 'border-brand-400' : 'border-ink-700'">
@@ -345,6 +434,7 @@ onMounted(async () => {
             <div class="absolute inset-0 bg-black/40 opacity-0 transition group-hover:opacity-100"></div>
             <div class="absolute inset-x-0 bottom-0 p-2 text-[10px] text-cream-100 opacity-0 transition group-hover:opacity-100">
               {{ store.genName(g) }} <span v-if="g.created_at" class="text-cream-300/70">· {{ g.created_at }}</span>
+              <span v-if="seedLabel(g)" class="ml-1 rounded bg-ink-900/80 px-1 py-0.5 text-[9px] text-brand-200">🎲 {{ seedLabel(g) }}</span>
             </div>
           </div>
 
@@ -357,6 +447,38 @@ onMounted(async () => {
           <!-- Checkbox chọn (luôn hiện ở chế độ quản lý) -->
           <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
                   class="absolute right-2 bottom-2 grid h-7 w-7 place-items-center rounded-lg border text-sm"
+                  :class="isSelected(g.id) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+            <StudioIcon name="check" size="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <!-- ══ Danh sách (list view) ══ -->
+      <div v-else class="space-y-2">
+        <div v-for="g in store.libraryItems" :key="g.id"
+             class="group relative flex items-center gap-3 overflow-hidden rounded-lg border-2 bg-ink-800/70 p-2 transition"
+             :class="isSelected(g.id) ? 'border-brand-400' : 'border-ink-700 hover:border-brand-500/50'">
+          <div class="h-16 w-12 shrink-0 cursor-pointer overflow-hidden rounded-md bg-ink-900" @click="openViewer(g)">
+            <img v-if="g.media_url" :src="thumbUrl(g.media_url, 320)" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, g.media_url)">
+            <div v-else class="grid h-full w-full place-items-center text-[10px] text-cream-300/60">{{ g.status === 'failed' ? 'Lỗi' : (g.type === 'video' ? '▶' : '—') }}</div>
+          </div>
+          <div class="min-w-0 flex-1 cursor-pointer" @click="openViewer(g)">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="truncate text-xs font-semibold text-cream-100">{{ store.genName(g) }}</span>
+              <span class="rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+                    :class="{
+                      'border-emerald-500/40 bg-emerald-500/15 text-emerald-200': g.status === 'completed',
+                      'border-red-500/40 bg-red-500/15 text-red-200': g.status === 'failed',
+                      'border-ink-600 bg-ink-800 text-cream-300/70': g.status === 'cancelled',
+                      'border-amber-500/40 bg-amber-500/15 text-amber-200': ['pending','processing'].includes(g.status),
+                    }">{{ statusLabel(g.status) }}</span>
+              <span v-if="g.type === 'video'" class="rounded-full bg-ink-700 px-1.5 py-0.5 text-[9px] text-cream-300/70">Video</span>
+              <span v-if="seedLabel(g)" class="rounded-full bg-brand-600/20 px-1.5 py-0.5 text-[9px] text-brand-200">🎲 {{ seedLabel(g) }}</span>
+            </div>
+            <p class="mt-0.5 truncate text-[10px] text-cream-300/50">{{ g.model || '—' }} · {{ g.created_at }}</p>
+          </div>
+          <button v-if="store.libraryManage" @click.stop="store.toggleLibrarySelect(g.id)"
+                  class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
                   :class="isSelected(g.id) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
@@ -421,14 +543,14 @@ onMounted(async () => {
         </div>
 
         <!-- Lưới file tải lên -->
-        <div v-if="store.uploadLoading && !store.uploadItems.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div v-if="store.uploadLoading && !store.uploadItems.length" class="grid gap-3" :class="gridCls">
           <div v-for="i in 10" :key="i" class="aspect-square animate-pulse rounded-lg border-2 border-ink-700 bg-ink-800"></div>
         </div>
         <div v-else-if="!store.uploadItems.length" class="rounded-lg border border-ink-700 bg-ink-800 py-16 text-center">
           <p class="text-sm text-cream-300/50">Chưa có file nào được tải lên.</p>
         </div>
-        <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          <div v-for="f in store.uploadItems" :key="f.rel"
+        <div v-else-if="store.libraryView === 'grid'" class="grid gap-3" :class="gridCls">
+          <div v-for="f in sortedUploads" :key="f.rel"
                class="group relative overflow-hidden rounded-lg border-2 transition"
                :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
             <div class="relative cursor-pointer">
@@ -447,10 +569,33 @@ onMounted(async () => {
             </button>
           </div>
         </div>
+      <!-- ══ Danh sách file tải lên (list view) ══ -->
+      <div v-else class="space-y-2">
+        <div v-for="f in sortedUploads" :key="f.rel"
+             class="group relative flex items-center gap-3 overflow-hidden rounded-lg border-2 bg-ink-800/70 p-2 transition"
+             :class="isUploadSelected(f.rel) ? 'border-brand-400' : (f.used ? 'border-ink-700' : 'border-red-500/40')">
+          <div class="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-ink-900">
+            <img :src="thumbUrl(f.url, 320)" class="h-full w-full object-cover" loading="lazy" @error="onThumbError($event, f.url)">
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5">
+              <p class="truncate text-xs font-medium text-cream-100">{{ f.name }}</p>
+              <span v-if="f.used" class="shrink-0 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-200">đang dùng</span>
+              <span v-else class="shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-red-200">chưa dùng</span>
+            </div>
+            <p class="truncate text-[10px] text-cream-300/50">{{ f.width }}×{{ f.height }} · {{ fmtBytes(f.size) }} · {{ f.kind === 'asset' ? 'tài nguyên' : 'ảnh nguồn' }}</p>
+          </div>
+          <button v-if="store.libraryManage && !f.used" @click.stop="store.toggleUploadSelect(f.rel)"
+                  class="grid h-7 w-7 shrink-0 place-items-center rounded-lg border text-sm"
+                  :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
+            <StudioIcon name="check" size="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
       </template>
       <!-- ══ Tab: 💡 PROMPT PHÂN TÍCH ══ -->
       <template v-else>
-        <SuggestLibraryCard />
+        <PromptLibraryTab />
       </template>
     </div>
 
