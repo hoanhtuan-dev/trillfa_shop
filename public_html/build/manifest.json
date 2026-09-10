@@ -154,7 +154,7 @@
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CytbY9Yk.css",
+    "file": "assets/app-BY3atmq_.css",
     "name": "app",
     "names": [
       "app.css"
@@ -335,7 +335,7 @@
     ]
   },
   "resources/js/studio/app.js": {
-    "file": "assets/app-CqLXCZkb.js",
+    "file": "assets/app-DbdfT81A.js",
     "name": "app",
     "src": "resources/js/studio/app.js",
     "isEntry": true,
@@ -351,7 +351,7 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-D8kxkhHG.js",
+    "file": "assets/settings-DNAxR7WD.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
@@ -361,7 +361,7 @@
       "__plugin-vue_export-helper-BDNMzG2s.js"
     ],
     "css": [
-      "assets/settings-53B4QJjc.css"
+      "assets/settings-7sPC5yEk.css"
     ]
   },
   "resources/js/studio/stylist-data.js": {

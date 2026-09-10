@@ -11,6 +11,15 @@ const store = useStudioStore();
       <span class="rounded-full bg-brand-600/30 px-1.5 py-0.5 text-[9px] font-semibold text-brand-200">video</span>
     </h2>
 
+    <!-- Model video — danh sách từ Cài đặt → 🎯 Nhóm công việc (video) -->
+    <div v-if="store.taskGroupModels('video').length > 1" class="mt-4 flex items-center gap-2">
+      <span class="shrink-0 text-[10px] font-medium text-cream-300/60">🤖</span>
+      <select v-model="store.videoModelSel" class="input !py-2 !text-xs" title="Model render video — danh sách từ Cài đặt → 🎯 Nhóm công việc (video)">
+        <option value="">Mặc định ({{ store.taskGroupModels('video')[0]?.label || 'auto' }})</option>
+        <option v-for="m in store.taskGroupModels('video')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
+      </select>
+    </div>
+
     <!-- Thời lượng -->
     <div class="mt-4 flex items-center justify-between">
       <p class="label"><StudioIcon name="clock" size="h-3.5 w-3.5" class="-mt-0.5 mr-1 inline text-brand-300" /> Thời lượng</p>

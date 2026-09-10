@@ -53,6 +53,10 @@ class StudioSettingsController extends Controller
             'providers' => $providers,
             'api_keys' => $this->keyRows(),
             'models' => $this->modelRows(),
+            // Task groups: mỗi card/tính năng một nhóm — models của nhóm + default hiện hành.
+            // Đây là cầu nối giữa các tab: tab Models đăng ký model vào nhóm, tab Cấu hình
+            // nhóm chọn default, cards /studio đọc đúng danh sách của nhóm mình.
+            'task_groups' => $this->taskGroupRows(),
             'config' => [
                 'image_provider' => setting('studio_image_provider', 'flux'),
                 'image_model' => setting('studio_image_model', config('studio.image_model')),
@@ -66,6 +70,46 @@ class StudioSettingsController extends Controller
             ],
             'usage' => studio_usage(auth()->user()),
         ]);
+    }
+
+    /**
+     * POST /studio/settings-vue/task-defaults — gán default model cho một nhóm công việc.
+     * value = "provider:model" hoặc "" (xóa default → về legacy/auto theo priority).
+     */
+    public function updateTaskDefault(Request $request): JsonResponse
+    {
+        $groups = studio_task_groups();
+        $data = $request->validate([
+            'group' => ['required', 'string', Rule::in(array_keys($groups))],
+            'value' => ['nullable', 'string', 'max:160'],
+        ]);
+
+        $value = trim((string) ($data['value'] ?? ''));
+        if ($value !== '' && (! str_contains($value, ':') || strlen($value) > 160)) {
+            return response()->json(['message' => 'Giá trị phải dạng provider:model.'], 422);
+        }
+
+        set_setting('studio_task_'.$data['group'].'_model', $value);
+
+        return response()->json(['ok' => true, 'group' => $data['group'], 'value' => $value]);
+    }
+
+    /**
+     * Task-group rows for the snapshot: label + ordered models + current default
+     * (default mới nếu đã gán; ngược lại model đầu danh sách kế thừa legacy).
+     */
+    protected function taskGroupRows(): array
+    {
+        $rows = [];
+        foreach (studio_task_groups() as $group => $meta) {
+            $rows[$group] = [
+                'label' => $meta['label'],
+                'default' => studio_task_group_default($group),
+                'assigned' => (string) setting('studio_task_'.$group.'_model', ''),
+                'models' => studio_task_group_models($group),
+            ];
+        }
+        return $rows;
     }
 
     /**
@@ -235,7 +279,7 @@ class StudioSettingsController extends Controller
     public function storeModel(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'group' => ['required', 'string', 'in:image,video,inference,text'],
+            'group' => ['required', 'string', 'in:image,edit,video,swap,vision,prompt,translate,inference,text'],
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:60'],
             'model_id' => ['required', 'string', 'max:255'],
@@ -262,7 +306,7 @@ class StudioSettingsController extends Controller
     public function updateModel(Request $request, StudioModel $model): JsonResponse
     {
         $data = $request->validate([
-            'group' => ['required', 'string', 'in:image,video,inference,text'],
+            'group' => ['required', 'string', 'in:image,edit,video,swap,vision,prompt,translate,inference,text'],
             'name' => ['required', 'string', 'max:120'],
             'provider' => ['required', 'string', 'max:60'],
             'model_id' => ['required', 'string', 'max:255'],

@@ -200,6 +200,7 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::put('/settings-vue/models/{model}', [StudioSettingsController::class, 'updateModel'])->name('settings-vue.models.update');
     Route::delete('/settings-vue/models/{model}', [StudioSettingsController::class, 'deleteModel'])->name('settings-vue.models.delete');
     Route::post('/settings-vue/config', [StudioSettingsController::class, 'updateConfig'])->name('settings-vue.config');
+    Route::post('/settings-vue/task-defaults', [StudioSettingsController::class, 'updateTaskDefault'])->name('settings-vue.task-defaults');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');
     Route::post('/settings/save', [StudioController::class, 'settingsSave'])->name('settings.save');

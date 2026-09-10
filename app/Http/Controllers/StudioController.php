@@ -81,6 +81,9 @@ class StudioController extends Controller
             'negative_prompt' => ['nullable', 'string', 'max:2000'],
             'prompt_prefix' => ['nullable', 'string', 'max:500'],
             'prompt_suffix' => ['nullable', 'string', 'max:500'],
+            // Model selector trên card Tạo Ảnh 2D / Ảnh mới từ ảnh mẫu (task group image).
+            'provider' => ['nullable', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:160'],
             // Phom dáng + tóc (không bắt buộc)
             'body_height' => ['nullable', 'integer', 'min:1', 'max:10'],
             'body_build' => ['nullable', 'integer', 'min:1', 'max:10'],
@@ -179,6 +182,7 @@ class StudioController extends Controller
             'base_image' => ['nullable', 'string', 'max:2048'],
             'camera' => ['nullable', 'string', 'max:1000'], // Kịch bản quay (video_scene) injection có thể dài
             'model' => ['nullable', 'string', 'max:120'], // video-model override (multi-model selector)
+            'provider' => ['nullable', 'string', 'max:60'], // provider của model chọn (task group video)
             'model_registry_id' => ['nullable', 'integer'],
             'provenance' => ['nullable', 'string', 'max:20'],
             'resolution' => ['nullable', 'string', 'in:480,720,1080'],
@@ -199,7 +203,8 @@ class StudioController extends Controller
                 $data['api_key_ref'] = $reg->api_key_ref;
             }
         } elseif (! empty($data['model'])) {
-            set_setting('studio_video_model', $data['model']);
+            // Selector trên card / task-group default: dùng đúng cặp provider:model gửi lên.
+            // KHÔNG ghi đè setting studio_video_model nữa — selection là per-request, không phải config.
         }
 
         return $this->queueGeneration('video', $data, $cost);
@@ -1386,9 +1391,17 @@ RULES:
      */
     protected function defaultProviderModel(string $type): array
     {
+        // Task-group resolution (Cài đặt → 🎯 Nhóm công việc): default nhóm nếu đã gán,
+        // rồi model theo priority của nhóm. Fallback về cơ chế cũ (model_candidates) khi
+        // nhóm chưa có gì — hành vi trước đó được bảo toàn.
+        $group = in_array($type, ['video', 'inference', 'text']) ? $type : 'image';
+        [$tp, $tm] = studio_task_group_resolve($type === 'video' ? 'video' : 'image');
+        if ($tp && $tm) {
+            return [$tp, $tm];
+        }
+
         // Unified priority: default-settings model first, then registered models of the group by priority.
         // Same list as generation and the settings check, so they never disagree.
-        $group = in_array($type, ['video', 'inference', 'text']) ? $type : 'image';
         $list = studio_model_candidates($group);
         if ($list) {
             return [$list[0]['provider'], $list[0]['model']];
@@ -4574,6 +4587,17 @@ RULES:
             $addEditOption($p, $m);
         }
 
+        // Task groups: mỗi card nhận đúng danh sách model của nhóm mình — cùng nguồn
+        // với trang Settings (studio_task_group_models) nên UI và pipeline không thể lệch nhau.
+        $taskGroups = [];
+        foreach (studio_task_groups() as $group => $meta) {
+            $taskGroups[$group] = [
+                'label' => $meta['label'],
+                'default' => studio_task_group_default($group),
+                'models' => studio_task_group_models($group),
+            ];
+        }
+
         return response()->json([
             'creative_level' => (int) studio_config('creative_level', 6),
             'texture' => (int) studio_config('texture', 5),
@@ -4589,6 +4613,8 @@ RULES:
             'suggest_enabled' => studio_suggest_enabled(),
             'suggest_default_lang' => (string) studio_suggest_config('default_lang', 'en'),
             'image_credits' => (int) studio_config('image_credits', 1),
+            // Task groups — model theo nhóm công việc cho selector trên từng card.
+            'task_groups' => $taskGroups,
             // Card Sửa ảnh: các model chỉnh sửa được phép chọn (mặc định đứng đầu).
             'inpaint_models' => $inpaintModels,
             // Card "Kịch bản quay" (DirectorCard): các preset video_scene từ Prompt Templates (Cài đặt).

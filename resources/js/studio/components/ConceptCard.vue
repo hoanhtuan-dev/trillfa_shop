@@ -610,7 +610,14 @@ const bodyHipsLabel = computed(() => {
             </div>
           </div>
 
-          <!-- Ratio + Resolution -->
+          <!-- Model + Ratio + Resolution -->
+          <div v-if="store.taskGroupModels('image').length > 1" class="flex items-center gap-2">
+            <span class="shrink-0 text-[10px] font-medium text-cream-300/60">🤖</span>
+            <select v-model="store.imageModelSel" class="input !py-2 !text-xs !rounded-md" title="Model tạo ảnh — danh sách từ Cài đặt → 🎯 Nhóm công việc (image)">
+              <option value="">Mặc định ({{ store.taskGroupModels('image')[0]?.label || 'auto' }})</option>
+              <option v-for="m in store.taskGroupModels('image')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
+            </select>
+          </div>
           <div class="grid grid-cols-2 gap-3">
             <select v-model="store.imageRatio" class="input !py-2.5 !text-sm !rounded-md" title="Tỷ lệ khung hình ảnh đầu ra"><option v-for="r in ['1:1','4:3','3:4','9:16','16:9','4:5','21:9']" :key="r" :value="r">{{ r }}</option></select>
             <select v-model="store.imageRes" class="input !py-2.5 !text-sm !rounded-md" title="Độ phân giải ảnh đầu ra"><option value="1K">1K</option><option value="2K">2K</option></select>

@@ -144,13 +144,17 @@ async function runRefgen() {
   if (!canSubmit.value) return;
   busy.value = true;
   // Ảnh tham chiếu có thể là data:URL (canvas flattened) → backend downscaleSource xử lý.
-  // Không truyền selectedModel → backend dùng model sinh ảnh đã cấu hình trong Cài đặt.
+  // Model: selector trên card (imageModelSel — dùng chung nhóm image với Tạo Ảnh 2D);
+  // '' = default nhóm image từ Cài đặt → 🎯 Nhóm công việc.
   // Thử đồ: gửi tryon=true + body directive từ store + khuôn mặt mẫu (ảnh, mô tả do vision đọc).
   const isTryon = mode.value === 'tryon';
   const body = isTryon ? { height: store.bodyHeight, build: store.bodyBuild, waist: store.bodyWaist, shoulders: store.bodyShoulders, hips: store.bodyHips } : null;
+  const selModel = store.imageModelSel && store.imageModelSel.includes(':')
+    ? (([p, m]) => ({ provider: p, model: m }))(store.imageModelSel.split(':'))
+    : null;
   // Nền Studio áp dụng cho cả 2 chế độ; Góc chụp chỉ cho "Tạo ảnh mới".
   const items = await store.refgen(
-    img.value, prompt.value.trim(), similarity.value, variants.value, null, isTryon, body,
+    img.value, prompt.value.trim(), similarity.value, variants.value, selModel, isTryon, body,
     isTryon ? faceModelId.value : '', isTryon ? poseId.value : '',
     activeBgPrompt.value, isTryon ? '' : activeAnglePrompt.value,
   );
@@ -231,6 +235,15 @@ async function runRefgen() {
       <label class="label mt-4">Mô tả ảnh mới <span class="text-cream-300/40">(để trống = tạo biến thể giống ảnh mẫu)</span></label>
       <textarea v-model="prompt" rows="3" maxlength="1000" class="input !text-xs" placeholder="VD: giữ chủ thể, đổi sang nền studio tối, góc máy chếch…"></textarea>
       <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ prompt.length }}/1000</p>
+
+      <!-- Model sinh ảnh — nhóm image (Cài đặt → 🎯 Nhóm công việc) -->
+      <div v-if="store.taskGroupModels('image').length > 1" class="mt-3 flex items-center gap-2">
+        <span class="shrink-0 text-[10px] font-medium text-cream-300/60">🤖</span>
+        <select v-model="store.imageModelSel" class="input !py-2 !text-xs" title="Model sinh ảnh — danh sách từ Cài đặt → 🎯 Nhóm công việc (image)">
+          <option value="">Mặc định ({{ store.taskGroupModels('image')[0]?.label || 'auto' }})</option>
+          <option v-for="m in store.taskGroupModels('image')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
+        </select>
+      </div>
 
       <!-- Độ giống ảnh mẫu -->
       <label class="label mt-3">Độ giống ảnh mẫu</label>

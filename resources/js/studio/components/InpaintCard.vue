@@ -128,6 +128,15 @@ const maskActive = computed(() => store.inpaintMaskMode !== 'none');
     <textarea v-model="store.inpaintPrompt" rows="3" maxlength="1000" @keydown="onPromptKeydown" class="input !text-xs" placeholder="VD: đổi màu áo thành đỏ, ngắn tay hơn, thêm túi trước… (Ctrl+Enter để gửi)"></textarea>
     <p class="mt-1 text-right text-[10px] text-cream-300/50">{{ store.inpaintPrompt.length }}/1000</p>
 
+    <!-- Model chỉnh sửa — nhóm edit (Cài đặt → 🎯 Nhóm công việc) -->
+    <div v-if="store.taskGroupModels('edit').length > 1" class="mt-2 flex items-center gap-2">
+      <span class="shrink-0 text-[10px] font-medium text-cream-300/60">🤖</span>
+      <select v-model="store.inpaintModel" class="input !py-2 !text-xs" title="Model chỉnh sửa ảnh — danh sách từ Cài đặt → 🎯 Nhóm công việc (edit)">
+        <option value="">Mặc định ({{ (store.taskGroupModels('edit')[0] || store.inpaintModels[0] || {}).label || 'Qwen Edit' }})</option>
+        <option v-for="m in store.taskGroupModels('edit')" :key="m.provider + m.model" :value="m.provider + ':' + m.model">{{ m.label }}</option>
+      </select>
+    </div>
+
     <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-cream-200">
       <label class="flex cursor-pointer items-center gap-1.5"><input type="checkbox" v-model="store.inpaintPreserveFace" class="h-3.5 w-3.5 accent-brand-500"> Giữ nguyên khuôn mặt & dáng</label>
       <label class="flex cursor-pointer items-center gap-1.5"><input type="checkbox" v-model="store.inpaintPreserveBg" class="h-3.5 w-3.5 accent-brand-500"> Giữ nguyên nền</label>

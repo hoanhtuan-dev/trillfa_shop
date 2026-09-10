@@ -149,7 +149,9 @@ const modelForm = ref({ group: 'image', name: '', provider: '', model_id: '', ap
 const modelSaving = ref(false);
 const editingModel = ref(null);
 const modelEdit = ref(null);
-const groupLabels = { image: 'Ảnh', video: 'Video', inference: 'Suy luận', text: 'Ngôn ngữ' };
+const groupLabels = { image: 'Tạo ảnh 2D', edit: 'Sửa ảnh (edit)', video: 'Video', swap: 'Thay người mẫu', vision: 'Đọc ảnh (vision)', prompt: 'Suy luận prompt', translate: 'Dịch prompt', inference: 'Suy luận (cũ)', text: 'Ngôn ngữ (cũ)' };
+const taskGroups = computed(() => data.value?.task_groups || {});
+const taskGroupKeys = computed(() => Object.keys(taskGroups.value));
 const modelsByGroup = computed(() => {
   const m = new Map();
   for (const g of Object.keys(groupLabels)) m.set(g, models.value.filter(x => x.group === g));
@@ -192,6 +194,42 @@ async function saveConfig() {
   await run(async () => { await api('/config', 'POST', cfgForm.value); }, 'Đã lưu cấu hình.');
   cfgSaving.value = false;
 }
+
+// ── Tab: Task groups (nhóm công việc — model theo card/tính năng) ────────
+const taskSaving = ref('');
+const taskValue = (g) => taskGroups.value[g]?.assigned ?? '';
+function taskDefaultLabel(g) {
+  const d = taskGroups.value[g]?.default;
+  if (!d) return '— chưa có —';
+  const m = taskGroups.value[g]?.models?.find(x => x.provider + ':' + x.model === d);
+  return m?.label || d;
+}
+function taskGroupModelOptions(g) {
+  // Danh sách chọn cho một nhóm: các model ĐÃ thuộc nhóm + "auto" (legacy/priority).
+  const models = taskGroups.value[g]?.models || [];
+  const seen = new Set(models.map(m => m.provider + ':' + m.model));
+  const opts = [...models.map(m => ({ value: m.provider + ':' + m.model, label: m.label + (m.default ? ' ★' : ''), registry: !!m.registry_id }))];
+  // Thêm các model khác trong Registry (chưa thuộc nhóm) để gán nhanh.
+  for (const m of models.value) {
+    const v = m.provider + ':' + m.model_id;
+    if (!seen.has(v)) { opts.push({ value: v, label: m.name + ' (chưa thuộc nhóm)', registry: true }); seen.add(v); }
+  }
+  return opts;
+}
+async function saveTaskDefault(g) {
+  taskSaving.value = g;
+  await run(async () => {
+    await api('/task-defaults', 'POST', { group: g, value: taskValue(g) || '' });
+  }, 'Đã lưu default cho nhóm «' + (taskGroups.value[g]?.label || g) + '».');
+  taskSaving.value = '';
+}
+async function clearTaskDefault(g) {
+  taskSaving.value = g;
+  await run(async () => {
+    await api('/task-defaults', 'POST', { group: g, value: '' });
+  }, 'Đã đặt lại về tự động (theo ưu tiên model).');
+  taskSaving.value = '';
+}
 </script>
 
 <template>
@@ -210,6 +248,7 @@ async function saveConfig() {
         <button @click="tab='keys'" :class="tab==='keys' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🔑 API Keys</button>
         <button @click="tab='providers'" :class="tab==='providers' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🌐 Custom Providers</button>
         <button @click="tab='models'" :class="tab==='models' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🤖 Models</button>
+        <button @click="tab='tasks'" :class="tab==='tasks' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">🎯 Nhóm công việc</button>
         <button @click="tab='general'; ensureCfg()" :class="tab==='general' ? 'bg-brand-600 text-white' : 'bg-ink-700 text-cream-200 hover:bg-ink-600'" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors">📋 Cấu hình</button>
       </div>
     </div>
@@ -368,8 +407,9 @@ async function saveConfig() {
         <div class="card p-5">
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <h2 class="font-display text-base font-semibold text-ink-900">🤖 Model Registry</h2>
-            <p class="text-xs text-ink-500">{{ models.length }} model. Thứ tự dùng thực tế: model mặc định (Cấu hình) → các model theo ưu tiên giảm dần.</p>
+            <p class="text-xs text-ink-500">{{ models.length }} model. <b>Vai trò (group)</b> quyết định model thuộc nhóm công việc nào — xem tab 🎯 Nhóm công việc.</p>
           </div>
+          <p class="mt-1 text-xs text-ink-500">Vai trò: <b>image</b> = tạo ảnh · <b>edit</b> = sửa ảnh · <b>video</b> · <b>swap</b> = thay người mẫu · <b>vision</b> = đọc ảnh · <b>prompt</b> = suy luận · <b>translate</b> = dịch. Thứ tự dùng: default nhóm (tab 🎯) → model theo ưu tiên giảm dần.</p>
 
           <div class="mt-4 space-y-4">
             <div v-for="(rows, g) in modelsByGroup" :key="g">
@@ -389,8 +429,8 @@ async function saveConfig() {
                   </div>
                   <div v-else class="space-y-2">
                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      <div><label class="label">Vai trò</label>
-                        <select v-model="modelEdit.group" class="input !py-1.5"><option v-for="(l, gv) in groupLabels" :key="gv" :value="gv">{{ l }}</option></select>
+                      <div><label class="label">Vai trò (nhóm)</label>
+                        <select v-model="modelEdit.group" class="input !py-1.5"><option v-for="(l, gv) in groupLabels" :key="gv" :value="gv">{{ l }} ({{ gv }})</option></select>
                       </div>
                       <div><label class="label">Tên</label><input v-model="modelEdit.name" class="input !py-1.5"></div>
                       <div><label class="label">Provider</label>
@@ -416,8 +456,10 @@ async function saveConfig() {
         <div class="card p-5">
           <h3 class="text-sm font-semibold text-ink-900">➕ Thêm model</h3>
           <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div><label class="label">Vai trò</label>
-              <select v-model="modelForm.group" class="input !py-2"><option v-for="(l, gv) in groupLabels" :key="gv" :value="gv">{{ l }}</option></select>
+            <div><label class="label">Vai trò (nhóm công việc)</label>
+              <select v-model="modelForm.group" class="input !py-2">
+                <option v-for="(l, gv) in groupLabels" :key="gv" :value="gv">{{ l }} ({{ gv }})</option>
+              </select>
             </div>
             <div><label class="label">Tên</label><input v-model="modelForm.name" class="input !py-2" placeholder="VD: Wan 2.2 i2v"></div>
             <div><label class="label">Provider</label>
@@ -428,6 +470,76 @@ async function saveConfig() {
             <div><label class="label">Ưu tiên</label><input type="number" v-model.number="modelForm.priority" min="0" max="100" class="input !py-2"></div>
           </div>
           <button @click="saveModel" :disabled="modelSaving" class="btn-brand btn-sm mt-3">{{ modelSaving ? 'Đang lưu…' : '➕ Thêm model' }}</button>
+        </div>
+      </div>
+
+      <!-- ══════════ TAB: TASK GROUPS (NHÓM CÔNG VIỆC) ══════════ -->
+      <div v-show="tab==='tasks'">
+        <div class="card p-5">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 class="font-display text-base font-semibold text-ink-900">🎯 Model theo nhóm công việc</h2>
+            <p class="text-xs text-ink-500">Mỗi card / tính năng trong Studio một nhóm — chọn model mặc định riêng cho từng việc.</p>
+          </div>
+          <p class="mt-1 text-xs text-ink-500">Danh sách model của mỗi nhóm lấy từ <b>Model Registry</b> (tab 🤖 Models — đăng ký model với vai trò tương ứng). Chọn <b>Tự động</b> để nhóm dùng model đầu tiên theo ưu tiên (kế thừa cấu hình cũ).</p>
+
+          <div class="mt-4 space-y-3">
+            <div v-for="g in taskGroupKeys" :key="g" class="rounded-xl border border-cream-200 p-3.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600/15 text-sm">🎯</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-ink-900">{{ taskGroups[g].label }}</p>
+                  <p class="mt-0.5 text-[11px] text-ink-500">
+                    {{ taskGroups[g].models.length }} model trong nhóm · đang dùng:
+                    <b :class="taskGroups[g].default ? 'text-emerald-600' : 'text-amber-600'">{{ taskDefaultLabel(g) }}</b>
+                    <span v-if="taskGroups[g].assigned" class="ml-1 rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-semibold text-brand-700">đã gán thủ công</span>
+                    <span v-else class="ml-1 rounded-full bg-cream-200 px-1.5 py-0.5 text-[9px] text-ink-600">tự động</span>
+                  </p>
+                </div>
+              </div>
+              <div class="mt-2.5 flex flex-wrap items-center gap-2">
+                <select v-model="taskGroups[g].assigned" class="input max-w-md !py-1.5 text-xs" @change="saveTaskDefault(g)">
+                  <option value="">⚙️ Tự động (ưu tiên model cao nhất)</option>
+                  <option v-for="o in taskGroupModelOptions(g)" :key="o.value" :value="o.value">{{ o.label }}</option>
+                </select>
+                <button v-if="taskGroups[g].assigned" @click="clearTaskDefault(g)" :disabled="taskSaving === g" class="btn-outline btn-sm">↺ Về tự động</button>
+                <span v-if="taskSaving === g" class="text-[10px] text-ink-500">đang lưu…</span>
+              </div>
+              <!-- Model chips của nhóm — nhảy sang tab Models để sửa -->
+              <div v-if="taskGroups[g].models.length" class="mt-2 flex flex-wrap gap-1">
+                <span v-for="(m, i) in taskGroups[g].models.slice(0, 6)" :key="m.provider + m.model"
+                      class="rounded-full px-2 py-0.5 text-[10px]"
+                      :class="m.provider + ':' + m.model === taskGroups[g].default ? 'bg-emerald-100 text-emerald-700 font-semibold' : 'bg-cream-100 text-ink-600'">
+                  {{ m.label }}{{ i === 5 && taskGroups[g].models.length > 6 ? '…' : '' }}
+                </span>
+                <button @click="tab='models'" class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-200">→ quản lý ở tab Models</button>
+              </div>
+              <p v-else class="mt-2 rounded-lg border border-dashed border-cream-300 p-2.5 text-[11px] text-ink-500">
+                Chưa có model nào trong nhóm — đang kế thừa cấu hình legacy. Thêm model với vai trò <b>{{ groupLabels[g] || g }}</b> ở tab 🤖 Models.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bảng ánh xạ card → nhóm (tham khảo) -->
+        <div class="card mt-5 p-5">
+          <h3 class="text-sm font-semibold text-ink-900">🗺️ Card nào dùng nhóm nào?</h3>
+          <div class="mt-2 overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead><tr class="border-b border-cream-200 text-ink-500">
+                <th class="py-1.5 pr-3">Card / tính năng</th><th class="py-1.5 pr-3">Nhóm</th><th class="py-1.5">Model hiện hành</th>
+              </tr></thead>
+              <tbody class="text-ink-700">
+                <tr class="border-b border-cream-100"><td class="py-1.5 pr-3">💡 Tạo Ảnh 2D (Concept)</td><td class="pr-3"><code>image</code></td><td>{{ taskGroups.image?.default || '—' }}</td></tr>
+                <tr class="border-b border-cream-100"><td class="py-1.5 pr-3">🖼️ Ảnh mới từ ảnh mẫu / Thử đồ</td><td class="pr-3"><code>image</code></td><td>{{ taskGroups.image?.default || '—' }}</td></tr>
+                <tr class="border-b border-cream-100"><td class="py-1.5 pr-3">✏️ Sửa ảnh (Inpaint) / Xóa vùng</td><td class="pr-3"><code>edit</code></td><td>{{ taskGroups.edit?.default || '—' }}</td></tr>
+                <tr class="border-b border-cream-100"><td class="py-1.5 pr-3">🎬 Kịch bản quay (Video)</td><td class="pr-3"><code>video</code></td><td>{{ taskGroups.video?.default || '—' }}</td></tr>
+                <tr class="border-b border-cream-100"><td class="py-1.5 pr-3">🪄 Thay Đổi Người Mẫu</td><td class="pr-3"><code>swap</code></td><td>{{ taskGroups.swap?.default || '—' }}</td></tr>
+                <tr class="border-b border-cream-100"><td class="py-1.5 pr-3">👁️ Đọc ảnh (khuôn mặt / dáng)</td><td class="pr-3"><code>vision</code></td><td>{{ taskGroups.vision?.default || '—' }}</td></tr>
+                <tr class="border-b border-cream-100"><td class="py-1.5 pr-3">✨ Thuật sỹ ảo / Giám đốc sáng tạo</td><td class="pr-3"><code>prompt</code></td><td>{{ taskGroups.prompt?.default || '—' }}</td></tr>
+                <tr><td class="py-1.5 pr-3">🌐 Dịch prompt</td><td><code>translate</code></td><td>{{ taskGroups.translate?.default || '—' }}</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

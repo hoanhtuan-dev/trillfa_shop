@@ -163,6 +163,9 @@ export const useStudioStore = defineStore('studio', {
     inpaintPreserveFace: true,// giữ nguyên khuôn mặt
     inpaintModels: [],        // các model chỉnh sửa được phép chọn (load từ /studio/defaults)
     inpaintModel: '',         // model đang chọn cho card Sửa ảnh — '' = mặc định (Qwen Edit cấu hình)
+    taskGroups: {},            // model theo nhóm công việc (image/edit/video/swap/vision/prompt/translate) — load từ /studio/defaults
+    imageModelSel: '',         // model đang chọn cho Tạo Ảnh 2D + Ảnh mới từ ảnh mẫu ('' = default nhóm image)
+    videoModelSel: '',         // model đang chọn cho Kịch bản quay ('' = default nhóm video)
     // ── Inpaint Mask (tích hợp region selection vào Inpaint) ──
     inpaintMaskMode: 'none',   // 'none' | 'rect' | 'brush' — chọn vùng cần sửa
     inpaintMaskBox: { x: 0.425, y: 0.425, w: 0.15, h: 0.15 }, // vùng mask mặc định = 15% ảnh (giữa), nhỏ để dễ thao tác
@@ -376,6 +379,8 @@ export const useStudioStore = defineStore('studio', {
       if (defaults.image_credits != null) this.imageCreditCost = Number(defaults.image_credits);
       // Card Sửa ảnh: danh sách model chỉnh sửa (mặc định đứng đầu).
       if (Array.isArray(defaults.inpaint_models)) this.inpaintModels = defaults.inpaint_models;
+      // Task groups: model theo nhóm công việc — selector trên từng card (Cài đặt → 🎯 Nhóm công việc).
+      if (defaults.task_groups && typeof defaults.task_groups === 'object') this.taskGroups = defaults.task_groups;
       // Card "Kịch bản quay": preset video_scene từ Prompt Templates (Cài đặt).
       if (Array.isArray(defaults.video_scenes)) this.videoScenes = defaults.video_scenes;
       // Card "Sửa ảnh": preset chỉnh sửa (category inpaint) từ Prompt Templates (Cài đặt).
@@ -458,6 +463,8 @@ export const useStudioStore = defineStore('studio', {
           prompt: this.imagePromptEn,
           creative_level: this.creativeLevel,
           texture: this.texture,
+          // Model do người dùng chọn trên card ('' = default nhóm image — Cài đặt → 🎯 Nhóm công việc).
+          ...(this.selectedTaskModel('image') ? { provider: this.selectedTaskModel('image').provider, model: this.selectedTaskModel('image').model } : {}),
           // Tôn trọng checkbox: tắt → gửi rỗng → backend bỏ qua prefix/suffix/negative.
           negative_prompt: this.promptUseNegative ? (this.negativePromptEn || '') : '',
           prompt_prefix: this.promptUsePrefix ? (this.promptPrefix || '') : '',
@@ -525,7 +532,10 @@ export const useStudioStore = defineStore('studio', {
       if (!image) { this.toast('Chọn ảnh tham chiếu.', 'error'); return null; }
       try {
         const payload = { image, prompt: prompt || '', similarity: Number(similarity) || 70, variants: Number(variants) || 1 };
-        if (model && model.provider && model.model) { payload.provider = model.provider; payload.model = model.model; }
+        // Ưu tiên: model truyền từ card > default nhóm image (Cài đặt → 🎯 Nhóm công việc).
+        const taskModel = this.selectedTaskModel('image');
+        const eff = (model && model.provider && model.model) ? model : taskModel;
+        if (eff) { payload.provider = eff.provider; payload.model = eff.model; }
         // Nền studio áp dụng cho cả 2 chế độ; góc chụp chỉ cho "Tạo ảnh mới".
         if (background) payload.background_prompt = background;
         if (!tryon && angle) payload.angle_prompt = angle;
@@ -704,7 +714,8 @@ export const useStudioStore = defineStore('studio', {
           prompt,
           camera: this.videoSceneCamera(),
           base_image: srcImage,
-          model: this.videoModel,
+          // Model do người dùng chọn trên card Kịch bản quay; '' = default nhóm video (Cài đặt → 🎯).
+          ...(this.selectedTaskModel('video') ? { provider: this.selectedTaskModel('video').provider, model: this.selectedTaskModel('video').model } : {}),
           duration: this.videoDuration,
           resolution: this.videoRes,
           project_id: this.appliedProjectId(),
@@ -717,6 +728,19 @@ export const useStudioStore = defineStore('studio', {
     videoSceneCamera() {
       const sc = this.videoScenes.find(s => String(s.id) === String(this.videoScene));
       return sc ? sc.prompt : '';
+    },
+    // ── Task groups: model theo nhóm công việc (Cài đặt → 🎯 Nhóm công việc) ──
+    // Danh sách model của một nhóm + default đang dùng — selector trên từng card.
+    taskGroupModels(group) { return (this.taskGroups[group] || {}).models || []; },
+    taskGroupDefault(group) { return (this.taskGroups[group] || {}).default || ''; },
+    // [provider, model] đang chọn cho một nhóm: selector trên card > default nhóm.
+    selectedTaskModel(group) {
+      const sel = group === 'video' ? this.videoModelSel : this.imageModelSel;
+      if (sel && sel.includes(':')) { const [p, m] = sel.split(':'); return { provider: p, model: m }; }
+      const d = this.taskGroupDefault(group);
+      if (d && d.includes(':')) { const [p, m] = d.split(':'); return { provider: p, model: m }; }
+      const first = this.taskGroupModels(group)[0];
+      return first ? { provider: first.provider, model: first.model } : null;
     },
     // Zoom theo điểm chuột (cx, cy = px so với TÂM khung) — điểm ảnh dưới con trỏ
     // không trôi khi phóng/thu (pan' = c*(1-k) + pan*k).

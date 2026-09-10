@@ -1068,6 +1068,187 @@ if (! function_exists('studio_candidate_key')) {
     }
 }
 
+/*
+|--------------------------------------------------------------------------
+| TASK GROUPS — model theo nhóm công việc (mỗi card / tính năng một nhóm)
+|--------------------------------------------------------------------------
+| Bản đồ card /studio → nhóm:
+|   image    : ConceptCard (Tạo Ảnh 2D), RefImageCard refgen (Ảnh mới từ ảnh mẫu / Thử đồ)
+|   edit     : InpaintCard (Sửa ảnh), reimagine/variation, xóa nền — model edit-capable
+|   video    : DirectorCard (Render video catwalk)
+|   swap     : SwapCard (Thay Đổi Người Mẫu / Try-on)
+|   vision   : đọc ảnh (mô tả khuôn mặt / dáng / phân tích ảnh tham chiếu)
+|   prompt   : Giám đốc sáng tạo (GeminiService), StylistCard (Thuật sỹ ảo)
+|   translate: dịch prompt VI ↔ EN
+|
+| Nguyên tắc: Model Registry (studio_models) là nguồn duy nhất — một model đăng ký
+| 1 lần với group = vai trò của nó; task-group helper gom + lọc đúng loại cho từng
+| card. Default-per-group lưu setting studio_task_<group>_model (provider:model).
+| Các setting cũ (qwen_edit_model, swap_model…) vẫn được tôn trọng khi nhóm chưa
+| gán default — không xóa trộn.
+*/
+if (! function_exists('studio_task_groups')) {
+    /**
+     * Danh sách nhóm công việc + nhãn hiển thị + model mặc định LEGACY (setting cũ
+     * tương ứng) để UI Settings hiển thị "đang dùng gì" ngay cả khi chưa gán default mới.
+     */
+    function studio_task_groups(): array
+    {
+        return [
+            'image' => ['label' => 'Tạo ảnh 2D (Concept / Ảnh mới từ ảnh mẫu)', 'legacy_default' => function () {
+                $p = (string) studio_config('image_provider', 'flux');
+                $m = match ($p) {
+                    'gemini' => (string) studio_config('gemini_image_model', 'gemini-2.5-flash-image'),
+                    'wan' => (string) studio_config('wan_model', 'wan2.7-image-pro'),
+                    'qwen' => (string) studio_config('qwen_model', 'qwen-image-3.0-pro'),
+                    default => (string) studio_config('image_model', 'flux-1.1-schnell'),
+                };
+                return $p.':'.$m;
+            }],
+            'edit' => ['label' => 'Sửa ảnh / Inpaint (chỉnh sửa theo vùng, reimagine)', 'legacy_default' => fn () => 'qwen:'.(string) studio_config('qwen_edit_model', 'qwen-image-edit')],
+            'video' => ['label' => 'Video catwalk (Kịch bản quay)', 'legacy_default' => fn () => 'wan:'.(string) studio_config('video_model', 'wan2.5-t2v')],
+            'swap' => ['label' => 'Thay đổi người mẫu (Try-on)', 'legacy_default' => fn () => 'qwen:'.studio_swap_model()],
+            'vision' => ['label' => 'Đọc ảnh (mô tả khuôn mặt / dáng / phân tích)', 'legacy_default' => fn () => 'qwen:'.(string) studio_config('qwen_vision_model', 'qwen3.8-flash')],
+            'prompt' => ['label' => 'Suy luận prompt (Giám đốc sáng tạo / Thuật sỹ ảo)', 'legacy_default' => function () {
+                $p = (string) studio_config('prompt_provider', 'gemini');
+                $m = $p === 'gemini'
+                    ? (string) studio_config('prompt_model', 'gemini-2.5-flash')
+                    : (string) studio_config('qwen_prompt_model', 'qwen3.8-flash');
+                return $p.':'.$m;
+            }],
+            'translate' => ['label' => 'Dịch prompt (VI ↔ EN)', 'legacy_default' => fn () => 'gemini:'.(string) studio_config('translate_model', 'gemini-2.5-flash')],
+        ];
+    }
+}
+
+if (! function_exists('studio_task_group_models')) {
+    /**
+     * Danh sách model của một nhóm công việc, theo thứ tự ưu tiên:
+     *   1. default mới (setting studio_task_<group>_model) — nếu có, đứng đầu;
+     *   2. các model group=<group> trong Model Registry (priority desc);
+     *   3. nhóm chưa có model đăng ký → kế thừa danh sách legacy tương ứng
+     *      (giữ mọi pipeline hiện có hoạt động nguyên vẹn).
+     * Dedup theo provider:model. Trả về [] = [['provider','model','label','default','registry_id'], …]
+     */
+    function studio_task_group_models(string $group): array
+    {
+        $groups = studio_task_groups();
+        if (! isset($groups[$group])) {
+            return [];
+        }
+
+        $list = [];
+        $seen = [];
+        $add = function (?string $provider, ?string $model, ?int $registryId = null, bool $default = false, ?string $label = null) use (&$list, &$seen) {
+            $provider = trim((string) $provider);
+            $model = trim((string) $model);
+            if ($provider === '' || $model === '') {
+                return;
+            }
+            $k = $provider.':'.$model;
+            if (isset($seen[$k])) {
+                return;
+            }
+            $seen[$k] = true;
+            $list[] = [
+                'provider' => $provider,
+                'model' => $model,
+                'label' => $label ?: $model,
+                'default' => $default,
+                'registry_id' => $registryId,
+            ];
+        };
+
+        // 1. Default mới của nhóm (nếu đã gán trong Settings → tab Cấu hình nhóm).
+        $assigned = trim((string) setting('studio_task_'.$group.'_model', ''));
+        if ($assigned !== '' && str_contains($assigned, ':')) {
+            [$p, $m] = explode(':', $assigned, 2);
+            $add($p, $m, null, true);
+        }
+
+        // 2. Model Registry của nhóm — hình thức chính: gán model vào đúng vai trò.
+        try {
+            foreach (\App\Models\StudioModel::where('group', $group)->where('enabled', true)
+                ->orderByDesc('priority')->orderBy('id')->get() as $row
+            ) {
+                $add($row->provider, $row->model_id, $row->id, false, $row->name);
+            }
+        } catch (\Throwable $e) {
+            // Chưa migrate studio_models — bỏ qua, dùng legacy.
+        }
+
+        // 3. Legacy kế thừa (nhóm chưa đăng ký model nào) — pipeline cũ tiếp tục chạy.
+        if (count($list) === 0) {
+            $legacy = [];
+            if ($group === 'image') {
+                $legacy = studio_model_candidates('image');
+            } elseif ($group === 'edit') {
+                $legacy = [['provider' => 'qwen', 'model' => (string) studio_config('qwen_edit_model', 'qwen-image-edit')]];
+                foreach (studio_model_candidates('image') as $c) {
+                    $p = (string) ($c['provider'] ?? '');
+                    $m = (string) ($c['model'] ?? '');
+                    if (in_array($p, ['qwen', 'wan', 'dashscope'], true)
+                        && app(\App\Services\ImageAIService::class)->isImageEditCapableModel($m)) {
+                        $legacy[] = ['provider' => $p, 'model' => $m];
+                    }
+                }
+            } elseif ($group === 'video') {
+                $legacy = studio_model_candidates('video');
+            } elseif ($group === 'swap') {
+                $legacy = [['provider' => 'qwen', 'model' => studio_swap_model()]];
+            } elseif ($group === 'vision') {
+                $legacy = array_map(fn ($m) => ['provider' => 'qwen', 'model' => $m], array_slice(studio_qwen_vision_models(), 0, 5));
+            } elseif ($group === 'prompt') {
+                $legacy = array_map(fn ($m) => ['provider' => 'qwen', 'model' => $m], array_slice(studio_qwen_text_models(), 0, 5));
+                $legacy[] = ['provider' => 'gemini', 'model' => (string) studio_config('prompt_model', 'gemini-2.5-flash')];
+            } elseif ($group === 'translate') {
+                $legacy = [
+                    ['provider' => 'gemini', 'model' => (string) studio_config('translate_model', 'gemini-2.5-flash')],
+                    ['provider' => 'qwen', 'model' => (string) studio_config('qwen_prompt_model', 'qwen3.8-flash')],
+                ];
+            }
+            foreach ($legacy as $i => $c) {
+                $add($c['provider'] ?? null, $c['model'] ?? null, null, $i === 0);
+            }
+        }
+
+        return $list;
+    }
+}
+
+if (! function_exists('studio_task_group_default')) {
+    /**
+     * Model mặc định HIỆN HÀNH của một nhóm — provider:model string. Ưu tiên default
+     * mới; nếu chưa gán, model đầu tiên của danh sách (default legacy đã đứng đầu).
+     */
+    function studio_task_group_default(string $group): ?string
+    {
+        $list = studio_task_group_models($group);
+        foreach ($list as $c) {
+            if (! empty($c['default'])) {
+                return $c['provider'].':'.$c['model'];
+            }
+        }
+        return $list ? $list[0]['provider'].':'.$list[0]['model'] : null;
+    }
+}
+
+if (! function_exists('studio_task_group_resolve')) {
+    /**
+     * Tách default của nhóm thành [provider, model] — dùng trực tiếp tại các call-site
+     * (queueGeneration, swap, translate…) thay cho chuỗi setting rời rạc cũ.
+     */
+    function studio_task_group_resolve(string $group): array
+    {
+        $d = studio_task_group_default($group);
+        if (! $d || ! str_contains($d, ':')) {
+            return [null, null];
+        }
+        [$p, $m] = explode(':', $d, 2);
+        return [$p, $m];
+    }
+}
+
 }
 
 
