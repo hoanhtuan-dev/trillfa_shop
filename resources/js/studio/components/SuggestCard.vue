@@ -18,11 +18,6 @@ function adherenceText(a) {
   if (a <= 6) return 'Trung bình — tinh chỉnh tinh tế';
   return 'Cao — tái tạo chính xác gốc';
 }
-function applyPrompt() {
-  const p = lang.value === 'vi' ? store.suggestResult?.prompt_vi : store.suggestResult?.image_prompt_en;
-  if (p) { store.imagePromptEn = p; store.promptOpen = true; }
-  else { store.toast('Chưa có prompt.', 'error'); }
-}
 
 // ── Luồng "Tạo ảnh ngay": Gợi ý → Prompt → Tạo ảnh, với tiến trình đẹp mắt ──
 // genFlow: 'idle' | 'transferring' | 'generating' | 'done'
@@ -79,17 +74,16 @@ const flowLabel = computed(() => {
 
 async function generateNow() {
   if (genFlow.value !== 'idle' && genFlow.value !== 'done') return; // chống double-click
+  // Ưu tiên prompt gợi ý; nếu chưa có gợi ý thì dùng prompt đang có ở ô Tạo Ảnh.
   const p = lang.value === 'vi' ? store.suggestResult?.prompt_vi : store.suggestResult?.image_prompt_en;
-  if (!p) { store.toast('Chưa có prompt. Bấm "Gợi ý phong cách & prompt" trước.', 'error'); return; }
-  if (!store.imagePromptEn || store.imagePromptEn !== p) {
-    // Giai đoạn 1: đưa prompt sang ConceptCard với hoạt ảnh.
-    genFlow.value = 'transferring';
-    runTransferAnim();
-    store.imagePromptEn = p;
-    store.promptOpen = true;
-    // Đợi hoạt ảnh chuyển prompt chạy xong (~800ms) rồi mới generate.
-    await new Promise(res => setTimeout(res, 850));
-  }
+  const prompt = p || store.imagePromptEn;
+  if (!prompt) { store.toast('Chưa có prompt — bấm "Gợi ý phong cách & prompt" hoặc nhập ở Tạo Ảnh.', 'error'); return; }
+  // Giai đoạn 1: đưa prompt sang ô Tạo Ảnh + đóng modal prompt (thoát về studio) với hoạt ảnh.
+  genFlow.value = 'transferring';
+  runTransferAnim();
+  store.imagePromptEn = prompt;
+  store.promptOpen = false; // "nhấn tạo ảnh và thoát": không mở modal, tạo ngay tại đây.
+  await new Promise(res => setTimeout(res, 850));
   // Giai đoạn 2: tạo ảnh.
   genFlow.value = 'generating';
   await store.generateImage();
@@ -150,6 +144,39 @@ watch(() => store.generating, (g, old) => {
 
     <button @click="store.suggestStyle(store.upscaleSrc)" :disabled="store.suggesting || !store.upscaleSrc" title="Phân tích ảnh và gợi ý phong cách, prompt" class="btn-brand mt-3 w-full">{{ store.suggesting ? 'Đang phân tích…' : 'Gợi ý phong cách & prompt' }}</button>
 
+    <!-- 🚀 Tạo ảnh ngay — gộp 1 nút, luôn hiện: đưa prompt → tạo ảnh → thoát → tiến trình tại đây -->
+    <button @click="generateNow" :disabled="(genFlow !== 'idle' && genFlow !== 'done') || store.generating"
+            title="Đưa prompt sang Tạo Ảnh, tạo ảnh ngay và thoát — tiến trình hiện ngay tại đây"
+            class="btn-genflow mt-1.5 w-full whitespace-nowrap">
+      <span v-if="genFlow === 'idle' || genFlow === 'done'" class="flex items-center justify-center gap-1.5"><span>🚀</span> Tạo ảnh ngay</span>
+      <span v-else class="flex items-center justify-center gap-1.5"><span class="genflow-spinner"></span> {{ flowLabel }}</span>
+    </button>
+
+    <!-- Tiến trình đa giai đoạn (stepper + thanh gradient) — luôn hiện khi đang chạy -->
+    <transition name="genfade">
+      <div v-if="genFlow !== 'idle'" class="genflow-panel mt-2">
+        <!-- Stepper 4 bước -->
+        <div class="genflow-steps">
+          <template v-for="(s, i) in steps" :key="s.key">
+            <div class="genflow-step" :class="{ active: i <= activeStep, done: i < activeStep }">
+              <span class="genflow-dot">
+                <span v-if="i < activeStep" class="genflow-check">✓</span>
+                <span v-else-if="i === activeStep && genFlow === 'generating'" class="genflow-pulse"></span>
+                <span v-else>{{ s.icon }}</span>
+              </span>
+              <span class="genflow-step-label">{{ s.label }}</span>
+            </div>
+            <div v-if="i < steps.length - 1" class="genflow-connector" :class="{ filled: i < activeStep }"></div>
+          </template>
+        </div>
+        <!-- Thanh gradient + % -->
+        <div class="genflow-bar-wrap">
+          <div class="genflow-bar" :style="{ width: flowPct + '%' }"></div>
+        </div>
+        <p class="genflow-pct">{{ Math.round(flowPct) }}% · {{ flowLabel }}</p>
+      </div>
+    </transition>
+
     <div v-if="store.suggestResult && (store.suggestResult.styles?.length || store.suggestResult.background || store.suggestResult.image_prompt_en)" class="relative mt-3 rounded-lg border border-emerald-500/40 bg-emerald-900/25 p-3 text-xs">
       <button @click="store.suggestResult = null; lang='en'" class="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-ink-700 text-cream-200 hover:bg-red-600" title="Xóa gợi ý"><StudioIcon name="x" size="h-3.5 w-3.5" /></button>
 
@@ -190,39 +217,6 @@ watch(() => store.generating, (g, old) => {
           </div>
         </div>
         <p class="max-h-36 overflow-y-auto rounded-md border border-white/10 bg-white/5 p-2 leading-relaxed text-cream-100">{{ lang === 'vi' ? (store.suggestResult.prompt_vi || 'Đang dịch…') : store.suggestResult.image_prompt_en }}</p>
-        <button @click="applyPrompt" title="Đưa prompt vào ô Prompt Tạo Ảnh" class="btn-ghost btn-sm mt-2 w-full border border-brand-500/30 text-brand-200 hover:bg-brand-900/30">📋 Áp dụng → Tạo Ảnh</button>
-
-        <!-- 🚀 Tạo ảnh ngay — một bấm qua Gợi ý → Prompt → Tạo ảnh, với tiến trình đẹp mắt -->
-        <button @click="generateNow" :disabled="genFlow !== 'idle' && genFlow !== 'done'" title="Đưa prompt sang Tạo Ảnh rồi tạo ảnh ngay"
-                class="btn-genflow mt-1.5 w-full whitespace-nowrap">
-          <span v-if="genFlow === 'idle' || genFlow === 'done'" class="flex items-center justify-center gap-1.5"><span>🚀</span> Tạo ảnh ngay</span>
-          <span v-else class="flex items-center justify-center gap-1.5"><span class="genflow-spinner"></span> {{ flowLabel }}</span>
-        </button>
-
-        <!-- Tiến trình đa giai đoạn (stepper + thanh gradient) -->
-        <transition name="genfade">
-          <div v-if="genFlow !== 'idle'" class="genflow-panel mt-2">
-            <!-- Stepper 4 bước -->
-            <div class="genflow-steps">
-              <template v-for="(s, i) in steps" :key="s.key">
-                <div class="genflow-step" :class="{ active: i <= activeStep, done: i < activeStep }">
-                  <span class="genflow-dot">
-                    <span v-if="i < activeStep" class="genflow-check">✓</span>
-                    <span v-else-if="i === activeStep && genFlow === 'generating'" class="genflow-pulse"></span>
-                    <span v-else>{{ s.icon }}</span>
-                  </span>
-                  <span class="genflow-step-label">{{ s.label }}</span>
-                </div>
-                <div v-if="i < steps.length - 1" class="genflow-connector" :class="{ filled: i < activeStep }"></div>
-              </template>
-            </div>
-            <!-- Thanh gradient + % -->
-            <div class="genflow-bar-wrap">
-              <div class="genflow-bar" :style="{ width: flowPct + '%' }"></div>
-            </div>
-            <p class="genflow-pct">{{ Math.round(flowPct) }}% · {{ flowLabel }}</p>
-          </div>
-        </transition>
 
         <button @click="store.saveSuggestResult()" :disabled="store.suggestSaving" title="Lưu kết quả vào Thư viện Prompt để dùng lại sau" class="btn-ghost btn-sm mt-1.5 w-full border border-emerald-500/30 text-emerald-200 hover:bg-emerald-900/30">{{ store.suggestSaving ? 'Đang lưu…' : '💾 Lưu vào Thư viện Prompt' }}</button>
       </div>
