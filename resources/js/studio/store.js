@@ -1248,6 +1248,19 @@ export const useStudioStore = defineStore('studio', {
       } catch (e) { this.toast(e.message || 'Lỗi xóa file.', 'error'); return false; }
       finally { this.uploadCleaning = false; }
     },
+    async deleteUpload(rel) {
+      if (!rel) return false;
+      if (this.uploadCleaning) return false;
+      this.uploadCleaning = true;
+      try {
+        const d = await this._libraryFetch('/studio/uploads/delete', { rels: [rel] });
+        this.uploadSelection = this.uploadSelection.filter(r => r !== rel);
+        this.toast('Đã xóa ' + (d.deleted || 0) + ' file · giải phóng ' + this.formatBytes(d.freed_bytes || 0) + '.');
+        await this.loadUploads();
+        return true;
+      } catch (e) { this.toast(e.message || 'Lỗi xóa file.', 'error'); return false; }
+      finally { this.uploadCleaning = false; }
+    },
     async uploadCleanup() {
       if (this.uploadCleaning) return false;
       this.uploadCleaning = true;

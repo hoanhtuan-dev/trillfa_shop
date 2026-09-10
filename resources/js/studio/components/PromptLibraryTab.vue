@@ -267,9 +267,16 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
           <StudioIcon name="check" size="h-3.5 w-3.5" />
         </button>
         <!-- Hành động nhanh (ngoài chế độ quản lý) -->
-        <div v-else class="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition group-hover:opacity-100">
-          <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
-          <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+        <div v-else class="absolute right-1.5 top-1.5 flex gap-1 transition"
+             :class="confirmDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+          <template v-if="confirmDeleteId === item.id">
+            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
+            <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-900/95 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+          </template>
+          <template v-else>
+            <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+          </template>
         </div>
       </div>
     </div>
@@ -296,9 +303,16 @@ onMounted(() => { if (!store.suggestLibItems.length) store.loadSuggestLib(); });
           <p class="mt-0.5 truncate text-xs text-cream-100">{{ item.image_prompt_en || item.prompt_vi || '—' }}</p>
           <p class="truncate text-[10px] text-cream-300/40">{{ item.created_at }}<span v-if="item.apply_count"> · Đã dùng {{ item.apply_count }}x</span></p>
         </div>
-        <div v-if="!store.suggestLibManage" class="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
-          <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
-          <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+        <div v-if="!store.suggestLibManage" class="flex shrink-0 gap-1 transition"
+             :class="confirmDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+          <template v-if="confirmDeleteId === item.id">
+            <button @click.stop="runDeleteSingle" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
+            <button @click.stop="cancelDeleteSingle" class="rounded-lg border border-ink-600 bg-ink-900/95 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+          </template>
+          <template v-else>
+            <button @click.stop="openEdit(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-brand-500/60 hover:bg-brand-600/30 hover:text-brand-100" title="Sửa prompt"><StudioIcon name="pencil" size="h-3.5 w-3.5" /></button>
+            <button @click.stop="askDeleteSingle(item)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa prompt"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+          </template>
         </div>
       </div>
     </div>

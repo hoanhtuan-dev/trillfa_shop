@@ -48,6 +48,24 @@ const uploadSelectedCount = computed(() => store.uploadSelection.length);
 const uploadUnusedCount = computed(() => store.uploadItems.filter(f => !f.used).length);
 function isUploadSelected(rel) { return store.uploadSelection.includes(rel); }
 
+// ── Xóa đơn lẻ file tải lên (2 bước, chỉ file CHƯA dùng) ──
+const confirmUploadDelete = ref(''); // rel của file đang xác nhận xóa
+let uploadConfirmTimer = null;
+function askUploadDelete(f) {
+  if (!f) return;
+  if (f.used) { store.toast('File đang được dùng — không thể xóa.', 'error'); return; }
+  confirmUploadDelete.value = f.rel;
+  clearTimeout(uploadConfirmTimer);
+  uploadConfirmTimer = setTimeout(() => { confirmUploadDelete.value = ''; }, 5000);
+}
+function cancelUploadDelete() { confirmUploadDelete.value = ''; clearTimeout(uploadConfirmTimer); }
+async function runUploadDelete() {
+  const rel = confirmUploadDelete.value;
+  confirmUploadDelete.value = '';
+  clearTimeout(uploadConfirmTimer);
+  await store.deleteUpload(rel);
+}
+
 function statusLabel(s) { const f = statuses.find(x => x.value === s); return f ? f.label : (s || '—'); }
 function fmtBytes(n) { return store.formatBytes(n); }
 function fmtNum(n) { const v = Number(n) || 0; return v >= 1000 ? v.toLocaleString('vi-VN') : String(v); }
@@ -567,6 +585,15 @@ onMounted(async () => {
                     :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
               <StudioIcon name="check" size="h-3.5 w-3.5" />
             </button>
+            <!-- Xóa nhanh (ngoài chế độ quản lý, chỉ file chưa dùng) -->
+            <div v-else-if="!f.used" class="absolute right-2 top-2 flex gap-1 transition"
+                 :class="confirmUploadDelete === f.rel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+              <template v-if="confirmUploadDelete === f.rel">
+                <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
+                <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-900/95 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+              </template>
+              <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+            </div>
           </div>
         </div>
       <!-- ══ Danh sách file tải lên (list view) ══ -->
@@ -590,6 +617,15 @@ onMounted(async () => {
                   :class="isUploadSelected(f.rel) ? 'border-brand-400 bg-brand-600 text-white' : 'border-cream-300/50 bg-ink-900/70 text-transparent hover:border-cream-200'">
             <StudioIcon name="check" size="h-3.5 w-3.5" />
           </button>
+          <!-- Xóa nhanh (ngoài chế độ quản lý, chỉ file chưa dùng) -->
+          <div v-else-if="!f.used" class="flex shrink-0 gap-1 transition"
+               :class="confirmUploadDelete === f.rel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+            <template v-if="confirmUploadDelete === f.rel">
+              <button @click.stop="runUploadDelete" class="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-red-500">Xóa</button>
+              <button @click.stop="cancelUploadDelete" class="rounded-lg border border-ink-600 bg-ink-800 px-2 py-1 text-[10px] font-semibold text-cream-200 hover:bg-ink-700">Hủy</button>
+            </template>
+            <button v-else @click.stop="askUploadDelete(f)" class="grid h-7 w-7 place-items-center rounded-lg border border-ink-600 bg-ink-900/90 text-cream-200 hover:border-red-500/60 hover:bg-red-600/30 hover:text-red-200" title="Xóa file"><StudioIcon name="trash" size="h-3.5 w-3.5" /></button>
+          </div>
         </div>
       </div>
       </template>
