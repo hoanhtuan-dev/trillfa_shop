@@ -579,6 +579,174 @@ if (! function_exists('dashscope_base_url')) {
     }
 }
 
+if (! function_exists('studio_provider_catalog')) {
+    /**
+     * BUILT-IN provider directory (the part every deployment ships — the DeepSeek
+     * Harness "configurable-provider directory" analog). Custom providers stored in
+     * the studio_providers table are MERGED on top by studio_provider_registry().
+     *
+     * protocol: openai (Bearer + /chat/completions) | dashscope (Bearer + /api/v1
+     * multimodal generation) | gemini (x-goog-api-key + generateContent).
+     */
+    function studio_provider_catalog(): array
+    {
+        return [
+            'qwen' => ['name' => 'Qwen — ảnh (QwenCloud)', 'protocol' => 'dashscope', 'hint' => 'QWEN_API_KEY (home.qwencloud.com/api-keys)'],
+            'qwen_edit' => ['name' => 'Qwen Edit — chỉnh sửa ảnh / Inpaint', 'protocol' => 'dashscope', 'hint' => 'QWEN_EDIT_KEY · model edit (qwen-image-edit, wanx2.1-imageedit…)'],
+            'dashscope' => ['name' => 'DashScope — Wan/Qwen image & video (Alibaba)', 'protocol' => 'dashscope', 'hint' => 'DASHSCOPE_API_KEY'],
+            'wan' => ['name' => 'Wan AI — video', 'protocol' => 'dashscope', 'hint' => 'WAN_API_KEY / DASHSCOPE_API_KEY'],
+            'gemini' => ['name' => 'Gemini — Giám đốc sáng tạo', 'protocol' => 'gemini', 'hint' => 'GEMINI_API_KEY (aistudio.google.com)'],
+            'veo' => ['name' => 'Google Veo — video', 'protocol' => 'gemini', 'hint' => 'GOOGLE_VEO_KEY'],
+            'fal' => ['name' => 'Fal.ai — Flux (ảnh)', 'protocol' => 'openai', 'hint' => 'FAL_KEY'],
+            'replicate' => ['name' => 'Replicate — Flux (ảnh)', 'protocol' => 'openai', 'hint' => 'REPLICATE_API_TOKEN (replicate.com/account/api-tokens)'],
+            'deepseek' => ['name' => 'DeepSeek — ngôn ngữ / suy luận', 'protocol' => 'openai', 'hint' => 'DEEPSEEK_API_KEY · model deepseek-chat'],
+        ];
+    }
+}
+
+if (! function_exists('studio_provider_registry')) {
+    /**
+     * The FULL provider directory: built-in catalog + user-declared custom routes
+     * (studio_providers rows), each tagged 'custom' => true/false. This is the single
+     * list the Settings SPA renders — it can never disagree with what resolution uses.
+     */
+    function studio_provider_registry(): array
+    {
+        $registry = [];
+        foreach (studio_provider_catalog() as $slug => $meta) {
+            $registry[$slug] = [
+                'slug' => $slug,
+                'name' => $meta['name'],
+                'protocol' => $meta['protocol'],
+                'base_url' => null,
+                'auth_style' => $meta['protocol'] === 'gemini' ? 'x-goog-api-key' : 'bearer',
+                'hint' => $meta['hint'] ?? null,
+                'custom' => false,
+                'enabled' => true,
+            ];
+        }
+
+        try {
+            foreach (\App\Models\StudioProvider::orderBy('id')->get() as $p) {
+                $registry[$p->slug] = [
+                    'slug' => $p->slug,
+                    'name' => $p->name,
+                    'protocol' => $p->protocol,
+                    'base_url' => $p->base_url,
+                    'auth_style' => $p->auth_style,
+                    'hint' => $p->note,
+                    'custom' => true,
+                    'enabled' => (bool) $p->enabled,
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Table not migrated yet — built-ins only, never a 500.
+        }
+
+        return $registry;
+    }
+}
+
+if (! function_exists('studio_custom_provider')) {
+    /**
+     * One user-declared provider profile by route key, or null when the key names a
+     * built-in (or nothing). This is how call sites branch: built-ins keep their
+     * hand-written transport, custom routes go through studio_custom_provider_call().
+     */
+    function studio_custom_provider(string $slug): ?array
+    {
+        try {
+            $p = \App\Models\StudioProvider::where('slug', $slug)->where('enabled', true)->first();
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (! $p) {
+            return null;
+        }
+
+        return [
+            'slug' => $p->slug,
+            'name' => $p->name,
+            'protocol' => (string) $p->protocol,
+            'base_url' => rtrim((string) $p->base_url, '/'),
+            'auth_style' => (string) $p->auth_style,
+            'api_key_ref' => $p->api_key_ref ?: $p->slug,
+        ];
+    }
+}
+
+if (! function_exists('studio_custom_provider_key')) {
+    /**
+     * Resolve the API key for a custom provider: its api_key_ref slot first, then the
+     * slug itself — both through the same StudioApiKey/env fallback as built-ins.
+     */
+    function studio_custom_provider_key(array $provider): ?string
+    {
+        foreach (array_filter([$provider['api_key_ref'] ?? null, $provider['slug'] ?? null]) as $ref) {
+            $key = studio_api_key((string) $ref);
+            if ($key) {
+                return $key;
+            }
+        }
+        return null;
+    }
+}
+
+if (! function_exists('studio_custom_provider_call')) {
+    /**
+     * Transport for user-declared provider routes. Speaks the three wire protocols
+     * this codebase already uses:
+     *   - openai:  POST {base}/chat/completions, Bearer auth (works for every
+     *              [OI]-compatible gateway: OpenRouter, Together, Groq, vLLM…)
+     *   - dashscope: POST {base}/api/v1/services/aigc/multimodal-generation/generation
+     *              (image generation on any DashScope-compatible host)
+     *   - gemini:  POST {base}/v1beta/models/{model}:generateContent, x-goog-api-key
+     * Returns the decoded JSON body on success, null otherwise.
+     */
+    function studio_custom_provider_call(array $provider, string $model, string $prompt, array $extra = [])
+    {
+        $key = studio_custom_provider_key($provider);
+        if (! $key) {
+            return null;
+        }
+
+        $base = (string) ($provider['base_url'] ?? '');
+        if ($base === '') {
+            return null;
+        }
+
+        $protocol = (string) ($provider['protocol'] ?? 'openai');
+
+        try {
+            if ($protocol === 'gemini') {
+                $url = $base.'/v1beta/models/'.$model.':generateContent';
+                $headerName = (($provider['auth_style'] ?? 'bearer') === 'x-goog-api-key') ? 'x-goog-api-key' : 'Authorization';
+                $headers = [$headerName => ($headerName === 'Authorization' ? 'Bearer '.$key : $key)];
+                $resp = \Illuminate\Support\Facades\Http::withHeaders($headers)->timeout(120)->post($url, [
+                    'contents' => [['parts' => [['text' => $prompt]]]],
+                ]);
+            } elseif ($protocol === 'dashscope') {
+                $url = $base.'/api/v1/services/aigc/multimodal-generation/generation';
+                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(180)->post($url, array_merge([
+                    'model' => $model,
+                    'input' => ['prompt' => $prompt],
+                ], $extra));
+            } else {
+                $url = $base.'/chat/completions';
+                $messages = $extra['messages'] ?? [['role' => 'user', 'content' => $prompt]];
+                $resp = \Illuminate\Support\Facades\Http::withToken($key)->timeout(120)->post($url, array_merge([
+                    'model' => $model,
+                ], $extra, ['messages' => $messages]));
+            }
+
+            return $resp->successful() ? $resp->json() : null;
+        } catch (\Throwable $e) {
+            logger()->warning('Custom provider call failed ('.($provider['slug'] ?? '?').'): '.$e->getMessage());
+            return null;
+        }
+    }
+}
+
 if (! function_exists('is_qwen_quota_error')) {
     /**
      * Whether a DashScope/QwenCloud message/body indicates quota exhaustion (Throttling.AllocationQuota).

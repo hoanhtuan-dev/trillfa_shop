@@ -34,6 +34,7 @@ use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StudioController;
+use App\Http\Controllers\StudioSettingsController;
 use App\Http\Controllers\StylistDataController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
@@ -183,6 +184,22 @@ Route::middleware(['auth', 'admin', 'nostore'])->prefix('studio')->name('studio.
     Route::get('/defaults', [StudioController::class, 'defaults'])->name('defaults');
     Route::get('/prompt-history', [StudioController::class, 'promptHistory'])->name('prompt-history');
     Route::post('/preview-enrich', [StudioController::class, 'previewEnrich'])->name('preview-enrich');
+    // ── Settings SPA (Vue) — JSON API cho trang Cài đặt mới ──
+    // Một snapshot endpoint duy nhất (data) + các endpoint CRUD nhỏ theo entity.
+    // Secrets là write-only: chỉ trả badge + prefix ngắn khi test, không bao giờ echo.
+    Route::get('/settings-vue/data', [StudioSettingsController::class, 'data'])->name('settings-vue.data');
+    Route::get('/settings-vue/models', [StudioSettingsController::class, 'models'])->name('settings-vue.models');
+    Route::post('/settings-vue/keys', [StudioSettingsController::class, 'storeKey'])->name('settings-vue.keys.store');
+    Route::put('/settings-vue/keys/{key}', [StudioSettingsController::class, 'updateKey'])->name('settings-vue.keys.update');
+    Route::delete('/settings-vue/keys/{key}', [StudioSettingsController::class, 'deleteKey'])->name('settings-vue.keys.delete');
+    Route::post('/settings-vue/keys/{key}/test', [StudioSettingsController::class, 'testKey'])->name('settings-vue.keys.test');
+    Route::post('/settings-vue/providers', [StudioSettingsController::class, 'storeProvider'])->name('settings-vue.providers.store');
+    Route::put('/settings-vue/providers/{provider}', [StudioSettingsController::class, 'updateProvider'])->name('settings-vue.providers.update');
+    Route::delete('/settings-vue/providers/{provider}', [StudioSettingsController::class, 'deleteProvider'])->name('settings-vue.providers.delete');
+    Route::post('/settings-vue/models', [StudioSettingsController::class, 'storeModel'])->name('settings-vue.models.store');
+    Route::put('/settings-vue/models/{model}', [StudioSettingsController::class, 'updateModel'])->name('settings-vue.models.update');
+    Route::delete('/settings-vue/models/{model}', [StudioSettingsController::class, 'deleteModel'])->name('settings-vue.models.delete');
+    Route::post('/settings-vue/config', [StudioSettingsController::class, 'updateConfig'])->name('settings-vue.config');
     Route::get('/settings', [StudioController::class, 'settings'])->name('settings');
     Route::get('/settings/data', [StudioController::class, 'settingsData'])->name('settings.data');
     Route::post('/settings/save', [StudioController::class, 'settingsSave'])->name('settings.save');

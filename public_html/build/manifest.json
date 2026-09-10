@@ -154,7 +154,7 @@
     "name": "useStudioThumb"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DwUmKsUI.css",
+    "file": "assets/app-CytbY9Yk.css",
     "name": "app",
     "names": [
       "app.css"
@@ -351,13 +351,17 @@
     ]
   },
   "resources/js/studio/settings.js": {
-    "file": "assets/settings-ZOYxZVtq.js",
+    "file": "assets/settings-D8kxkhHG.js",
     "name": "settings",
     "src": "resources/js/studio/settings.js",
     "isEntry": true,
     "imports": [
       "_runtime-dom.esm-bundler-kB79XGL3.js",
-      "_pinia-CuHzl6Pp.js"
+      "_pinia-CuHzl6Pp.js",
+      "__plugin-vue_export-helper-BDNMzG2s.js"
+    ],
+    "css": [
+      "assets/settings-53B4QJjc.css"
     ]
   },
   "resources/js/studio/stylist-data.js": {

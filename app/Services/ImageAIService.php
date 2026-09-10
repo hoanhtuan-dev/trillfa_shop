@@ -185,8 +185,65 @@ class ImageAIService
             return $this->tryDashscope($prompt, $model, $key, $resolution, $ratio, $faceRef, $negativePrompt, $seed);
         }
 
+        // User-declared custom provider routes (Settings → Custom Providers) — the profile
+        // carries its own protocol + base URL + auth style. Built-ins never reach this branch,
+        // so existing routing is untouched.
+        $custom = function_exists('studio_custom_provider') ? studio_custom_provider($provider) : null;
+        if ($custom) {
+            return $this->tryCustomProvider($prompt, $model, $custom);
+        }
+
         // 'fal' / 'replicate' are not wired into this service (no Fal client), so skip them.
         return null;
+    }
+
+    /**
+     * Generate through one user-declared custom provider profile. Supports the two
+     * image-capable wire protocols: dashscope (multimodal generation) and gemini
+     * (generateContent). openai-protocol routes are chat-only and cannot return
+     * images, so they are skipped for generation (still valid for text/inference).
+     */
+    protected function tryCustomProvider(string $prompt, string $model, array $provider): ?string
+    {
+        if (! in_array($provider['protocol'] ?? '', ['dashscope', 'gemini'], true)) {
+            return null;
+        }
+
+        $extra = [];
+        $parameters = [];
+        if ($resolution) {
+            // DashScope uses size like 1024x1024; approximate 1K/2K on the long edge.
+            $size = $resolution === '2K' ? 2048 : 1024;
+            $ratioMap = ['1:1' => [1, 1], '4:3' => [4, 3], '3:4' => [3, 4], '16:9' => [16, 9], '9:16' => [9, 16], '4:5' => [4, 5], '21:9' => [21, 9], '19:6' => [19, 6]];
+            if ($ratio && isset($ratioMap[$ratio])) {
+                [$rw, $rh] = $ratioMap[$ratio];
+                $long = $size;
+                $w = $rw >= $rh ? $long : (int) round($long * $rw / $rh);
+                $h = $rw >= $rh ? (int) round($long * $rh / $rw) : $long;
+                $parameters['size'] = $w.'x'.$h;
+            }
+        }
+        if ($parameters) {
+            $extra['parameters'] = $parameters;
+        }
+
+        $body = studio_custom_provider_call($provider, $model, $prompt, $extra);
+        if (! is_array($body)) {
+            return null;
+        }
+
+        $url = data_get($body, 'output.choices.0.message.images.0.url')
+            ?: data_get($body, 'output.task_url')
+            ?: data_get($body, 'candidates.0.content.parts.0.inlineData.data');
+
+        // Gemini inline data → persist to storage and return the public URL.
+        if ($url && ! str_starts_with((string) $url, 'http') && ! str_starts_with((string) $url, '/')) {
+            $name = 'studio/gen-'.Str::uuid().'.png';
+            \Illuminate\Support\Facades\Storage::disk('public')->put($name, base64_decode((string) $url, true) ?: '');
+            return '/storage/'.$name;
+        }
+
+        return $url ? (string) $url : null;
     }
 
     protected function providerErrorMessage(): string
