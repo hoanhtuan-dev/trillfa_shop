@@ -1,7 +1,8 @@
 // Trillfa Studio — Service Worker (scope: /studio)
 // Lưu ý: /studio trả về Cache-Control: no-store → KHÔNG cache HTML (cache.put sẽ reject).
-// Chiến lược: navigation network-first; asset hashed /build//icons//images/ stale-while-revalidate.
-const CACHE = 'trillfa-studio-v3';
+// Chiến lược: navigation network-first; asset hashed /build//icons//images/ network-first khi
+// có phiên bản mới (bump CACHE → activate xóa cache cũ → ép tải bundle hash mới ngay).
+const CACHE = 'trillfa-studio-v4';
 
 self.addEventListener('install', (event) => {
   // Không cache shell HTML (no-store) — chỉ skipWaiting để SW kích hoạt ngay (điều kiện installable).
@@ -11,6 +12,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
+      // Bump version → xóa MỌI cache cũ (kể cả v3) để ép load bundle hash mới sau deploy.
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
