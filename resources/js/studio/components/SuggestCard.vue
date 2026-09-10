@@ -19,19 +19,19 @@ function adherenceText(a) {
   return 'Cao — tái tạo chính xác gốc';
 }
 
-// ── Luồng "Tạo ảnh ngay": Gợi ý → Prompt → Tạo ảnh, với tiến trình đẹp mắt ──
-// genFlow: 'idle' | 'transferring' | 'generating' | 'done'
+// ── Luồng "Tạo ảnh ngay": bấm → mở popup xác nhận → user bấm Tạo Ảnh → tiến trình đẹp mắt ──
+// genFlow: 'idle' | 'armed' (chờ xác nhận popup) | 'generating' | 'done'
 const genFlow = ref('idle');
 // Bước stepper: [key, icon, label] — active khi tiến trình chạm tới bước đó.
 const steps = [
   { key: 'suggest', icon: '💡', label: 'Đã gợi ý' },
-  { key: 'transfer', icon: '📋', label: 'Đưa prompt' },
+  { key: 'confirm', icon: '✏️', label: 'Xác nhận' },
   { key: 'generate', icon: '🎨', label: 'Tạo ảnh' },
   { key: 'done', icon: '✅', label: 'Hoàn tất' },
 ];
 // Bước đang active dựa trên genFlow + store.generateStage.
 const activeStep = computed(() => {
-  if (genFlow.value === 'transferring') return 1; // đang đưa prompt
+  if (genFlow.value === 'armed') return 1; // đang chờ xác nhận popup
   if (genFlow.value === 'generating') {
     // generating chia 2 giai đoạn con theo store.generateStage
     return store.generateStage === 'done' ? 3 : 2;
@@ -42,24 +42,13 @@ const activeStep = computed(() => {
 // Phần trăm hiển thị — dùng progress thật từ store khi đang generate.
 const flowPct = computed(() => {
   if (genFlow.value === 'idle') return 0;
-  if (genFlow.value === 'transferring') return Math.min(100, transferPct.value);
+  if (genFlow.value === 'armed') return 0; // chờ user xác nhận, chưa có tiến trình
   if (genFlow.value === 'generating') return store.generateProgress || 0;
   return 100;
 });
-// Tiến trình "đưa prompt" — hoạt ảnh nhỏ chạy ~800ms.
-const transferPct = ref(0);
-let transferTimer = null;
-function runTransferAnim() {
-  clearInterval(transferTimer);
-  transferPct.value = 0;
-  transferTimer = setInterval(() => {
-    transferPct.value = Math.min(100, transferPct.value + 14 + Math.random() * 10);
-    if (transferPct.value >= 100) clearInterval(transferTimer);
-  }, 90);
-}
 
 const flowLabel = computed(() => {
-  if (genFlow.value === 'transferring') return 'Đang đưa prompt sang Tạo Ảnh…';
+  if (genFlow.value === 'armed') return 'Đang chờ xác nhận prompt ở popup…';
   if (genFlow.value === 'generating') {
     const s = store.generateStage;
     if (s === 'preparing') return 'Đang chuẩn bị…';
@@ -72,31 +61,34 @@ const flowLabel = computed(() => {
   return '';
 });
 
+// Bấm nút → mở popup prompt để người dùng XÁC NHẬN / chỉnh sửa. Không tự tạo ngay.
+// genFlow = 'armed' = đang chờ user bấm "Tạo Ảnh" trong popup. Khi popup đóng, huỷ armed.
 async function generateNow() {
   if (genFlow.value !== 'idle' && genFlow.value !== 'done') return; // chống double-click
-  // Ưu tiên prompt gợi ý; nếu chưa có gợi ý thì dùng prompt đang có ở ô Tạo Ảnh.
   const p = lang.value === 'vi' ? store.suggestResult?.prompt_vi : store.suggestResult?.image_prompt_en;
   const prompt = p || store.imagePromptEn;
   if (!prompt) { store.toast('Chưa có prompt — bấm "Gợi ý phong cách & prompt" hoặc nhập ở Tạo Ảnh.', 'error'); return; }
-  // Giai đoạn 1: đưa prompt sang ô Tạo Ảnh + đóng modal prompt (thoát về studio) với hoạt ảnh.
-  genFlow.value = 'transferring';
-  runTransferAnim();
-  store.imagePromptEn = prompt;
-  store.promptOpen = false; // "nhấn tạo ảnh và thoát": không mở modal, tạo ngay tại đây.
-  await new Promise(res => setTimeout(res, 850));
-  // Giai đoạn 2: tạo ảnh.
-  genFlow.value = 'generating';
-  await store.generateImage();
-  // Giai đoạn 3: hoàn tất.
-  genFlow.value = 'done';
-  setTimeout(() => { genFlow.value = 'idle'; transferPct.value = 0; }, 4000);
+  store.imagePromptEn = prompt;     // điền prompt vào ô của popup
+  store.promptOpen = true;           // mở popup xác nhận
+  genFlow.value = 'armed';           // chờ xác nhận
 }
 
-// Khi store.generating về false nhưng genFlow vẫn 'generating' (lỗi) → dọn.
+// Khi popup đóng (user bấm Tạo Ảnh hoặc huỷ) → nếu vẫn armed mà chưa generate → huỷ.
+watch(() => store.promptOpen, (open, wasOpen) => {
+  if (!open && wasOpen && genFlow.value === 'armed' && !store.generating) {
+    genFlow.value = 'idle';          // user đóng popup mà chưa tạo
+  }
+});
+
+// Khi bắt đầu generate (user đã bấm Tạo Ảnh trong popup) → hiện tiến trình tại đây.
 watch(() => store.generating, (g, old) => {
+  if (g && !old && genFlow.value === 'armed') {
+    genFlow.value = 'generating';    // chuyển sang tạo ảnh → hiện stepper
+  }
   if (!g && old && genFlow.value === 'generating') {
+    // generate xong → done, rồi reset.
     genFlow.value = store.generateStage === 'done' ? 'done' : 'idle';
-    setTimeout(() => { if (genFlow.value === 'done') genFlow.value = 'idle'; }, 4000);
+    setTimeout(() => { if (genFlow.value === 'done') { genFlow.value = 'idle'; } }, 4000);
   }
 });
 </script>
@@ -144,11 +136,12 @@ watch(() => store.generating, (g, old) => {
 
     <button @click="store.suggestStyle(store.upscaleSrc)" :disabled="store.suggesting || !store.upscaleSrc" title="Phân tích ảnh và gợi ý phong cách, prompt" class="btn-brand mt-3 w-full">{{ store.suggesting ? 'Đang phân tích…' : 'Gợi ý phong cách & prompt' }}</button>
 
-    <!-- 🚀 Tạo ảnh ngay — gộp 1 nút, luôn hiện: đưa prompt → tạo ảnh → thoát → tiến trình tại đây -->
-    <button @click="generateNow" :disabled="(genFlow !== 'idle' && genFlow !== 'done') || store.generating"
-            title="Đưa prompt sang Tạo Ảnh, tạo ảnh ngay và thoát — tiến trình hiện ngay tại đây"
+    <!-- 🚀 Tạo ảnh ngay — luôn hiện: điền prompt → mở popup xác nhận → bấm Tạo Ảnh → tiến trình tại đây -->
+    <button @click="generateNow" :disabled="genFlow !== 'idle' && genFlow !== 'done'"
+            title="Đưa prompt vào popup Tạo Ảnh để xác nhận / chỉnh sửa, rồi bấm Tạo Ảnh — tiến trình hiện tại đây"
             class="btn-genflow mt-1.5 w-full whitespace-nowrap">
       <span v-if="genFlow === 'idle' || genFlow === 'done'" class="flex items-center justify-center gap-1.5"><span>🚀</span> Tạo ảnh ngay</span>
+      <span v-else-if="genFlow === 'armed'" class="flex items-center justify-center gap-1.5"><span>⏳</span> Chờ xác nhận ở popup…</span>
       <span v-else class="flex items-center justify-center gap-1.5"><span class="genflow-spinner"></span> {{ flowLabel }}</span>
     </button>
 
