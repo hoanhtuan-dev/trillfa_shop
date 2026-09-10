@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useStudioStore } from '../store.js';
 import StudioIcon from './StudioIcon.vue';
 const store = useStudioStore();
@@ -23,6 +23,88 @@ function applyPrompt() {
   if (p) { store.imagePromptEn = p; store.promptOpen = true; }
   else { store.toast('Chưa có prompt.', 'error'); }
 }
+
+// ── Luồng "Tạo ảnh ngay": Gợi ý → Prompt → Tạo ảnh, với tiến trình đẹp mắt ──
+// genFlow: 'idle' | 'transferring' | 'generating' | 'done'
+const genFlow = ref('idle');
+// Bước stepper: [key, icon, label] — active khi tiến trình chạm tới bước đó.
+const steps = [
+  { key: 'suggest', icon: '💡', label: 'Đã gợi ý' },
+  { key: 'transfer', icon: '📋', label: 'Đưa prompt' },
+  { key: 'generate', icon: '🎨', label: 'Tạo ảnh' },
+  { key: 'done', icon: '✅', label: 'Hoàn tất' },
+];
+// Bước đang active dựa trên genFlow + store.generateStage.
+const activeStep = computed(() => {
+  if (genFlow.value === 'transferring') return 1; // đang đưa prompt
+  if (genFlow.value === 'generating') {
+    // generating chia 2 giai đoạn con theo store.generateStage
+    return store.generateStage === 'done' ? 3 : 2;
+  }
+  if (genFlow.value === 'done') return 3;
+  return 0;
+});
+// Phần trăm hiển thị — dùng progress thật từ store khi đang generate.
+const flowPct = computed(() => {
+  if (genFlow.value === 'idle') return 0;
+  if (genFlow.value === 'transferring') return Math.min(100, transferPct.value);
+  if (genFlow.value === 'generating') return store.generateProgress || 0;
+  return 100;
+});
+// Tiến trình "đưa prompt" — hoạt ảnh nhỏ chạy ~800ms.
+const transferPct = ref(0);
+let transferTimer = null;
+function runTransferAnim() {
+  clearInterval(transferTimer);
+  transferPct.value = 0;
+  transferTimer = setInterval(() => {
+    transferPct.value = Math.min(100, transferPct.value + 14 + Math.random() * 10);
+    if (transferPct.value >= 100) clearInterval(transferTimer);
+  }, 90);
+}
+
+const flowLabel = computed(() => {
+  if (genFlow.value === 'transferring') return 'Đang đưa prompt sang Tạo Ảnh…';
+  if (genFlow.value === 'generating') {
+    const s = store.generateStage;
+    if (s === 'preparing') return 'Đang chuẩn bị…';
+    if (s === 'enriching') return 'Đang làm giàu prompt…';
+    if (s === 'rendering') return 'Đang tạo ảnh…';
+    if (s === 'done') return 'Hoàn tất!';
+    return 'Đang tạo ảnh…';
+  }
+  if (genFlow.value === 'done') return '✅ Đã tạo xong — xem kết quả ở Tạo Ảnh / Thư viện.';
+  return '';
+});
+
+async function generateNow() {
+  if (genFlow.value !== 'idle' && genFlow.value !== 'done') return; // chống double-click
+  const p = lang.value === 'vi' ? store.suggestResult?.prompt_vi : store.suggestResult?.image_prompt_en;
+  if (!p) { store.toast('Chưa có prompt. Bấm "Gợi ý phong cách & prompt" trước.', 'error'); return; }
+  if (!store.imagePromptEn || store.imagePromptEn !== p) {
+    // Giai đoạn 1: đưa prompt sang ConceptCard với hoạt ảnh.
+    genFlow.value = 'transferring';
+    runTransferAnim();
+    store.imagePromptEn = p;
+    store.promptOpen = true;
+    // Đợi hoạt ảnh chuyển prompt chạy xong (~800ms) rồi mới generate.
+    await new Promise(res => setTimeout(res, 850));
+  }
+  // Giai đoạn 2: tạo ảnh.
+  genFlow.value = 'generating';
+  await store.generateImage();
+  // Giai đoạn 3: hoàn tất.
+  genFlow.value = 'done';
+  setTimeout(() => { genFlow.value = 'idle'; transferPct.value = 0; }, 4000);
+}
+
+// Khi store.generating về false nhưng genFlow vẫn 'generating' (lỗi) → dọn.
+watch(() => store.generating, (g, old) => {
+  if (!g && old && genFlow.value === 'generating') {
+    genFlow.value = store.generateStage === 'done' ? 'done' : 'idle';
+    setTimeout(() => { if (genFlow.value === 'done') genFlow.value = 'idle'; }, 4000);
+  }
+});
 </script>
 <template>
   <div class="card p-5" style="background: linear-gradient(160deg, rgba(80,150,150,.13), rgba(74,122,144,.06));">
@@ -108,9 +190,160 @@ function applyPrompt() {
           </div>
         </div>
         <p class="max-h-36 overflow-y-auto rounded-md border border-white/10 bg-white/5 p-2 leading-relaxed text-cream-100">{{ lang === 'vi' ? (store.suggestResult.prompt_vi || 'Đang dịch…') : store.suggestResult.image_prompt_en }}</p>
-        <button @click="applyPrompt" title="Đưa prompt vào ô Prompt Tạo Ảnh" class="btn-brand btn-sm mt-2 w-full">Áp dụng → Tạo Ảnh</button>
+        <button @click="applyPrompt" title="Đưa prompt vào ô Prompt Tạo Ảnh" class="btn-ghost btn-sm mt-2 w-full border border-brand-500/30 text-brand-200 hover:bg-brand-900/30">📋 Áp dụng → Tạo Ảnh</button>
+
+        <!-- 🚀 Tạo ảnh ngay — một bấm qua Gợi ý → Prompt → Tạo ảnh, với tiến trình đẹp mắt -->
+        <button @click="generateNow" :disabled="genFlow !== 'idle' && genFlow !== 'done'" title="Đưa prompt sang Tạo Ảnh rồi tạo ảnh ngay"
+                class="btn-genflow mt-1.5 w-full whitespace-nowrap">
+          <span v-if="genFlow === 'idle' || genFlow === 'done'" class="flex items-center justify-center gap-1.5"><span>🚀</span> Tạo ảnh ngay</span>
+          <span v-else class="flex items-center justify-center gap-1.5"><span class="genflow-spinner"></span> {{ flowLabel }}</span>
+        </button>
+
+        <!-- Tiến trình đa giai đoạn (stepper + thanh gradient) -->
+        <transition name="genfade">
+          <div v-if="genFlow !== 'idle'" class="genflow-panel mt-2">
+            <!-- Stepper 4 bước -->
+            <div class="genflow-steps">
+              <template v-for="(s, i) in steps" :key="s.key">
+                <div class="genflow-step" :class="{ active: i <= activeStep, done: i < activeStep }">
+                  <span class="genflow-dot">
+                    <span v-if="i < activeStep" class="genflow-check">✓</span>
+                    <span v-else-if="i === activeStep && genFlow === 'generating'" class="genflow-pulse"></span>
+                    <span v-else>{{ s.icon }}</span>
+                  </span>
+                  <span class="genflow-step-label">{{ s.label }}</span>
+                </div>
+                <div v-if="i < steps.length - 1" class="genflow-connector" :class="{ filled: i < activeStep }"></div>
+              </template>
+            </div>
+            <!-- Thanh gradient + % -->
+            <div class="genflow-bar-wrap">
+              <div class="genflow-bar" :style="{ width: flowPct + '%' }"></div>
+            </div>
+            <p class="genflow-pct">{{ Math.round(flowPct) }}% · {{ flowLabel }}</p>
+          </div>
+        </transition>
+
         <button @click="store.saveSuggestResult()" :disabled="store.suggestSaving" title="Lưu kết quả vào Thư viện Prompt để dùng lại sau" class="btn-ghost btn-sm mt-1.5 w-full border border-emerald-500/30 text-emerald-200 hover:bg-emerald-900/30">{{ store.suggestSaving ? 'Đang lưu…' : '💾 Lưu vào Thư viện Prompt' }}</button>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* ── Nút Tạo ảnh ngay — gradient động, pulse khi đang chạy ── */
+.btn-genflow {
+  position: relative;
+  overflow: hidden;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(120deg, #4a7890, #5b9d6e, #4a7890);
+  background-size: 200% 100%;
+  animation: genflow-gradient 3s ease infinite;
+  transition: transform 0.15s, opacity 0.2s;
+  box-shadow: 0 4px 14px -4px rgba(91, 157, 110, 0.5);
+}
+.btn-genflow:hover:not(:disabled) { transform: translateY(-1px); }
+.btn-genflow:disabled { opacity: 0.85; cursor: progress; background: linear-gradient(120deg, #3a5d70, #4a7d5a, #3a5d70); }
+@keyframes genflow-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+/* Spinner nhỏ trong nút khi đang chạy */
+.genflow-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: genflow-spin 0.7s linear infinite;
+}
+@keyframes genflow-spin { to { transform: rotate(360deg); } }
+
+/* ── Panel tiến trình ── */
+.genflow-panel {
+  border: 1px solid rgba(91, 157, 110, 0.35);
+  background: linear-gradient(160deg, rgba(91,157,110,.12), rgba(74,122,144,.06));
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.6rem 0.55rem;
+}
+/* Stepper */
+.genflow-steps { display: flex; align-items: center; }
+.genflow-step {
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  flex: 0 0 auto;
+  opacity: 0.45; transition: opacity 0.35s, transform 0.35s;
+}
+.genflow-step.active { opacity: 1; transform: scale(1.06); }
+.genflow-step.done { opacity: 0.85; }
+.genflow-dot {
+  display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-size: 12px; line-height: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.2);
+  transition: all 0.35s;
+}
+.genflow-step.active .genflow-dot {
+  background: linear-gradient(135deg, #5b9d6e, #4a7890);
+  border-color: #5b9d6e;
+  box-shadow: 0 0 0 4px rgba(91,157,110,0.18);
+}
+.genflow-step.done .genflow-dot {
+  background: #5b9d6e; border-color: #5b9d6e;
+}
+.genflow-check { color: #fff; font-size: 12px; font-weight: 700; }
+.genflow-step-label { font-size: 9px; color: rgba(245,241,232,0.7); white-space: nowrap; }
+.genflow-step.active .genflow-step-label { color: #bfe8c8; font-weight: 600; }
+
+/* Chấm pulse ở bước đang chạy */
+.genflow-pulse {
+  display: block; width: 8px; height: 8px; border-radius: 50%;
+  background: #fff;
+  animation: genflow-pulse 1s ease-in-out infinite;
+}
+@keyframes genflow-pulse {
+  0%, 100% { transform: scale(0.6); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Đường nối giữa các bước */
+.genflow-connector {
+  flex: 1 1 auto; height: 2px; margin: 0 4px 14px;
+  background: rgba(255,255,255,0.12); border-radius: 2px;
+  position: relative; overflow: hidden;
+}
+.genflow-connector.filled::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, #5b9d6e, #4a7890);
+  animation: genflow-fill 0.5s ease forwards;
+}
+@keyframes genflow-fill { from { transform: scaleX(0); transform-origin: left; } to { transform: scaleX(1); } }
+
+/* Thanh tiến trình chính */
+.genflow-bar-wrap {
+  margin-top: 0.5rem; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.1); overflow: hidden;
+}
+.genflow-bar {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #5b9d6e, #6ec9a8, #4a7890);
+  background-size: 200% 100%;
+  animation: genflow-shimmer 1.8s linear infinite;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(110,201,168,0.5);
+}
+@keyframes genflow-shimmer {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+.genflow-pct { margin-top: 0.35rem; font-size: 10px; color: rgba(245,241,232,0.6); text-align: center; }
+
+/* Transition xuất/biến mất của panel */
+.genfade-enter-active, .genfade-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+.genfade-enter-from, .genfade-leave-to { opacity: 0; transform: translateY(-6px); }
+</style>
